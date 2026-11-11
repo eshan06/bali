@@ -158,8 +158,14 @@ class CoversTest {
         never(holder(Intent(EMERGENCY_DIALER)), { shell("am start -a $EMERGENCY_DIALER") })
         // Emergency information, where the image has a system app for it: the Safety app's own screen on Android 17's.
         context.packageManager.resolveActivity(Intent(EMERGENCY_ASSISTANCE), 0)?.let { never(it.activityInfo.packageName, { shell("am start -a $EMERGENCY_ASSISTANCE") }) }
-        // Then the call at once, from Messages, as a student who has texted for help calls (AN7g).
-        never(checkNotNull(Telephony.Sms.getDefaultSmsPackage(context)), { shell("am start -a android.intent.action.SENDTO -d smsto:5551234") }) {}
+        // Then the call at once, from Messages, as a student who has texted for help calls (AN7g). Messages opens the number's
+        // conversation by itself, each of its activities starting the next (on Android 16's and 17's, one after asking the
+        // network whether the number is a business's), and the last, a main screen made anew, would come up over the in-call
+        // screen. So the call waits until Android has resumed that one, not one left from before: nothing of the link is left.
+        val before = records(MESSAGES_CONVERSATION)
+        never(checkNotNull(Telephony.Sms.getDefaultSmsPackage(context)), { shell("am start -a android.intent.action.SENDTO -d smsto:5551234") }) {
+            until { Unit.takeIf { resumed()?.let { (record, activity) -> activity == MESSAGES_CONVERSATION && record !in before } == true } }
+        }
         // A call, to the emulator's own pretend network: the in-call screen, a window of the dialer's own.
         val calling = System.currentTimeMillis()
         try {
@@ -379,6 +385,14 @@ class CoversTest {
     /** The window with the focus, as `dumpsys window` names it. */
     private fun focused(): String = shell("dumpsys window").lineSequence().firstOrNull { "mCurrentFocus" in it }.orEmpty()
 
+    /** The activity Android has resumed on top, its record and its name, as `dumpsys activity activities` names them. */
+    private fun resumed(): Pair<String, String>? =
+        Regex("""^\s*ResumedActivity: ActivityRecord\{(\w+) u0 (\S+) t-?\d+\}""", RegexOption.MULTILINE).find(shell("dumpsys activity activities"))?.groupValues?.let { it[1] to it[2] }
+
+    /** The records Android holds now of [activity], as `dumpsys activity activities` names them. */
+    private fun records(activity: String): Set<String> =
+        Regex("""ActivityRecord\{(\w+) u0 ${Regex.escape(activity)} """).findAll(shell("dumpsys activity activities")).map { it.groupValues[1] }.toSet()
+
     /** How many covers the window manager holds: each window's own line in `dumpsys window windows`. */
     private fun coversOnScreen(): Int = Regex("""Window #\d+ Window\{\w+ u0 ${Covers.TITLE}\}""").findAll(shell("dumpsys window windows")).count()
 
@@ -451,6 +465,9 @@ class CoversTest {
 
         /** A system app the allow-list never holds, which opens on these emulators with no prompt of its own in front. */
         const val BLOCKED = "com.google.android.contacts/com.android.contacts.activities.PeopleActivity"
+
+        /** Where Google Messages, these emulators' SMS app, ends a number's link: the conversation, on a main screen made anew. */
+        const val MESSAGES_CONVERSATION = "com.google.android.apps.messaging/.main.MainActivity"
         val PATIENCE = 30.seconds
     }
 }
