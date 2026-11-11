@@ -28,7 +28,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 // C4: Delete account through the engine (AN9b), over the real sign-in: the API, Cognito's token endpoint and its
 // DeleteUser all answered by hand by the rig's one server. BaliOutbox's DeleteAccountTests, and new: a run cancelled
 // while its sends are out, the caller cancelled, a sign-in of another account landing meanwhile, Cognito's
-// NotAuthorizedException then `invalid_grant`, and a token renewed for the deletion.
+// NotAuthorizedException then `invalid_grant`, and a token renewed for the deletion. And AN9h's (the owner, 2026-11-10:
+// "Close it now"): another account's sign-in landing before `DELETE /v1/me` is answered deleted, which stops the
+// deletion, nothing sent under that sign-in, and a renewal of the same account, which doesn't.
 
 val deleteMeRoute = "DELETE /v1/me"
 
@@ -55,6 +57,17 @@ fun SignedRig.deleting(): Deferred<AccountDeletion> = scope.async { engine.delet
 
 /** The deletion's answer; none in time fails the test rather than hanging it. */
 suspend fun Deferred<AccountDeletion>.answer(): AccountDeletion = withTimeoutOrNull(patience) { await() } ?: fail("the deletion never answered")
+
+/** The routes [SignedRig.server] saw under [access], or renewing [refresh]: another account's sign-in, in these tests. */
+fun SignedRig.sentUnder(access: String, refresh: String): List<String> =
+    server.sent.filter { it.token == "Bearer $access" || "refresh_token=$refresh" in it.request.body?.decodeToString().orEmpty() }.map { it.route }
+
+/** [call]'s answer once it comes, failing at once should anything be sent before it: the server sees nothing meanwhile. */
+suspend fun <T> SignedRig.answerSendingNothing(call: Deferred<T>): T {
+    eventually { call.isCompleted || server.waiting.isNotEmpty() }
+    assertEquals(emptyList(), server.waiting, "sent once the sign-in changed")
+    return call.await()
+}
 
 /** Delete account through the engine (C4): BaliOutbox's DeleteAccountTests. */
 class DeleteAccountTest : EngineFiles() {
@@ -606,8 +619,146 @@ class DeleteAccountTest : EngineFiles() {
             rig.stop()
         }
 
+    @Test
+    fun aSignInOfAnotherAccountLandingAsTheOutboxGoesStopsTheDeletionNothingMoreSentNorRenewedUnderItNobodyDeletedOrMarkedEveryRecordKept(): Unit =
+        runBlocking {
+            // The owner, 2026-11-10: "Close it now" (AN9h). b1 signs in while the unlock the deletion sends first is out, which
+            // then gets no answer, or a 401: the report behind it would go under b1's token, or the 401 renew b1's sign-in.
+            // Neither goes, and the deletion stops with an answer of its own, whose screen has no Try again.
+            for (status in listOf(null, 401)) {
+                val rig = signedRig()
+                val (off, unlock) = rig.queuedThenHeld()
+                val deletion = rig.deleting()
+                val sent = rig.server.next(unlockRoute)
+                assertEquals(listOf(unlock.eventId, "Bearer ${scoped("a1")}"), listOf(sent.eventId, sent.token), "$status")
+                withTimeout(patience) { rig.signStudentIn(scoped("b1"), refresh = "refresh-b") }
+                sent.reply(status)
+                assertEquals("SignInChanged", "${rig.answerSendingNothing(deletion)}", "$status")
+                rig.nobodyDeleted("$status")
+                assertEquals(setOf(off.eventId, unlock.eventId), rig.outbox.records().map { it.eventId }.toSet(), "$status")
+                rig.stop()
+            }
+        }
+
+    @Test
+    fun aSignInOfAnotherAccountLandingWhileASendsRenewalIsOutStopsTheDeletionTheRenewalAboutTokensLetGoNothingMoreSentEveryRecordKept(): Unit =
+        runBlocking {
+            // AN9h: the unlock refused with a 401, the renewal of a1's sign-in out as b1 signs in.
+            val rig = signedRig()
+            val (off, unlock) = rig.queuedThenHeld()
+            val deletion = rig.deleting()
+            rig.server.next(unlockRoute).reply(401)
+            val renewal = rig.server.next(tokenRoute)
+            assertTrue("refresh_token=refresh-1" in renewal.request.body?.decodeToString().orEmpty())
+            withTimeout(patience) { rig.signStudentIn(scoped("b1"), refresh = "refresh-b") }
+            renewal.reply(200, grant(scoped("a1", issued = 1_000_000_100)))
+            assertEquals("SignInChanged", "${rig.answerSendingNothing(deletion)}")
+            rig.nobodyDeleted("the renewal out")
+            assertEquals(setOf(off.eventId, unlock.eventId), rig.outbox.records().map { it.eventId }.toSet())
+            rig.stop()
+        }
+
+    @Test
+    fun aSignInOfAnotherAccountLandingAsDeleteMesTokenIsRenewedStopsTheDeletionNoDeleteMeEverSentNobodyDeleted(): Unit =
+        runBlocking {
+            // AN9h: nothing queued, so DELETE /v1/me is the deletion's first send, its token expired and renewed first as b1
+            // signs in.
+            val rig = signedRig()
+            rig.signedIn()
+            withTimeout(patience) { rig.running.cancelAndJoin() }
+            rig.clock.advance(3600) // a1 has expired
+            val deletion = rig.deleting()
+            val renewal = rig.server.next(tokenRoute)
+            withTimeout(patience) { rig.signStudentIn(scoped("b1"), refresh = "refresh-b") }
+            renewal.reply(200, grant(scoped("a1", issued = 1_000_003_600)))
+            assertEquals("SignInChanged", "${rig.answerSendingNothing(deletion)}")
+            rig.nobodyDeleted("the token renewed")
+            assertTrue(rig.server.sent.none { it.route == deleteMeRoute })
+            rig.stop()
+        }
+
+    @Test
+    fun aSignInOfAnotherAccountLandingWhileDeleteMeIsOutThenAnsweredAnythingButDeletedStopsTheDeletionItsRenewalNeverTheOthers(): Unit =
+        runBlocking {
+            // AN9h: AN9b's call stands for a DELETE /v1/me answered deleted (above). A 401, whose renewal would be b1's, or no
+            // answer, whose Try again would delete b1, stops the deletion with nothing more sent.
+            for (status in listOf(401, null)) {
+                val rig = signedRig()
+                rig.signedIn()
+                withTimeout(patience) { rig.running.cancelAndJoin() }
+                val deletion = rig.deleting()
+                val delete = rig.server.next(deleteMeRoute)
+                assertEquals("Bearer ${scoped("a1")}", delete.token, "$status")
+                withTimeout(patience) { rig.signStudentIn(scoped("b1"), refresh = "refresh-b") }
+                delete.reply(status)
+                assertEquals("SignInChanged", "${rig.answerSendingNothing(deletion)}", "$status")
+                rig.nobodyDeleted("$status")
+                rig.stop()
+            }
+        }
+
+    @Test
+    fun aRenewalOfTheSameAccountDuringTheDeletionKeepsItGoingUnderTheRenewedTokenARotatedRefreshTokenTooDeleteUserSendingTheSignInsOwn(): Unit =
+        runBlocking {
+            // AN9h: the account is the sign-in's `sub`, so the deletion goes on through its renewals, its refresh token rotated
+            // or not; DeleteUser sends the tokens of the refresh token held as it begins (Q4).
+            val rig = signedRig()
+            rig.signedIn()
+            rig.engine.record(Change.ProtectionOff("s"))
+            rig.server.next(protectionOffRoute).reply(null)
+            rig.until { it.retryAt == at(2) }
+            withTimeout(patience) { rig.running.cancelAndJoin() }
+            rig.clock.advance(3600) // a1 has expired: renewed for the report the deletion sends
+            val deletion = rig.deleting()
+            val first = rig.server.next(tokenRoute)
+            assertTrue("refresh_token=refresh-1" in first.request.body?.decodeToString().orEmpty())
+            val renewed = scoped("a1", issued = 1_000_003_600)
+            first.reply(200, grant(renewed))
+            val report = rig.server.next(protectionOffRoute)
+            assertEquals("Bearer $renewed", report.token)
+            rig.clock.advance(3600) // expired again as the report lands: renewed for DELETE /v1/me, Cognito rotating the refresh token
+            report.reply(200, Answer.protectionOff())
+            val second = rig.server.next(tokenRoute)
+            assertTrue("refresh_token=refresh-1" in second.request.body?.decodeToString().orEmpty())
+            val again = scoped("a1", issued = 1_000_007_200)
+            second.reply(200, grant(again, refresh = "refresh-2"))
+            val delete = rig.server.next(deleteMeRoute)
+            assertEquals("Bearer $again", delete.token)
+            delete.reply(200, deletedAnswer)
+            val cognito = rig.server.next(deleteUserRoute)
+            assertTrue(again in cognito.request.body?.decodeToString().orEmpty())
+            cognito.reply(200, "{}")
+            assertEquals(AccountDeletion.Deleted, deletion.answer())
+            assertTrue(rig.keychain.isEmpty)
+            rig.stop()
+        }
+
     private companion object {
         /** The outbox's read of everything queued, as Room's DAO prepares it. */
         const val RECORDS = "ORDER BY COALESCE(orderSeq, seq), seq"
     }
+}
+
+/**
+ * Signed in as a1 in session `s`, a report tried and kept, then an Emergency Unlock held behind it, and the loops ended,
+ * so the deletion's are the only sends from here: the report and the unlock, as the outbox holds them.
+ */
+private suspend fun SignedRig.queuedThenHeld(): Pair<OutboxRecord, OutboxRecord> {
+    signedIn(me = Answer.me())
+    until { it.standing == Standing.InSession(session(), ParticipationState.Focused) }
+    val off = assertNotNull(engine.record(Change.ProtectionOff("s")))
+    server.next(protectionOffRoute).reply(null)
+    until { it.retryAt == at(2) }
+    val unlock = assertNotNull(engine.emergencyUnlock())
+    withTimeout(patience) { running.cancelAndJoin() }
+    return off to unlock
+}
+
+/** b1, signed in as a1's deletion ran: nothing sent under b1's sign-in, nothing deleted but by a1's token, b1 neither marked nor gone. */
+private suspend fun SignedRig.nobodyDeleted(case: String) {
+    assertEquals(emptyList(), sentUnder(scoped("b1"), "refresh-b"), case)
+    assertTrue(server.sent.none { it.route == deleteMeRoute && it.token != "Bearer ${scoped("a1")}" || it.route == deleteUserRoute }, case)
+    assertFalse(signIn.deletionPending(), case)
+    assertEquals("b1", signIn.account(), case)
+    assertFalse(keychain.isEmpty, case)
 }

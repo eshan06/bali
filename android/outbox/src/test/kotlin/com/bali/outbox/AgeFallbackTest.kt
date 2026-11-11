@@ -22,7 +22,8 @@ import kotlinx.coroutines.withTimeout
 // app's is, and the API and Cognito answered by hand. BaliOutbox's AgeFallbackTests, their 200 ms waits replaced by a
 // point the rig or the state marks, and new: the check's own read renewed, a yes's 401, 408 and 429, a yes kept going
 // nowhere while a deletion runs, a run cancelled while its yes is out, an ask that throws or ends in a cancel of its
-// own, and the check never standing between a student and Emergency Unlock.
+// own, and the check never standing between a student and Emergency Unlock. And AN9h's: the read and the yes of one
+// account never under another account's sign-in (the owner, 2026-11-10: "Close it now").
 
 val ageCheckRoute = "GET /v1/me/age-check"
 val recordAgeCheckRoute = "PUT /v1/me/age-check"
@@ -360,6 +361,81 @@ class AgeFallbackTest : EngineFiles() {
             assertEquals(true, reading.await().answer?.passed)
             rig.stop()
         }
+
+    @Test
+    fun theChecksReadForOneAccountGoesUnderNoOtherAccountsTokenNorRenewsItsSignInOneLandingWhileItsRenewalOrTheReadIsOutAskedItself(): Unit =
+        runBlocking {
+            // The owner, 2026-11-10: "Close it now" (AN9h). a1's read refused with a 401, its renewal of a1's sign-in out as b1
+            // signs in: the read isn't sent again under b1's token. Or b1 signs in while the read is out, then the 401: b1's
+            // sign-in isn't renewed for it. b1 is asked itself, its own read under its own token.
+            for (renewalOut in listOf(true, false)) {
+                val rig = signedRig(gated = true)
+                rig.signStudentIn(accessToken("a1"))
+                rig.until { it.link == Link.SignIn && it.meFailed == SendResult.NetworkError }
+                val asking = async { rig.engine.ageCheck() }
+                val read = rig.server.next(ageCheckRoute)
+                assertEquals("Bearer ${accessToken("a1")}", read.token, "$renewalOut")
+                if (renewalOut) {
+                    read.reply(401)
+                    val renewal = rig.server.next(tokenRoute)
+                    withTimeout(patience) { rig.signStudentIn(accessToken("b1"), refresh = "refresh-b") }
+                    renewal.reply(200, grant(accessToken("a1")))
+                } else {
+                    withTimeout(patience) { rig.signStudentIn(accessToken("b1"), refresh = "refresh-b") }
+                    read.reply(401)
+                }
+                val answer = rig.answerSendingNothing(asking)
+                assertEquals(if (renewalOut) SendResult.NetworkError else SendResult.Status(401), answer.result, "$renewalOut")
+                assertEquals(emptyList(), rig.sentUnder(accessToken("b1"), "refresh-b"), "$renewalOut")
+                val own = async { rig.engine.ageCheck() }
+                val asked = rig.server.next(ageCheckRoute)
+                assertEquals("Bearer ${accessToken("b1")}", asked.token, "$renewalOut")
+                asked.reply(200, """{"passed":false}""")
+                assertEquals(false, own.await().answer?.passed, "$renewalOut")
+                rig.stop()
+            }
+        }
+
+    @Test
+    fun aYesForOneAccountGoesUnderNoOtherAccountsTokenNorRenewsItsSignInOneSignedInMeanwhileAskedItselfNothingOfTheFirstsRecordedForIt(): Unit =
+        runBlocking {
+            // The owner, 2026-11-10: "Close it now" (AN9h). a1's yes refused with a 401, its renewal of a1's sign-in out as b1
+            // signs in, is asked itself and passes: the yes isn't sent again under b1's token. Or b1 signs in and passes while
+            // the yes is out, then the 401: b1's sign-in isn't renewed for it. The next request is b1's own read of the truth.
+            for (renewalOut in listOf(true, false)) {
+                val rig = signedRig(gated = true)
+                rig.signStudentIn(accessToken("a1"), yes = "y1")
+                val yes = yesOnItsWay(rig)
+                assertEquals(listOf("y1", "Bearer ${accessToken("a1")}"), listOf(yes.eventId, yes.token), "$renewalOut")
+                if (renewalOut) {
+                    yes.reply(401)
+                    val renewal = rig.server.next(tokenRoute)
+                    b1AskedItselfAndPassed(rig)
+                    renewal.reply(200, grant(accessToken("a1")))
+                } else {
+                    b1AskedItselfAndPassed(rig)
+                    yes.reply(401)
+                }
+                val next = rig.server.next()
+                assertEquals(listOf(meRoute, "Bearer ${accessToken("b1")}"), listOf(next.route, next.token), "$renewalOut")
+                next.reply(200, Answer.me(null))
+                noYesAtTheNextWake(rig)
+                assertEquals(listOf("Bearer ${accessToken("a1")}"), rig.server.sent.filter { it.route == recordAgeCheckRoute }.map { it.token }, "$renewalOut")
+                assertEquals(emptyList(), rig.server.sent.filter { "refresh_token=refresh-b" in it.request.body?.decodeToString().orEmpty() }.map { it.route })
+                rig.stop()
+            }
+        }
+}
+
+/** b1 signs in, is asked itself, its own read under its own token, and passes (C7-server). */
+private suspend fun b1AskedItselfAndPassed(rig: SignedRig) {
+    withTimeout(patience) { rig.signStudentIn(accessToken("b1"), refresh = "refresh-b") }
+    val asking = rig.scope.async { rig.engine.ageCheck() }
+    val read = rig.server.next(ageCheckRoute)
+    assertEquals("Bearer ${accessToken("b1")}", read.token)
+    read.reply(200, ageCheckPassed)
+    assertEquals(true, asking.await().answer?.passed)
+    rig.signIn.passed("b1")
 }
 
 /**
