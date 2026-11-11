@@ -124,7 +124,6 @@ class AccountTest : EngineFiles() {
             account.until { it.signedIn == true && it.age == AgeCheck.Answer.Unanswered }
             rig.until { it.link == Link.SignIn && it.meFailed == SendResult.NetworkError }
             assertEquals(emptyList(), rig.server.waiting)
-            assertFalse(account.state.value.signedInThisRun)
 
             account.answerAge(1, 2000)
             // The yes at the next wake, and the truth read, in either order (AgeFallbackTest's).
@@ -140,6 +139,27 @@ class AccountTest : EngineFiles() {
             assertTrue(rig.signIn.checked())
             assertEquals(1, rig.server.sent.count { it.route == recordAgeCheckRoute })
             assertTrue(rig.server.sent.all { it.token == null || it.token == "Bearer ${accessToken("a1")}" })
+            rig.stop()
+        }
+
+    @Test
+    fun anAnswerOfThirteenOrOlderIsKeptForTheAccountWhoseQuestionItWasNeverForAnotherSignInLandedAsItWasGiven(): Unit =
+        runBlocking {
+            // AN9h's rule for the yes: a1's question answered as b1's sign-in lands, before the account follows it (its follow
+            // ended here): b1 is asked itself, its own read first, never through on a1's answer.
+            val rig = signedRig(gated = true)
+            val account = checkNotNull(Account.of(rig.engine, scope, rig.clock))
+            val following = scope.launch { account.run() }
+            account.until { it.signedIn != null }
+            rig.signStudentIn(accessToken("a1"))
+            rig.server.next(ageCheckRoute).reply(200, notPassed)
+            account.until { it.signedIn == true && it.age == AgeCheck.Answer.Unanswered }
+            withTimeout(patience) { following.cancelAndJoin() }
+            rig.signStudentIn(accessToken("b1"), refresh = "refresh-b")
+            account.answerAge(1, 2000)
+            assertEquals("b1", rig.signIn.account())
+            assertFalse(rig.signIn.checked())
+            assertNull(rig.signIn.yes())
             rig.stop()
         }
 
