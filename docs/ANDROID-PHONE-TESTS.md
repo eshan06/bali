@@ -163,7 +163,9 @@ readout starts a sign-in, on both phones, each with its browser and that browser
 
 AN7f's device check (`docs/PLAN-ANDROID.md`), on both phones, a Debug build on each, offline before
 AN9 and on dev after it (`docs/DECISIONS.md`, 2026-11-05, Q8). AN7c, AN7d and AN7e each add what the
-emulators couldn't answer, and AN7f adds B5 round 1's steps in Android's terms.
+emulators couldn't answer, and AN7f adds B5 round 1's steps in Android's terms. On dev, this round and
+AN8's sign in as a student account that passed the 13+ check on an iPhone: the yes is kept per account, on
+the server, and the readout has no 13+ button before AS2 (`docs/DECISIONS.md`, 2026-11-05, AN9a's Q7).
 
 **The service (AN7c),** each part opening with its starting state as the header asks; a session's tap
 is typed in the Debug readout (AN7d), or scanned from a block (AN8):

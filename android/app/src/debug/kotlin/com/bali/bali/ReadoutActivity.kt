@@ -21,6 +21,10 @@ import androidx.core.content.edit
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.bali.core.BlockRead
+import com.bali.core.EnrollmentJoinRequest
+import com.bali.core.EventId
+import com.bali.outbox.Account
+import com.bali.outbox.AgeCheck
 import com.bali.outbox.Change
 import com.bali.outbox.Enforcer
 import com.bali.outbox.Protection
@@ -37,6 +41,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -48,8 +53,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * own, until Phase 10's screens: a developer's words, never a student's, and nothing a teacher sees, as iOS's
  * (DECISIONS 2026-09-25, B4c; 2026-11-05, AN7d). Plain Views: today's Compose needs compileSdk 37. In front,
  * it tells the app ([BaliApp.front]), which reads the truth and runs rule 3's check. Its Scan reads a block over
- * NFC and taps it, and Read block code only reads one, for registering it (AN8). Not here: Join and History
- * (AN9's), and iOS's marker, asks and monitor, which have no twin.
+ * NFC and taps it, and Read block code only reads one, for registering it (AN8). Its Join joins a typed code,
+ * and History reads the last five moments (AN9i); its Signed in line reads the run's account and names the 13+
+ * check (Q3), which has no button before AS2's question, and Delete account isn't here: AS7's. Not here: iOS's
+ * marker, asks and monitor, which have no twin.
  */
 // Lint's SetTextI18n guards the words a student reads and a translator translates: these are a developer's alone.
 @SuppressLint("SetTextI18n")
@@ -61,15 +68,16 @@ class ReadoutActivity : ComponentActivity() {
     internal lateinit var readCode: Button
     internal lateinit var blockTag: EditText
     internal lateinit var tap: Button
+    internal lateinit var joinCode: EditText
+    internal lateinit var join: Button
     internal lateinit var unlock: Button
+    internal lateinit var history: Button
     internal lateinit var shortCap: CheckBox
     internal lateinit var tryAgain: Button
-    private var signedIn = "not known yet"
     private var drawing: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (app.signIn == null) signedIn = "sign-in isn't set up in this build"
         lines = TextView(this).apply { typeface = Typeface.MONOSPACE }
         signIn = button("Sign in") { signingIn() }
         val signOut = button("Sign out") { app.signIn?.let { it.signOut(); "signed out" } ?: "sign-in isn't set up in this build: nobody to sign out" }
@@ -81,22 +89,27 @@ class ReadoutActivity : ComponentActivity() {
         blockTag = EditText(this).apply { hint = "Block tag"; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS }
         // The tag read here, on the main thread, before the trigger goes.
         tap = Button(this).apply { text = "Tap"; setOnClickListener { blockTag.text.toString().trim().let { typed -> act { tapped(typed) } } } }
+        joinCode = EditText(this).apply { hint = "Join code"; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS }
+        // The code read here, on the main thread, before the trigger goes.
+        join = Button(this).apply { text = "Join"; setOnClickListener { joinCode.text.toString().trim().let { typed -> act { joined(typed) } } } }
         unlock = button("Emergency Unlock") { if (app.running.value?.engine?.emergencyUnlock() == null) "nothing to unlock" else "recorded" }
+        history = button("History") { history() }
         shortCap = CheckBox(this).apply { text = "Cap a tap at 15 min (phone check)"; isChecked = cap(context) != null; setOnCheckedChangeListener { _, on -> capped(on) } }
         tryAgain = button("Try again") { app.begin(); app.startFailed.value?.let { "start failed again: $it" } ?: "started" }
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(PAD, PAD, PAD, PAD) }
-        listOf(lines, row(signIn, signOut), settings, row(scan, readCode), row(blockTag, tap), unlock, shortCap, tryAgain).forEach(column::addView)
+        listOf(lines, row(signIn, signOut), settings, row(joinCode, join), row(scan, readCode), row(blockTag, tap), unlock, history, shortCap, tryAgain)
+            .forEach(column::addView)
         setContentView(ScrollView(this).apply { fitsSystemWindows = true; addView(column) })
     }
 
-    // Drawn while it shows: at each note and change of the sign-in, and each second, the service and the launch read
-    // live, as iOS's timeline reads its own.
+    // Drawn while it shows: at each note and change of the run's account, and each second, the service and the launch
+    // read live, as iOS's timeline reads its own.
     override fun onStart() {
         super.onStart()
         drawing =
             lifecycleScope.launch {
                 launch { note.collect { draw() } }
-                launch { app.signIn?.signedIn()?.collect { signedIn = if (it) "yes" else "no"; draw() } }
+                launch { app.running.collectLatest { run -> run?.account?.state?.collect { draw() } } }
                 while (true) {
                     draw()
                     delay(REDRAW)
@@ -128,10 +141,10 @@ class ReadoutActivity : ComponentActivity() {
         lines.text =
             listOf(
                 "Debug readout — temporary",
-                "Engine: ${engine(run != null)}",
+                "Engine: ${engine(run)}",
                 "Link: ${state?.link ?: "no exchange yet"}",
                 "Server last answered: ${state?.heardAt?.let(::time) ?: "never"}",
-                "Signed in: $signedIn",
+                "Signed in: ${signedIn(run?.account?.state?.value)}",
                 "Standing: ${standing(state)}",
                 "Lock: ${claim(run?.enforcer?.updates?.value)}",
                 "Service: ${service()}",
@@ -144,10 +157,28 @@ class ReadoutActivity : ComponentActivity() {
         tryAgain.isVisible = run == null && app.startFailed.value != null
     }
 
-    private fun engine(running: Boolean): String =
+    /** Who is signed in, and the 13+ check as the run's account has it (Q3): there's no button for it before AS2. */
+    private fun signedIn(account: Account.State?): String {
+        if (account == null) return if (app.signIn == null) "sign-in isn't set up in this build" else "not known yet"
+        return when (account.signedIn) {
+            null -> "not known yet"
+            false -> "no"
+            true ->
+                "yes · 13+ check: " +
+                    when (account.age) {
+                        AgeCheck.Answer.Passed -> "through"
+                        AgeCheck.Answer.Checking -> "asking Bali for this account's yes"
+                        AgeCheck.Answer.TooYoung -> "answered under 13 this run: its account's deletion"
+                        AgeCheck.Answer.Unanswered, AgeCheck.Answer.Asked -> "not through: Bali's API gets no token until it's answered (AS2's question)"
+                    }
+        }
+    }
+
+    // The run's own: an engine with no sign-in has no account.
+    private fun engine(run: BaliApp.Running?): String =
         when {
-            !running -> app.startFailed.value?.let { "start failed: $it" } ?: "not running"
-            app.signIn == null -> "over no token, as a signed-out phone: sign-in isn't set up, so nothing is sent"
+            run == null -> app.startFailed.value?.let { "start failed: $it" } ?: "not running"
+            run.account == null -> "over no token, as a signed-out phone: sign-in isn't set up, so nothing is sent"
             else -> "over the sign-in"
         }
 
@@ -197,6 +228,23 @@ class ReadoutActivity : ComponentActivity() {
         val engine = app.running.value?.engine ?: return "no engine: nothing recorded"
         if (typed.isEmpty()) return "type a block's tag first"
         return if (engine.record(Change.Tap(typed)) == null) "nothing new to send" else "recorded"
+    }
+
+    /** A class joined with the code [typed], through the engine, as the Join screen joins one (its look-up first is AS4's): in `me` at once. */
+    private suspend fun joined(typed: String): String {
+        val engine = app.running.value?.engine ?: return "no engine: nothing joined"
+        if (typed.isEmpty()) return "type a join code first"
+        val now = Instant.now()
+        val joined = engine.join(EnrollmentJoinRequest(typed, EventId.mint(now), now))
+        return joined.answer?.let { "joined ${it.schoolClass.name}" } ?: "not joined: ${joined.result} ${joined.error?.error?.message.orEmpty()}".trim()
+    }
+
+    /** The student's latest moments, as `GET /v1/me/history` gives them, newest first: each its wire name and when. */
+    private suspend fun history(): String {
+        val engine = app.running.value?.engine ?: return "no engine: no history read"
+        val page = engine.client.history(limit = 5)
+        val events = page.answer?.events ?: return "history not read: ${page.result}"
+        return events.joinToString(" · ") { "${it.type.wire} ${time(it.occurredAt)}" }.ifEmpty { "history: no moments yet" }
     }
 
     /**

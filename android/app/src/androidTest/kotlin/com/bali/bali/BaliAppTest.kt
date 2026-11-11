@@ -1,19 +1,28 @@
 package com.bali.bali
 
+import android.content.pm.FeatureInfo
 import android.content.pm.PackageManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.bali.core.AppConfig
+import com.bali.core.SendResult
+import com.bali.outbox.AgeCheck
 import com.bali.outbox.Link
+import com.bali.outbox.SyncEngine
 import com.bali.outbox.SyncState
 import java.io.IOException
 import java.net.URI
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -59,6 +68,18 @@ class BaliAppTest {
         assertEquals(app.config == null, app.signIn == null)
         val config = checkNotNull(AppConfig.from(built + (AppConfig.Key.CognitoClientId.key to clientId.ifEmpty { "client" })))
         assertEquals(URI("com.bali.bali:/auth/callback"), config.cognito.redirectUri)
+        // The portal's address since the owner's ruling (2026-11-07, #540).
+        assertEquals(URI("https://app.getbali.app"), config.portal)
+    }
+
+    // NFC required (the owner, 2026-11-10), so Play offers Bali to phones with NFC alone. Play's filter alone: an install
+    // over adb still goes on a phone with none, as on these emulators, where the suite runs at all.
+    @Test
+    fun theInstalledManifestRequiresNfc() {
+        @Suppress("DEPRECATION")
+        val features = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_CONFIGURATIONS).reqFeatures.orEmpty()
+        val nfc = features.single { it.name == PackageManager.FEATURE_NFC }
+        assertEquals(FeatureInfo.FLAG_REQUIRED, nfc.flags and FeatureInfo.FLAG_REQUIRED)
     }
 
     // The build's client id stays empty until the owner's (docs/DEPLOY.md): until then a Debug build's start
@@ -73,6 +94,8 @@ class BaliAppTest {
             assertTrue(context.getDatabasePath(OUTBOX_FILE).exists())
             app.begin()
             val engine = checkNotNull(app.running.value).engine
+            // An engine with no sign-in has no account half to run.
+            assertNull(checkNotNull(app.running.value).account)
             // The truth read, as Bali in front reads it: never sent, for want of a token, so waiting on sign-in.
             engine.setInFront(true)
             until { engine.updates.value.takeIf { it.link == Link.SignIn } }
@@ -141,4 +164,53 @@ class BaliAppTest {
             app.begin()
             assertEquals(SyncState.TAP_CAP, checkNotNull(app.running.value).engine.updates.value.cap)
         }
+
+    // BaliApp.swift's start: one account a run, over the engine's sign-in, run in the run's job, which hooks the 13+ check's
+    // ask at each of the engine's wakes and follows each sign-in. Over a sign-in, a server and a file of the test's own
+    // (TestSignIn.kt), as none of the emulators can sign in.
+    @Test
+    fun aRunsStartRunsItsAccountWhichFollowsEachSignInAndAsksBaliForTheCheckAgainAtEachWake(): Unit =
+        runBlocking {
+            val server = Server()
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            context.deleteDatabase(FILE)
+            val outbox = context.outbox(FILE)
+            try {
+                val signIn = testSignIn(server, scope)
+                val engine = SyncEngine.make(outbox, URI(API), signIn, scope, server)
+                app.start(engine, scope)
+                val account = checkNotNull(checkNotNull(app.running.value).account)
+                until { account.state.value.takeIf { it.signedIn == false } }
+                server.signStudentIn(signIn, scope, "student-1")
+                // Not through the check: Bali asked under the student's own account, the starting mark meanwhile.
+                val first = server.next(AGE_CHECK)
+                assertEquals("Bearer ${accessToken("student-1")}", first.token)
+                until { account.state.value.takeIf { it.signedIn == true && it.age == AgeCheck.Answer.Checking } }
+                // The sign-in's own wake over (its read found no token) before Bali goes unanswered: asked again at the next.
+                until { engine.updates.value.takeIf { it.meFailed == SendResult.NetworkError } }
+                first.drop()
+                until { account.state.value.takeIf { it.age == AgeCheck.Answer.Unanswered } }
+                engine.retryNow()
+                server.next(AGE_CHECK).reply(200, PASSED)
+                until { account.state.value.takeIf { it.age == AgeCheck.Answer.Passed } }
+                // Through: Bali's API given the student's token.
+                assertEquals("Bearer ${accessToken("student-1")}", server.next("GET /v1/me").token)
+                // Signed out, then another student signed in: each followed, the other asked under their own account.
+                signIn.signOut()
+                until { account.state.value.takeIf { it.signedIn == false } }
+                server.signStudentIn(signIn, scope, "student-2")
+                assertEquals("Bearer ${accessToken("student-2")}", server.next(AGE_CHECK).token)
+                until { account.state.value.takeIf { it.signedIn == true && it.age == AgeCheck.Answer.Checking } }
+            } finally {
+                // Everything that reads the file ended before it closes (the engine rig's teardown, AN5c).
+                withTimeout(30.seconds) { scope.coroutineContext.job.cancelAndJoin() }
+                server.close()
+                outbox.close()
+                context.deleteDatabase(FILE)
+            }
+        }
+
+    private companion object {
+        const val FILE = "bali-app-test.sqlite"
+    }
 }

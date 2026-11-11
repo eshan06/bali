@@ -458,8 +458,11 @@ private class SeenClock : SyncClock {
     }
 }
 
-/** The API, answered by hand: each request waits for the test's answer, and gets none once the server closes. The engine rig's `Server`. */
-private class Server : HttpTransport {
+/**
+ * The API, answered by hand: each request waits for the test's answer, and gets none once the server closes. The engine rig's
+ * `Server`; Cognito's token endpoint too, for a sign-in of a test's own (TestSignIn.kt).
+ */
+internal class Server : HttpTransport {
     class Exchange(val request: HttpRequest) {
         private val answer = CompletableDeferred<Pair<Int, String>?>()
         val route = "${request.method} ${request.url.path}"

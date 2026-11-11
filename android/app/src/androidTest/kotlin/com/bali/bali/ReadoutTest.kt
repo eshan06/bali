@@ -5,12 +5,19 @@ import android.app.UiAutomation
 import android.content.Intent
 import android.nfc.NfcAdapter
 import android.os.ParcelFileDescriptor
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.room.Room
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.bali.core.BaliJson
+import com.bali.core.EnrollmentJoinRequest
+import com.bali.core.SignIn
+import com.bali.outbox.AgeCheck
 import com.bali.outbox.Change
 import com.bali.outbox.Enforcer
 import com.bali.outbox.Link
@@ -21,9 +28,11 @@ import com.bali.outbox.OutboxRecord
 import com.bali.outbox.SyncEngine
 import com.bali.outbox.SyncState
 import java.io.IOException
+import java.net.URI
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
@@ -36,6 +45,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -48,13 +58,15 @@ import org.junit.runner.RunWith
  * Each test runs a Debug build's engine over no token (ThisBuild, Q2), as the app's start makes one while
  * sign-in isn't set up, but over the test's own file and scope, handed to the app's start; the service
  * switched on as a student would, through the shell of a UiAutomation that leaves accessibility services
- * running. What the engine and the enforcer do is the JVM's to prove; here, that the readout reaches them.
+ * running. Its account, Join and History (AN9i) take a run over a sign-in of the test's own instead ([signed]). What
+ * the engine, the account and the enforcer do is the JVM's to prove; here, that the readout reaches them.
  */
 @RunWith(AndroidJUnit4::class)
 class ReadoutTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
     private val app = context.applicationContext as BaliApp
+    private val server = Server()
     private lateinit var scope: CoroutineScope
     private lateinit var outbox: Outbox
     private lateinit var engine: SyncEngine
@@ -88,6 +100,7 @@ class ReadoutTest {
             readout?.close()
             withTimeout(PATIENCE) { scope.coroutineContext.job.cancelAndJoin() }
             app.running.value?.job?.cancelAndJoin()
+            server.close()
             outbox.close()
             app.lock.unlock()
             put(found.first)
@@ -219,6 +232,136 @@ class ReadoutTest {
             assertFalse(until { readout.shows { it.tryAgain }.takeIf { !it } })
         }
 
+    // Q3: the Signed in line reads the run's account and names the 13+ check where it stands, which no button answers before
+    // AS2's question; nor is Delete account here (AS7's).
+    @Test
+    fun theSignedInLineFollowsTheRunsAccountAndNamesThe13PlusCheckWhichNoButtonAnswersAndThereIsNoDeleteAccount() {
+        val signIn = signed()
+        val readout = open()
+        until { readout.lines().takeIf { "Signed in: no\n" in it } }
+        // The Engine line reads the run too: this one's engine is over a sign-in, the app's own not set up.
+        until { readout.lines().takeIf { "Engine: over the sign-in\n" in it } }
+        server.signStudentIn(signIn, scope, "student-1")
+        val asked = server.next(AGE_CHECK)
+        until { readout.lines().takeIf { "Signed in: yes · 13+ check: asking Bali for this account's yes\n" in it } }
+        asked.reply(200, """{"passed":false}""")
+        until { readout.lines().takeIf { "Signed in: yes · 13+ check: not through: " in it } }
+        runBlocking { signIn.signOut() }
+        until { readout.lines().takeIf { "Signed in: no\n" in it } }
+        server.signStudentIn(signIn, scope, "student-1")
+        server.next(AGE_CHECK).reply(200, PASSED)
+        until { readout.lines().takeIf { "Signed in: yes · 13+ check: through\n" in it } }
+        val buttons =
+            listOf(
+                "Sign in", "Sign out", "Open Accessibility settings", "Join", "Scan", "Read block code", "Tap", "Emergency Unlock",
+                "History", "Cap a tap at 15 min (phone check)", "Try again",
+            )
+        assertEquals(buttons, readout.buttons())
+    }
+
+    // iOS's Readout's Join: the code typed, through the engine, as the Join screen joins one (its look-up first is AS4's),
+    // each press under an event id of its own; joined names the class, not joined says the server's answer.
+    @Test
+    fun joinSendsTheCodeTypedUnderAFreshEventIdAtEachPressAndSaysJoinedOrNotJoinedWithItsAnswer() {
+        through(signed())
+        val readout = open()
+        // A code of spaces alone, trimmed as the Tap trims a tag: said so at once, by the press's own end nothing sent.
+        ReadoutActivity.note.value = ""
+        readout.onActivity {
+            it.joinCode.setText("   ")
+            it.join.performClick()
+        }
+        assertEquals("type a join code first", said())
+        assertFalse("POST /v1/enrollments" in server.waiting)
+        val joined = join(readout, "6bvza5")
+        joined.reply(200, """{"outcome":"joined","enrollmentId":"e","class":{"id":"c","name":"Period 3"}}""")
+        assertEquals("joined Period 3", said())
+        val refused = join(readout, "NOCODE")
+        refused.reply(404, """{"error":{"code":"not_found","reason":"class_not_found","message":"no class with that join code"}}""")
+        assertEquals("not joined: Status(code=404) no class with that join code", said())
+        val (first, second) = listOf(joined, refused).map { BaliJson.decodeFromString(EnrollmentJoinRequest.serializer(), it.request.body!!.decodeToString()) }
+        assertEquals(listOf("6bvza5", "NOCODE"), listOf(first.joinCode, second.joinCode))
+        assertNotEquals(first.eventId, second.eventId)
+        // Each a UUIDv7, as every mutation's (CLAUDE.md).
+        for (id in listOf(first.eventId, second.eventId)) assertTrue(id, Regex("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}").matches(id))
+    }
+
+    // iOS's Readout's History: the student's last five moments, read through the engine's client as `GET /v1/me/history`
+    // gives them, newest first, each its wire name and time (History's own rules are AN9g's); or why they weren't read.
+    @Test
+    fun historyReadsTheLastFiveMomentsNewestFirstEachItsWireNameAndTimeOrSaysWhyNot() {
+        through(signed())
+        val readout = open()
+        ReadoutActivity.note.value = ""
+        readout.onActivity { it.history.performClick() }
+        val read = server.next(HISTORY)
+        assertEquals("limit=5", read.request.url.rawQuery)
+        val now = Instant.now().truncatedTo(ChronoUnit.SECONDS)
+        val moments = listOf("tap_in", "unlock", "refocus", "protection_off", "enrollment_left").mapIndexed { i, type -> type to now.minusSeconds(60L * i) }
+        read.reply(200, page(moments))
+        assertEquals(moments.joinToString(" · ") { (type, at) -> "$type ${time(at)}" }, said())
+        ReadoutActivity.note.value = ""
+        readout.onActivity { it.history.performClick() }
+        server.next(HISTORY).reply(503, "")
+        assertEquals("history not read: Status(code=503)", said())
+        // No moments yet: said so, where iOS's shows nothing.
+        ReadoutActivity.note.value = ""
+        readout.onActivity { it.history.performClick() }
+        server.next(HISTORY).reply(200, page(emptyList()))
+        assertEquals("history: no moments yet", said())
+    }
+
+    /**
+     * This test's run started again over a sign-in of its own (TestSignIn.kt), as a relaunch starts one over the same file:
+     * everything that read the file ended first. The sign-in it runs over is the test's to sign in.
+     */
+    private fun signed(): SignIn {
+        runBlocking { withTimeout(PATIENCE) { scope.coroutineContext.job.cancelAndJoin() } }
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val signIn = testSignIn(server, scope)
+        engine = runBlocking { SyncEngine.make(outbox, URI(API), signIn, scope, server) }
+        app.start(engine, scope)
+        return signIn
+    }
+
+    /** A student signed in over [signIn] and let through the 13+ check on Bali's yes, as the run's account asks it. */
+    private fun through(signIn: SignIn) {
+        server.signStudentIn(signIn, scope, "student-1")
+        server.next(AGE_CHECK).reply(200, PASSED)
+        until { app.running.value?.account?.state?.value?.takeIf { it.age == AgeCheck.Answer.Passed } }
+    }
+
+    /** [code] typed and Join pressed: its request, once the engine has sent it. */
+    private fun join(readout: ActivityScenario<ReadoutActivity>, code: String): Server.Exchange {
+        ReadoutActivity.note.value = ""
+        readout.onActivity {
+            it.joinCode.setText(code)
+            it.join.performClick()
+        }
+        return server.next("POST /v1/enrollments")
+    }
+
+    /** What the last press did, once it has ended. */
+    private fun said(): String = until { ReadoutActivity.note.value.takeIf { it.isNotEmpty() } }
+
+    /** A page of the history holding [moments], each its wire type and when, in the order given. */
+    private fun page(moments: List<Pair<String, Instant>>): String =
+        moments.mapIndexed { i, (type, at) ->
+            """{"eventId":"e$i","type":"$type","occurredAt":"$at","class":{"id":"c","name":"Period 3"},"teacher":{"displayName":null}}"""
+        }.joinToString(",", """{"events":[""", """],"nextBefore":null}""")
+
+    /** The readout's buttons, each as a tester reads it, shown or not. */
+    private fun ActivityScenario<ReadoutActivity>.buttons(): List<String> {
+        val found = mutableListOf<String>()
+
+        fun walk(view: View) {
+            if (view is Button) found += view.text.toString()
+            if (view is ViewGroup) (0 until view.childCount).forEach { walk(view.getChildAt(it)) }
+        }
+        onActivity { walk(it.findViewById(android.R.id.content)) }
+        return found
+    }
+
     /** The readout, opened as from the launcher, in front. */
     private fun open(): ActivityScenario<ReadoutActivity> = ActivityScenario.launch(ReadoutActivity::class.java).also { readout = it }
 
@@ -256,6 +399,7 @@ class ReadoutTest {
     private companion object {
         const val FILE = "readout-test.sqlite"
         const val SERVICE = "com.bali.bali/com.bali.bali.LockService"
+        const val HISTORY = "GET /v1/me/history"
         val PATIENCE = 30.seconds
     }
 }

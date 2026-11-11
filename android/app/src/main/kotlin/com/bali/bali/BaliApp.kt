@@ -8,6 +8,7 @@ import com.bali.core.AppConfig
 import com.bali.core.HttpTransport
 import com.bali.core.OkHttpTransport
 import com.bali.core.SignIn
+import com.bali.outbox.Account
 import com.bali.outbox.Enforcer
 import com.bali.outbox.Outbox
 import com.bali.outbox.SyncEngine
@@ -24,7 +25,7 @@ import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.launch
 
-/** The app's process, and what lives as long as it does: the engine and the lock (AN7), which the screens (AN10) take from here. */
+/** The app's process, and what lives as long as it does: the engine, the lock (AN7) and the account (AN9i), which the screens (AN10) take from here. */
 class BaliApp : Application() {
     /** The app's scope: never a screen's, a ViewModel's or a service's, in which no renewal starts again once ended (AN6b). */
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -71,8 +72,11 @@ class BaliApp : Application() {
     /** The app's own start, as it's created ([begin]): a test that starts a run of its own waits for it first, which could replace that run. */
     internal lateinit var launched: Job
 
-    /** The app's one engine, and the enforcer keeping the lock where its truth says. */
-    class Running internal constructor(val engine: SyncEngine, val enforcer: Enforcer, internal val job: Job)
+    /**
+     * The app's one engine, the enforcer keeping the lock where its truth says, and the account's half over the engine's
+     * sign-in: none over an engine with no sign-in, a Debug build's while sign-in isn't set up.
+     */
+    class Running internal constructor(val engine: SyncEngine, val enforcer: Enforcer, val account: Account?, internal val job: Job)
 
     override fun onCreate() {
         super.onCreate()
@@ -112,17 +116,21 @@ class BaliApp : Application() {
      * app starts begins its grace, the service's connect ending it, and at each change of Android's list
      * of switched-on services, so a switch turned off and on again between two check-ins is reported
      * (AN7b). The service's connect and unbind run it too ([check]), and Bali's own screen coming to the
-     * front ([front]), after the truth is asked for, as iOS's coming back has both.
+     * front ([front]), after the truth is asked for, as iOS's coming back has both. And the account over the
+     * engine's sign-in, one a run (AN9e's `Account`): its 13+ check's ask hooked at each wake, and each sign-in
+     * followed (AN9i).
      */
     fun start(engine: SyncEngine, scope: CoroutineScope = this.scope) {
         val job = SupervisorJob(scope.coroutineContext[Job])
         val within = CoroutineScope(scope.coroutineContext + job)
         val enforcer = Enforcer(engine, lock, within)
-        val running = Running(engine, enforcer, job)
+        val account = Account.of(engine, within)
+        val running = Running(engine, enforcer, account, job)
         runs.getAndUpdate { running }?.job?.cancel()
         job.invokeOnCompletion { runs.compareAndSet(running, null) }
         within.launch { engine.run() }
         within.launch { enforcer.run() }
+        account?.let { within.launch { it.run() } }
         // From the screen's first turn on: the engine starts with it off. Bali's own screen in front likewise.
         within.launch { screen.dropWhile { !it }.collect { engine.setScreenOn(it) } }
         within.launch { front.dropWhile { !it }.collect { engine.setInFront(it); if (it) check() } }

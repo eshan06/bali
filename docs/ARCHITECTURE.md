@@ -392,7 +392,9 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   filed under whoever signs in next, whose account is always another (amended 2026-10-07, Claude
   Review). With nothing queued, as a sign-up made around the question comes back, the server
   never sees the account: `DELETE /v1/me` looks its caller up and creates no one, and keeps only
-  its sign-in's deletion until Cognito's user is gone (2026-10-09, decision 3's amendment). A record queued
+  its sign-in's deletion, while it is queued and for 24 hours once its try finishes, whatever it found
+  (2026-10-09, decision 3's amendment; amended 2026-11-11, C3d, #558, the owner's ruling:
+  "Now, on the server"; `docs/DECISIONS.md`, 2026-11-11). A record queued
   under a sign-in the server never saw makes the account as it lands, and the deletion
   de-identifies it a moment later, as C3 de-identifies any. An existing student on a new phone
   answers it once.

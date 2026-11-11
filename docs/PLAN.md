@@ -13,7 +13,7 @@ for Review" (Before the pilot, items 5 and 6; #548; DECISIONS 2026-11-09): the l
 around focus, the privacy label published, rated 13+, the United States only, released by hand.
 Before it, every session's bell on a whole minute (#546). Next: App Review's verdict, the
 §3.3.3(P) answer (Open owner items); a session builds the retire-a-block command; the owner the
-sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN9i; AN1's
+sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN9f; AN1's
 part 2 on the owner's phones; the audit's polish waits._
 
 ## Now
@@ -39,8 +39,7 @@ reviewed by santa and pushed straight to the branch, with no PR, as its README s
 **The portal's address** ✅ (#540; DECISIONS 2026-11-07): `https://app.getbali.app` since
 2026-11-07, its sign-in round trip passing at the sitting (2026-11-08); the old
 `https://bali-portal.vercel.app` redirects there, and Cognito and the API's CORS keep it until no
-build in use links it. The app links the new address from build 13; Android's
-(`android/app/build.gradle.kts`) is Android's to change.
+build in use links it. The iPhone's build 13 links the new address, Android's from AN9i.
 
 **In flight.**
 - **The conductor on the Windows PC (the owner, 2026-10-14):** an always-on PC runs the conductor,
@@ -72,8 +71,8 @@ build in use links it. The app links the new address from build 13; Android's
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04): the owner picked (a), the Accessibility service, with
   no VPN for now and a battery plan, so ARCHITECTURE's "Android app structure" is decided; part 2 on
   a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱), before
-  launch; AN2–AN9e's code, the core, the unlock contract, the outbox, the engine, sign-in,
-  the lock, the tap, ✅ (#488–#557); AN9i next. AS0, the
+  launch; AN2–AN9i's code, the core, the unlock contract, the outbox, the engine, sign-in,
+  the lock, the tap, ✅ (#488–#559); AN9f next. AS0, the
   screens' canvas, ✅ approved as it stands
   (#484, #486; DECISIONS 2026-11-04): lock (a) alone, the approved iPhone boards standing for the
   rest. Not on the pilot's critical path.
@@ -196,7 +195,7 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), S8 (the owner's decision) |
 | 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
 | 8 | Android: the lock, the candidates measured on the emulators, then (a) on a Pixel and a Samsung (iOS's Phase 0) | building: AN1's parts 1 and 1c on the emulators ✅ (2026-11-03); AN1b, lock (a) decided ✅ (2026-11-04); AN1's part 2 📱 waits for the phones, before launch |
-| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | building: AN2–AN9e's code ✅ (2026-11-11); AN9i next |
+| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | building: AN2–AN9i's code ✅ (2026-11-11); AN9f next |
 | 10 | Android: the screens, from the approved boards | AS0's canvas approved ✅ (2026-11-04); AS1–AS8 build from it |
 | 11 | Android: on Play, its testing tracks, device gate and exit check | planned |
 
@@ -299,7 +298,7 @@ One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
   - **C2-text** The drafts' words on `/privacy` and `/terms` — ✅ (#461; DECISIONS 2026-10-24)
 - **S8** 🔧 Least-privilege database roles (Phase 6): the owner's decision (Open owner items, 1)
 - **C3d** Deleted sign-ins refused on the server — ✅ (#558; DECISIONS 2026-11-11)
-- **C4c** AN9h's iPhone twin: one account's token for Delete account and the 13+ check (the owner, 2026-11-10: "Close it now"), the Mac's; DECISIONS 2026-11-10, "For C4c"
+- **C4c** AN9h's iPhone twin: one account's token for Delete account and the 13+ check (the owner, 2026-11-10: "Close it now"), the Mac's; DECISIONS 2026-11-10, "For C4c"; AN9e's two iOS gaps (DECISIONS 2026-11-11)
 - **D2k** ⏸ The shield's new look (Phase 3): waits for a design the owner approves in Claude Design
 - **The push's app half** — ✅ (#456; DECISIONS 2026-10-24); N6's end-to-end check passed on prod (2026-11-08); left, runbook 7's step 4, dev's `APNS_*` variables, the owner's
 
