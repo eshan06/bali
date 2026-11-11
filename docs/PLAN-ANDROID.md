@@ -14,13 +14,13 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-11 (Central) — AN7g, the cover test's SMS step waiting out Google Messages (#562;
-`docs/DECISIONS.md`, 2026-11-11), test-only, Bali's code unchanged: AN7e's CoversTest now calls at once after the SMS
-step, as a student who has texted for help calls, once Android has resumed the last activity Messages opens for the
-number's link, a main screen made anew, so nothing of the link comes up later over the in-call screen; its
-failing test first, Android 16's race provoked. Before it, AN9g, History's rules and its call, AN9's last step. Next:
-AN10, the router and the screens' rules; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account
-that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android
+_Last updated: 2026-11-11 (Central) — AN10a, the router (#563; `docs/DECISIONS.md`, 2026-11-11), the first of AN10's
+eight steps: `outbox`'s `Screen.kt`, which screen shows when, iOS's `Screen.choose` with the lock's switch in Screen
+Time's place (Q3): Focus whenever the lock's own rule says it's on, the home a standing not read keeps over the last
+run's lock, a teacher's account its screen alone, a start's problem a type; the bell by the phone's clock, looked at
+again at each time-set signal; and `SyncState.teacher`. No word and no screen. Before it, AN7g, the cover test's SMS
+step. Next: AN10b, the router's inputs and its run; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an
+account that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android
 17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner
 items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
@@ -170,15 +170,22 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   2026-11-11)
 - **AN9f** Me's rules: Your name, Leave and Sign out's hold — ✅ (#560; DECISIONS 2026-11-11)
 - **AN9g** History's rules and its call — ✅ (#561; DECISIONS 2026-11-11)
-- **AN10** The router and the screens' rules (twin: `Screen.swift`, `FocusWords`, `UnlockedWords`,
-  `ProtectionOffWords` and `ShieldWords`): which screen shows when, and what Focus, Unlocked,
-  Protection off and the block screen say (rule 3: no countdown over nothing locked), their rules
-  and tests ported; a teacher's account seeing one screen and nothing else once a read of `GET /v1/me`
-  names it a teacher's (`MeResponse.user.role`; the owner, 2026-11-07, #541; DECISIONS 2026-11-07),
-  the screen Phase 10's from the approved iPhone board (Open owner items, 5), and AN12 registering no
-  device token for it; from SyncEngine.swift, Home's Tap in (`tapIn`) and every word the engine says,
-  with TapInTests, BellRedrawTests and UnlockedTests (AN5's split); the words from AS0's approved
-  boards, so AN10 follows AS0
+- **AN10a** The router — ✅ (#563; DECISIONS 2026-11-11)
+- **AN10b** The router's inputs, and its run (twin: BaliApp.swift's notes, `everApproved` and `shown`, and RootView.swift's
+  bell): `Account`'s notes behind a `Notes` store, `sawList` and `email`; a `Router`, one a process (Q1), choosing again at
+  each change and at the bell; a Debug engine with no account read as signed out (Q2) — validation: the JVM tests
+- **AN10c** The router in the app (twin: BaliApp.swift's start problems): the app's `Notes`, out of the backup; `BaliApp`'s
+  `problem`, one `Router` for the app's life and Android's time-set broadcast; the readout's Screen line (Q11) —
+  validation: the JVM tests, then the instrumented tests on `Bali_Spike_API35`, `36` and `37`
+- **AN10d** Home's words, Tap in, and the sign-in's and the start's words (twin: Join.swift's and Screen.swift's words, and
+  SyncEngine.swift's `tapIn`), and the guard over every Android word — validation: the JVM tests
+- **AN10e** Focus's words and the block screen's (twin: `FocusWords` and `ShieldWords`) — validation: the JVM tests
+- **AN10f** Unlocked's, Protection off's and Session over's words (twin: `UnlockedWords`, `ProtectionOffWords`, and
+  SyncEngine.swift's `ReasonFailure` and `RefocusFailure`) — validation: the JVM tests
+- **AN10g** The words of Me, Leave, Sign out, Delete account and the 13+ stop (twin: Me.swift's, Deletion.swift's and
+  Age.swift's), Delete account's new lines drawn first (Q9) — validation: the JVM tests
+- **AN10h** History's words and the consent list (twin: History.swift's words, and JoinView.swift's `ConsentCard`), day
+  titles from the phone's own patterns (Q6) — validation: the JVM tests
 - **AN11** The API's push (cloud; twin: `apps/api/src/push/apns.ts`): an FCM sender beside APNs,
   under the same rules (after the Start commits, the same words, no personal data, a token reported
   gone deleted); an additive field on the push-token endpoint, `PUT` and `DELETE`, naming the
@@ -190,8 +197,8 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   and `openapi.json` regenerated; integration tests for the happy path, authz, validation and
   replay. 🔧 The owner makes the Firebase project and puts its key on Railway, dev then prod —
   validation: `npm run typecheck && npm run lint && npm test`, `npm run demo`
-- **AN12** The app's push (twin: the push's app half, #456): the FCM token registered at each launch
-  and removed at Sign out; Android's notification permission (Android 13 and later) asked once,
+- **AN12** The app's push (twin: the push's app half, #456): the FCM token registered at each launch,
+  never for a teacher's account (`SyncState.teacher`; #541), and removed at Sign out; Android's notification permission (Android 13 and later) asked once,
   right after onboarding's permission steps, as iOS asks after its Screen Time step; and #336's
   random wait of up to 10 s before the first read after a fresh alert; from SyncEngine.swift,
   `PushWait`, `holdRead`, `endWait` and the token's register and remove (an FCM token sent as it

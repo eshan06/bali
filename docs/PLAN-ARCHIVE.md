@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN10a's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN7g, the cover test's SMS step waiting out Google Messages (#562;
+`docs/DECISIONS.md`, 2026-11-11), test-only, Bali's code unchanged: AN7e's CoversTest now calls at once after the SMS
+step, as a student who has texted for help calls, once Android has resumed the last activity Messages opens for the
+number's link, a main screen made anew, so nothing of the link comes up later over the in-call screen; its
+failing test first, Android 16's race provoked. Before it, AN9g, History's rules and its call, AN9's last step. Next:
+AN10, the router and the screens' rules; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account
+that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android
+17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner
+items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN7g's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN9g, History's rules and its call (#561; `docs/DECISIONS.md`, 2026-11-11),
 AN9's last step: `outbox`'s `History.kt`, every failure and day title a type: the pages as they came, from the top or
 Show earlier's, each moment once, which read may start and the cursor it sends, and Show earlier's cursor the server
@@ -2690,6 +2700,29 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN10a's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11). The conductor split AN10's
+line into AN10a–AN10h that day, one short line each in `docs/PLAN-ANDROID.md`, and AN10's line comes here whole, below
+it.
+
+- **AN10a** The router (twin: Screen.swift's `Screen`, `choose`, `settled`, `rings`, `bell` and `keepsOpened`, and
+  BaliApp.swift's `offersSignOut`): which screen shows when, in `outbox`'s `Screen.kt`; `Storage` carrying a typed
+  `Problem`, not set up or the start failed; `bell`, by the `SyncClock`, looked at again at each time-set signal; and
+  `SyncState.teacher`, from `MeResponse.user.role`. Tests: ScreenTests' router halves, the screen halves of
+  WaitingHomeTests' `startFromHome` and DroppedWaitTests, BellRedrawTests' `timeSet` and LaunchGraceTests' `settles`
+  — validation: the JVM tests
+
+AN10's line, as it read until the conductor split it (2026-11-11), word for word.
+
+- **AN10** The router and the screens' rules (twin: `Screen.swift`, `FocusWords`, `UnlockedWords`,
+  `ProtectionOffWords` and `ShieldWords`): which screen shows when, and what Focus, Unlocked,
+  Protection off and the block screen say (rule 3: no countdown over nothing locked), their rules
+  and tests ported; a teacher's account seeing one screen and nothing else once a read of `GET /v1/me`
+  names it a teacher's (`MeResponse.user.role`; the owner, 2026-11-07, #541; DECISIONS 2026-11-07),
+  the screen Phase 10's from the approved iPhone board (Open owner items, 5), and AN12 registering no
+  device token for it; from SyncEngine.swift, Home's Tap in (`tapIn`) and every word the engine says,
+  with TapInTests, BellRedrawTests and UnlockedTests (AN5's split); the words from AS0's approved
+  boards, so AN10 follows AS0
 
 AN9g's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11).
 

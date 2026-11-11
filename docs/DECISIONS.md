@@ -8,6 +8,77 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-11** — **AN10a, the router: BaliOutbox's `Screen.choose` in Kotlin, which screen shows when, the lock's switch in
+  Screen Time's place; the bell by the phone's clock; and `SyncState.teacher` (the conductor's calls Q1 to Q3, and this
+  step's own, marked, each awaiting the owner's look; AN10a, #563).** The owner is asleep and said to take the recommended
+  option on every regular call, so each call here is the conductor's or this step's, for the owner to look at.
+
+  **AN10 in eight steps (the conductor's split, awaiting the owner):** AN10a, the router; AN10b, its inputs and its run;
+  AN10c, the router in the app; AN10d, Home's words, Tap in, and the sign-in's and the start's words; AN10e, Focus's and the
+  block screen's; AN10f, Unlocked's, Protection off's and Session over's; AN10g, the words of Me, Leave, Sign out, Delete
+  account and the 13+ stop; AN10h, History's and the consent list's. Each has its line in `docs/PLAN-ANDROID.md`, and AN10's
+  whole line is in `docs/PLAN-ARCHIVE.md`. Of the split's eleven questions, the router's three are answered here, each the
+  recommended option; the rest come with their steps:
+  - **Q1, where the router runs:** `outbox`'s `Router`, one a process, since it must say "not set up" with no engine. It
+    reads the run's account and enforcer, the problem, the notes and the screens' inputs as a flow (empty until Phase 10).
+    AN10b builds it over this step's `Screen.choose`.
+  - **Q2, a Debug engine with no account:** read as signed out, so Sign in, never Starting forever; Focus still shows for a
+    typed tap, the lock's own rule coming before the sign-in (`shieldedFirst`'s twin). AN10b's input.
+  - **Q3, "approved" on Android:** the switch on, or starting while `everApproved` is set and the check doesn't judge the
+    switch off (`switchedOff`); set at on and cleared at `switchedOff` (AN10b keeps it). `switchedOff` stands for iOS's
+    `permissionOff`, `locked` for `shielded`, as AN7a mapped them (lock (a), AN1b). Stricter than iOS, whose not determined
+    routes as approved whenever the flag is set: iOS clears the flag in the step its check judges it off
+    (`Phone.remember`), while AN10b's run may hand the router a claim before its flag, so Android's rule needs no order.
+
+  **Where it lives:** `outbox`'s new `Screen.kt`: `Screen`, each screen a type; `Screen.choose` and its `settled`; `bell`;
+  `offersSignOut`; `SessionView.rings` and `SyncState.keepsOpened`; and `SyncState.kt`'s `teacher`. Nothing runs it yet:
+  AN10b's `Router` does, AN10c wires it in the app, and Phase 10 draws each screen. It has no word. Where Kotlin differs,
+  said plainly:
+  - **A start's problem is a type, never words** (`Screen.Storage(Problem)`): `NotSetUp`, a Release build with no config
+    (AN10c), or `StartFailed` with its cause, where iOS's `storage(String)` carries the line itself. The cause stays for
+    AN10d's words, as iOS's line says the error in parentheses for a support request (this step's call). A test holds
+    every screen, problem and answer of the router free of any string.
+  - **Screen Time's step is the lock's permission step** (`Screen.Permission`, AS3's, in the Screen Time ask's place:
+    DESIGN.md's Android section), routed by Q3.
+  - **The home a standing not read keeps shows over the lock verified on** (`Protection.locked`, iOS's `shielded`): a switch
+    still starting covers nothing until the service binds, and the check at its connect claims the lock then (AN7c).
+    Focus, by the lock's own rule (`shieldedUntil`), shows whatever the switch reads, before any pass, as on iOS.
+  - **`SyncState.teacher`** (additive): a teacher's account as `GET /v1/me` last named it, where iOS reads the role at each
+    use. The router reads it, and AN12 registers no device token while it holds.
+  - **`bell` takes the time-set signals as a `Flow<Unit>`** (AN10c's broadcast) and sleeps by the `SyncClock` it's given;
+    it follows the flow before its first read of the clock, as iOS registers its observer first, and throws once
+    cancelled, where iOS's returns. Its test's clock sleeps by the time that passes, as the phone's does: the rig's
+    `TestClock` wakes a sleep its clock is turned past, which would hide a change never looked at.
+  - **`offersSignOut` is the screen's** (iOS's is `Phone`'s, of the screen shown): Me, Your name and the teacher's screen.
+    **The router's answer is `Screen.Shown`**, iOS's tuple of the screen and its tab bar.
+
+  **The tests,** on the JVM, by a fixed clock and zone (the tests' `t0`, in Central): ScreenTests' `starting`,
+  `ageAtSignIn`, `ageAfterSignIn`, `name`, `nameHeld`, `listChanged`, `teacher` (with `SyncState.teacher` for each role),
+  `storage` (each problem its type, no string anywhere), `deleting`, `onboarding`, `shieldedFirst`, `inSession`, `backOn`,
+  `permissionOffInSession`, `bellRung`, `unreadAndWaiting`, `out`, `opened`, `tabs`, `homeOverUnlocked`, `keepsOpened`,
+  `pendingTap` and `everApproved` (with Q3's case), and the router halves of `homeWaiting` and `inNoClass`; AppTests'
+  `nameAndSignOut`, its `offersSignOut` half, over every screen; the screen halves of WaitingHomeTests' `startFromHome` and
+  DroppedWaitTests (`dropped`, `startAfterExpiry`, `takenAndOver`, `offlineAtTheEnd` and `relaunched`; the first two read
+  a student named Ana, as iOS's do, so the rig's `Answer.me` takes a name); BellRedrawTests' `timeSet`; and
+  LaunchGraceTests' `settles`, each claim it collects routed to Home or Focus, never the permission step. No twin:
+  `waitingWords` and `ridersWiring`, which read iOS's views. Every word and card (Home's, Waiting's) is AN10d's to AN10h's.
+  Tried, each failing by name, then reverted: the home a standing not read keeps not shown over the last run's lock (4
+  tests); Focus by the standing and a tap alone, a countdown over nothing locked past the bell or the cap (13); the bell
+  not looked at again at a time-set signal, and never ended by its sleep (`timeSet`, each); a teacher's account shown a
+  student's screens (4); "approved" claimed after `switchedOff` (Q3's case); a problem said as a string (`storage`), and
+  every problem flattened into one (8); starting never routed as on once read on (2, `settles` among them); `rings` to the
+  millisecond (2); `keepsOpened` blind to a tap; and Home offering Sign out.
+
+  **For AN10b to AN10h and Phase 10:** the `Router` calls `Screen.choose` with `Account.State`'s `signedIn`,
+  `signedInThisRun`, `age`, `deleting.shows` and `sync`, the enforcer's `updates`, `everApproved` and the notes; it
+  chooses again at each of their changes and at `Screen.bell` of the standing's session's `endsAt` (iOS's `Phone.bell`),
+  over AN10c's time-set signals, and keeps what was opened while `keepsOpened` says. Phase 10 offers Sign out where
+  `offersSignOut` says. AN12 reads `SyncState.teacher`.
+
+  **The proof:** RUNS-TO-FILL
+
+  **Santa's review:** SANTA-TO-FILL
+
 - **2026-11-11** — **AN7g, the cover test's SMS step waits out Google Messages before its call: AN7e's CoversTest,
   test-only, the race AN9i's run met once on Android 16 made impossible (the conductor's calls, marked, each awaiting
   the owner's look; AN7g, #562).** Bali's own code is unchanged.
