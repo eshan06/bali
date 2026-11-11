@@ -499,15 +499,16 @@ class SignInTokensTest : SignIns() {
             signingIn.await()
             endpoint.answer(400, refusal("invalid_grant")) // the renewal's, about a1's refresh token
             assertNull(renewal.await())
-            assertEquals(jwt("b1"), phone.deletionToken()) // the check's own read's
+            assertEquals(jwt("b1"), phone.deletionToken("b1")) // the check's own read's
             // The API deleting the account while a renewal runs: neither token from then on.
             now.set(8000)
-            val deleting = async { phone.deletionToken() }
+            val deleting = async { phone.deletionToken("b1") }
             endpoint.received(3)
             phone.accountDeleted("b1")
-            endpoint.answer(200, granted(jwt("b2")))
+            val renewed = jwt("b1", lifetime = 7200) // a renewal keeps the account its sign-in is
+            endpoint.answer(200, granted(renewed))
             assertNull(deleting.await())
-            assertEquals(jwt("b2"), store.tokens?.access)
+            assertEquals(renewed, store.tokens?.access)
             assertEquals(true, store.tokens?.deleted)
         }
 
@@ -528,21 +529,22 @@ class SignInTokensTest : SignIns() {
             // C7-server: no renewal for a token it wouldn't give; `passed` for the account its tokens name,
             // kept through a renewal and a relaunch; another account's, or nobody's, changes nothing; an
             // account the API deleted gives neither token.
-            val endpoint = TransportDouble.answering(200, granted(jwt("a2")))
+            val renewed = jwt("a1", lifetime = 7200) // a renewal keeps the account its sign-in is
+            val endpoint = TransportDouble.answering(200, granted(renewed))
             val (store, now) = MemoryStore.holding(jwt("a1")) to Now()
             val phone = signIn(store, endpoint, now, gated = true)
             assertNull(phone.accessToken())
             assertFalse(phone.checked())
-            assertEquals(jwt("a1"), phone.deletionToken())
+            assertEquals(jwt("a1"), phone.deletionToken("a1"))
             now.set(3600) // a1 has expired
             assertNull(phone.accessToken())
             assertTrue(endpoint.sent.isEmpty())
-            assertEquals(jwt("a2"), phone.deletionToken())
+            assertEquals(renewed, phone.deletionToken("a1"))
             phone.passed("b1") // another account's
             assertNull(phone.accessToken())
             assertFalse(phone.checked())
-            phone.passed("a2") // the renewed token's account: its sub
-            assertEquals(jwt("a2"), phone.accessToken())
+            phone.passed("a1") // the account its renewed tokens name: their sub
+            assertEquals(renewed, phone.accessToken())
             assertEquals(true, store.tokens?.checked)
             assertNull(phone.yes())
             // Through a renewal, and a relaunch over the same store.
@@ -550,9 +552,9 @@ class SignInTokensTest : SignIns() {
             assertEquals(true, store.tokens?.checked)
             val relaunched = signIn(store, endpoint, now, gated = true)
             assertTrue(relaunched.checked())
-            assertEquals(jwt("a2"), relaunched.accessToken())
-            phone.accountDeleted("a2")
-            assertNull(phone.deletionToken())
+            assertEquals(renewed, relaunched.accessToken())
+            phone.accountDeleted("a1")
+            assertNull(phone.deletionToken("a1"))
             assertNull(phone.accessToken())
             // Nobody signed in: nothing to let through.
             val nobody = signIn(MemoryStore(), endpoint, gated = true)
@@ -562,7 +564,50 @@ class SignInTokensTest : SignIns() {
             // Gated unless said otherwise, so a sign-in built without the flag fails closed (santa's review).
             val unsaid = SignIn(cognito, MemoryStore.holding(jwt("a1")), scope, endpoint, Now())
             assertNull(unsaid.accessToken())
-            assertEquals(jwt("a1"), unsaid.deletionToken())
+            assertEquals(jwt("a1"), unsaid.deletionToken("a1"))
+        }
+
+    @Test
+    fun oneAccountsTokensAreItsAloneNoneNorAnyRenewalWhileAnothersSignInIsHeldNoneAfterARenewalALandingSignInLetGo() =
+        inTime {
+            // The owner, 2026-11-10: "Close it now" (AN9h): a deletion's token, the 13+ check's read's, its yes's, and the
+            // renewal a 401 asks for, each the account's alone, its `sub`, checked before a renewal and after it.
+            val renewed = jwt("a1", lifetime = 7200)
+            val answering = TransportDouble.answering(200, granted(renewed))
+            val (store, now) = MemoryStore.holding(jwt("a1")) to Now()
+            val phone = signIn(store, answering, now, gated = true)
+            phone.passed("a1", recording = "y1")
+            assertEquals(listOf(jwt("a1"), jwt("a1"), "y1"), listOf(phone.deletionToken("a1"), phone.accessToken("a1"), phone.yes("a1")))
+            for (other in listOf("b1", null)) {
+                assertEquals(listOf(null, null, null), listOf(phone.deletionToken(other), phone.accessToken(other), phone.yes(other)), "$other")
+                assertFalse(phone.refresh(other), "$other")
+            }
+            assertEquals(jwt("a1"), phone.accessToken("a1")) // never marked refused for another
+            now.set(4000) // a1 has expired: nothing renewed for another account
+            assertNull(phone.deletionToken("b1"))
+            assertNull(phone.accessToken("b1"))
+            assertTrue(answering.sent.isEmpty())
+            assertEquals(renewed, phone.deletionToken("a1")) // its own, renewed
+            assertTrue(phone.refresh("a1"))
+            assertEquals(listOf(renewed, "y1"), listOf(phone.accessToken("a1"), phone.yes("a1")))
+
+            // b1's sign-in landing while a1's tokens are renewed for a1: none for a1, and its refresh false; b1's for b1.
+            for (refreshing in listOf(false, true)) {
+                val held = HeldEndpoint()
+                val (kept, later) = MemoryStore.holding(jwt("a1")) to Now()
+                val second = signIn(kept, held, later)
+                if (!refreshing) later.set(4000) // a1 has expired: renewed first
+                val asking = async { if (refreshing) second.refresh("a1").toString() else second.deletionToken("a1") }
+                held.received(1)
+                val signingIn = async { second.signIn(browser = signsIn) }
+                held.received(2)
+                held.answer(200, granted(jwt("b1"), refresh = "refresh-b"), newestOnly = true)
+                signingIn.await()
+                held.answer(200, granted(renewed)) // the renewal's, about a1's refresh token
+                assertEquals(if (refreshing) "false" else null, asking.await(), "$refreshing")
+                assertEquals(jwt("b1"), second.deletionToken("b1"), "$refreshing")
+                assertEquals(2, held.sent, "$refreshing")
+            }
         }
 
     @Test

@@ -202,6 +202,9 @@ class Server : HttpTransport {
     /** The routes of the requests sent and not yet taken by [next]. */
     val waiting: List<String> get() = synchronized(lock) { unanswered.map { it.route } }
 
+    /** Every request sent, in order, taken or not. */
+    val sent: List<Exchange> get() = synchronized(lock) { exchanges.toList() }
+
     override suspend fun send(request: HttpRequest): HttpAnswer {
         val answer = CompletableDeferred<Pair<Int?, String>>()
         val exchange = Exchange(request, answer)

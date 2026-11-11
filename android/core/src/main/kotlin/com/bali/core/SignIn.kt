@@ -273,6 +273,9 @@ internal data class Tokens(
         /** `sub` from [token]'s payload, unverified: only ever to tell one account from another. */
         fun subject(token: String): String? = claims(token)?.text("sub")
 
+        /** Whether access token [token] is [account]'s, by its `sub` ([subject]): never for none. */
+        fun isFor(token: String, account: String?): Boolean = account != null && subject(token) == account
+
         /** `email` from an ID token's payload, unverified: only ever shown, to say whose sign-in this is. */
         fun email(token: String): String? = claims(token)?.text("email")
 
@@ -381,19 +384,35 @@ class SignIn(
      */
     override suspend fun accessToken(): String? = given(gate = gated)
 
-    /** An account deletion's token, and the 13+ check's own read's (C7-server): the check passed or not. */
-    override suspend fun deletionToken(): String? = given(gate = false)
+    /**
+     * [accessToken] for [account] alone, its `sub` as [account] read it (the owner, 2026-11-10: "Close it now"): none
+     * while the sign-in held is another's, before a renewal and after it, and nothing renewed for it.
+     */
+    override suspend fun accessToken(account: String?): String? = given(gate = gated) { Tokens.isFor(it.access, account) }
+
+    /** An account deletion's token, and the 13+ check's own read's (C7-server): [account]'s alone, the check passed or not. */
+    override suspend fun deletionToken(account: String?): String? = given(gate = false) { Tokens.isFor(it.access, account) }
 
     /**
      * The engine's refresh, after the API refused the token it sent: never given again, after a relaunch
      * too, and a renewal tried: true once a fresh one is ready, false when only a sign-in can give one. It
      * never waits on the student, and never throws.
      */
-    suspend fun refresh(): Boolean {
+    suspend fun refresh(): Boolean = refreshIf { true }
+
+    /**
+     * [refresh] for [account]'s sign-in alone: true once a fresh token of [account]'s is held; false while the sign-in
+     * held is another's, nothing renewed or marked refused for it, and once a renewal leaves another's held.
+     */
+    suspend fun refresh(account: String?): Boolean =
+        refreshIf { Tokens.isFor(it.access, account) } && alone { tokens?.let { Tokens.isFor(it.access, account) } == true }
+
+    /** [refresh], while the tokens held are those [holds] takes. */
+    private suspend fun refreshIf(holds: (Tokens) -> Boolean): Boolean {
         val renewal =
             alone {
-                if (current() == null) return@alone null
-                tokens = tokens?.copy(until = Tokens.DISTANT_PAST)
+                val held = current()?.takeIf(holds) ?: return@alone null
+                tokens = held.copy(until = Tokens.DISTANT_PAST)
                 unsaved = !keep(tokens)
                 renew(telling = false)
             }
@@ -454,6 +473,9 @@ class SignIn(
 
     /** The yes Bali's server is still to record for this sign-in's account, by its event id; none when none waits. */
     suspend fun yes(): String? = alone { current()?.yes }
+
+    /** The yes Bali's server is still to record for [account], while the sign-in held is [account]'s; none else. */
+    suspend fun yes(account: String?): String? = alone { current()?.takeIf { Tokens.isFor(it.access, account) }?.yes }
 
     /** The yes [eventId] names, settled (recorded, or refused for good), let go, while it is still this sign-in's. */
     suspend fun recorded(eventId: String) =
@@ -576,10 +598,11 @@ class SignIn(
 
     /**
      * The access token, renewed first when it has expired; none once the API deleted the account or, [gate],
-     * while not through the 13+ check, the tokens a renewal leaves held to that too, where iOS's gives them.
+     * while not through the 13+ check, or while the tokens aren't those [holds] takes, the tokens a renewal
+     * leaves held to all that too, where iOS's gives them.
      */
-    private suspend fun given(gate: Boolean): String? {
-        fun Tokens.given() = deleted != true && (!gate || checked == true)
+    private suspend fun given(gate: Boolean, holds: (Tokens) -> Boolean = { true }): String? {
+        fun Tokens.given() = deleted != true && (!gate || checked == true) && holds(this)
         val (token, renewal) =
             alone {
                 val held = current()?.takeIf { it.given() }

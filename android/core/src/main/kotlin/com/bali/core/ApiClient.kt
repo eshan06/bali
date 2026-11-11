@@ -25,17 +25,25 @@ interface TokenProvider {
     suspend fun accessToken(): String?
 
     /**
-     * The token an account deletion sends under (C4; [ApiClient.forDeletion]): [accessToken]'s,
-     * unless a provider gives this one where that gives none, as sign-in does while it is not
-     * through the 13+ check (C7), so a sign-in answered under 13 deletes its account as Delete
-     * account does, and the check's own read, which makes no account either, goes first.
+     * The token to send now for [account] alone, by its `sub` (the owner, 2026-11-10: "Close it now";
+     * [ApiClient.forAccount]): [accessToken]'s while it is [account]'s, else none, so nothing is sent
+     * ([NoAnswer.NoToken]): never another account's, nor any for none. A provider that renews its
+     * tokens checks the account first, so none of another account's is renewed for it.
      */
-    suspend fun deletionToken(): String? = accessToken()
+    suspend fun accessToken(account: String?): String? = accessToken()?.takeIf { Tokens.isFor(it, account) }
+
+    /**
+     * The token an account deletion sends under (C4; [ApiClient.forDeletion]), [account]'s alone as
+     * [accessToken] gives it, unless a provider gives this one where that gives none, as sign-in does
+     * while it is not through the 13+ check (C7), so a sign-in answered under 13 deletes its account
+     * as Delete account does, and the check's own read, which makes no account either, goes first.
+     */
+    suspend fun deletionToken(account: String?): String? = accessToken(account)
 }
 
-/** A provider's deletion token, as every token it gives ([ApiClient.forDeletion]). */
-private class DeletionTokens(private val tokens: TokenProvider) : TokenProvider {
-    override suspend fun accessToken() = tokens.deletionToken()
+/** A provider's tokens for [account] alone: its deletion token, [deletion], else its access token. */
+private class AccountTokens(private val tokens: TokenProvider, private val account: String?, private val deletion: Boolean) : TokenProvider {
+    override suspend fun accessToken() = if (deletion) tokens.deletionToken(account) else tokens.accessToken(account)
 }
 
 /** Why a call has no answer: [SendResult.NetworkError], which every outbox table reads as retry. */
@@ -105,8 +113,14 @@ class ApiClient(
     private val transport: HttpTransport = OkHttpTransport(),
     private val timeout: Duration = REQUEST_TIMEOUT,
 ) {
-    /** This client under [TokenProvider.deletionToken]: an account deletion's (C4), and the 13+ check's read. */
-    val forDeletion: ApiClient get() = ApiClient(baseUrl, DeletionTokens(tokens), transport, timeout)
+    /** This client under [account]'s token alone ([TokenProvider.accessToken]): what goes for one account, the 13+ check's yes. */
+    fun forAccount(account: String?): ApiClient = ApiClient(baseUrl, AccountTokens(tokens, account, deletion = false), transport, timeout)
+
+    /**
+     * This client under [account]'s deletion token alone ([TokenProvider.deletionToken]): an account deletion's (C4),
+     * and the 13+ check's read. Never under whoever is signed in: a deletion is always one account's.
+     */
+    fun forDeletion(account: String?): ApiClient = ApiClient(baseUrl, AccountTokens(tokens, account, deletion = true), transport, timeout)
 
     /** `GET /v1/me`: the boot call; a read of the truth, for `readMayReconcile`. */
     suspend fun me(): ApiResponse<MeResponse> = read("/v1/me")

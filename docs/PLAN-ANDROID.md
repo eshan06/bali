@@ -14,17 +14,17 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-11 (Central) — AN9c, the 13+ check (#554; `docs/DECISIONS.md`, 2026-11-11): the
-server's yes read under the deletion's token, renewed once; the app's ask and the yes its sign-in keeps,
-each at every wake of the read loop and never during a deletion, the yes counted so a deletion waits out
-exactly the one on its way; each with the engine let go, so none holds an Emergency Unlock back; and the
-question's rules, counted by java.time's ISO calendar whatever calendar the phone's locale asks for. The
-owner ruled to close AN9b's wrong-account gap (2026-11-10: "Close it now"): AN9h. Before it, AN9b, the
-deletion in the engine. Next: AN9h, one account's token for Delete account and the 13+ check, then AN9d;
-AN7f and AN8's 📱 check on the owner's phones; Android's Cognito clients, the owner's (Open owner items, 8);
-Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5
-with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical
-path._
+_Last updated: 2026-11-10 (Central) — AN9h, one account's token for Delete account and the 13+ check
+(#555; `docs/DECISIONS.md`, 2026-11-10; the owner, 2026-11-10: "Close it now"): every request a deletion
+sends, and the 13+ read and yes, under the token of the account they are for alone, by its `sub`, each
+renewal that account's own; another account's sign-in landing before `DELETE /v1/me` is answered deleted
+stops the deletion with an answer of its own (`SignInChanged`), every record kept, nothing more sent and no
+Try again. The
+iPhone's twin is C4c, the Mac's. Before it, AN9c, the 13+ check. Next: AN9d, Join, Leave, Your name and
+forget me through the engine; AN7f and AN8's 📱 check on the owner's phones; Android's Cognito clients, the
+owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with
+today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones.
+Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -162,10 +162,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN9a** Delete account's rules — ✅ (#533; DECISIONS 2026-11-05)
 - **AN9b** The deletion in the engine — ✅ (#553; DECISIONS 2026-11-10)
 - **AN9c** The 13+ check — ✅ (#554; DECISIONS 2026-11-11)
-- **AN9h** One account's token for Delete account and the 13+ check (the owner, 2026-11-10: "Close it
-  now"; DECISIONS 2026-11-10): every request a deletion sends, and the 13+ read and yes, go under the
-  account they are for alone; a sign-in that changed meanwhile has nothing sent for it; the iPhone's
-  twin is C4c — validation: the JVM tests
+- **AN9h** One account's token for Delete account and the 13+ check — ✅ (#555; DECISIONS 2026-11-10)
 - **AN9d** Join, Leave, Your name and forget me through the engine, and Join's rules (twin: `Join`'s
   `Joining`, and SyncEngine.swift's `lookUp`, `join`, `rename`, `leave`, `unlockUnsent`, `forgetMe`
   and `meChanges`): Join with the consent list beside its preview, the code as codes are written; a

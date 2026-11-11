@@ -58,7 +58,8 @@ import kotlinx.coroutines.withContext
 // The sync engine, BaliOutbox's SyncEngine.swift: its frame, AN5a's, its drain, AN5b's, its read loop,
 // AN5c's, its wait for the Start, AN5d's, Emergency Unlock, AN5e's: where it is filed, its reason and the
 // late unlock, the phone check's cap, AN7a's, Delete account, AN9b's, and the 13+ check's read, ask and yes,
-// AN9c's. Swift's actor is a lock each stretch holds (docs/PLAN-ANDROID.md).
+// AN9c's, the deletion's sends and the check's each under one account's token alone, AN9h's. Swift's actor is a
+// lock each stretch holds (docs/PLAN-ANDROID.md).
 
 /** The engine's clock: the time records are stamped with, the zone its days end in, and waiting on it: a test's own there. */
 interface SyncClock {
@@ -294,10 +295,12 @@ class SyncEngine private constructor(
     /**
      * A change's answer, settled. A change's own answer is the truth as of that change, but a later change
      * of the phone's, still waiting for its own answer, stands over it until then. Each disposition is
-     * placed by name ([effect]). Returns the refresh a 401 calls for ([heard]).
+     * placed by name ([effect]). Returns the refresh a 401 calls for ([heard]), [renew]'s.
      */
-    private suspend fun answered(record: OutboxRecord, sent: Sent, disposition: Disposition?): Deferred<Unit>? {
-        val refreshing = heard(sent.result, sent.noAnswer)
+    private suspend fun answered(
+        record: OutboxRecord, sent: Sent, disposition: Disposition?, renew: suspend () -> Boolean = refresh,
+    ): Deferred<Unit>? {
+        val refreshing = heard(sent.result, sent.noAnswer, renew)
         knowLastTap()
         val queued = queue()
         val applies = stored { outbox.awaiting() }.getOrNull() == 0
@@ -477,21 +480,21 @@ class SyncEngine private constructor(
                     throw cancelled
                 }
             refreshing?.await()
-            // The account's 13+ yes, kept with its sign-in until Bali's server has it (C7-server).
-            signIn?.yes()?.let { record(yes = it) }
+            // The account's 13+ yes, kept with its sign-in until Bali's server has it (C7-server), and sent for that account.
+            signIn?.let { held -> held.account()?.let { account -> held.yes(account)?.let { record(account, yes = it) } } }
             readRings.pause(alone { nextRead() })
         }
     }
 
     /**
-     * The account's 13+ yes, sent (`PUT /v1/me/age-check`) under its event id [yes], its token renewed once on a 401,
-     * and counted in the stretch that reads [deleting]: never during an account deletion, since landing after its
-     * `DELETE /v1/me` it would make a fresh account, and a deletion waits out one on its way ([Counted]). Sent, and
-     * settled with the sign-in, with the engine let go. Recorded, or refused for good (a 4xx but 401, 408 and 429,
-     * which only a deletion meanwhile or a spent id can earn), the sign-in lets it go: at worst the account is asked
-     * once more, at a sign-in where Bali's server has no yes for it. Else kept for the next wake.
+     * [account]'s 13+ yes, sent (`PUT /v1/me/age-check`) under its event id [yes] and that account's token alone, renewed
+     * once on a 401, never another's (AN9h), and counted in the stretch that reads [deleting]: never during an account
+     * deletion, since landing after its `DELETE /v1/me` it would make a fresh account, and a deletion waits out one on its
+     * way ([Counted]). Sent, and settled with the sign-in, with the engine let go. Recorded, or refused for good (a 4xx
+     * but 401, 408 and 429, which only a deletion meanwhile or a spent id can earn), the sign-in lets it go: at worst the
+     * account is asked once more, at a sign-in where Bali's server has no yes for it. Else kept for the next wake.
      */
-    private suspend fun record(yes: String) {
+    private suspend fun record(account: String, yes: String) {
         val answer =
             counted { request ->
                 val held =
@@ -499,7 +502,12 @@ class SyncEngine private constructor(
                         if (!deleting) request.count()
                         deleting
                     }
-                if (held) null else renewing { client.recordAgeCheck(RecordAgeCheckRequest(yes)) }.also { alone { request.land() } }
+                if (held) {
+                    null
+                } else {
+                    renewing({ renewed(account) }) { client.forAccount(account).recordAgeCheck(RecordAgeCheckRequest(yes)) }
+                        .also { alone { request.land() } }
+                }
             } ?: return
         val code = (answer.result as? SendResult.Status)?.code ?: return
         if (code in 200..299 || code in 400..499 && code != 401 && code != 408 && code != 429) signIn?.recorded(yes)
@@ -833,14 +841,16 @@ class SyncEngine private constructor(
         }
 
     /**
-     * Whether Bali's server holds the 13+ yes of the account signed in (`GET /v1/me/age-check`, C7-server): the one
-     * call a sign-in makes before its age is settled, which makes no account, so under the token the sign-in gives
-     * whatever the check ([ApiClient.forDeletion]), renewed once on a 401. The app's own call, right after a sign-in not
-     * yet through the check and at the wakes [askAgeAtEachWake] asks it at, with the engine let go, since a renewal it
-     * starts tells the engine. Uncounted, as on iOS: landing after a deletion's `DELETE /v1/me`, a read that makes no
-     * account reads `false`.
+     * Whether Bali's server holds the 13+ yes of [account], the one signed in as the app asks (`GET /v1/me/age-check`,
+     * C7-server): the one call a sign-in makes before its age is settled, which makes no account, so under the token
+     * that account's sign-in gives whatever the check ([ApiClient.forDeletion]), renewed once on a 401, and never
+     * another's (AN9h): while the sign-in held is another account's, nothing is sent ([NoAnswer.NoToken]), and that
+     * one is asked by a read of its own. The app's own call, right after a sign-in not yet through the check and at the
+     * wakes [askAgeAtEachWake] asks it at, with the engine let go, since a renewal it starts tells the engine.
+     * Uncounted, as on iOS: landing after a deletion's `DELETE /v1/me`, a read that makes no account reads `false`.
      */
-    suspend fun ageCheck(): ApiResponse<AgeCheckResponse> = renewing { client.forDeletion.ageCheck() }
+    suspend fun ageCheck(account: String?): ApiResponse<AgeCheckResponse> =
+        renewing({ renewed(account) }) { client.forDeletion(account).ageCheck() }
 
     /**
      * Me's Delete account (C4): the one call the screen makes, answered with where the deletion stands, a press
@@ -856,12 +866,15 @@ class SyncEngine private constructor(
      * - Cognito's DeleteUser, which the next call tries again, alone, until it is done; done, the sign-in is
      *   forgotten, as Sign out forgets it.
      *
-     * Only for the account signed in as it starts ([SignIn.account]): another's sign-in landed meanwhile is
-     * neither marked deleted nor deleted from Cognito. What the student does while it runs, or while DeleteUser
-     * waits (a tap, Back to focus, a join, a rename), is C4b's to keep from happening. Everything it sends goes
-     * under the sign-in's deletion token ([ApiClient.forDeletion]), whether or not its 13+ check has passed:
-     * the gap's fallback (C7) deletes its account by these same steps. It runs in the engine's scope, each send
-     * and each call into the sign-in with the engine let go: its caller cancelled stops waiting, and it goes on.
+     * Only for the account signed in as it starts ([SignIn.account]), which every send goes under, each renewal
+     * included, and its mark and DeleteUser hold to (the owner, 2026-11-10: "Close it now"): another's sign-in
+     * landed meanwhile has nothing sent for it. Landed before `DELETE /v1/me` is answered deleted, it stops the
+     * deletion there ([AccountDeletion.SignInChanged]), nothing more sent and every record kept; after, the deletion
+     * goes on, the other neither marked deleted nor deleted from Cognito. What the student does while it runs, or
+     * while DeleteUser waits (a tap, Back to focus, a join, a rename), is C4b's to keep from happening. It sends
+     * under that account's deletion token ([ApiClient.forDeletion]), whether or not its 13+ check has passed: the
+     * gap's fallback (C7) deletes its account by these same steps. It runs in the engine's scope, each send and
+     * each call into the sign-in with the engine let go: its caller cancelled stops waiting, and it goes on.
      */
     suspend fun deleteAccount(signIn: SignIn): AccountDeletion =
         alone { deletion?.takeIf { it.isActive } ?: scope.async { delete(signIn) }.also { deletion = it } }.await()
@@ -875,16 +888,15 @@ class SyncEngine private constructor(
             alone { deleting = true }
             try {
                 waitOut()
-                sendAll()?.let { return it }
-                val answer = sendDeletion()
+                sendAll(signIn, account)?.let { return stopped(signIn, account, it) }
+                val answer = sendDeletion(signIn, account)
                 when (answer.answer?.outcome?.known) {
                     DeleteMeResponse.Outcome.Deleted, DeleteMeResponse.Outcome.AlreadyDeleted -> alone { deletionId = null }
-                    null ->
-                        return if (answer.error?.error?.reason == ApiErrorReason.TeacherHasClasses) {
-                            AccountDeletion.TeacherHasClasses
-                        } else {
-                            AccountDeletion.NotDeleted(answer.result)
-                        }
+                    null -> {
+                        val teacher = answer.error?.error?.reason == ApiErrorReason.TeacherHasClasses
+                        val stop = if (teacher) AccountDeletion.TeacherHasClasses else AccountDeletion.NotDeleted(answer.result)
+                        return stopped(signIn, account, stop)
+                    }
                 }
                 signIn.accountDeleted(account)
             } finally {
@@ -910,6 +922,15 @@ class SyncEngine private constructor(
     }
 
     /**
+     * Where the deletion for [account] stopped, [stop], unless another account's sign-in is held now: then who is signed in
+     * changed before `DELETE /v1/me` was answered deleted ([AccountDeletion.SignInChanged]), and no stop offers a Try again
+     * that would delete the account signed in now. Nobody signed in (Cognito refused the sign-in meanwhile), [stop] stands:
+     * its Try again asks for a sign-in first.
+     */
+    private suspend fun stopped(signIn: SignIn, account: String, stop: AccountDeletion): AccountDeletion =
+        if (signIn.account().let { it == null || it == account }) stop else AccountDeletion.SignInChanged
+
+    /**
      * What the loops have on its way, waited out ([underway]): exactly that, since they count nothing more
      * while [deleting], and never forever, since each lands however its send ends ([Counted]).
      */
@@ -921,26 +942,28 @@ class SyncEngine private constructor(
     }
 
     /**
-     * The outbox sent before an account deletion (C4), each record once, in the order [nextBeforeDeletion]
-     * gives, every Emergency Unlock first, under the deletion's token with the engine let go, each answer
-     * settled and applied as the drain's is, a 401's refresh waited for; then what holds the deletion back, if
-     * anything: an unlock still queued, one tried and stuck included, which the deleted account could never
-     * send, never let go; else a record no answer settled, with the last answer; or the file unread. A tap the
-     * server refused holds nothing back.
+     * The outbox sent before [account]'s deletion (C4), each record once, in the order [nextBeforeDeletion]
+     * gives, every Emergency Unlock first, under [account]'s deletion token with the engine let go, each answer
+     * settled and applied as the drain's is, a 401's refresh, of [account]'s sign-in alone, waited for; then what
+     * holds the deletion back, if anything: an unlock still queued, one tried and stuck included, which the
+     * deleted account could never send, never let go; else a record no answer settled, with the last answer; or
+     * the file unread. A tap the server refused holds nothing back.
      */
-    private suspend fun sendAll(): AccountDeletion? {
+    private suspend fun sendAll(signIn: SignIn, account: String): AccountDeletion? {
         val tried = mutableSetOf<String>()
         var last: SendResult = SendResult.NetworkError
+        val renew = suspend { signIn.refresh(account) }
         while (true) {
             val (record, onItsWay) = alone { stored { nextToSend(tried) } }.getOrElse { return AccountDeletion.Unread } ?: break
             tried += record.eventId
-            val sent = record.send(client.forDeletion)
-            // No token: nothing went, so nothing is settled (the drain's rule), said as no answer.
+            val sent = record.send(client.forDeletion(account))
+            // No token, [account]'s sign-in no longer held among the reasons: nothing went, so nothing is settled (the
+            // drain's rule), said as no answer.
             if (sent == null || sent.noAnswer == NoAnswer.NoToken) {
                 alone { if (!onItsWay) update { it.copy(sending = it.sending - record.eventId) } }
                 break
             }
-            val settled = alone { stored { outbox.settle(sent, clock.now()) }.map { answered(record, sent, it) to (it?.keeps == true) } }
+            val settled = alone { stored { outbox.settle(sent, clock.now()) }.map { answered(record, sent, it, renew) to (it?.keeps == true) } }
             val (refreshing, keeps) = settled.getOrElse { return AccountDeletion.Unread }
             if (keeps) last = sent.result
             refreshing?.await()
@@ -963,17 +986,20 @@ class SyncEngine private constructor(
      * says another event holds it: a boot call racing a deletion can make the account it makes look older than
      * the deletion, whose retry then reads as another's.
      */
-    private suspend fun sendDeletion(): ApiResponse<DeleteMeResponse> {
-        val answer = deleteMe()
+    private suspend fun sendDeletion(signIn: SignIn, account: String): ApiResponse<DeleteMeResponse> {
+        val answer = deleteMe(signIn, account)
         if (answer.error?.error?.reason != ApiErrorReason.EventIdConflict) return answer
         alone { deletionId = null }
-        return deleteMe()
+        return deleteMe(signIn, account)
     }
 
-    /** One `DELETE /v1/me`, under the last one's event id while no answer settled it (rule 4), the engine let go. */
-    private suspend fun deleteMe(): ApiResponse<DeleteMeResponse> {
+    /**
+     * One `DELETE /v1/me` under [account]'s token, renewed for that account alone, and under the last one's event id
+     * while no answer settled it (rule 4), the engine let go.
+     */
+    private suspend fun deleteMe(signIn: SignIn, account: String): ApiResponse<DeleteMeResponse> {
         val eventId = alone { deletionId ?: EventId.mint(clock.now()).also { deletionId = it } }
-        return renewing { client.forDeletion.deleteMe(DeleteMeRequest(eventId)) }
+        return renewing({ signIn.refresh(account) }) { client.forDeletion(account).deleteMe(DeleteMeRequest(eventId)) }
     }
 
     /** What the deleted account still had queued let go, but every Emergency Unlock ([Outbox.accountDeleted]), and the queue read again. */
@@ -1139,9 +1165,10 @@ class SyncEngine private constructor(
      * token sends everything again at once; a fresh token refused too waits out the backoff, or for the
      * sign-in's [retryNow]; one that gives none is asked again at the next 401. Returns that refresh,
      * started here or shared, for its caller to wait for with the engine let go, after a stretch that has
-     * nothing of a 401's to apply, where Swift waits in `heard`.
+     * nothing of a 401's to apply, where Swift waits in `heard`. A refresh started here is [renew]'s: an account
+     * deletion's renews its own account's sign-in alone.
      */
-    private suspend fun heard(result: SendResult, noAnswer: NoAnswer?): Deferred<Unit>? {
+    private suspend fun heard(result: SendResult, noAnswer: NoAnswer?, renew: suspend () -> Boolean = refresh): Deferred<Unit>? {
         if (result !is SendResult.Status) {
             update { it.copy(link = if (noAnswer == NoAnswer.NoToken) Link.SignIn else Link.Unreachable) }
             return null
@@ -1155,7 +1182,7 @@ class SyncEngine private constructor(
         return reauth ?: scope.async {
             var fresh = false
             try {
-                fresh = hooked(false) { refresh() }
+                fresh = hooked(false) { renew() }
             } finally {
                 reauthed(fresh)
             }
@@ -1178,14 +1205,18 @@ class SyncEngine private constructor(
         }
 
     /**
-     * A screen's own call, [send]: sent once more when the API refused its token and [refresh] renewed it,
-     * as the loops do for their own; a refresh that gives none leaves the 401, said. iOS's
-     * `Joining.send(renewing:)`, the engine's own until AN9 gives it to `Joining`.
+     * A screen's own call, [send]: sent once more when the API refused its token and [renew] renewed it, the engine's
+     * [refresh], or for a call of one account's, that account's sign-in alone ([renewed]), as the loops do for their
+     * own; a refresh that gives none leaves the 401, said. iOS's `Joining.send(renewing:)`, the engine's own until AN9
+     * gives it to `Joining`.
      */
-    private suspend fun <A> renewing(send: suspend () -> ApiResponse<A>): ApiResponse<A> {
+    private suspend fun <A> renewing(renew: suspend () -> Boolean = refresh, send: suspend () -> ApiResponse<A>): ApiResponse<A> {
         val answer = send()
-        return if (answer.result == SendResult.Status(401) && hooked(false) { refresh() }) send() else answer
+        return if (answer.result == SendResult.Status(401) && hooked(false) { renew() }) send() else answer
     }
+
+    /** [account]'s sign-in renewed after a 401 to a call for that account alone (AN9h); none for an engine with no sign-in. */
+    private suspend fun renewed(account: String?): Boolean = signIn?.refresh(account) == true
 
     /** A refresh's end: a fresh token, the first since the rejection, sends everything again at once. */
     private suspend fun reauthed(fresh: Boolean) =
