@@ -14,17 +14,17 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-11 (Central) — AN9f, Me's rules: Your name, Leave and Sign out's hold (#560;
-`docs/DECISIONS.md`, 2026-11-11): `outbox`'s `Me.kt`, each failure a type: `Naming`, the name typed as the API takes
-it, kept to whole characters within 64 code points, tidied as the API stores it, and saved under one event id while
-it stays the same, a blank one nothing to save; `Leaving`, a class's Leave asked, sent under one event id while the
-enrollment stays the same, and held in that class's lesson; and `SignOutHold`, Sign out held while an Emergency Unlock
-is queued or the file can't say. The blank test's Default_Ignorable_Code_Point is a table, held to the API's own regex
-by the API's own test (Q6). Before it, AN9i, the account's flows in the app. Next: AN9g, History's rules and its call;
-AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone
-(Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK
-before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner
-has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-11 (Central) — AN9g, History's rules and its call (#561; `docs/DECISIONS.md`, 2026-11-11),
+AN9's last step: `outbox`'s `History.kt`, every failure and day title a type: the pages as they came, from the top or
+Show earlier's, each moment once, which read may start and the cursor it sends, and Show earlier's cursor the server
+doesn't hold read again from the top; days in the phone's zone, whole at a daylight-saving change, today, yesterday or a date, in cards
+of one class's moments in a row, each card's id kept as moments join it; a kind this build doesn't know kept in the
+page and left out of the days. The engine's `history(before)` is a read that applies nothing. Before it, AN9f, Me's
+rules. Next: AN10, the router and the screens' rules; the cover test's SMS step waiting out Google Messages, a step
+of its own (`docs/DECISIONS.md`, 2026-11-11, AN9i's entry); AN7f and AN8's 📱 check on the owner's phones, signed in
+on dev as an account that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner
+items, 8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5
+with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -170,12 +170,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN9i** The account's flows in the app, and the readout's Join and History — ✅ (#559; DECISIONS
   2026-11-11)
 - **AN9f** Me's rules: Your name, Leave and Sign out's hold — ✅ (#560; DECISIONS 2026-11-11)
-- **AN9g** History's rules and its call (twin: `History`, and SyncEngine.swift's `history`): History's
-  pages, from the top, Show earlier, each moment once, an unknown cursor read again from the top; its
-  days in the phone's zone, and cards of one class's moments in a row; a moment's kind, reason and note,
-  but no word, day title or time format (AN10's). Tests: HistoryTests' `days`, `cardIds`, `everyKind`,
-  `unknowns`, `pages`, `readAgain` and `failures`, and HistoryEngineTests (AN5's split) — validation:
-  the JVM tests
+- **AN9g** History's rules and its call — ✅ (#561; DECISIONS 2026-11-11)
 - **AN10** The router and the screens' rules (twin: `Screen.swift`, `FocusWords`, `UnlockedWords`,
   `ProtectionOffWords` and `ShieldWords`): which screen shows when, and what Focus, Unlocked,
   Protection off and the block screen say (rule 3: no countdown over nothing locked), their rules

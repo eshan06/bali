@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN9g's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN9f, Me's rules: Your name, Leave and Sign out's hold (#560;
+`docs/DECISIONS.md`, 2026-11-11): `outbox`'s `Me.kt`, each failure a type: `Naming`, the name typed as the API takes
+it, kept to whole characters within 64 code points, tidied as the API stores it, and saved under one event id while
+it stays the same, a blank one nothing to save; `Leaving`, a class's Leave asked, sent under one event id while the
+enrollment stays the same, and held in that class's lesson; and `SignOutHold`, Sign out held while an Emergency Unlock
+is queued or the file can't say. The blank test's Default_Ignorable_Code_Point is a table, held to the API's own regex
+by the API's own test (Q6). Before it, AN9i, the account's flows in the app. Next: AN9g, History's rules and its call;
+AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone
+(Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK
+before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner
+has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN9f's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN9i, the account's flows in the app, and the readout's Join and History
 (#559; `docs/DECISIONS.md`, 2026-11-11): `BaliApp`'s `start` makes one `Account` a run over the engine's sign-in and
 runs it in the run's job, the 13+ check's ask hooked at each wake and each sign-in followed; the Debug readout's Join
@@ -2666,6 +2678,15 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN9g's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11).
+
+- **AN9g** History's rules and its call (twin: `History`, and SyncEngine.swift's `history`): History's
+  pages, from the top, Show earlier, each moment once, an unknown cursor read again from the top; its
+  days in the phone's zone, and cards of one class's moments in a row; a moment's kind, reason and note,
+  but no word, day title or time format (AN10's). Tests: HistoryTests' `days`, `cardIds`, `everyKind`,
+  `unknowns`, `pages`, `readAgain` and `failures`, and HistoryEngineTests (AN5's split) — validation:
+  the JVM tests
 
 AN9f's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11).
 

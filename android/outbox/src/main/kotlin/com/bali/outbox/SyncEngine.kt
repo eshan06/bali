@@ -15,6 +15,7 @@ import com.bali.core.EndEnrollmentResponse
 import com.bali.core.EnrollmentJoinRequest
 import com.bali.core.EnrollmentJoinResponse
 import com.bali.core.EventId
+import com.bali.core.HistoryPage
 import com.bali.core.HttpTransport
 import com.bali.core.JoinCodePreviewResponse
 import com.bali.core.MeResponse
@@ -882,6 +883,14 @@ class SyncEngine private constructor(
      * runs in its caller's coroutine: a caller cancelled stops it, and nothing else.
      */
     suspend fun lookUp(code: String): ApiResponse<JoinCodePreviewResponse> = Joining.send(refresh) { client.previewJoinCode(code) }
+
+    /**
+     * A page of the student's own history (`GET /v1/me/history`), older than [before], none the newest: the History screen's
+     * own call (C6a), under whoever is signed in, its token renewed once on a 401 by the engine's own [refresh]
+     * ([Joining.send]). A read that applies nothing, to the engine's state or the outbox, so it runs in its caller's
+     * coroutine, as [lookUp] does: a caller cancelled stops it, and nothing else. `History` keeps its answer.
+     */
+    suspend fun history(before: String?): ApiResponse<HistoryPage> = Joining.send(refresh) { client.history(before) }
 
     /**
      * Joins the class a code opens (`POST /v1/enrollments`): the Join screen's own call (C2b), under whoever is signed in,
