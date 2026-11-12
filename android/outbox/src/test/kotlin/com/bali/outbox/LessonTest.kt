@@ -106,6 +106,11 @@ class LessonTest {
         // The one the phone stands in before the class in session, as the lesson followed is.
         val both = assertNotNull(headed(synced(Standing.InSession(bell1042, ParticipationState.Focused), live = true)))
         assertEquals(period3 to "with Ms. Rivera · ends 10:42 AM", both.first to plain(both.second))
+        // Its bell rung by the phone's clock, or said over: the class in session's, the lesson followed then.
+        val rung = assertNotNull(headed(synced(Standing.InSession(session(endsAt = 60), ParticipationState.Focused), live = true), now = at(61)))
+        assertEquals("Period 3" to "ends 11:03 AM", rung.first to plain(rung.second))
+        val over = assertNotNull(headed(synced(Standing.InSession(bell1042, ParticipationState.Focused), live = true), over = setOf("s")))
+        assertEquals("Period 3" to "ends 11:03 AM", over.first to plain(over.second))
         assertNull(headed(listing(Standing.Out), over = setOf("live")))
         assertNull(headed(synced(Standing.InSession(bell1042, ParticipationState.Unlocked), read = false)))
         // Followed, in a class the read doesn't name.

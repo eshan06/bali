@@ -53,8 +53,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - **`AnswerCard` is a plain class, as `FocusWords` is,** made from what iOS's init takes, with no equality of its own (Swift's
     is `Hashable`): AN13d keeps the card's inputs in its own state, as iOS's `Phone` does, and makes the card from them.
   - **The tests read a little past the twin's:** the lesson followed over a standing that won't read and a state not known; the
-    heading over a class in session beside the one stood in, and over a class the read doesn't name with the read in; the
-    couldn't-send line kept while Bali holds the answer it held as the pick was made; and each line's whole text on every board.
+    heading over a class in session beside the one stood in, before that one's bell and once it has rung or is said over, and
+    over a class the read doesn't name with the read in; the couldn't-send line kept while Bali holds the answer it held as the
+    pick was made; and each line's whole text on every board.
+  - **A known limit, the twin's, kept for parity (santa's reviewer B):** the heading takes the first session of the id followed,
+    the one stood in before a class's, as iOS's does. So past the bell of the session the phone stands in, by its own clock,
+    after a teacher's extend that a read of `GET /v1/me` applied while the standing wasn't reconciled (a record of the phone's
+    on its way holds a read's standing back), the class is followed under the same id but headed with the old bell, gone by,
+    until a read reconciles the standing, about one read on a working network. On Android only the permission step heads a
+    lesson (AS3-Lesson), shown past the bell with the lock's switch off. Recommendation, taken with the owner away: the twin's
+    in this step, since the parity rule names every difference and Android's steps edit nothing in `ios/`; a later step heads
+    the entry `lessonSession` matched, in both apps at once.
 
   **The guard** (`WordsTest`) reads `SyncState.lessonHeading` wherever the phone may stand, the classes not read, read as none,
   as one and as one in session, before the bell and at it, said over or not; and `AnswerCard.line` for every question a read can
@@ -68,8 +77,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   send…" for "Your answer is in."); a mark on an open card, the closed looks drawn open (the open test, and the guard:
   "Look's cases, each with a sample"); the session the phone stands in not checked first (the lesson-followed test, "live" for
   "tapped", and the heading test, Period 3's for the one stood in); an em-dash in a line (the closed test, and the guard:
-  "AnswerCard.line holds an em-dash"); a too-late card left open (the said test); and an `AnswerResult` added with no place
-  (the compile: "'when' expression must be exhaustive. Add the 'Added' branch").
+  "AnswerCard.line holds an em-dash"); a too-late card left open (the said test); an `AnswerResult` added with no place (the
+  compile: "'when' expression must be exhaustive. Add the 'Added' branch"); and, after santa's review, the heading taken from
+  the session stood in whenever there is one (the heading test: its class for the class in session's, once its bell rang).
 
   **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble :app:lint
   check` green, Android 10's API check with it (Animal Sniffer over `core` and `outbox`), and no compiler or lint warning from
@@ -79,7 +89,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   was installed and no library added: the build downloads none (`android.builder.sdkDownload=false`), and no build file changed.
   The size, santa's count: 134 changed lines not counting tests and Markdown (the split guessed about 120), 244 in the tests.
 
-  **Santa's review:** SANTA.
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): 0 blockers. Their WARNs: the heading test never headed a lesson whose session
+  stood in had rung, or was said over, beside a class in session, so a heading of the session stood in whenever there is one
+  would have passed (reviewer A; taken: two assertions, their break tried); and the heading's lookup, the twin's known limit
+  above (reviewer B; left as the twin's). The design check, no-ai-slop's Detect job over the new strings, found nothing: each
+  line is iOS's and a board's, in DESIGN.md's voice.
 
   **For AN13d to AN13g and AS8:** AN13d follows `lessonSession(now, over)`, `over` its own set of sessions a read said are over
   (iOS's `notFollowed`), and makes the card from the lesson's state, `AnswerCard(question, state.problem, sending, said)`, `said`
