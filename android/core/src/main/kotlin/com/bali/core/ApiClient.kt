@@ -110,8 +110,10 @@ interface HttpTransport {
 class ApiClient(
     val baseUrl: URI,
     private val tokens: TokenProvider,
-    private val transport: HttpTransport = OkHttpTransport(),
-    private val timeout: Duration = REQUEST_TIMEOUT,
+    /** How every request goes on the wire, and a slide's deck from its bucket, with no token ([LiveLesson.deck]). */
+    internal val transport: HttpTransport = OkHttpTransport(),
+    /** Each request's wait for its next byte, a deck's from its bucket too. */
+    internal val timeout: Duration = REQUEST_TIMEOUT,
 ) {
     /** This client under [account]'s token alone ([TokenProvider.accessToken]): what goes for one account, the 13+ check's yes. */
     fun forAccount(account: String?): ApiClient = ApiClient(baseUrl, AccountTokens(tokens, account, deletion = false), transport, timeout)
