@@ -10,9 +10,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-12** — **AN10e, Focus's words and the block screen's: BaliOutbox's `FocusWords`, `UnlockFailure`'s words and
   `ShieldWords` in Kotlin, each line a function of its type, the claim naming Bali's lock, the block screen's title alone,
-  and the late unlock's clock line naming Android's Settings, drawn first (this step's calls, marked, each awaiting the
-  owner's look; AN10e, #570).** The owner is asleep and said to take the recommended option on every regular call, so each
-  call here is this step's, for the owner to look at.
+  and the late unlock's clock line naming Android's Settings, drawn first (the conductor's calls, made in this step, marked,
+  each awaiting the owner's look; AN10e, #570).** The owner is asleep and said to take the recommended option on every
+  regular call, so each call here is the conductor's, for the owner to look at.
 
   **Where it lives:** `outbox`, beside each type. `Focus.kt`: `FocusWords`, from the engine's truth (`SyncState`) and what
   rule 3's check verified (`Protection`), with its `Claim` (`Paused`, `LockOff`, `Unverified`: iOS's `screenTimeOff` named
@@ -34,7 +34,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the screen itself (Focused, Almost done, No connection, While offline, Open Accessibility settings, the time left as
   TalkBack says it) are AS5's, as they are iOS's view's, not `FocusWords`'.
 
-  **This step's calls, each awaiting the owner's look:**
+  **The conductor's calls, made in this step, each awaiting the owner's look:**
   - **The late unlock's clock line names Android's own way** (the brief: "superseded's Settings path is Android's own"):
     "Bali recorded your unlock, but this phone's clock was behind, so it counted as before you went back to focus. Turn on
     automatic time in Settings → System → Date & time, then hold to unlock again." iOS's "Turn on Set Automatically in
@@ -63,8 +63,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
     Emergency Unlock): an unlock not saved and Bali still starting each end on another try, and a late unlock's two lines
     each say to hold to unlock again. "There was nothing to unlock, so nothing was recorded." is said only once nothing the
     phone knows locks (`pressUnlock`). No line says the unlock can be missing, used up or refused. The block screen's Open
-    Bali opens on Focus wherever the lock is on by its own rule, before anything but a start that failed or a deletion,
-    which take the lock off (`Screen.choose`, AN10a's tests).
+    Bali opens on Focus wherever the lock is on by its own rule, or on Home over the last run's lock with the standing
+    unread, both holding Emergency Unlock; only a start that failed and a deletion come first, and each takes the lock off
+    (`Screen.choose`, AN10a's tests).
   - **The block screen's parts are a type** (`ShieldWords`), so the guard reads each and a part with no word stops the
     compile; it has no website's case, Android's lock covering apps alone.
 
@@ -91,12 +92,27 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **For AN10f to AN10h and Phase 10:** AS5's Focus says `FocusWords` (its `countdown` the ring's and the strip's, drawn only
   where it isn't none) and `UnlockFailure.words(paused = claim == Claim.Paused)` under the hold; the block screen says
   `ShieldWords`' words, a picture-in-picture cover its title alone (AS5-Block-pip-a). The view's own words above are AS5's,
-  from iOS's FocusView. AN10f to AN10h: a line whose iPhone Settings path no board redraws names Android's own, drawn
-  first, as the clock line was here.
+  from iOS's FocusView. AN10f: Unlocked's and Protection off's headings call `SyncState.heading` (Focus.kt, internal), iOS's
+  one helper, as AS8's lesson heading will. AN10f to AN10h: a line whose iPhone Settings path no board redraws names
+  Android's own, drawn first, as the clock line was here. PLAN.md is at 7,990 of its 8,000 words: the next step that adds
+  to it moves finished detail to the archive first.
 
-  **The proof:** PROOF.
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof: `./gradlew assemble :app:lint check` green
+  before santa's fix and on the final code, Android 10's API check with it (Animal Sniffer over `core` and `outbox`); the
+  core and outbox suites run seven times, each green, once before santa's fix and six times on the final code (626 tests,
+  ten of them new), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck &&
+  npm run lint && npm test` green, the portal's suite whole. Two emulators, `Bali_Spike_API35` and `_API37`, ran only to
+  read Android's Settings labels (Date & time and System, by `uiautomator dump`): nothing installed and no setting changed,
+  the two dumps deleted, each stopped. No SDK package was installed: the build downloads none
+  (`android.builder.sdkDownload=false`), and the SDK's folders matched before and after.
 
-  **Santa's review:** SANTA.
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: the session's heading written inline where
+  iOS shares one helper (reviewer B; taken: `SyncState.heading`, above); the clock line on no board but this step's, so the
+  Words board's count leaves it out, and a Samsung's path differing (both; said above, for the owner's look); this entry's
+  and the PR's placeholders (reviewer A; filled); and PLAN.md's 10 words of room (reviewer B; above, for AN10f). The design
+  check, no-ai-slop's Detect job over the new and changed strings, found nothing: each line is iOS's or a board's but the
+  clock line's second sentence, in DESIGN.md's voice.
 
 - **2026-11-12** — **AN10c2, the last run's lock over a storage that won't read: where the phone's storage fails to give
   back where it stood, the last run's lock comes off as the engine loads, as at a start that runs nothing, and a later read
