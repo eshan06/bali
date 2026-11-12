@@ -10,7 +10,7 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 
 _Last updated: 2026-11-12 (Central) — The portal's sign-in page rebuilt from the approved sign-in
 redesign: two panels, the session ring as art, Sign in a pill, its intermediate states drawn first
-(#NNN; DECISIONS 2026-11-12). Before it, Cognito's sign-in pages on its managed login (#581).
+(#582; DECISIONS 2026-11-12). Before it, Cognito's sign-in pages on its managed login (#581).
 Next: the owner's switch of prod's domain, the release call and disabling the review account (Open
 owner items); the app's Sign in from the same redesign (the Mac's); a session builds the
 retire-a-block command; the owner the sitting's findings' calls; GA5's known limit, the owner's
@@ -64,7 +64,7 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   (`infra/cognito/managed-login/`); dev's domain switched, prod's the owner's (Open owner items).
   Rebuilt from the approved
   [Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB): the portal's sign-in
-  page ✅ (#NNN; DECISIONS 2026-11-12); next, the app's Sign in screen (the Mac's).
+  page ✅ (#582; DECISIONS 2026-11-12); next, the app's Sign in screen (the Mac's).
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04); part 2 on
