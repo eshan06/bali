@@ -328,14 +328,14 @@ developer's — and because it's free until 50,000 monthly users and already pro
 (v2's auth bugs were in our code around Cognito, not in Cognito). If its clunkiness
 becomes real pain during the iOS build, the named fallback is Clerk.
 *Amended 2026-11-12 (the owner's ask):* Cognito's own pages, where everyone signs in, signs up and
-resets a password, are its **managed login**, the pages' second version, in both pools, where they
-were the classic hosted UI: in Bali's tokens (`infra/cognito/managed-login/`), their words still
-AWS's. Cognito stays rather than Clerk: passwords can't be moved out of Cognito, so a move would
-have every account set a new one, and the app App Review approved has Cognito built in. Username
-and password sit on one page: an app client allowing choice-based sign-in (`ALLOW_USER_AUTH`) gets
-managed login's identifier-first form, the username alone and then the password on a page of its
-own, so Bali's clients leave it off. `/signup` still opens the sign-up page, as the app's Sign up
-needs (C7, below). Dev's domain switched on 2026-11-12; prod's is the owner's to switch (PLAN).
+resets a password, move from the classic hosted UI to its **managed login**, the pages' second
+version, in Bali's tokens (`infra/cognito/managed-login/`), their words still AWS's: dev's on
+2026-11-12, prod's once the owner switches its domain (PLAN). Cognito stays rather than Clerk:
+passwords can't be moved out of Cognito, so a move would have every account set a new one, and the
+app App Review approved has Cognito built in. Username and password sit on one page: an app client
+allowing choice-based sign-in (`ALLOW_USER_AUTH`) gets managed login's identifier-first form, the
+username alone and then the password on a page of its own, so Bali's clients leave it off.
+`/signup` still opens the sign-up page, as the app's Sign up needs (C7, below).
 
 **2. Every request carries a JWT — a signed identity note.** The server doesn't remember
 anyone between requests, so each request must say who it's from without re-sending a
@@ -1114,8 +1114,8 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   it is asked), before Screen Time and Home. The shields' Focus and the home a standing not read
   keeps, which hold the exit, come before both, and so do a session's own screens: Unlocked,
   Protection off and Session over.
-  Every way to Cognito's managed login starts at one call (`Phone.signIn`), which, for the sign-up page,
-  asks the check first, every time; only that question's Continue and then the intro, shown where
+  Every way to Cognito's managed login starts at one call (`Phone.signIn`), which, for the sign-up
+  page, asks the check first, every time; only that question's Continue and then the intro, shown where
   this run has not shown it since its last sign-out (once per account, not per phone: the owner's
   rulings, 2026-10-07), go on to the page, after an answer of 13 or older that same time
   (`Phone.answerAge`, `sawIntro`, through the private `Phone.open`); the sign-in page opens at
@@ -1253,8 +1253,8 @@ without it is APNs's, so every shipped iPhone calls it as today. FCM's tokens ar
 APNs's, in the same privacy paths, and Google becomes a processor the privacy policy names before
 the first Android build reaches a student.
 
-**7. Sign-in through Cognito's managed login**, as on iOS: in an Auth Tab where the phone's browser has
-one, which answers Bali alone, else a Custom Tab, whose answer, a link any app can send, is taken
+**7. Sign-in through Cognito's managed login**, as on iOS: in an Auth Tab where the phone's browser
+has one, which answers Bali alone, else a Custom Tab, whose answer, a link any app can send, is taken
 only for the waiting sign-in with its state; each ephemeral where the browser offers that, and where
 it doesn't, sharing the browser's cookies (the conductor's call, awaiting the owner; `docs/DECISIONS.md`,
 2026-11-05). The code grant with PKCE, through app clients of Android's own on each pool, with no
