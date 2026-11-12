@@ -253,7 +253,7 @@ class BaliAppTest {
                 account.sawList()
                 assertEquals(listOf("u1", "u1"), app.notes.run { listOf(inClass, listSeenBy) })
                 // Written behind: on the disk once the write lands.
-                until { file.takeIf { it.exists() }?.readText()?.takeIf { """name="inClass">u1<""" in it && """name="listSeenBy">u1<""" in it } }
+                until { disk(file)?.takeIf { """name="inClass">u1<""" in it && """name="listSeenBy">u1<""" in it } }
                 // A later run, nobody signed in: its account reads them back.
                 val (again, later) = run(outbox, server, scope)
                 assertEquals(listOf("u1", "u1"), later.state.value.run { listOf(inClass, listSeenBy) })
@@ -264,13 +264,13 @@ class BaliAppTest {
                 val deleting = scope.async { later.deleteAccount() }
                 // Its first request on its way: the notes already off the disk, written through.
                 val delete = server.pastReads("DELETE /v1/me")
-                assertFalse(file.readText(), "u1" in file.readText())
+                until { disk(file) }.let { assertFalse(it, "u1" in it) }
                 delete.reply(200, """{"outcome":"deleted"}""")
                 server.next("POST /").reply(200, "{}")
                 withTimeout(30.seconds) { deleting.await() }
                 assertEquals(Deleting.Done, later.state.value.deleting)
                 assertEquals(listOf(null, null), app.notes.run { listOf(inClass, listSeenBy) })
-                assertFalse(file.readText(), "u1" in file.readText())
+                until { disk(file) }.let { assertFalse(it, "u1" in it) }
                 val (_, last) = run(outbox, server, scope)
                 assertEquals(listOf(null, null), last.state.value.run { listOf(inClass, listSeenBy) })
             } finally {
@@ -294,6 +294,9 @@ class BaliAppTest {
         until { account.state.value.takeIf { it.signedIn == false } }
         return signIn to account
     }
+
+    /** [file]'s text, or none while SharedPreferences has it moved aside to write it (the router's own notes write behind too). */
+    private fun disk(file: File): String? = runCatching { file.readText() }.getOrNull()
 
     /** Each read of the truth answered with [ME] until a request to [route] waits: a deletion waits out the reads on their way (AN9b). */
     private fun Server.pastReads(route: String): Server.Exchange =

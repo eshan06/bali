@@ -50,8 +50,9 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
    off and on, each put back as found; the Debug readout, driven as a tester drives it, its Join, History
    and Signed in line over a sign-in of the test's own, its token endpoint and Bali's API answered by
    hand, since no emulator can sign in, as the account a run starts is (`TestSignIn.kt`), and its Screen
-   line, the router's; the phone's notes in the app's own SharedPreferences, read back by a later run and
-   gone with a deleted account; Android's time-set, zone and screen-on broadcasts each asking the router
+   line, the router's; the phone's notes in the app's own SharedPreferences, read back from the disk by a
+   store made later and by a later run's account, and gone with a deleted account; Android's time-set,
+   zone and screen-on broadcasts each asking the router
    again, handed to the app's own receiver, since no test can send a protected broadcast; and the cover,
    over Android's own apps and a blocked app of the tests' own (`StandIn.java`, in Java since it runs in
    the test app's process, which has no Kotlin), with split screen made through System UI's shell and a
