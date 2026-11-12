@@ -3,10 +3,12 @@ package com.bali.core
 import java.io.IOException
 import java.net.URI
 import java.net.URISyntaxException
+import java.nio.ByteBuffer
 import java.security.MessageDigest
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -85,10 +87,15 @@ sealed interface AnswerResult {
 sealed interface DeckResult {
     /**
      * The PDF, its SHA-256 the slide's: the only bytes a slide is given, drawn with no link in them followed (decision 8).
-     * Equal by the bytes' content, as Swift's `Data` is, where a data class would compare the array itself. The array is the
-     * one the lesson keeps for its next ask, never a copy, so each deck is in memory once: read it, never write to it.
+     * Equal by the bytes' content, as Swift's `Data` is, where a data class would compare the array itself.
      */
-    class Ready(val bytes: ByteArray) : DeckResult {
+    class Ready(internal val bytes: ByteArray) : DeckResult {
+        /**
+         * The bytes, read-only: the array is the one the lesson keeps for its next ask, never a copy, so each deck is in memory
+         * once, as Swift's `Data` shares its buffer, and nothing given it can change a kept deck past its check.
+         */
+        fun buffer(): ByteBuffer = ByteBuffer.wrap(bytes).asReadOnlyBuffer()
+
         override fun equals(other: Any?) = other is Ready && bytes.contentEquals(other.bytes)
 
         override fun hashCode() = bytes.contentHashCode()
@@ -321,11 +328,16 @@ private fun address(url: String): URI? =
         null
     }
 
-/** [bytes]' SHA-256 in lower-case hex, as the API gives a slide's: written by hand, since `HexFormat` needs Android 14. */
-private fun sha256(bytes: ByteArray): String =
-    buildString {
-        for (byte in MessageDigest.getInstance("SHA-256").digest(bytes)) {
-            append(HEX_DIGITS[byte.toInt() shr 4 and 0x0F]).append(HEX_DIGITS[byte.toInt() and 0x0F])
+/**
+ * [bytes]' SHA-256 in lower-case hex, as the API gives a slide's, its hex written by hand, since `HexFormat` needs Android 14:
+ * worked out off its caller's thread, which may be a screen's, as a deck is up to 25 MB and Swift's actor is never the main one.
+ */
+private suspend fun sha256(bytes: ByteArray): String =
+    withContext(Dispatchers.Default) {
+        buildString {
+            for (byte in MessageDigest.getInstance("SHA-256").digest(bytes)) {
+                append(HEX_DIGITS[byte.toInt() shr 4 and 0x0F]).append(HEX_DIGITS[byte.toInt() and 0x0F])
+            }
         }
     }
 

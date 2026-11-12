@@ -4,6 +4,7 @@ import com.bali.core.LessonWorld.Reply
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.URI
+import java.nio.ReadOnlyBufferException
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.concurrent.TimeUnit.MILLISECONDS
@@ -11,6 +12,7 @@ import java.util.zip.GZIPOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -130,9 +132,14 @@ class LessonWorld(replies: List<Reply>, now: Instant = start) : HttpTransport {
         }
     }
 
-    /** Session `s1`'s lesson in this world, its client signed in with [token]. */
-    fun lesson(token: String? = "t") =
-        LiveLesson("s1", ApiClient(URI("https://api.bali.test"), FixedToken(token), this), now = { now() }, sleep = { sleep(it) })
+    /** Session `s1`'s lesson in this world, its client signed in with [token], each request's wait [timeout]. */
+    fun lesson(token: String? = "t", timeout: Duration = ApiClient.REQUEST_TIMEOUT) =
+        LiveLesson(
+            "s1",
+            ApiClient(URI("https://api.bali.test"), FixedToken(token), this, timeout),
+            now = { now() },
+            sleep = { sleep(it) },
+        )
 }
 
 /** A fixture's body, as the API sends it. */
@@ -564,7 +571,7 @@ class LessonDeckTest {
     fun itAsksForAUrlFetchesTheBytesWithNoTokenAndKeepsThemTheNextPageAsksNothing() =
         inTime {
             val world = LessonWorld(listOf(Reply.ok(wire("download/shown.json")), bucket))
-            val lesson = world.lesson()
+            val lesson = world.lesson(timeout = 7.seconds)
             assertEquals(ready, lesson.deck(slide(page = 4)))
             assertEquals(ready, lesson.deck(slide(page = 5)))
 
@@ -574,7 +581,20 @@ class LessonDeckTest {
             assertEquals(listOf("Bearer t", null), sent.map { it.headers["Authorization"] })
             // The bucket's request carries one header, its ask for the bytes as stored (Q6), and waits as the client's do.
             assertEquals(mapOf("Accept-Encoding" to "identity"), sent[1].headers)
-            assertEquals(ApiClient.REQUEST_TIMEOUT, sent[1].timeout)
+            assertEquals(listOf(7.seconds, 7.seconds), sent.map { it.timeout })
+        }
+
+    @Test
+    fun aDeckIsGivenReadOnlySoNothingGivenItCanChangeTheOneKeptForTheNextAsk() =
+        inTime {
+            // Kotlin's own: Swift's `Data` is a value, where the array kept here is the one given, so it goes out read-only.
+            val world = LessonWorld(listOf(Reply.ok(wire("download/shown.json")), bucket))
+            val lesson = world.lesson()
+            val given = (lesson.deck(slide()) as? DeckResult.Ready)?.buffer() ?: fail("the deck was not given")
+            assertTrue(given.isReadOnly)
+            assertFailsWith<ReadOnlyBufferException> { given.put(0, 0) }
+            assertEquals(pdf, ByteArray(given.remaining()).also { given.get(it) }.decodeToString())
+            assertEquals(ready, lesson.deck(slide()))
         }
 
     @Test
