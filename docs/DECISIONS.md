@@ -59,8 +59,6 @@ a real decision? Add a dated entry at the top: what was decided and why.
     on its way as it starts, which the deletion waits out (AN9b), or the consent list seen meanwhile keeps it in the
     account alone, so the disk never gets the id back; a stop writes the account's own back. A deletion cut short by its
     run's end leaves them off the disk, the safe side.
-  - **A stop with no answer** (`NotDeleted`) writes them back though a deletion with no answer may have landed (C4a): the id
-    stays until a Try again settles it, as iOS keeps it.
   - **`BaliApp.problem` replaces `startFailed`,** `Problem.NotSetUp` or `StartFailed` with its cause, made by `started`, a
     function the JVM reaches, so Release's own tests say a Release build with no config is not set up. `begin` takes the
     engine's making (`make`), where it took the outbox's opening, so a test can make none and see not set up on the phone.
@@ -71,14 +69,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - **BaliAppTest's wake ask goes over Focus:** with the app's router reading each run's account, a wake asks Bali again
     only where the question can't show (AN10b's rule), so the test holds a tap waiting on the check first.
 
-  **The tests,** on `Bali_Spike_API35`, `36` and `37` (instrumented), 60 a run: BaliAppTest's notes, kept by one run and read
-  back by a later one, on the disk in the app's own `shared_prefs/`, off it as the deletion's first request goes and gone
-  once the account is deleted, a later run reading none; its start that runs nothing, each problem its type and the
-  router's storage screen; LockServiceTest's start that fails, for either problem, its lock's file gone and the service
-  listening to nothing, then a later start putting it back to the bell; LooksTest's time set past the bell, the zone
-  changed back before it and the screen coming on, each handed to the app's receiver as Android hands it (no test can send
-  a protected broadcast) and the screen's from the screen itself too, and Android's dump holding that receiver for the
-  three; ReadoutTest's Screen line. On the JVM: ThisBuildTest's Release build, not set up; AccountTest's three, by a store
+  **The tests,** on `Bali_Spike_API35`, `36` and `37` (instrumented), 61 a run: BaliAppTest's notes, kept by one run and read
+  back by a later one's account, on the disk in the app's own `shared_prefs/`, off it as the deletion's first request goes
+  and gone once the account is deleted, a later run reading none; PreferencesNotesTest's store, what it writes read back
+  from the disk by one made later (a file copied under a name never opened, since Android keeps each file it opened in
+  memory), the student's two off the disk before their forget returns; BaliAppTest's start that runs nothing, each problem
+  its type and the router's storage screen; LockServiceTest's start that fails, for either problem, its lock's file gone
+  and the service listening to nothing, then a later start putting it back to the bell; LooksTest's time set past the bell,
+  the zone changed back before it and the screen coming on, each handed to the app's receiver as Android hands it (no test
+  can send a protected broadcast) and the screen's from the screen itself too, and Android's dump holding that receiver for
+  the three; ReadoutTest's Screen line. On the JVM: ThisBuildTest's Release build, not set up; AccountTest's three, by a store
   that records each write: the notes off the store, written through, as the deletion's first request goes, written back at
   a stop and forgotten once done, `everApproved` untouched; a read and the consent list landing mid-deletion kept off the
   store; and a relaunch with the deletion pending keeping and showing nothing of the student's. The two fixes' failing
@@ -87,16 +87,38 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the router given no looks (LooksTest's time and screen tests); the receiver hearing neither the time set nor the screen
   (the dump's test, and the screen's own); a Release build's start said as nothing (ThisBuildTest's); a start that fails
   leaving the lock on (LockServiceTest's, at its file); the forget after the engine's call, or none (AccountTest's three);
-  no write-back at a stop, or one at the end too (two each); and a note written behind while the deletion runs, each note
-  (the mid-deletion test's).
+  no write-back at a stop, or one at the end too (two each); a note written behind while the deletion runs, each note
+  (the mid-deletion test's); and the store reading one note under another's key (PreferencesNotesTest's).
 
   **For AN10d to AN10h and Phase 10:** `BaliApp.problem` is what the storage screen says (AN10d), and a start that fails
   has taken the lock off, so its words never say the apps are locked. The screens read `BaliApp.router.shown`; the app's
   router takes no inputs yet, so Phase 10 hands it its `Router.Input`s in `BaliApp.router`.
 
-  **The proof:** _to come with the runs below._
+  **The proof:** the whole instrumented suite, 61 of 61, on each of `Bali_Spike_API35`, `36` and `37` (54 before this step),
+  on the final code; `./gradlew assemble :app:assembleDebugAndroidTest :app:lint check` green, Android 10's API check with
+  it; the core and outbox suites run five times on the final code, each green (596 tests), AN9h's AgeFallbackTest
+  `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run lint && npm test` green, the
+  portal's suite whole. No SDK package was installed: the build downloads none (`android.builder.sdkDownload=false`), and
+  the SDK's folders matched before and after. Each emulator after its runs: Bali and its test app uninstalled, AN1's spike
+  apps kept, every setting as found (the accessibility list and switch, the font scale, Airplane mode, the screen's
+  timeout, automatic time and zone, the zone, the call log), stopped.
 
-  **Santa's review:** _to come._
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: no test read the store back from the disk,
+  BaliAppTest's later run reading the same object in memory, so a mixed-up key would pass (both; taken: PreferencesNotesTest,
+  failing by name with a key swapped, tried); and BaliAppTest's read of the notes' file could meet it moved aside while
+  SharedPreferences writes it, a rare flake (reviewer A; taken). **For the owner, two privacy notes (reviewer B), neither a
+  defect of this step:**
+  - **A stop after `DELETE /v1/me` went out writes the notes back**, as the brief has every stop do: where the server deleted
+    the account but its answer was lost (`NotDeleted`, `Unfinished`), or another account's sign-in landed after it
+    (`SignInChanged`, which has no Try again), the deleted account's id is back on the disk until another student's
+    replaces it, the key the server's de-identified records stay under. iOS keeps it the same way. [The recommendation:
+    keep the notes off the disk after any stop that came once the deletion's own request was sent; the cost is the one-time
+    screen shown again to a student whose deletion didn't land. A small change in `Account.delete`, with its test, if you
+    want it.]
+  - **The phone never hears of a deletion made elsewhere:** a school's disposal, the retention run, or a deletion from the
+    student's other phone leaves this phone's notes holding the id for good, as iOS's defaults do. Outside this step; for
+    the privacy list.
 
 - **2026-11-11** — **AN10b, the router's inputs and its run: BaliApp.swift's `shown`, `remember` and notes in Kotlin, a
   `Router` choosing again at each change, a tap's cap and the bell, and `Account`'s notes, `sawList`, email, and Me's name
