@@ -171,6 +171,9 @@ class Lessons(
                 } ?: return@call
             val result = pick.live.answer(pick.question, option)
             alone {
+                // The lesson as its answer left it, taken first, as iOS's main actor runs the lesson's read ahead of the tap's
+                // end: the card never shows, for a moment, the answer held before this one.
+                read(pick.live.state.value, pick.live)
                 if (pick.count != picks) return@alone
                 sending = null
                 said = AnswerCard.Said.of(result, pick.held)
