@@ -4,7 +4,9 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.URI
 import java.time.Instant
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit.MILLISECONDS
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -16,12 +18,17 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
 import mockwebserver3.SocketEffect
 import okhttp3.Call
 import okhttp3.CookieJar
@@ -235,6 +242,63 @@ class OkHttpTransportTest {
                 // A dot among other characters is no path segment of dots: it goes, escaped.
                 assertEquals(SendResult.Status(404), client.previewJoinCode("a.b").result)
                 assertEquals("GET /v1/join-codes/a%2Eb HTTP/1.1", server.takeRequest().requestLine)
+            }
+        }
+
+    @Test
+    fun aCallThroughTheAppsTransportGoesAtOnceWhileMoreCallsThanOkHttpsFiveAHostWaitAtTheServerThroughATransportApartFromIt(): Unit =
+        runBlocking {
+            // AN13d's queue (santa's reviewer B on #574): OkHttp lets 5 requests a host go at once and queues the rest, so the
+            // live lesson's poll and answers, held on a slow network, could hold an Emergency Unlock's send behind them.
+            val release = CountDownLatch(1)
+            val held = AtomicInteger()
+            MockWebServer().use { server ->
+                server.dispatcher =
+                    object : Dispatcher() {
+                        override fun dispatch(request: RecordedRequest): MockResponse {
+                            if (request.url.encodedPath == "/held") {
+                                held.incrementAndGet()
+                                release.await(stall.inWholeMilliseconds * 3, MILLISECONDS)
+                            }
+                            return MockResponse(200)
+                        }
+                    }
+                server.start()
+                try {
+                    // The app's own transport, each of its waits past the test's, and the lesson's apart from it.
+                    val app = waiting(stall * 3)
+                    val lesson = app.apart()
+                    fun get(path: String) = HttpRequest("GET", server.url(path).toUri(), emptyMap(), null, stall * 3)
+                    val calls = List(6) { async(Dispatchers.IO) { lesson.send(get("/held")) } }
+                    // Five at the server, OkHttp's limit, the sixth in the lesson's own queue.
+                    withTimeout(stall) { while (held.get() < 5) delay(1) }
+                    val answered = withTimeout(stall) { app.send(get("/app")) }
+                    assertEquals(200, answered.status)
+                    assertEquals(5, held.get(), "the lesson's calls let go before the app's went")
+                    release.countDown()
+                    assertEquals(List(6) { 200 }, calls.awaitAll().map { it.status })
+                } finally {
+                    release.countDown()
+                }
+            }
+        }
+
+    @Test
+    fun aTransportApartIsTheAppsOwnItsRedirectsComingBackAsThemselvesItsCallsOnTheConnectionsTheAppsLeft(): Unit =
+        runBlocking {
+            MockWebServer().use { server ->
+                server.enqueue(MockResponse(200))
+                server.enqueue(MockResponse(302, headersOf("Location", "/elsewhere")))
+                server.start()
+                val app = waiting(stall)
+                fun get(path: String) = HttpRequest("GET", server.url(path).toUri(), emptyMap(), null, stall)
+                assertEquals(200, app.send(get("/first")).status)
+                assertEquals(302, app.apart().send(get("/moved")).status)
+                val (first, moved) = server.takeRequest() to server.takeRequest()
+                assertEquals("GET /moved HTTP/1.1", moved.requestLine)
+                // The connection the app's call left, its second exchange: one pool for both. And followed nowhere.
+                assertEquals(listOf(first.connectionIndex, 1), listOf(moved.connectionIndex, moved.exchangeIndex))
+                assertEquals(2, server.requestCount)
             }
         }
 

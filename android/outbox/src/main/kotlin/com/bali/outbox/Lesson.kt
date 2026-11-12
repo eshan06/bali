@@ -24,7 +24,10 @@ private fun SyncState.lessons(): List<SessionView> =
  * state, else the first class in session by `GET /v1/me`, tapped in or not (decision 2); each only while its bell is ahead, and
  * never one of [over], a read having said it is over. BaliOutbox's `lessonSession`.
  */
-fun SyncState.lessonSession(now: Instant, over: Set<String>): String? = lessons().firstOrNull { it.endsAt > now && it.id !in over }?.id
+fun SyncState.lessonSession(now: Instant, over: Set<String>): String? = followed(now, over)?.id
+
+/** The session [lessonSession] names, as the entry it took names it, its bell with it: where the lesson half wakes (Q7). */
+internal fun SyncState.followed(now: Instant, over: Set<String>): SessionView? = lessons().firstOrNull { it.endsAt > now && it.id !in over }
 
 /**
  * The class of the lesson the phone follows at [now] ([lessonSession]), headed as a session's screens head theirs
