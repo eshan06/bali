@@ -190,21 +190,28 @@ class RouterTest : EngineFiles() {
             // RootView.swift's bell (C5a, C5b): Unlocked watches nothing at the bell, as Focus's lock does, so the router chooses
             // again there itself, by the phone's clock: the time passing, or the clock set past it, looked at again at Android's
             // signal (AN10c's), which a sleep doesn't count.
-            val unlocked = Answer.me(session(), state = "unlocked", name = "Ana")
             val rig = signedRig(gated = true)
             val phone = routed(rig.engine, rig.clock)
-            rig.through(checkNotNull(phone.account), accessToken("a1"), me = unlocked)
+            rig.through(checkNotNull(phone.account), accessToken("a1"), me = Answer.me(session(), state = "unlocked", name = "Ana"))
             phone.until { it == Screen.Shown(Screen.Unlocked, false) }
             rig.clock.advance(3000)
             phone.until { it == Screen.Shown(Screen.SessionOver, false) }
+            // Focused, the clock set past the bell, then back before it, each at Android's signal: Session over, then Focus again,
+            // the lock's own rule on by the clock though no bell waits then (santa's review), and the bell slept towards anew.
             val (looks, clock) = MutableSharedFlow<Unit>() to PhoneClock()
             val set = signedRig(gated = true)
             val signal = routed(set.engine, set.clock, looks = looks, routerClock = clock)
-            set.through(checkNotNull(signal.account), accessToken("a1"), me = unlocked)
-            signal.until { it == Screen.Shown(Screen.Unlocked, false) }
-            eventually { looks.subscriptionCount.value == 1 && clock.sleeps.size == 1 }
+            set.through(checkNotNull(signal.account), accessToken("a1"), me = Answer.me(session(), name = "Ana"))
+            signal.until { it == Screen.Shown(Screen.Focus, false) }
+            eventually { clock.sleeps.size == 1 } // the bell asleep, its looks followed first
             clock.turn(Duration.ofSeconds(3000))
             looks.emit(Unit)
+            signal.until { it == Screen.Shown(Screen.SessionOver, false) }
+            clock.turn(Duration.ofSeconds(-3000))
+            looks.emit(Unit)
+            signal.until { it == Screen.Shown(Screen.Focus, false) }
+            eventually { clock.sleeps.size == 1 }
+            clock.advance(Duration.ofSeconds(3000))
             signal.until { it == Screen.Shown(Screen.SessionOver, false) }
             rig.stop()
             set.stop()
@@ -283,6 +290,11 @@ class RouterTest : EngineFiles() {
             phone.until { it == Screen.Shown(Screen.Permission, false) }
             phone.switched(LockSwitch.On)
             phone.until { it == Screen.Shown(Screen.History, true) }
+            // A tap closes what was opened and the tab chosen, as keepsOpened says: Home once its answer leaves the phone out.
+            assertNotNull(rig.engine.record(Change.Tap("tag")))
+            phone.until { it == Screen.Shown(Screen.Focus, false) }
+            rig.server.next(tapRoute).reply(200, Answer.replayNoSession)
+            phone.until { it == Screen.Shown(Screen.Home, true) }
             phone.inputs.send(Router.Input.Tab(Screen.Me))
             phone.until { it == Screen.Shown(Screen.Me, true) }
             account.naming { it.edit("ana") to Unit }
