@@ -114,11 +114,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **For Phase 10 (AS2, AS4, AS7):** AS7's History says `failure.words` in the moments' place or Show earlier's, with Try
   again, and `notUpdated.notUpdatedWords` above the moments read; each day's `title.words(now, zone, thisYear,
   anotherYear)`, and each moment's `time`, `words` and its note's `words`; it asks for the engine before `reading` and, with
-  none, takes `notStarted(more)`, counted as the latest read. Its formatters are the phone's own patterns, made with `DateTimeFormatter.ofPattern(pattern,
-  locale)`: a pattern letter Android 10's java.time lacks (the day period `B` some locales use) throws there, and java.time
-  writes ASCII digits unless handed the locale's `DecimalStyle`, both AS5's and AS7's to settle as they build. The intro's
-  second page, Join's preview and Me's What your teacher sees show `ConsentList.WHOLE` under their own headings ("Sees",
-  "What Ms. Rivera sees", "Never sees"), and the list-changed screen `ADDED` with its See the whole list.
+  none, takes `notStarted(more)`, counted as the latest read. Its formatters are the phone's own patterns, made with
+  `DateTimeFormatter.ofPattern(pattern, locale)`: a pattern letter Android 10's java.time lacks (the day period `B` some
+  locales use) throws there, and java.time writes ASCII digits unless handed the locale's `DecimalStyle`, both AS5's and
+  AS7's to settle as they build. The intro's second page, Join's preview and Me's What your teacher sees show
+  `ConsentList.WHOLE` under their own headings ("Sees", "What Ms. Rivera sees", "Never sees"), and the list-changed screen
+  `ADDED` with its See the whole list, once the owner has looked at its three lines.
 
 - **2026-11-12** — **AN10g, the words of Me, Leave, Sign out, Delete account and the 13+ stop: BaliOutbox's `Naming.words` and
   `blank`, `Leaving`'s words, `SignOutWords`, `Deleting.said` and `saidUnderThirteen`, and `AgeCheck`'s stop in Kotlin, each line
