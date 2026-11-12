@@ -28,7 +28,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `failed` and `signedIn`; `Deleting.said`, `saidUnderThirteen`, `question` and `consequence`; and `AgeCheck.notYet` and
   `askTeacher`. Bali still starting is Join's line (`Joining.Failure.NotStarted.words`). A 409 `account_deleted` (C3d) is said as
   any 409 is, "Something went wrong at Bali. Try again in a moment.", while the owner's call on reading it as signed out waits.
-  no-ai-slop's Edit job over the two new lines, checked against `eval.md`: both pass as drawn.
+  no-ai-slop's Edit job over the two new lines, their three new sentences, checked against `eval.md`: each passes as drawn.
 
   **Drawn on the canvas first (Q9):** three boards on AS7's Delete account row, each "(intermediate state)", at the row's end, the
   row's note moved three places right, the canvas at version 61 (`1794480318-6d00`): AS7-Del-changed, "Delete account · stopped,

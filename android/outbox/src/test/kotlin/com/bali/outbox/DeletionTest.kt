@@ -213,8 +213,11 @@ class DeletingTest {
         for (quiet in listOf(Deleting.None, Deleting.Asking)) assertNull(quiet.said, "$quiet")
         // Me's question under Delete account, before anything runs: what goes, and that it isn't an Emergency Unlock.
         assertEquals("Delete your account?", Deleting.QUESTION)
-        assertTrue(Deleting.CONSEQUENCE.startsWith("Bali deletes your account, your name and your sign-in. This can't be undone."))
-        assertTrue(Deleting.CONSEQUENCE.endsWith("If a class is running, you leave it now and your apps unlock. It isn't an Emergency Unlock."))
+        assertEquals(
+            "Bali deletes your account, your name and your sign-in. This can't be undone. Lessons you were in still count in your teachers' " +
+                "reports, with no name on them. If a class is running, you leave it now and your apps unlock. It isn't an Emergency Unlock.",
+            Deleting.CONSEQUENCE,
+        )
     }
 
     @Test

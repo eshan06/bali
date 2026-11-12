@@ -34,8 +34,9 @@ sealed interface AccountDeletion {
      * The last answer, [result], when something else the phone queued, or the deletion itself, got none that
      * settled it: nothing deleted that the phone knows of, though a deletion with no answer may have landed,
      * which a try again settles, deleting too any account a read has made since (C3). [noAnswer], why none came
-     * when none did: [NoAnswer.NoToken] when the sign-in gave the try no token, so nothing went, a token run out
-     * partway among the reasons, never a connection's fault (Q7; #553's review).
+     * when none did: [NoAnswer.NoToken] when the sign-in gave the try no token, so nothing went, said as the
+     * sign-in, never as no connection, though one of its reasons is a token run out partway that the phone
+     * couldn't renew offline (Q7; #553's review).
      */
     data class NotDeleted(val result: SendResult, val noAnswer: NoAnswer? = null) : AccountDeletion
 
@@ -164,7 +165,7 @@ sealed interface Deleting {
     /**
      * The engine's answer to the deletion under way; one to no deletion is dropped. [underThirteen], the gap's
      * fallback's: a deletion that couldn't reach Bali is its own stop ([Stop.Unfinished]), every other as Me's, one
-     * with no token among them, which no connection would have helped (Q7).
+     * with no token among them, said as the sign-in, never as no connection (Q7).
      */
     fun answered(answer: AccountDeletion, underThirteen: Boolean = false): Deleting {
         if (this != Busy) return this
