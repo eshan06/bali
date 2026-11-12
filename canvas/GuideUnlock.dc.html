@@ -48,7 +48,7 @@ body{margin:0;background:#F7F5F2}
 <div class="bs-wrap">
 <a class="bs-brand" href="Main.dc.html" translate="no" aria-label="Bali, home"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" fill="none" stroke="#BCDCCA" stroke-width="10"></circle><path d="M26.6 8.61A24 24 0 1 1 8.61 26.6" fill="none" stroke="#2C6F51" stroke-width="10" stroke-linecap="round"></path></svg><span>Bali</span></a>
 <nav class="bs-nav" aria-label="Sections"><a href="Main.dc.html#how">How it works</a><a href="Main.dc.html#teachers">For teachers</a><a href="Main.dc.html#students">For students</a><a href="Main.dc.html#privacy">Privacy</a><a href="Main.dc.html#faq">Questions</a><a href="GuideFirstClass.dc.html">Guides</a></nav>
-<div class="bs-end"><details class="bs-menu"><summary>Menu</summary><nav class="bs-menu-panel" aria-label="Pages"><a href="Main.dc.html#how">How it works</a><a href="Main.dc.html#teachers">For teachers</a><a href="Main.dc.html#students">For students</a><a href="Main.dc.html#privacy">Privacy</a><a href="Main.dc.html#faq">Questions</a><a href="GuideFirstClass.dc.html">Guides</a><hr><a href="https://bali-portal.vercel.app/login">Sign in</a></nav></details><a class="bs-btn bs-btn-s" href="https://bali-portal.vercel.app/login">Sign in</a><a class="bs-btn bs-btn-p" href="Main.dc.html#contact">Talk to us</a></div>
+<div class="bs-end"><details class="bs-menu"><summary>Menu</summary><nav class="bs-menu-panel" aria-label="Sections"><a href="Main.dc.html#how">How it works</a><a href="Main.dc.html#teachers">For teachers</a><a href="Main.dc.html#students">For students</a><a href="Main.dc.html#privacy">Privacy</a><a href="Main.dc.html#faq">Questions</a><a href="GuideFirstClass.dc.html">Guides</a><hr><a href="https://bali-portal.vercel.app/login">Sign in</a></nav></details><a class="bs-btn bs-btn-s" href="https://bali-portal.vercel.app/login">Sign in</a><a class="bs-btn bs-btn-p" href="Main.dc.html#contact">Talk to us</a></div>
 </div>
 </header>
 <main id="main">
@@ -88,6 +88,32 @@ body{margin:0;background:#F7F5F2}
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2240}}'>
 class Component extends DCLogic {
+  componentDidMount() {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    // On narrower screens the menu closes when one of its links is chosen, on Escape, on a tap outside
+    // it, and when Back brings the page back from the browser's cache.
+    const root = document.querySelector('[data-bs="' + this.uid + '"]');
+    const menu = root && root.querySelector('.bs-menu');
+    if (menu) {
+      this.onMenu = (e) => { if (e.target && e.target.closest && e.target.closest('.bs-menu-panel a')) menu.open = false; };
+      this.onKey = (e) => { if (e.key === 'Escape' && menu.open) { menu.open = false; const s = menu.querySelector('summary'); if (s) s.focus(); } };
+      this.onDoc = (e) => { if (menu.open && !menu.contains(e.target)) menu.open = false; };
+      this.onShow = () => { menu.open = false; };
+      menu.addEventListener('click', this.onMenu);
+      document.addEventListener('keydown', this.onKey);
+      document.addEventListener('click', this.onDoc);
+      window.addEventListener('pageshow', this.onShow);
+      this.menu = menu;
+    }
+  }
+  componentWillUnmount() {
+    if (this.menu) {
+      this.menu.removeEventListener('click', this.onMenu);
+      document.removeEventListener('keydown', this.onKey);
+      document.removeEventListener('click', this.onDoc);
+      window.removeEventListener('pageshow', this.onShow);
+    }
+  }
   renderVals() {
     if (!this.uid) this.uid = 'pg' + Math.random().toString(36).slice(2, 9);
     return { uid: this.uid };

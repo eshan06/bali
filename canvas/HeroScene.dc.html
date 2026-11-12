@@ -64,7 +64,7 @@ body{margin:0}
 .hs-lab-card{left:236px}
 .hs-lab-phone{left:118px;top:528px;transform:translateX(-50%)}
 /* Phones show the teacher's screen on its own, large enough to read. */
-.hs[data-crop] .hs-box{width:calc(380px * var(--k));height:calc(512px * var(--k));overflow:hidden}
+.hs[data-crop] .hs-box{width:calc(380px * var(--k));height:calc(512px * var(--k));margin:0 auto;overflow:hidden}
 .hs[data-crop] .hs-stage{left:calc(-232px * var(--k))}
 .hs[data-crop] .hs-card,.hs[data-crop] .hs-locked,.hs[data-crop] .hs-pop{box-shadow:0 0 0 1px #E3DFD8}
 .hs[data-crop] .hs-phone,.hs[data-crop] .hs-block,.hs[data-crop] .hs-ripple,.hs[data-crop] .hs-lab-block,.hs[data-crop] .hs-lab-phone,.hs[data-crop] .hs-arrow,.hs[data-crop] .hs-sig,.hs[data-crop] .hs-dot{display:none}
@@ -115,15 +115,22 @@ class Component extends DCLogic {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     const root = document.querySelector('[data-hs="' + this.uid + '"]');
     if (!root) return;
-    // Scale the 620 × 560 scene to the width it is given. Below 560 px it crops to the teacher's screen
-    // (380 px of the scene), so the tiles stay readable on a phone.
+    // Scale the 620 × 560 scene to the width it is given. On phones (below 600 px) it crops to the
+    // teacher's screen (380 px of the scene), so the tiles stay readable; a tablet or a narrow laptop,
+    // whose two-column hero also gives the scene less than 620 px, keeps the whole scene.
+    const phone = window.matchMedia ? window.matchMedia('(max-width: 599px)') : null;
+    const whole = root.getAttribute('aria-label');
+    const cropped = 'A sample class with Bali, on the teacher\'s screen. Each student\'s tile turns from Not here to Focused as they tap in, and one student uses Emergency Unlock.';
     const fit = () => {
       const w = root.clientWidth;
       if (!(w > 0)) return;
-      const crop = w < 560;
+      const crop = !!(phone && phone.matches);
       if (crop) root.setAttribute('data-crop', ''); else root.removeAttribute('data-crop');
+      // A screen reader hears only what the picture shows: on a phone, the teacher's screen.
+      root.setAttribute('aria-label', crop ? cropped : whole);
       root.style.setProperty('--k', Math.min(1, w / (crop ? 380 : 620)).toFixed(4));
     };
+    if (phone && phone.addEventListener) { this.phone = phone; this.onPhone = fit; phone.addEventListener('change', fit); }
     fit();
     if (window.ResizeObserver) {
       // Fitting changes the size being watched, so it waits a frame: no resize loop.
@@ -153,6 +160,7 @@ class Component extends DCLogic {
     }
   }
   componentWillUnmount() {
+    if (this.phone) this.phone.removeEventListener('change', this.onPhone);
     if (this.ro) this.ro.disconnect();
     cancelAnimationFrame(this.fitRaf);
     if (this.onResize) window.removeEventListener('resize', this.onResize);

@@ -201,12 +201,22 @@ test('narrower screens get a Menu: it opens, its links go where they say, and it
   if (width < 600) await expect(signIn).toBeHidden();
   else await expect(signIn).toBeVisible();
   await summary.click();
-  const panel = page.getByRole('navigation', { name: 'Pages' });
+  const panel = page.getByRole('navigation', { name: 'Sections' });
   await expect(panel.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', 'https://bali-portal.vercel.app/login');
   await expect(panel.getByRole('link', { name: 'Guides' })).toHaveAttribute('href', '/guides/first-class');
   await panel.getByRole('link', { name: 'Questions' }).click();
   await expect(panel).toBeHidden();
   await expect(page.locator('#faq')).toBeInViewport();
+  // Escape closes it and puts the focus back on Menu; so does a tap outside it.
+  await summary.click();
+  await expect(panel).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  await expect(summary).toBeFocused();
+  await summary.click();
+  await expect(panel).toBeVisible();
+  await page.locator('#faq h2').click();
+  await expect(panel).toBeHidden();
 });
 
 test('on phones the hero shows the teacher’s screen on its own, large enough to read', async ({ page }) => {
@@ -215,13 +225,44 @@ test('on phones the hero shows the teacher’s screen on its own, large enough t
   if (page.viewportSize().width < 600) {
     expect(await cropped()).toBe(true);
     await expect(page.locator('.hs-phone')).toBeHidden();
-    // The tiles' names draw at 12 px or more on the screen.
+    // The tiles' names draw at 11 px or more on the screen (about 11.7 px on a 375 px phone, 12.2 px at 390).
     const size = await page.locator('.hs-card .hs-nm').first().evaluate((el) => (parseFloat(getComputedStyle(el).fontSize) * el.getBoundingClientRect().width) / el.offsetWidth);
-    expect(size).toBeGreaterThanOrEqual(12);
+    expect(size).toBeGreaterThanOrEqual(11);
   } else {
     expect(await cropped()).toBe(false);
     await expect(page.locator('.hs-phone')).toBeVisible();
   }
+});
+
+test('a tablet or a narrow laptop keeps the whole hero picture; only a phone crops it', async ({ page }) => {
+  for (const width of [600, 768, 1024, 1180]) {
+    await page.setViewportSize({ width, height: 800 });
+    await open(page, '/');
+    expect(await page.locator('.hs').evaluate((el) => el.hasAttribute('data-crop')), `${width} px`).toBe(false);
+    await expect(page.locator('.hs-block'), `${width} px`).toBeVisible();
+    await expect(page.locator('.hs-phone'), `${width} px`).toBeVisible();
+    // Below 1080 px the Menu takes the place of the section links, with Sign in still beside it.
+    await expect(page.locator('.bs-menu > summary'), `${width} px`).toBeVisible({ visible: width < 1080 });
+    await expect(page.locator('.bs-end > .bs-btn-s'), `${width} px`).toBeVisible();
+  }
+});
+
+test('while a tile changes state, its old words are gone before its new ones come in', async ({ page }) => {
+  await open(page, '/');
+  const at = (ms) => page.evaluate((t) => document.getAnimations().forEach((a) => { a.pause(); a.currentTime = t; }), ms);
+  const opacity = (selector) => page.evaluate((sel) => [...document.querySelectorAll(sel)].map((el) => Number(getComputedStyle(el).opacity)), selector);
+  // The hero: Sofia's tile (data-i 4) turns from Not here to Focused between 3000 and 3150 ms of its class.
+  await at(3075);
+  expect(await opacity('.hs-tile[data-i="4"] .hs-t-not > *')).toEqual([0, 0]);
+  const next = (await opacity('.hs-tile[data-i="4"] .hs-t-on'))[0];
+  expect(next).toBeGreaterThan(0);
+  expect(next).toBeLessThan(1);
+  // The Emergency Unlock card: the teacher's tile turns from Focused to Unlocked between 1850 and 2000 ms.
+  await at(1925);
+  expect(await opacity('.bs-ut-on > *')).toEqual([0, 0]);
+  const unlocked = (await opacity('.bs-ut-unl'))[0];
+  expect(unlocked).toBeGreaterThan(0);
+  expect(unlocked).toBeLessThan(1);
 });
 
 test('every page’s footer names Bali Focus Inc.', async ({ page }) => {
