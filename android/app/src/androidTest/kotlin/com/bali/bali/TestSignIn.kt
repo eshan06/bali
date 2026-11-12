@@ -28,19 +28,28 @@ private val cognito = Cognito(URI("https://bali.auth.test"), "the-client", URI("
 /** A sign-in over [server], its calls in [scope], the test's. */
 internal fun testSignIn(server: Server, scope: CoroutineScope): SignIn = SignIn(cognito, Memory(), scope, server)
 
-/** [student] signs in through [signIn]'s hosted UI, Cognito's token endpoint answered here; back once the sign-in has landed. */
-internal fun Server.signStudentIn(signIn: SignIn, scope: CoroutineScope, student: String) {
+/**
+ * [student] signs in through [signIn]'s hosted UI, Cognito's token endpoint answered here, its token one that may delete its
+ * account where [mayDelete] says; back once the sign-in has landed.
+ */
+internal fun Server.signStudentIn(signIn: SignIn, scope: CoroutineScope, student: String, mayDelete: Boolean = false) {
     val signing =
         scope.async {
             signIn.signIn { page -> "${cognito.redirectUri}?code=the-code&" + page.rawQuery.split('&').first { it.startsWith("state=") } }
         }
-    next("POST /oauth2/token").reply(200, """{"access_token":"${accessToken(student)}","refresh_token":"refresh-$student","expires_in":3600,"token_type":"Bearer"}""")
+    val access = accessToken(student, mayDelete)
+    next("POST /oauth2/token").reply(200, """{"access_token":"$access","refresh_token":"refresh-$student","expires_in":3600,"token_type":"Bearer"}""")
     runBlocking { withTimeout(30.seconds) { signing.await() } }
 }
 
-/** An access token as Cognito's reads on the phone, [student] its `sub`, an hour long; unsigned, as the phone never checks it. */
-internal fun accessToken(student: String): String {
-    val payload = """{"sub":"$student","iat":1000000000,"exp":1000003600}"""
+/**
+ * An access token as Cognito's reads on the phone, [student] its `sub`, an hour long; with [mayDelete], the scope Cognito's
+ * DeleteUser needs and its pool's issuer, whose region's endpoint DeleteUser goes to (`POST /` here). Unsigned, as the phone never
+ * checks it.
+ */
+internal fun accessToken(student: String, mayDelete: Boolean = false): String {
+    val deletes = ""","scope":"openid email profile aws.cognito.signin.user.admin","iss":"https://cognito-idp.us-east-1.amazonaws.com/us-east-1_test""""
+    val payload = """{"sub":"$student","iat":1000000000,"exp":1000003600${if (mayDelete) deletes else ""}}"""
     return "eyJhbGciOiJSUzI1NiJ9.${Base64.getUrlEncoder().withoutPadding().encodeToString(payload.encodeToByteArray())}.signature"
 }
 

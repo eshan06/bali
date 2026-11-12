@@ -6,10 +6,18 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.bali.core.AppConfig
 import com.bali.core.SendResult
+import com.bali.core.SignIn
+import com.bali.outbox.Account
 import com.bali.outbox.AgeCheck
+import com.bali.outbox.Change
+import com.bali.outbox.Deleting
 import com.bali.outbox.Link
+import com.bali.outbox.Outbox
+import com.bali.outbox.Problem
+import com.bali.outbox.Screen
 import com.bali.outbox.SyncEngine
 import com.bali.outbox.SyncState
+import java.io.File
 import java.io.IOException
 import java.net.URI
 import java.util.concurrent.CountDownLatch
@@ -18,6 +26,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -25,6 +34,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -90,7 +100,7 @@ class BaliAppTest {
     fun withSignInNotSetUpADebugBuildsStartRunsAnEngineOverNoTokenAsASignedOutPhone(): Unit =
         runBlocking {
             assertNull(app.signIn)
-            assertNull(app.startFailed.value)
+            assertNull(app.problem.value)
             assertTrue(context.getDatabasePath(OUTBOX_FILE).exists())
             app.begin()
             val engine = checkNotNull(app.running.value).engine
@@ -102,18 +112,25 @@ class BaliAppTest {
             assertNull(engine.updates.value.heardAt)
         }
 
-    // CLAUDE.md's "no silent failures": a start that fails (its outbox, say) is held for a screen to say, the
-    // Debug readout's now (ReadoutTest), never swallowed, and tried again.
+    // CLAUDE.md's "no silent failures": a start that runs nothing says why, each problem its type (AN10a's), held for the
+    // screens to say, the app's router showing it as the storage screen and the Debug readout now (ReadoutTest), never
+    // swallowed, and tried again. A start that fails (its outbox, say) keeps its cause; one that makes no engine, a Release
+    // build's with no config (ThisBuildTest, on the JVM), is not set up.
     @Test
-    fun aStartThatFailsIsHeldForTheScreensToSayAndTriedAgain(): Unit =
+    fun aStartThatRunsNothingSaysWhyEachProblemItsTypeTheRoutersStorageScreenShowingItAndIsTriedAgain(): Unit =
         runBlocking {
             val refused = IOException("the disk refused the outbox")
-            app.begin { throw refused }
-            assertSame(refused, app.startFailed.value)
-            assertNull(app.running.value)
-            app.begin()
-            checkNotNull(app.running.value)
-            assertNull(app.startFailed.value)
+            for (problem in listOf(Problem.StartFailed(refused), Problem.NotSetUp)) {
+                app.begin { if (problem == Problem.NotSetUp) null else throw refused }
+                assertEquals(problem, app.problem.value)
+                assertNull(app.running.value)
+                until { app.router.shown.value.takeIf { it == Screen.Shown(Screen.Storage(problem), false) } }
+                app.begin()
+                checkNotNull(app.running.value)
+                assertNull(app.problem.value)
+                until { app.router.shown.value.takeIf { it.screen != Screen.Storage(problem) } }
+                checkNotNull(app.running.value).job.cancelAndJoin()
+            }
         }
 
     // BaliApp.swift's `start` guards both: a start while a run exists, or while another start is under way
@@ -123,33 +140,33 @@ class BaliAppTest {
         runBlocking {
             app.begin()
             val run = checkNotNull(app.running.value)
-            app.begin { error("a start opened the outbox while a run exists") }
+            app.begin { error("a start made an engine while a run exists") }
             assertSame(run, app.running.value)
-            assertNull(app.startFailed.value)
+            assertNull(app.problem.value)
             run.job.cancelAndJoin()
-            // A start held at its outbox: a second one meanwhile returns at once. Held at most 30 s, so a failure
+            // A start held at its making: a second one meanwhile returns at once. Held at most 30 s, so a failure
             // here ends the test rather than hanging it.
             val entered = CountDownLatch(1)
-            val opening = CountDownLatch(1)
+            val making = CountDownLatch(1)
             val refused = IOException("the disk refused the outbox")
             val first =
                 launch(Dispatchers.IO) {
                     app.begin {
                         entered.countDown()
-                        opening.await(30, TimeUnit.SECONDS)
+                        making.await(30, TimeUnit.SECONDS)
                         throw refused
                     }
                 }
             assertTrue(entered.await(30, TimeUnit.SECONDS))
-            app.begin { error("a second start opened the outbox") }
-            assertNull(app.startFailed.value)
-            opening.countDown()
+            app.begin { error("a second start made an engine") }
+            assertNull(app.problem.value)
+            making.countDown()
             first.join()
-            assertSame(refused, app.startFailed.value)
+            assertEquals(Problem.StartFailed(refused), app.problem.value)
             assertNull(app.running.value)
             // Tried again, it starts.
             app.begin()
-            assertNull(app.startFailed.value)
+            assertNull(app.problem.value)
         }
 
     // B5b's phone check, as BaliApp.swift's start sets it: the readout's cap, kept, is read at each start.
@@ -167,7 +184,8 @@ class BaliAppTest {
 
     // BaliApp.swift's start: one account a run, over the engine's sign-in, run in the run's job, which hooks the 13+ check's
     // ask at each of the engine's wakes and follows each sign-in. Over a sign-in, a server and a file of the test's own
-    // (TestSignIn.kt), as none of the emulators can sign in.
+    // (TestSignIn.kt), as none of the emulators can sign in. The app's router reads the run's account (AN10c), so a wake asks
+    // again only where the question can't show: here over Focus, a tap waiting on the check holding the lock (AN10b).
     @Test
     fun aRunsStartRunsItsAccountWhichFollowsEachSignInAndAsksBaliForTheCheckAgainAtEachWake(): Unit =
         runBlocking {
@@ -190,6 +208,8 @@ class BaliAppTest {
                 until { engine.updates.value.takeIf { it.meFailed == SendResult.NetworkError } }
                 first.drop()
                 until { account.state.value.takeIf { it.age == AgeCheck.Answer.Unanswered } }
+                engine.record(Change.Tap("tag"))
+                until { app.router.shown.value.takeIf { it.screen == Screen.Focus } }
                 engine.retryNow()
                 server.next(AGE_CHECK).reply(200, PASSED)
                 until { account.state.value.takeIf { it.age == AgeCheck.Answer.Passed } }
@@ -210,7 +230,86 @@ class BaliAppTest {
             }
         }
 
+    // AN10b's notes in the app's own store (AN10c), handed to each run's account: what one run keeps, a later run reads back, the
+    // store's file the app's own SharedPreferences, whose domain the backup rules leave out (OutboxFileTest); once the account is
+    // deleted, none, off the disk too, and a later run reads none. Over sign-ins, a server and a file of the test's own.
+    @Test
+    fun theNotesARunKeepsALaterRunReadsBackAndOnceTheAccountIsDeletedNoneOffTheDiskTooAndALaterRunReadsNone(): Unit =
+        runBlocking {
+            val server = Server()
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            context.deleteDatabase(FILE)
+            val outbox = context.outbox(FILE)
+            val found = app.notes.run { inClass to listSeenBy }
+            val file = File(context.dataDir, "shared_prefs/$NOTES_FILE.xml")
+            try {
+                app.notes.forgetStudent()
+                // A run: the student listed in a class here, then shown the consent list.
+                val (signIn, account) = run(outbox, server, scope)
+                server.signStudentIn(signIn, scope, "u1", mayDelete = true)
+                server.next(AGE_CHECK).reply(200, PASSED)
+                server.next("GET /v1/me").reply(200, ME)
+                until { account.state.value.takeIf { it.inClass == "u1" && it.sync?.me != null } }
+                account.sawList()
+                assertEquals(listOf("u1", "u1"), app.notes.run { listOf(inClass, listSeenBy) })
+                // Written behind: on the disk once the write lands.
+                until { disk(file)?.takeIf { """name="inClass">u1<""" in it && """name="listSeenBy">u1<""" in it } }
+                // A later run, nobody signed in: its account reads them back.
+                val (again, later) = run(outbox, server, scope)
+                assertEquals(listOf("u1", "u1"), later.state.value.run { listOf(inClass, listSeenBy) })
+                // The student signs in there and deletes the account: none, off the disk too, and a later run reads none.
+                server.signStudentIn(again, scope, "u1", mayDelete = true)
+                server.next(AGE_CHECK).reply(200, PASSED)
+                later.deleting { it.ask() }
+                val deleting = scope.async { later.deleteAccount() }
+                // Its first request on its way: the notes already off the disk, written through.
+                val delete = server.pastReads("DELETE /v1/me")
+                until { disk(file) }.let { assertFalse(it, "u1" in it) }
+                delete.reply(200, """{"outcome":"deleted"}""")
+                server.next("POST /").reply(200, "{}")
+                withTimeout(30.seconds) { deleting.await() }
+                assertEquals(Deleting.Done, later.state.value.deleting)
+                assertEquals(listOf(null, null), app.notes.run { listOf(inClass, listSeenBy) })
+                until { disk(file) }.let { assertFalse(it, "u1" in it) }
+                val (_, last) = run(outbox, server, scope)
+                assertEquals(listOf(null, null), last.state.value.run { listOf(inClass, listSeenBy) })
+            } finally {
+                // Everything that reads the file ended before it closes (the engine rig's teardown, AN5c); the notes put back.
+                app.running.value?.job?.cancelAndJoin()
+                withTimeout(30.seconds) { scope.coroutineContext.job.cancelAndJoin() }
+                server.close()
+                outbox.close()
+                context.deleteDatabase(FILE)
+                app.notes.inClass = found.first
+                app.notes.listSeenBy = found.second
+            }
+        }
+
+    /** The app's run started over [outbox] afresh, as a relaunch starts one, the last ended first: a sign-in of the test's own, nobody signed in. */
+    private suspend fun run(outbox: Outbox, server: Server, scope: CoroutineScope): Pair<SignIn, Account> {
+        app.running.value?.job?.cancelAndJoin()
+        val signIn = testSignIn(server, scope)
+        app.start(SyncEngine.make(outbox, URI(API), signIn, scope, server), scope)
+        val account = checkNotNull(checkNotNull(app.running.value).account)
+        until { account.state.value.takeIf { it.signedIn == false } }
+        return signIn to account
+    }
+
+    /** [file]'s text, or none while SharedPreferences has it moved aside to write it (the router's own notes write behind too). */
+    private fun disk(file: File): String? = runCatching { file.readText() }.getOrNull()
+
+    /** Each read of the truth answered with [ME] until a request to [route] waits: a deletion waits out the reads on their way (AN9b). */
+    private fun Server.pastReads(route: String): Server.Exchange =
+        until {
+            if ("GET /v1/me" in waiting) next("GET /v1/me").reply(200, ME)
+            if (route in waiting) next(route) else null
+        }
+
     private companion object {
         const val FILE = "bali-app-test.sqlite"
+
+        /** `GET /v1/me`'s answer: student u1, named, in a class. */
+        const val ME =
+            """{"user":{"id":"u1","role":"student","displayName":"Ana"},"classes":[{"id":"c","name":"Period 3","teacher":{"displayName":"Ms. Rivera"}}],"session":null}"""
     }
 }

@@ -26,6 +26,7 @@ import com.bali.outbox.Enforcer
 import com.bali.outbox.LockSwitch
 import com.bali.outbox.Outbox
 import com.bali.outbox.OutboxDatabase
+import com.bali.outbox.Problem
 import com.bali.outbox.Standing
 import com.bali.outbox.SyncClock
 import com.bali.outbox.SyncEngine
@@ -75,6 +76,7 @@ class LockServiceTest {
     private val app = context.applicationContext as BaliApp
     private val server = Server()
     private val clock = SeenClock()
+    private val token = object : TokenProvider { override suspend fun accessToken() = "token" }
     private lateinit var scope: CoroutineScope
     private lateinit var outbox: Outbox
     private lateinit var engine: SyncEngine
@@ -281,6 +283,44 @@ class LockServiceTest {
         }
 
     @Test
+    fun aStartThatFailsTakesOffTheLockTheLastRunLeftOnAndALaterStartThatWorksPutsItBackFromTheOutboxsStanding(): Unit =
+        runBlocking {
+            // AN10a's santa (reviewer B), the conductor's call for AN10c: a start that fails runs no enforcer, so a lock the last
+            // run left on would hold with no Emergency Unlock the phone can offer or record, until the student switched Bali's
+            // service off in Settings. It comes off, for either problem: its file gone, the service covering nothing. A later
+            // start that works puts it back from where the outbox says the phone stands, as a relaunch does. In one process the
+            // last run's lock is the one a run that ended left on; a relaunch's, read from the file, has no end of its own (Q4),
+            // and comes off the same way.
+            switchOn()
+            tapIn()
+            until { enforcer.updates.value.takeIf { it.locked && it.until == view.endsAt } }
+            val file = File(context.noBackupFilesDir, LOCK_FILE)
+            val refused = IOException("the disk refused the outbox")
+            for (problem in listOf(Problem.StartFailed(refused), Problem.NotSetUp)) {
+                // The run ends as Bali stops, its lock left on to the bell.
+                end()
+                assertTrue(file.exists())
+                assertEquals(view.endsAt, app.lock.until)
+                app.begin { if (problem == Problem.NotSetUp) null else throw refused }
+                assertEquals(problem, app.problem.value)
+                assertFalse("$problem", file.exists())
+                assertNull("$problem", app.lock.until)
+                assertEquals("", until { listening()?.takeIf { it.isEmpty() } })
+                // Tried again, a start that works, over the outbox the last run left, as a relaunch opens it: on again to the bell.
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+                outbox = Outbox.open(Room.databaseBuilder(context, OutboxDatabase::class.java, FILE))
+                app.begin { SyncEngine.open(outbox, ApiClient(URI("https://api.bali.test"), token, server), scope, clock).also { engine = it } }
+                assertNull(app.problem.value)
+                val claim = until { enforcer.updates.value.takeIf { it.locked } }
+                assertEquals(view.endsAt, claim.until)
+                assertTrue("$problem", file.exists())
+                assertEquals(WIDE, until { listening()?.takeIf { it == WIDE } })
+                // That run is the app's, in its scope: ended with this one's calls before the outbox closes (AN5c).
+                app.running.value?.job?.cancelAndJoin()
+            }
+        }
+
+    @Test
     fun baliComingToTheFrontReadsTheTruthAndRunsTheCheckWhichFindsTheSwitchOff(): Unit =
         runBlocking {
             // In a session, the service never switched on: no screen heard and the list unchanged, so no wake checks
@@ -331,7 +371,6 @@ class LockServiceTest {
         runBlocking { app.launched.join() }
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         outbox = Outbox.open(Room.databaseBuilder(context, OutboxDatabase::class.java, FILE))
-        val token = object : TokenProvider { override suspend fun accessToken() = "token" }
         engine = runBlocking { SyncEngine.open(outbox, ApiClient(URI("https://api.bali.test"), token, server), scope, clock) }
         app.start(engine, scope)
     }

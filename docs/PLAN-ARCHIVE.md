@@ -10,6 +10,17 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN10c's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN10b, the router's inputs and its run (#564; `docs/DECISIONS.md`, 2026-11-11), the
+second of AN10's eight steps: `outbox`'s `Router.kt`, one a process (Q1), choosing again at each change of the run's
+account, enforcer and engine, the start's problem and the screens' inputs, and at each bell and tap's cap by the phone's
+clock; a Debug engine with no account read as signed out (Q2); `everApproved` and the notes under the student (who was
+listed in a class here, who has seen the consent list) behind a `Notes` store, the student's forgotten with the account;
+the sign-in's email; and Me's name and Leave started afresh at each sign-in. No word and no screen. Before it, AN10a, the
+router. Next: AN10c, the router in the app; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account
+that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's
+SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items,
+6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN10b's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN10a, the router (#563; `docs/DECISIONS.md`, 2026-11-11), the first of AN10's
 eight steps: `outbox`'s `Screen.kt`, which screen shows when, iOS's `Screen.choose` with the lock's switch in Screen
 Time's place (Q3): Focus whenever the lock's own rule says it's on, the home a standing not read keeps over the last
@@ -2710,6 +2721,13 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN10c's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11).
+
+- **AN10c** The router in the app (twin: BaliApp.swift's start problems): the app's `Notes`, out of the backup; `BaliApp`'s
+  `problem`, and the last run's lock at a start that fails (DECISIONS 2026-11-11, AN10a's santa); one `Router` for the
+  app's life, the bell looked at again at Android's time-set broadcast and the screen coming on; the readout's Screen line
+  (Q11) — validation: the JVM tests, then the instrumented tests on `Bali_Spike_API35`, `36` and `37`
 
 AN10b's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11).
 

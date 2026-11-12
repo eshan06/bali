@@ -1275,8 +1275,10 @@ out, and no token reaches Bali's API before the 13+ check but the check's own re
 - **A reinstall starts signed out, with an outbox of its own.** Android deletes an app's files and
   its Keystore keys with the app, but its backup can bring the files back on a reinstall or a new
   phone. Bali leaves its own out of the backup and of a transfer to a new phone (the outbox, its
-  counter and install id, the sign-in): a restored counter would rank a new record behind ones the
-  server already holds (A12), and a restored sign-in would open a reinstall signed in.
+  counter and install id, the sign-in, and the notes iOS keeps in the phone's defaults: whether the
+  lock's switch has read on, who was listed in a class here and who has seen the consent list): a
+  restored counter would rank a new record behind ones the server already holds (A12), and a
+  restored sign-in would open a reinstall signed in.
 
 ### The battery plan (the owner, 2026-11-04)
 

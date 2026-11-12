@@ -143,14 +143,15 @@ class Account internal constructor(
 
     /**
      * The engine's state as it comes, BaliApp.swift's `synced`: one sent before the engine forgot the last `me` comes without it,
-     * and a student it lists in a class is kept as one in the notes (#143), replacing the last.
+     * and a student it lists in a class is kept as one in the notes (#143), replacing the last, the store's once no deletion runs
+     * ([delete]).
      */
     internal suspend fun synced(state: SyncState) =
         alone {
             engineState = state
             shown()?.me?.takeIf { it.classes.isNotEmpty() && it.user.id != inClass }?.let {
                 inClass = it.user.id
-                notes.inClass = it.user.id
+                if (deleting != Deleting.Busy) notes.inClass = it.user.id
             }
             publish()
         }
@@ -165,7 +166,7 @@ class Account internal constructor(
             val id = shown()?.me?.user?.id
             if (id == null || id == listSeenBy) return@alone
             listSeenBy = id
-            notes.listSeenBy = id
+            if (deleting != Deleting.Busy) notes.listSeenBy = id
             publish()
         }
 
@@ -227,9 +228,11 @@ class Account internal constructor(
      * runs. After an answer under 13 this run it is the gap's fallback's. Another account's sign-in landed since the press
      * (Q2), after the deletion's own last read of it too (AN9h's window), leaves nothing whose Try again would act on it: any
      * stop is [AccountDeletion.SignInChanged], and the account deleted on the server but not its sign-in is deleted, that
-     * sign-in gone from the phone and its Cognito user the server's deleter's (C3-cognito; AN9b's call). The account deleted
-     * on the server, the notes under the student go, and its `me` with them, as iOS's `forgetNotes` forgets them (the owner's
-     * rulings, 2026-10-23).
+     * sign-in gone from the phone and its Cognito user the server's deleter's (C3-cognito; AN9b's call). The notes under the
+     * student leave the store before anything is sent, written through, so a process ended mid-deletion keeps nothing of the
+     * student's (AN10c), the screens reading them from here meanwhile; a stop writes them back, so the same student isn't
+     * asked again. The account deleted on the server, they go here too, and its `me` with them, as iOS's `forgetNotes`
+     * forgets them (the owner's rulings, 2026-10-23).
      */
     suspend fun deleteAccount(): Unit = call { delete() }
 
@@ -241,6 +244,9 @@ class Account internal constructor(
                 publish()
                 Triple(age.answer == AgeCheck.Answer.TooYoung, landed, account)
             } ?: return
+        // The notes under the student off the disk before the engine sends anything; Busy from here, so nothing writes them back
+        // meanwhile ([synced], [sawList]).
+        notes.forgetStudent()
         val answer = engine.deleteAccount(signIn)
         val now = signIn.landings().first()
         val forget =
@@ -259,6 +265,9 @@ class Account internal constructor(
                 if (gone) {
                     forgetNotes()
                     forgot()
+                } else {
+                    notes.inClass = inClass
+                    notes.listSeenBy = listSeenBy
                 }
                 publish()
                 gone
@@ -418,8 +427,8 @@ class Account internal constructor(
     companion object {
         /**
          * The account half over [engine]'s sign-in, [SyncEngine.make]'s, its calls in [scope], the app's, the notes under the
-         * student in [notes], the app's own store (AN10c's), in memory alone until then; none for an engine opened without one, a
-         * Debug build's while sign-in isn't set up.
+         * student in [notes], the app's own store (AN10c's), in memory alone where none is given; none for an engine opened without
+         * one, a Debug build's while sign-in isn't set up.
          */
         fun of(engine: SyncEngine, scope: CoroutineScope, clock: SyncClock = SystemClock, notes: Notes = MemoryNotes()): Account? =
             engine.signIn?.let { Account(engine, it, scope, clock, notes) }

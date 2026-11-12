@@ -49,7 +49,11 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
    accessibility services running (one that doesn't has Android unbind them all), the screen turned
    off and on, each put back as found; the Debug readout, driven as a tester drives it, its Join, History
    and Signed in line over a sign-in of the test's own, its token endpoint and Bali's API answered by
-   hand, since no emulator can sign in, as the account a run starts is (`TestSignIn.kt`); and the cover,
+   hand, since no emulator can sign in, as the account a run starts is (`TestSignIn.kt`), and its Screen
+   line, the router's; the phone's notes in the app's own SharedPreferences, read back from the disk by a
+   store made later and by a later run's account, and gone with a deleted account; Android's time-set,
+   zone and screen-on broadcasts each asking the router
+   again, handed to the app's own receiver, since no test can send a protected broadcast; and the cover,
    over Android's own apps and a blocked app of the tests' own (`StandIn.java`, in Java since it runs in
    the test app's process, which has no Kotlin), with split screen made through System UI's shell and a
    call to the emulator's own pretend network, its call log put back; and the readout's Scan on a phone
@@ -146,12 +150,14 @@ check found of the lock, the service and how long it read starting after the run
 (`ServiceLock`'s own measure, against the grace), and the outbox; with Sign in and Sign out, Open
 Accessibility settings, Join with a typed code, Scan and Read block code (AN8, below), a typed tap,
 Emergency Unlock, History's last five moments in the wire's names (AN9i), the phone check's 15-minute cap,
-kept in its own preferences and read at each start, and Try again where the start failed. In front, it tells the app (`BaliApp.front`), which
+kept in its own preferences and read at each start, and Try again where the start failed; and the screen the app's
+router shows (Q11, AN10c). In front, it tells the app (`BaliApp.front`), which
 reads the truth and runs the check. While sign-in isn't set up, a Debug build's start runs the engine
 all the same, over no token at the build's API, as a signed-out phone, so a typed tap locks offline to
 its cap and nothing reaches the network; a Release build's makes none, as on iOS (`app/src/release`'s
 `ThisBuild`, pinned on the JVM by Release's own tests, which `gradle.properties` turns on). A start that
-fails is held (`BaliApp.startFailed`) for a screen to say, never swallowed.
+runs nothing says why (`BaliApp.problem`, a type: not set up, or the start failed with its cause), never
+swallowed, and takes off the lock the last run left on, which no enforcer runs to end (AN10c).
 
 **The cover** (`outbox`'s `Cover.kt`, the rule, on the JVM; `app`'s `AllowList.kt`, `Covers.kt` and
 `LockService`'s window events, AN7e; no iOS twin, the shields covering every app at once): while a lock
@@ -294,14 +300,16 @@ reached and the sign-in isn't through; holds an answer under 13 in memory for th
 another student's `me`, a state counting fewer forgets shown without it; and runs Delete account through the engine,
 a stop answered once another account's sign-in landed since the press taken as `SignInChanged`. `BaliApp`'s `start`
 makes one and runs it in the run's job (AN9i); none over an engine with no sign-in, a Debug build's while sign-in isn't
-set up. It keeps the notes under the student (AN10b, `Notes.kt`): who was listed in a class here and who has seen the
-consent list (`sawList`), forgotten once the account is deleted on Bali's server, at a relaunch finding it so too; says
+set up. It keeps the notes under the student (AN10b, `Notes.kt`; the app's in its SharedPreferences, `PreferencesNotes.kt`,
+AN10c): who was listed in a class here and who has seen the consent list (`sawList`), off the disk as Delete account
+starts and written back if it stops, forgotten once the account is deleted on Bali's server, at a relaunch finding it so too; says
 whose email the sign-in is; and holds Me's name and Leave, started afresh at each change of who is signed in.
 
 **The router** (`outbox`'s `Screen.kt` and `Router.kt`, BaliOutbox's `Screen.swift` and BaliApp.swift's `shown`, AN10a and
 AN10b): which screen shows, a type, chosen from the run's account, enforcer and engine, the start's problem, the notes
 and what the screens opened, again at each change and at each moment the phone's clock may change it, the bell and a
-tap's cap, looked at again at each signal the app gives. One a process; it keeps `everApproved` in the notes. It holds
+tap's cap, looked at again at each signal the app gives: Android's time set, zone changed and screen coming on (AN10c).
+One a process, the app's for its life (`BaliApp.router`); it keeps `everApproved` in the notes. It holds
 no lock, and reads each part by the value it last published, as the account's 13+ ask reads it.
 
 **The lock's rules** (`outbox`'s `Enforcer.kt` and `Lock.kt`, BaliOutbox's `Enforcement`, AN7a): the

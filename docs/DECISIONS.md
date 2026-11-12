@@ -8,6 +8,118 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-11** — **AN10c, the router in the app: the phone's notes in its own SharedPreferences, one `Router` for the
+  app's life asked again at Android's time, zone and screen signals, a start's problem as a type with the last run's lock
+  taken off, and Delete account's notes off the disk before it sends anything (the conductor's two calls from #563's and
+  #564's reviews, and this step's own, marked, each awaiting the owner's look; AN10c, #565).** The owner is asleep and said
+  to take the recommended option on every regular call, so each call here is the conductor's or this step's, for the owner
+  to look at.
+
+  **Where it lives:** `app`'s new `PreferencesNotes.kt`, AN10b's `Notes` in the app's own SharedPreferences
+  (`shared_prefs/notes.xml`), the twin of the phone's own defaults: read whole as the app is created, before the account or
+  the router reads it, then kept in memory and written behind (`apply`). `BaliApp.kt`: `notes`, handed to each run's
+  account; `router`, one for the app's life (Q1) over `running`, `problem` and the notes; `looking`, the receiver the app
+  registers for its life for Android's looks; `problem`, in `startFailed`'s place, made by `started`; and a start that runs
+  nothing taking the lock off. `outbox`'s `Notes.forgetStudent` and `Account`'s deletion. The Debug readout's Screen line
+  (Q11). No word and no screen: the words are AN10d's to AN10h's, the screens Phase 10's. Where Kotlin differs, said
+  plainly:
+  - **The looks are Android's own:** iOS's router asks again at its bell and at `significantTimeChangeNotification`
+    (RootView.swift); Android's at the time set (`ACTION_TIME_CHANGED`), the zone changed and the screen coming on, since a
+    `delay` doesn't count deep sleep (#563's santa). The receiver is registered by the app, not declared, as only a context
+    can register the screen's, with `RECEIVER_NOT_EXPORTED` through `ContextCompat` (Android 14's rule for a receiver a
+    context registers: the system's broadcasts alone, none from another app, Android 10 to 12 the same).
+  - **The notes' keys are their own names** (`everApproved`, `inClass`, `listSeenBy`), not iOS's `screenTimeApproved` and
+    `listSeenBy2`: no Android build had Screen Time or L8a's list. Never renamed, since a later build reads them.
+
+  **The conductor's calls, awaiting the owner's look** (the owner away; each the reviewers' recommendation):
+  - **A start that runs nothing takes the last run's lock off** (#563's santa, reviewer B), either problem. Such a start runs
+    no enforcer, so `ServiceLock` went on covering the last run's lock, which has no end (`Instant.MAX` while `kept`), and
+    the problem showed over a lock with no Emergency Unlock until the student switched Bali's service off in Settings; iOS's
+    monitor ends its shields at the bell. Now the lock comes off first, its file gone and the service covering nothing, then
+    the problem is said, so the phone never holds a lock it can neither offer nor record an Emergency Unlock over. It opens
+    no escape a student lacks today (Settings' switch does the same). A later start that works puts it back from the
+    outbox's standing, as a relaunch does, shown by LockServiceTest. A weak spot, said plainly: where that later start
+    reads the standing as unread (the outbox opening but its standing row not), nothing puts the lock back until the
+    server's truth says where the phone stands, where a relaunch with no failed start before it keeps the last run's lock
+    over that standing. Both are storage failures in a row, which no student can cause.
+  - **The deleted student's id never stays on disk** (#564's santa, reviewer B, and Claude Review): the store persists now,
+    so a process ended in the milliseconds between Cognito's DeleteUser and its answer would relaunch signed out with
+    nothing pending, keeping the id until another student's replaced it. Delete account now takes `inClass` and
+    `listSeenBy` off the disk before it sends anything, written through (`Notes.forgetStudent`, a `commit`, the one write
+    that waits on the disk, made with the account let go), the screens reading them from the account meanwhile; a deletion
+    that stops writes them back, so the same student isn't shown the one-time screen again (the owner's reason for keeping
+    them at a sign-out, 2026-10-23); one that finishes forgets them as before. `everApproved` stays: it's the phone's.
+    Claude Review's third WARN (at a relaunch with the deletion pending, the engine's `forgetMe` is asked only where a note
+    was left): shown by a test, the forget left as it is. The notes are never left now, and the sign-in gives Bali's API no
+    token while the deletion is pending, so no `me` comes either. **For the Mac:** iOS has the same window (its
+    `deleteAccount` forgets the notes after the engine's answer); nothing in `ios/` changes here.
+
+  **This step's calls, each awaiting the owner's look:**
+  - **Nothing writes a note under the student to the store while the deletion runs** (from its press to its answer): a read
+    on its way as it starts, which the deletion waits out (AN9b), or the consent list seen meanwhile keeps it in the
+    account alone, so the disk never gets the id back; a stop writes the account's own back. A deletion cut short by its
+    run's end leaves them off the disk, the safe side.
+  - **`BaliApp.problem` replaces `startFailed`,** `Problem.NotSetUp` or `StartFailed` with its cause, made by `started`, a
+    function the JVM reaches, so Release's own tests say a Release build with no config is not set up. `begin` takes the
+    engine's making (`make`), where it took the outbox's opening, so a test can make none and see not set up on the phone.
+  - **The router is made by `BaliApp.router(clock)`,** the phone's clock for the app's own; the tests make one the same way
+    by a clock of their own whose sleep never ends, as deep sleep stretches one, so only a look shows the bell rung.
+  - **The readout's Screen line** names the screen's type, " · tab bar" where the bar shows, and the storage screen's
+    problem as the Engine line says it: Debug's developer words (AN7d), no screen of Release's.
+  - **BaliAppTest's wake ask goes over Focus:** with the app's router reading each run's account, a wake asks Bali again
+    only where the question can't show (AN10b's rule), so the test holds a tap waiting on the check first.
+
+  **The tests,** on `Bali_Spike_API35`, `36` and `37` (instrumented), 61 a run: BaliAppTest's notes, kept by one run and read
+  back by a later one's account, on the disk in the app's own `shared_prefs/`, off it as the deletion's first request goes
+  and gone once the account is deleted, a later run reading none; PreferencesNotesTest's store, what it writes read back
+  from the disk by one made later (a file copied under a name never opened, since Android keeps each file it opened in
+  memory), the student's two off the disk before their forget returns; BaliAppTest's start that runs nothing, each problem
+  its type and the router's storage screen; LockServiceTest's start that fails, for either problem, its lock's file gone
+  and the service listening to nothing, then a later start putting it back to the bell; LooksTest's time set past the bell,
+  the zone changed back before it and the screen coming on, each handed to the app's receiver as Android hands it (no test
+  can send a protected broadcast) and the screen's from the screen itself too, and Android's dump holding that receiver for
+  the three; ReadoutTest's Screen line. On the JVM: ThisBuildTest's Release build, not set up; AccountTest's three, by a store
+  that records each write: the notes off the store, written through, as the deletion's first request goes, written back at
+  a stop and forgotten once done, `everApproved` untouched; a read and the consent list landing mid-deletion kept off the
+  store; and a relaunch with the deletion pending keeping and showing nothing of the student's. The two fixes' failing
+  tests came first, each failing on main by name. Tried, each failing by name, then reverted: the notes not handed to the
+  run's account (BaliAppTest's, at the first run's notes); a store that never forgets (the same, at the deletion's end);
+  the router given no looks (LooksTest's time and screen tests); the receiver hearing neither the time set nor the screen
+  (the dump's test, and the screen's own); a Release build's start said as nothing (ThisBuildTest's); a start that fails
+  leaving the lock on (LockServiceTest's, at its file); the forget after the engine's call, or none (AccountTest's three);
+  no write-back at a stop, or one at the end too (two each); a note written behind while the deletion runs, each note
+  (the mid-deletion test's); and the store reading one note under another's key (PreferencesNotesTest's).
+
+  **For AN10d to AN10h and Phase 10:** `BaliApp.problem` is what the storage screen says (AN10d), and a start that fails
+  has taken the lock off, so its words never say the apps are locked. The screens read `BaliApp.router.shown`; the app's
+  router takes no inputs yet, so Phase 10 hands it its `Router.Input`s in `BaliApp.router`.
+
+  **The proof:** the whole instrumented suite, 61 of 61, on each of `Bali_Spike_API35`, `36` and `37` (54 before this step),
+  on the final code; `./gradlew assemble :app:assembleDebugAndroidTest :app:lint check` green, Android 10's API check with
+  it; the core and outbox suites run five times on the final code, each green (596 tests), AN9h's AgeFallbackTest
+  `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run lint && npm test` green, the
+  portal's suite whole. No SDK package was installed: the build downloads none (`android.builder.sdkDownload=false`), and
+  the SDK's folders matched before and after. Each emulator after its runs: Bali and its test app uninstalled, AN1's spike
+  apps kept, every setting as found (the accessibility list and switch, the font scale, Airplane mode, the screen's
+  timeout, automatic time and zone, the zone, the call log), stopped.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: no test read the store back from the disk,
+  BaliAppTest's later run reading the same object in memory, so a mixed-up key would pass (both; taken: PreferencesNotesTest,
+  failing by name with a key swapped, tried); and BaliAppTest's read of the notes' file could meet it moved aside while
+  SharedPreferences writes it, a rare flake (reviewer A; taken). **For the owner, two privacy notes (reviewer B), neither a
+  defect of this step:**
+  - **A stop after `DELETE /v1/me` went out writes the notes back**, as the brief has every stop do: where the server deleted
+    the account but its answer was lost (`NotDeleted`, `Unfinished`), or another account's sign-in landed after it
+    (`SignInChanged`, which has no Try again), the deleted account's id is back on the disk until another student's
+    replaces it, the key the server's de-identified records stay under. iOS keeps it the same way. [The recommendation:
+    keep the notes off the disk after any stop that came once the deletion's own request was sent; the cost is the one-time
+    screen shown again to a student whose deletion didn't land. A small change in `Account.delete`, with its test, if you
+    want it.]
+  - **The phone never hears of a deletion made elsewhere:** a school's disposal, the retention run, or a deletion from the
+    student's other phone leaves this phone's notes holding the id for good, as iOS's defaults do. Outside this step; for
+    the privacy list.
+
 - **2026-11-11** — **AN10b, the router's inputs and its run: BaliApp.swift's `shown`, `remember` and notes in Kotlin, a
   `Router` choosing again at each change, a tap's cap and the bell, and `Account`'s notes, `sawList`, email, and Me's name
   and Leave (the conductor's calls Q1 to Q3 built, and this step's own, marked, each awaiting the owner's look; AN10b,

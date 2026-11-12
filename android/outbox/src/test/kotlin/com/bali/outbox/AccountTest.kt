@@ -8,6 +8,7 @@ import com.bali.core.SignIn
 import java.io.File
 import java.net.URI
 import java.util.Base64
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -92,6 +93,44 @@ private suspend fun EngineFiles.relaunched(rig: SignedRig, file: File): SignedRi
 
 /** A birth month and year under 13 by [SignedRig.clock]: this month, this year. */
 private fun SignedRig.thisMonth(): Pair<Int, Int> = clock.now().atZone(clock.zone()).let { it.monthValue to it.year }
+
+/**
+ * The notes in [kept], each write recorded as it's made, in order ([writes]): a value set, as the app's store writes behind, or
+ * the student's two forgotten, written through ([Notes.forgetStudent]).
+ */
+private class RecordedNotes(private val kept: Notes = MemoryNotes()) : Notes by kept {
+    val writes = CopyOnWriteArrayList<String>()
+
+    override var everApproved: Boolean
+        get() = kept.everApproved
+        set(value) {
+            writes += "everApproved=$value"
+            kept.everApproved = value
+        }
+
+    override var inClass: String?
+        get() = kept.inClass
+        set(value) {
+            writes += "inClass=$value"
+            kept.inClass = value
+        }
+
+    override var listSeenBy: String?
+        get() = kept.listSeenBy
+        set(value) {
+            writes += "listSeenBy=$value"
+            kept.listSeenBy = value
+        }
+
+    override fun forgetStudent() {
+        writes += FORGOT
+        kept.forgetStudent()
+    }
+
+    companion object {
+        const val FORGOT = "the student's forgotten, written through"
+    }
+}
 
 /** The phone's account half: BaliApp.swift's `Phone`'s, its engine halves (AppTests). */
 class AccountTest : EngineFiles() {
@@ -446,9 +485,9 @@ class AccountTest : EngineFiles() {
             account.synced(checkNotNull(listed))
             assertEquals(listOf(null, null), listOf(notes.inClass, account.state.value.inClass))
 
-            // A relaunch over the same keychain, the notes still there, as an app closed between the server's deletion and its
-            // own answer leaves them: the deletion's screen at once, before any press, the notes gone at once, never left for a
-            // Try again (the owner's ruling, 2026-10-23), the list's note alone too. Try again finishes it.
+            // A relaunch over the same keychain, the notes there, as no deletion leaves them now (they leave the store as it
+            // starts, AN10c, below), as iOS's can: the deletion's screen at once, before any press, the notes gone at once,
+            // never left for a Try again (the owner's ruling, 2026-10-23), the list's note alone too. Try again finishes it.
             val listOnly = MemoryNotes().apply { listSeenBy = "u" }
             val first = relaunched(rig, file)
             assertEquals(Deleting.Pending, account(first, listOnly).state.value.deleting)
@@ -469,6 +508,112 @@ class AccountTest : EngineFiles() {
             assertEquals(Deleting.None, again.state.value.deleting)
             relaunch.stop()
             first.stop()
+            rig.stop()
+        }
+
+    @Test
+    fun deleteAccountTakesTheNotesUnderTheStudentOffTheStoreBeforeItSendsAnythingAStopWritesThemBackOneDoneForgetsThem(): Unit =
+        runBlocking {
+            // santa's reviewer B and Claude Review on #564, the conductor's call for AN10c: the app's store persists, so a process
+            // ended between Cognito's DeleteUser and its answer would keep the deleted student's id on the phone. The notes under
+            // the student leave the store before the deletion sends anything, the screens reading them as before; a stop writes
+            // them back, so the same student isn't shown the one-time screen again (the owner's rulings, 2026-10-23); one done
+            // forgets them. `everApproved` is the phone's, not the student's: it stays through all of it.
+            val notes = RecordedNotes(MemoryNotes().apply { everApproved = true; listSeenBy = "u" })
+            val rig = signedRig(gated = true)
+            val account = account(rig, notes)
+            rig.through(account, scoped("a1"), me = Answer.me(null, classes = listOf(Answer.inClass("p3"))))
+            assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy))
+            account.deleting { it.ask() }
+            notes.writes.clear()
+            val stopping = scope.async { account.deleteAccount() }
+            // Its first request on the wire, unanswered: the notes off the store by then, written through and nothing written
+            // since, the screens reading them as before.
+            val lost = rig.pastReads(deleteMeRoute)
+            assertEquals(listOf(RecordedNotes.FORGOT), notes.writes)
+            assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
+            assertEquals(listOf("u", "u"), account.state.value.let { listOf(it.inClass, it.listSeenBy) })
+            lost.reply(null)
+            withTimeout(patience) { stopping.await() }
+            assertEquals(Deleting.Stopped(Deleting.Stop.NotDeleted(SendResult.NetworkError)), account.state.value.deleting)
+            assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy))
+            // Try again, done: forgotten, and kept so.
+            val deleting = scope.async { account.deleteAccount() }
+            rig.pastReads(deleteMeRoute).reply(200, deletedAnswer)
+            rig.server.next(deleteUserRoute).reply(200, "{}")
+            withTimeout(patience) { deleting.await() }
+            assertEquals(Deleting.Done, account.state.value.deleting)
+            assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
+            assertEquals(listOf(null, null), account.state.value.let { listOf(it.inClass, it.listSeenBy) })
+            assertTrue(notes.everApproved)
+            assertTrue(notes.writes.none { it.startsWith("everApproved") }, "${notes.writes}")
+            rig.stop()
+        }
+
+    @Test
+    fun aReadLandingWhileTheDeletionRunsKeepsItsStudentInAClassOffTheStoreTheScreensSeeingItAndAStopWritesItBack(): Unit =
+        runBlocking {
+            // This step's call (AN10c): from the press on, nothing writes a note under the student to the store, so a read on its
+            // way as the deletion starts, which the deletion waits out (AN9b), can't put the student's id back on the disk, nor
+            // can the consent list seen meanwhile.
+            val notes = RecordedNotes()
+            val rig = signedRig(gated = true)
+            val account = account(rig, notes)
+            rig.through(account, scoped("a1"))
+            assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
+            rig.engine.retryNow()
+            val read = rig.server.next(meRoute)
+            account.deleting { it.ask() }
+            notes.writes.clear()
+            val stopping = scope.async { account.deleteAccount() }
+            eventually { notes.writes.isNotEmpty() }
+            read.reply(200, Answer.me(null, classes = listOf(Answer.inClass("p3"))))
+            val lost = rig.pastReads(deleteMeRoute)
+            account.until { it.inClass == "u" }
+            account.sawList()
+            assertEquals("u", account.state.value.listSeenBy)
+            assertEquals(listOf(RecordedNotes.FORGOT), notes.writes)
+            assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
+            lost.reply(null)
+            withTimeout(patience) { stopping.await() }
+            assertEquals(Deleting.Stopped(Deleting.Stop.NotDeleted(SendResult.NetworkError)), account.state.value.deleting)
+            assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy))
+            rig.stop()
+        }
+
+    @Test
+    fun aRelaunchWithTheDeletionPendingFindsNothingOfTheDeletedStudentsKeptOnThePhoneAndShowsNoneTheDeletionsScreenAlone(): Unit =
+        runBlocking {
+            // Claude Review's third WARN on #564: the process ends between Cognito's DeleteUser and its answer. The notes left the
+            // store as the deletion began, so its disk holds none of the student's for the relaunch to forget, and the relaunch
+            // shows none: the deletion's screen, no note, and no `me`, its sign-in giving Bali's API no token. The sign-in's own
+            // tokens stay, as they must until DeleteUser goes.
+            val (outbox, file) = makeOutbox()
+            val rig = signedRig(outbox, gated = true)
+            val notes = RecordedNotes(MemoryNotes().apply { listSeenBy = "u" })
+            val account = account(rig, notes)
+            rig.through(account, scoped("a1"), me = Answer.me(null, classes = listOf(Answer.inClass("p3"))))
+            account.deleting { it.ask() }
+            scope.launch { account.deleteAccount() }
+            rig.pastReads(deleteMeRoute).reply(200, deletedAnswer)
+            // DeleteUser on its way, never answered: the process ends here, its store as the disk holds it.
+            rig.server.next(deleteUserRoute)
+            val disk = MemoryNotes().apply { inClass = notes.inClass; listSeenBy = notes.listSeenBy }
+            assertEquals(listOf(null, null), listOf(disk.inClass, disk.listSeenBy))
+            val relaunch = relaunched(rig, file)
+            val again = checkNotNull(Account.of(relaunch.engine, scope, relaunch.clock, disk))
+            assertEquals(listOf(null, null), again.state.value.let { listOf(it.inClass, it.listSeenBy) })
+            scope.launch { again.run() }
+            val shown = again.until { it.deleting == Deleting.Pending }
+            assertTrue(shown.deleting.shows)
+            assertEquals(listOf(null, null, null), listOf(shown.inClass, shown.listSeenBy, shown.sync?.me))
+            // Its read finds no token for Bali's API: no `me` comes, and nothing of the student's is kept since.
+            relaunch.engine.retryNow()
+            relaunch.until { it.link == Link.SignIn }
+            assertTrue(relaunch.server.sent.none { it.route == meRoute })
+            assertEquals(listOf(null, null, null), again.state.value.let { listOf(it.inClass, it.listSeenBy, it.sync?.me) })
+            assertEquals(listOf(null, null), listOf(disk.inClass, disk.listSeenBy))
+            relaunch.stop()
             rig.stop()
         }
 
