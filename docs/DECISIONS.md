@@ -8,6 +8,119 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **AN10h, History's words and the consent list: BaliOutbox's `History.words`, `notUpdated`, the moments'
+  and notes' words and the day titles, and JoinView.swift's `ConsentCard` lists in Kotlin, each a function of its type, the
+  last of AN10's eight steps (the conductor's Q6 built, and this step's own calls, marked, each awaiting the owner's look;
+  AN10h, #573).** The owner is asleep and said to take the recommended option on every regular call, so each call here is
+  the conductor's or this step's, for the owner to look at. AN10 is done.
+
+  **Where it lives:** `outbox`, beside each type. `History.kt`: `History.Failure`, sealed now, `NotRead` (AN9g's result and
+  reason) and `NotStarted`, with `words` (iOS's `History.words`) and `notUpdatedWords` (iOS's `History.notUpdated`);
+  `History.notStarted(more)`, a read with no engine said where its failure belongs; and `Title.words`, `Moment.time`,
+  `Moment.words` and `Note.words`. A new `Consent.kt`: `ConsentList`, the whole list (`WHOLE`) and what the one-time screen
+  lists (`ADDED`). `outbox`'s tests read iOS's lists in place (`bali.consent`). `android/app` is unchanged, and no screen is
+  built: they are AS2's, AS4's and AS7's.
+
+  **The words:** each iOS's, word for word, its straight apostrophes too, but four from AS0's Words board: "Lock off" and
+  "Lock back on" for the moments iOS calls "Screen Time off" and "Screen Time back on", "The lock was off at the time" for
+  the note "Screen Time was off at the time", and the consent list's first line, "Your focus status: focused, unlocked, or
+  Bali's lock off" (the board's "Join, intro 2, Me" row, as the canvas's Consent draws it). A reason is named as iOS's
+  `capitalized` names it ("Bathroom", "Nurse", "Other"), each written out, so a reason added with no word stops compiling.
+  History's failures key on the status alone, as iOS's pass Join's words no reason: a 403 is History's own line, "This is a
+  teacher's account, and History is only for students.", the rest Join's, each whole line pinned by a test (#572's WARN: a
+  change to Join's now shows in History's tests); a 409 `account_deleted` is said as any 409 while the owner's call on it
+  waits. Every line is iOS's or a board's, so nothing was drawn. no-ai-slop's Edit job over every new string, checked
+  against `eval.md`: each passes as written, iOS's or owner-ruled.
+
+  **The conductor's call, built (Q6):** a day's date takes the phone's own patterns, `DateTimeFormatter`s the app makes from
+  `DateFormat.getBestDateTimePattern(locale, "EEEEMMMMd")` for a date this year and `(locale, "yEEEEMMMMd")` for one in
+  another (iOS's `.weekday(.wide).month(.wide).day()`, with `.year()`), as a time takes the phone's short time pattern
+  (AN10e's). Why: java.time's localized skeleton, `DateTimeFormatter.ofLocalizedPattern`, is JDK 19's, and Android 10's
+  java.time is Java 8's, whose `ofLocalizedDate` has no style without the year; so `outbox`, plain Kotlin, takes the
+  patterns Android's ICU gives. The JVM tests use en_US's ("EEEE, MMMM d" and "EEEE, MMMM d, y") on a fixed clock, zone
+  and locale, never the PC's.
+
+  **This step's calls, each awaiting the owner's look:**
+  - **A read with no engine is History's own step** (`notStarted(more)`): AS7 asks for the engine before `reading` (AN9g's
+    note) and, with none, takes `notStarted`, which says "Bali is still starting. Try again in a moment." where that read's
+    failure would be, above the moments read for one from the top ("Bali couldn't update your history. Bali is still
+    starting. Try again in a moment.", iOS's line), with nothing busy. iOS's `readHistory` does it by `reading`, then
+    `failed`; here the rule of where is History's, never a screen's. AS7 counts it as the latest read all the same
+    (`reads`), as iOS does, so a Show earlier's answer still on its way is dropped, never taken as this read's page from the
+    top (santa's reviewer B; its doc says so). Android's router shows History only with an engine's account (Q1, Q2), so
+    none is reached today; the type keeps the twin's.
+  - **A date's year is judged as written, in the calendar its pattern writes in** (the formatter's chronology, the ISO
+    calendar where it names none), as iOS judges it in the phone's. Whether the app's formatters carry the phone's
+    calendar is AS7's call; with none, the ISO calendar writes and judges, as Age.kt counts.
+  - **The one-time screen lists everything the list gained** (`ConsentList.ADDED`, iOS's `added(sawAnswers: false)`): a
+    clock set ahead, the answers line and how many answered, and "Which answer is yours". No Android build ever showed L8a's
+    list (`Notes`, AN10b), so the phone can't tell a student who saw it, and neither change goes untold. The canvas's
+    AS7-ListChanged draws the other case, two Sees lines (the Consent's `added` variant, iOS's `sawAnswers: true`), so on
+    Android its board draws a case the phone never shows, and the three-line case is the only one. [Recommendation: the
+    owner's look before AS7 builds the screen, since a state that is a screen's only case may be more than an intermediate
+    one (santa's reviewer A); the three lines are the whole list's own, and Consent.dc.html is untouched.]
+  - **The consent list is held to iOS's in place:** ConsentTest reads `ConsentCard.sees` and `neverSees` from JoinView.swift,
+    as the portal's help page does, so an iPhone list changed without Android's fails ci.yml's "Android contract tests
+    (JVM)", which runs `outbox`'s tests on every PR but a docs-only one. Said plainly: an iPhone PR that changes the list
+    goes red there until Android's changes with it, which is the point: one list, so they never say different things.
+  - **A moment's time is a function of its own** (`Moment.time`), the phone's pattern at the moment's day's zone, so the
+    guard reads it and no screen formats one another way.
+
+  **For the owner (the portal's help page), not blocking:** the help page and the privacy policy show iOS's list
+  (`teacher-sees.ts`, held to JoinView.swift by `support.test.ts`), so they say "or Screen Time off" where an Android phone
+  says "or Bali's lock off": Android's one differing line. Nothing in `apps/web/` changed. [Recommendation: before the first
+  Android build reaches a student, the help page names Android's lock beside Screen Time, in the owner's words.]
+
+  **The guard** (`WordsTest`) reads every new word over every case: a read's failures, every result with every reason and
+  none, and Bali still starting, in their place and above the moments; every kind of moment with each reason and none, and
+  a class counted in and none; each note; each title, a date this year and another year's; each moment's time; and the
+  consent list, whole and what it gained.
+
+  **The tests,** on the JVM, on a US phone in New York (en_US's patterns and AN10e's `usShortTime`, read through `plain`):
+  the word halves of HistoryTests' `days` (UTC's and just after midnight too), `everyKind`, `unknowns`, `pages`,
+  `readAgain` and `failures`, each whole line pinned. New: the daylight-saving test's words, both ways (1:30 AM twice in a
+  25-hour yesterday; a 23-hour one just after midnight, the day before it by its date); the year's own midnight, a December
+  date gaining its year a minute into January in New York, never by UTC's New Year five hours earlier; a date this year by
+  the ISO calendar and last year by the Hijri one, written with its year in the Hijri; each reason in `@bali/shared`'s list
+  named as `capitalized` names it; "Lock off", "Lock back on" and the lock's note; every kind given a reason and a class,
+  which only an unlock and a declined tap say; a read with no engine, in each place; and the consent list, iOS's line for
+  line but the board's one, the canvas's word for word, and the one-time screen's. Tried, each failing by name, then
+  reverted: "Screen Time off" for "Lock off" (`everyKind`, the lock's test, and the guard: "History.Moment.words names
+  Screen Time"); "Screen Time back on" and "Screen Time was off at the time" (`everyKind`, `unknowns`, the lock's test and
+  the guard); a reason on a return to focus, and a class on a tap in (the kinds' test, each); a title's year judged by UTC's
+  date (the year's midnight test); yesterday 24 hours back (the daylight-saving test); a consent line reworded, one dropped
+  with one added, and iOS's Screen Time line back in it (ConsentTest's, and the guard: "ConsentList names Screen Time"); a
+  failure with no word (the compile: "'when' expression must be exhaustive. Add the 'Added' branch"), then with a word and
+  no sample (the guard: "Failure's cases, each with a sample"); an em-dash in the declined tap's line and a "!" in a note
+  (the guard: "History.Moment.words holds an em-dash", "History.Note.words holds an exclamation mark", and `everyKind` and
+  the lock's test); and no engine said in the failure's place above moments read (the no-engine test).
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble :app:lint
+  check` green, Android 10's API check with it (Animal Sniffer over `core` and `outbox`) and no compiler warning from this
+  step's code; the core and outbox suites green in each `check` and four more times on the final code (`--rerun`; 658 tests,
+  seven of them new), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck &&
+  npm run lint && npm test` green, the portal's suite whole (78 files). No SDK package was installed: the build downloads
+  none (`android.builder.sdkDownload=false`), and the SDK's folders matched before and after. The size, santa's count: 197
+  changed lines not counting tests and Markdown (the split guessed about 110), 297 in the tests.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: `notStarted` over a Show
+  earlier still on its way, whose answer AS7 must drop by counting this read as the latest, as iOS's `reads` does (reviewer
+  B; its doc says so now, and AS7's note above); the one-time screen's three lines are Android's only case where its board
+  draws two (reviewer A; the recommendation above is the owner's look now, not a drawing); and this entry's placeholders
+  (both; filled). Reviewer B's third, the help page's "or Screen Time off", is the owner's item above. The design check,
+  no-ai-slop's Detect job over the new strings, found nothing: each is iOS's or the board's, in DESIGN.md's voice.
+
+  **For Phase 10 (AS2, AS4, AS7):** AS7's History says `failure.words` in the moments' place or Show earlier's, with Try
+  again, and `notUpdated.notUpdatedWords` above the moments read; each day's `title.words(now, zone, thisYear,
+  anotherYear)`, and each moment's `time`, `words` and its note's `words`; it asks for the engine before `reading` and, with
+  none, takes `notStarted(more)`, counted as the latest read. Its formatters are the phone's own patterns, made with
+  `DateTimeFormatter.ofPattern(pattern, locale)`: a pattern letter Android 10's java.time lacks (the day period `B` some
+  locales use) throws there, and java.time writes ASCII digits unless handed the locale's `DecimalStyle`, both AS5's and
+  AS7's to settle as they build. The intro's second page, Join's preview and Me's What your teacher sees show
+  `ConsentList.WHOLE` under their own headings ("Sees", "What Ms. Rivera sees", "Never sees"), and the list-changed screen
+  `ADDED` with its See the whole list, once the owner has looked at its three lines.
+
 - **2026-11-12** — **AN10g, the words of Me, Leave, Sign out, Delete account and the 13+ stop: BaliOutbox's `Naming.words` and
   `blank`, `Leaving`'s words, `SignOutWords`, `Deleting.said` and `saidUnderThirteen`, and `AgeCheck`'s stop in Kotlin, each line
   a function of its type, Delete account's three new lines drawn first (the conductor's Q7 to Q9 built, and this step's own calls,

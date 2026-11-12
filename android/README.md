@@ -71,9 +71,10 @@ that needs a new SDK package names it, its source and its size for the owner fir
 
 Both are plain Kotlin, so their tests run on a JDK alone, as BaliCore's and BaliOutbox's run on
 Linux. Their tests read the repo's `contracts/` in place, never a copy, and `@bali/shared`'s lists
-(`packages/shared/src/`) so too, and `outbox`'s the API's name rules (`apps/api/src/display-name.ts`):
-Gradle names each in a system property (`bali.contracts`, `bali.shared`, `bali.names`) and makes it
-an input of the test task, so a changed fixture, list or rule runs them again. Run outside Gradle,
+(`packages/shared/src/`) so too, and `outbox`'s the API's name rules (`apps/api/src/display-name.ts`)
+and iOS's consent list (`ios/Bali/UI/JoinView.swift`): Gradle names each in a system property
+(`bali.contracts`, `bali.shared`, `bali.names`, `bali.consent`) and makes it an input of the test
+task, so a changed fixture, list or rule runs them again. Run outside Gradle,
 the properties are unset and they fail, never passing on nothing. They compile to Java 17's bytecode, which the app's build turns into Android's.
 Every body is coded with kotlinx.serialization, its compiler plugin Kotlin's own (`core`'s
 `Json.kt`).
@@ -297,16 +298,19 @@ Unlocked's (`UnlockedWords`: the class, what is open, the reason card, the re-ta
 and Back to focus's failures, Protection off's (`ProtectionOffWords`: Bali's lock off, back on or being checked, and
 the way back), Session over's and Home's card for a class in session. AN10g's are Me's (a name's refusals, Leave's
 question and refusals, Sign out's holds and whose sign-in it is), Delete account's (`Deleting.said`, a deletion with no
-token said as the sign-in Bali couldn't check, never as no connection) and the 13+ stop's. `WordsTest` reads every one
-for every case of its type: none names Screen Time, iOS, an iPhone, FaceTime or Emergency SOS, or holds an em-dash or an
-exclamation mark; each later step adds its own.
+token said as the sign-in Bali couldn't check, never as no connection) and the 13+ stop's. AN10h's are History's (a read's
+failures, each moment and its note, "Lock off" and "Lock back on" among them, a day's title and a moment's time, from the
+phone's own patterns) and the consent list (`ConsentList`, iOS's line for line but its focus status, read against
+JoinView.swift's in place). `WordsTest` reads every one for every case of its type: none names Screen Time, iOS, an iPhone,
+FaceTime or Emergency SOS, or holds an em-dash or an exclamation mark.
 
 **History's rules** (`outbox`'s `History.kt`, BaliOutbox's `History.swift`, AN9g): the pages as they came, from
 the top or Show earlier's, each moment once; which read may start, Show earlier only while a page follows those read
 and one read at a time, but one from the top ahead of Show earlier's, and the cursor it sends; Show earlier's cursor
 the server doesn't hold read again from the top; days in the phone's zone, whole at a daylight-saving change, in cards of one class's
 moments in a row, each card's id kept as moments join it; a kind this build doesn't know left out of the days and kept
-in the page. Every failure and day title is a type; the words, the date and time formats are AN10's.
+in the page. Every failure and day title is a type, a read with no engine started too (`notStarted`), each said by its
+words beside it (AN10h's), the dates and times in the phone's own patterns, handed in.
 
 **The account** (`outbox`'s `Account.kt`, BaliApp.swift's `Phone`'s account half, AN9e): one a run over the
 engine's sign-in (`Account.of`), its state what AN10's router will read. It follows the sign-in as each sign-in

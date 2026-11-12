@@ -3,6 +3,7 @@ package com.bali.outbox
 import com.bali.core.ApiErrorReason
 import com.bali.core.BaliJson
 import com.bali.core.BlockRead
+import com.bali.core.HistoryEventType
 import com.bali.core.HostedPage
 import com.bali.core.MeClass
 import com.bali.core.MeResponse
@@ -12,6 +13,7 @@ import com.bali.core.SendResult
 import com.bali.core.SignInError
 import com.bali.core.UnlockReason
 import java.io.IOException
+import java.time.LocalDate
 import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,8 +43,8 @@ private fun me(json: String): MeResponse = BaliJson.decodeFromString(MeResponse.
  * Every word the app says, by the function that says it, each read for every case of the types it keys on: AN10d's, Join's,
  * Home's, a scan's, Tap in's, the sign-in's and the start's; AN10e's, Focus's, Emergency Unlock's failures and the block
  * screen's; AN10f's, Unlocked's, a reason's and Back to focus's failures, Protection off's, Session over's and Home's card for a
- * class in session; AN10g's, Me's name, Leave and Sign out, whose sign-in it is, Delete account and the 13+ stop. Each later AN10
- * step adds its own.
+ * class in session; AN10g's, Me's name, Leave and Sign out, whose sign-in it is, Delete account and the 13+ stop; AN10h's,
+ * History's and the consent list.
  */
 private fun everyWord(): Map<String, List<String>> {
     // Every result an answer can have, a status from 100 to 599 or none, and every reason with none.
@@ -141,6 +143,16 @@ private fun everyWord(): Map<String, List<String>> {
         )
     val deletings =
         each(Deleting::class, Deleting.None, Deleting.Asking, Deleting.Busy, *stops.map { Deleting.Stopped(it) }.toTypedArray(), Deleting.Pending, Deleting.Done)
+    // History's: a read's failures, every result with every reason and none, and no engine; every kind of moment with each reason
+    // and none, a class counted in and none; each note; and each title, a date this year and another year's.
+    val notRead = results.flatMap { result -> reasons.map { History.Failure.NotRead(result, it) } }
+    val unread = each(History.Failure::class, *notRead.toTypedArray(), History.Failure.NotStarted)
+    val moments =
+        HistoryEventType.entries.flatMap { kind ->
+            (UnlockReason.entries + null).flatMap { reason -> listOf(null, "Period 5").map { History.Moment("e", kind, t0.atZone(newYorkZone), reason, it, null) } }
+        }
+    val titles =
+        each(History.Title::class, History.Title.Today, History.Title.Yesterday, History.Title.On(LocalDate.of(2026, 9, 16)), History.Title.On(LocalDate.of(2025, 12, 15)))
     return mapOf(
         "Joining.Failure.words" to each(Joining.Failure::class, *failures.toTypedArray()).map { it.words },
         "SyncState.meWords" to each(SendResult::class, *results.toTypedArray()).map { SyncState(meFailed = it).meWords },
@@ -172,6 +184,13 @@ private fun everyWord(): Map<String, List<String>> {
         "Deleting" to listOf(Deleting.QUESTION, Deleting.CONSEQUENCE),
         "Deleting.said" to deletings.flatMap { listOfNotNull(it.said, it.saidUnderThirteen) }.flatMap { listOf(it.title, it.body) },
         "AgeCheck's stop" to listOf(AgeCheck.NOT_YET, AgeCheck.ASK_TEACHER),
+        "History.Failure.words" to unread.map { it.words },
+        "History.Failure.notUpdatedWords" to unread.map { it.notUpdatedWords },
+        "History.Moment.words" to moments.map { it.words },
+        "History.Moment.time" to moments.map { it.time(usShortTime) },
+        "History.Note.words" to History.Note.entries.map { it.words },
+        "History.Title.words" to titles.map { it.words(t0, newYorkZone, usDate, usDateWithYear) },
+        "ConsentList" to listOf(ConsentList.WHOLE, ConsentList.ADDED).flatMap { it.sees + it.neverSees },
     ).mapValues { (_, words) -> words.filterNotNull() }
 }
 

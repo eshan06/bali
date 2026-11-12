@@ -42,9 +42,9 @@ dependencies {
     signature(libs.gummy.bears.api29) { artifact { type = "signature" } }
 }
 
-// The tests read the repo's contracts/, @bali/shared's constants and the API's name rules in place,
-// never a copy (decision 4): inputs of the task, so a changed table, constant or rule runs them
-// again; and a failure's whole message in the log, where CI shows it.
+// The tests read the repo's contracts/, @bali/shared's constants, the API's name rules and iOS's
+// consent list in place, never a copy (decision 4): inputs of the task, so a changed table,
+// constant, rule or line runs them again; and a failure's whole message in the log, where CI shows it.
 tasks.test {
     useJUnitPlatform()
     testLogging.exceptionFormat = TestExceptionFormat.FULL
@@ -57,4 +57,7 @@ tasks.test {
     val names = rootDir.resolve("../apps/api/src/display-name.ts")
     inputs.file(names).withPropertyName("names").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("bali.names", names.canonicalPath)
+    val consent = rootDir.resolve("../ios/Bali/UI/JoinView.swift")
+    inputs.file(consent).withPropertyName("consent").withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("bali.consent", consent.canonicalPath)
 }

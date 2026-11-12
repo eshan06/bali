@@ -12,18 +12,23 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.time.chrono.IsoChronology
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoField
 
 // The History screen (C6a; D1's History), BaliOutbox's History.swift: the student's own moments as the pages of `GET
-// /v1/me/history` came, and D1's days and cards of them, every failure and day title a type. Its rules alone: every word, the
-// day titles' text and the time format are AN10's, the screen AS7's, and the call the engine's (SyncEngine.kt's `history`).
-// It holds what the server answers and writes nothing: no state of the engine's, no record of the outbox's.
+// /v1/me/history` came, and D1's days and cards of them, every failure and day title a type, and their words, each a
+// function of its type (AN10h's; WordsTest reads every one): a read's failures, each moment and its note, a day's title and
+// a moment's time, from the phone's own patterns. The screen and its own words are AS7's, and the call the engine's
+// (SyncEngine.kt's `history`). It holds what the server answers and writes nothing: no state of the engine's, no record of
+// the outbox's.
 
 /**
  * The History screen (C6a; D1's History) as the phone keeps it: the student's own moments, as the pages of `GET
  * /v1/me/history` came, newest first, each moment once; the next page's cursor; and why the last read did not finish, as
  * types ([failure], [notUpdated]; rule 5). A value whose every step gives the next, as `Joining` is, where Swift's mutating
- * calls change it; its words are AN10's. The app keeps it while it runs (#141) and starts it afresh when who is signed in
- * changes. BaliOutbox's `History`.
+ * calls change it; what it says is [Failure.words] and [Failure.notUpdatedWords]. The app keeps it while it runs (#141) and
+ * starts it afresh when who is signed in changes. BaliOutbox's `History`.
  */
 data class History(
     /** The moments read, newest first, as the server answered them: one of a kind this build doesn't know kept as it came. */
@@ -47,8 +52,17 @@ data class History(
      */
     val fromTop: Boolean = true,
 ) {
-    /** Why a read gave no page: its answer's [result] and its error's [reason], which AN10's words key on, never its message. */
-    data class Failure(val result: SendResult, val reason: ApiErrorReason?)
+    /** Why a read gave no page, each said in words of its own ([words] in its place, [notUpdatedWords] over the moments read). */
+    sealed interface Failure {
+        /** The read's answer gave no page: its [result] and its error's [reason], never its message. */
+        data class NotRead(val result: SendResult, val reason: ApiErrorReason?) : Failure
+
+        /**
+         * The phone's engine hasn't started, so nothing was sent: the app's to give ([notStarted]), never the engine's, as Join's
+         * is (AN10d's call; BaliApp.swift's `readHistory`).
+         */
+        data object NotStarted : Failure
+    }
 
     /**
      * The cursor the read [reading] started sends: none from the top, the next page's for Show earlier, which starts only while
@@ -71,6 +85,18 @@ data class History(
         }
 
     /**
+     * The read [reading] would start, with no engine started to send it (the app's to give, asked before [reading]; BaliApp.swift's
+     * `readHistory`): nothing sent, and why said where that read's own failure would be, as [answered] says one, nothing busy.
+     * None where [reading] would start none. The app counts it as the latest read all the same (`reads`, AS7's), as iOS's does, so
+     * the answer to a Show earlier still on its way is dropped, never taken as this read's page from the top.
+     */
+    fun notStarted(more: Boolean): History? = reading(more)?.failed(Failure.NotStarted)
+
+    /** [failure] said where it belongs, no read under way: over the moments read, for a read from the top; else in its place. */
+    private fun failed(failure: Failure): History =
+        if (fromTop && read) copy(busy = false, notUpdated = failure) else copy(busy = false, failure = failure)
+
+    /**
      * A page came back: the next, and true when the history must be read again from the top. One from the top takes the
      * place of the moments read (a newer moment added after older ones would be drawn out of order, and one read before may
      * have changed since: an unlock's reason, A20); Show earlier's goes after them, each moment once. No page: why, said
@@ -82,9 +108,9 @@ data class History(
     fun answered(response: ApiResponse<HistoryPage>): Pair<History, Boolean> {
         val page = response.answer
         if (page == null) {
-            val failure = Failure(response.result, response.error?.error?.reason)
+            val failure = Failure.NotRead(response.result, response.error?.error?.reason)
             if (failure.reason == ApiErrorReason.UnknownCursor && !fromTop) return copy(busy = false) to true
-            return (if (fromTop && read) copy(busy = false, notUpdated = failure) else copy(busy = false, failure = failure)) to false
+            return failed(failure) to false
         }
         val kept = if (fromTop) History() else this
         val known = kept.events.map { it.eventId }.toSet()
@@ -124,7 +150,7 @@ data class History(
     /** A day as D1 draws it: its title, and its cards. */
     data class Day(val title: Title, val cards: List<Card>)
 
-    /** A day's title, a type: its words and its date's format, with its year once that isn't this one, are AN10's. */
+    /** A day's title, a type: what it says is [words], its date's with its year once that isn't this one. */
     sealed interface Title {
         data object Today : Title
 
@@ -156,7 +182,7 @@ data class History(
         val note: Note?,
     )
 
-    /** A moment's note, where its record changed nothing or Screen Time was off (A7's `recordedAs`), each with words of its own (AN10's). */
+    /** A moment's note, where its record changed nothing or the lock was off (A7's `recordedAs`), each with words of its own ([words]). */
     enum class Note {
         /** It reached the server after the class ended. */
         AfterSessionEnd,
@@ -167,10 +193,103 @@ data class History(
         /** It reached the server after the student left this class. */
         NoLiveParticipation,
 
-        /** Screen Time was off at the time: not "changed nothing", since Screen Time back on returns the student to it (#167). */
+        /** The lock was off at the time (iOS's Screen Time): not "changed nothing", since the lock back on returns the student to it (#167). */
         ProtectionOff,
     }
 }
+
+/**
+ * What History says where a read gave no page (rule 5), in the moments' place or Show earlier's, with Try again: a teacher's
+ * account its own line on a 403, the rest in Join's words keyed on the status alone; and Bali still starting. BaliOutbox's
+ * `History.words`.
+ */
+val History.Failure.words: String
+    get() =
+        when (this) {
+            is History.Failure.NotRead ->
+                if (result == SendResult.Status(403)) {
+                    "This is a teacher's account, and History is only for students."
+                } else {
+                    Joining.words(result, null)
+                }
+            History.Failure.NotStarted -> Joining.Failure.NotStarted.words
+        }
+
+/**
+ * What History says above the moments read when reading them again from the top didn't finish (#141), so they may not be the
+ * newest: why, in one sentence with it where it is a sign-in Bali couldn't check, never "Bali couldn't" twice (F4's review).
+ * BaliOutbox's `History.notUpdated`.
+ */
+val History.Failure.notUpdatedWords: String
+    get() =
+        if (this is History.Failure.NotRead && result == SendResult.Status(401)) {
+            "Bali couldn't check your sign-in to update your history. Try again."
+        } else {
+            "Bali couldn't update your history. $words"
+        }
+
+/**
+ * A day's title (D1's History): Today, Yesterday, or its date as the phone writes one, in [thisYear]'s pattern, or with its
+ * year in [anotherYear]'s once that isn't this one at [now] in [zone]: the year as written, in the calendar [thisYear] writes
+ * in (the ISO calendar where it names none), as iOS judges it in the phone's. Each pattern the phone's own for its locale (Q6:
+ * `DateFormat.getBestDateTimePattern`'s for iOS's weekday, month and day, without the year and with it), since Android 10's
+ * java.time has no localized skeleton. BaliOutbox's `History.title`.
+ */
+fun History.Title.words(now: Instant, zone: ZoneId, thisYear: DateTimeFormatter, anotherYear: DateTimeFormatter): String =
+    when (this) {
+        History.Title.Today -> "Today"
+        History.Title.Yesterday -> "Yesterday"
+        is History.Title.On -> {
+            val calendar = thisYear.chronology ?: IsoChronology.INSTANCE
+            val year = { day: LocalDate -> calendar.date(day).get(ChronoField.YEAR_OF_ERA) }
+            (if (year(date) == year(now.atZone(zone).toLocalDate())) thisYear else anotherYear).format(date)
+        }
+    }
+
+/** A moment's time as the phone writes one, [time] its own pattern, as Focus's is (AN10e), at the moment's day's zone. */
+fun History.Moment.time(time: DateTimeFormatter): String = time.format(at)
+
+/**
+ * A moment's line (D1's History; AS7's board), iOS's words but for the lock's two kinds, Android's (the Words board: "Lock off"
+ * and "Lock back on" for the ruled "Screen Time off" and "Screen Time back on"): an unlock's reason on an unlock alone, and the
+ * class a declined tap already counted in on a declined tap alone, "another class" where the server named none, as iOS's rule
+ * is. BaliOutbox's `History.Moment` words.
+ */
+val History.Moment.words: String
+    get() =
+        when (kind) {
+            HistoryEventType.TapIn -> "Tapped in"
+            HistoryEventType.Refocus -> "Locked apps again"
+            HistoryEventType.Unlock -> reason?.let { "Unlocked · ${it.label}" } ?: "Unlocked"
+            HistoryEventType.ProtectionOff -> "Lock off"
+            HistoryEventType.ProtectionOn -> "Lock back on"
+            HistoryEventType.LeftForOtherSession -> "Switched to another class"
+            HistoryEventType.EnrollmentLeft -> "Left the class"
+            HistoryEventType.EnrollmentRemoved -> "Removed from the class"
+            // D1's words, in two sentences on the owner's ruling (2026-09-30): a class named with a dash of its own read as one
+            // line of two dashes.
+            HistoryEventType.ArmedTapSkipped -> "Tap not used. It already counted in ${countedIn ?: "another class"}."
+            HistoryEventType.SessionEnded, HistoryEventType.SessionExpired -> "Class ended"
+        }
+
+/** An unlock's reason as its moment names it, iOS's: its name capitalized. */
+private val UnlockReason.label: String
+    get() =
+        when (this) {
+            UnlockReason.Bathroom -> "Bathroom"
+            UnlockReason.Nurse -> "Nurse"
+            UnlockReason.Other -> "Other"
+        }
+
+/** A moment's note, under its line: iOS's, but the lock off's, Android's (the Words board, for "Screen Time was off at the time"). */
+val History.Note.words: String
+    get() =
+        when (this) {
+            History.Note.AfterSessionEnd -> "Arrived after class ended"
+            History.Note.Superseded -> "Arrived late, so it changed nothing"
+            History.Note.NoLiveParticipation -> "Arrived after you left this class"
+            History.Note.ProtectionOff -> "The lock was off at the time"
+        }
 
 /** [event]'s line, at its time in [zone]; none for a kind this build doesn't know. BaliOutbox's `History.Moment.init`. */
 private fun moment(event: HistoryEvent, zone: ZoneId): History.Moment? {

@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN10h's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN10g, the words of Me, Leave, Sign out, Delete account and the 13+ stop (#572;
+`docs/DECISIONS.md`, 2026-11-12), the seventh of AN10's eight steps: in `outbox`, each a function of its type, iOS's word for
+word: a name's refusals, Leave's question and refusals, Sign out's holds, none saying the unlock goes, and whose sign-in it is;
+Delete account's screen at each step, under 13 too; and the 13+ stop. Three lines of Delete account's are Android's, drawn first
+on AS7's row as intermediate states: no token, said as the sign-in Bali couldn't check, never as no connection (Q7); a sign-in
+that can't delete, with no "older version" (Q8); and this phone signed in to another account meanwhile, Back alone (Q9). No
+screen. Before it, AN10f, Unlocked's, Protection off's and Session over's words. Next: AN10h, History's words and the consent
+list; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone (Q7);
+Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step
+with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN10g's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN10f, Unlocked's, Protection off's and Session over's words (#571; `docs/DECISIONS.md`,
 2026-11-12), the sixth of AN10's eight steps: in `outbox`, each a function of its type, iOS's word for word but where AS0's
 Words board names Bali's lock in Screen Time's place: Unlocked's class and bell, what is open, the reason card's captions, the
@@ -2780,6 +2792,11 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN10h's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12).
+
+- **AN10h** History's words and the consent list (twin: History.swift's words, and JoinView.swift's `ConsentCard`), day
+  titles from the phone's own patterns (Q6) — validation: the JVM tests
 
 AN10g's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12).
 
