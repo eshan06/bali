@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN10f's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN10e, Focus's words and the block screen's (#570; `docs/DECISIONS.md`,
+2026-11-12), the fifth of AN10's eight steps: in `outbox`, each a function of its type, iOS's word for word but where AS0's
+Words board changes one (the claim names Bali's lock) or the owner cut one (the block screen says "Focused with Bali" alone,
+with OK and Open Bali): Focus's class and bell, its countdown over the lock verified on alone, its claim, offline's card, a
+stall, and a late unlock, whose clock line names Android's Settings path, drawn first on AS5's row as an intermediate
+state (AS5-Focus-clock); Emergency Unlock's failures; and the block screen's parts, with no website's case. No screen.
+Before it, AN10c2, the last run's lock over a storage that won't read. Next: AN10f, Unlocked's, Protection off's and
+Session over's words; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check
+on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to
+OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner
+has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN10e's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN10c2, the last run's lock over a storage that won't read (#569;
 `docs/DECISIONS.md`, 2026-11-12), a fix to AN10c's call, from AN10d's review: on Android a storage that won't open fails
 the engine's reads, never its start, so where the phone's storage fails to give back where it stood, the last run's lock
@@ -2756,6 +2768,11 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN10f's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12).
+
+- **AN10f** Unlocked's, Protection off's and Session over's words (twin: `UnlockedWords`, `ProtectionOffWords`, and
+  SyncEngine.swift's `ReasonFailure` and `RefocusFailure`) — validation: the JVM tests
 
 AN10e's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12).
 

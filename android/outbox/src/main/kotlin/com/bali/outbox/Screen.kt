@@ -1,5 +1,6 @@
 package com.bali.outbox
 
+import com.bali.core.ApiErrorReason
 import com.bali.core.BlockRead
 import com.bali.core.HostedPage
 import com.bali.core.ParticipationState
@@ -12,6 +13,8 @@ import com.bali.core.tapDisposition
 import java.io.IOException
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -20,8 +23,9 @@ import kotlinx.coroutines.launch
 
 // Which screen the student app shows (C1 to C6), BaliOutbox's Screen.swift: the router (`choose`), the bell where it chooses
 // again, and what the student opened kept across a change (`keepsOpened`); and the words of Home, a scan, the sign-in and the
-// start (AN10d), each a function of its type (WordsTest reads every one). The router's run is AN10b's, the other screens' words
-// AN10e's to AN10h's, each screen Phase 10's, and `Screen.Move` AS2's.
+// start (AN10d), and of Home's card for a class in session, a refused Back to focus and Session over (AN10f), each a function of
+// its type (WordsTest reads every one). The router's run is AN10b's, the other screens' words AN10e's to AN10h's, each screen
+// Phase 10's, and `Screen.Move` AS2's.
 
 /**
  * Which screen the student app shows (C1 to C6), from what the phone knows: the one place that decides it. A screen renders its
@@ -394,6 +398,72 @@ val Account.State.noClassesCard: String? get() = sync?.noClassesCard(everInClass
 
 /** What Home and Waiting say while `GET /v1/me` gives no answer (rule 5), beside Try again: in the Join screen's words; none while none failed. */
 val SyncState.meWords: String? get() = meFailed?.let { Joining.words(it, null) }
+
+/**
+ * Home's card while a class of the student's is in session and they aren't focused in it (C3c; the conductor's decision under the
+ * owner's delegation, 2026-09-30), at [now] by the phone's clock: unlocked there, Home opened over Unlocked, or, out, a class in
+ * session by the last read of `GET /v1/me`; gone at its bell. None otherwise: Protection off, Focus and Waiting are their own
+ * screens. The bell in [time] at [zone], as the phone writes it ([FocusWords]). BaliOutbox's `inSessionCard`.
+ */
+fun SyncState.inSessionCard(now: Instant, zone: ZoneId, time: DateTimeFormatter): InSessionCard? =
+    when (val stood = standing) {
+        is Standing.InSession -> {
+            val session = stood.session
+            if (stood.state == ParticipationState.Unlocked && session.endsAt > now) {
+                val name = me?.classes?.firstOrNull { it.id == session.classId }?.name ?: "your class"
+                val bell = time.format(session.endsAt.atZone(zone))
+                InSessionCard(unlocked = true, bell = session.endsAt, words = "You're unlocked in $name until $bell.", retap = retapIn(session.id))
+            } else {
+                null
+            }
+        }
+        Standing.Out -> {
+            val running = me?.classes?.firstOrNull { (it.liveSession?.endsAt ?: now) > now }
+            val bell = running?.liveSession?.endsAt
+            if (running == null || bell == null) null else InSessionCard(unlocked = false, bell = bell, words = "${running.name} is in session. Tap your teacher's block to join.")
+        }
+        Standing.Waiting, Standing.Unread -> null
+    }
+
+/**
+ * Home's card for a class in session (C3c): [unlocked] there, its way back Lock my apps again, or, [retap], why a re-tap is
+ * (Unlocked's own rule); else not in it, its way in Tap in; what it says, [words], and its [bell], when it goes.
+ */
+data class InSessionCard(val unlocked: Boolean, val bell: Instant, val words: String, val retap: String? = null)
+
+/**
+ * What the screen the student lands on says of a Back to focus the server refused, never sent again, with the way back, a re-tap
+ * (C5b; rule 5): while the phone stands in that class and its bell hasn't rung by the phone's clock ([now]). Once the class is over
+ * for the phone the words would be stale (santa's review): none then, and while none was refused since the phone's last change.
+ * BaliOutbox's `refusedRefocusWords`.
+ */
+fun SyncState.refusedRefocusWords(now: Instant): String? {
+    val stood = standing as? Standing.InSession ?: return null
+    return if (stood.session.endsAt > now) refusedRefocus(stood.session.id) else null
+}
+
+/** The words for a Back to focus the server refused in [session], the class the phone stands in, protection off's in the Words board's line. */
+internal fun SyncState.refusedRefocus(session: String): String? {
+    val refusal = refused?.takeIf { it.change == Change.Refocus(session) } ?: return null
+    return if (refusal.reason == ApiErrorReason.ProtectionOff) {
+        "Bali couldn't lock your apps again, because Bali's lock was off during this class. Tap your teacher's block to lock them again."
+    } else {
+        "Bali couldn't lock your apps again. Tap your teacher's block to lock them again, or ask your teacher."
+    }
+}
+
+/**
+ * What Session over says (C5b; AS6's Session over) of the session the phone stands in, its bell rung: the class and when, and that
+ * every app is back only once rule 3's check has run and found no lock on ([Protection.locked], iOS's `shielded`), never over a
+ * check not made yet, which iOS's defaults would claim; none standing in none. The bell in [time] at [zone], as the phone writes it
+ * ([FocusWords]). BaliOutbox's `sessionOverWords`.
+ */
+fun SyncState.sessionOverWords(protection: Protection?, zone: ZoneId, time: DateTimeFormatter): String? {
+    val session = (standing as? Standing.InSession)?.session ?: return null
+    val name = me?.classes?.firstOrNull { it.id == session.classId }?.name ?: "Your class"
+    val ended = "$name ended at ${time.format(session.endsAt.atZone(zone))}."
+    return if (protection?.checked == true && !protection.locked) "$ended All your apps are back." else ended
+}
 
 /**
  * What the phone says when a scan recorded no tap (rule 5), with the way on: none for a block's code, the tap, nor for a scan the

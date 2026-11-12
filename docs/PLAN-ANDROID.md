@@ -14,17 +14,17 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-12 (Central) — AN10e, Focus's words and the block screen's (#570; `docs/DECISIONS.md`,
-2026-11-12), the fifth of AN10's eight steps: in `outbox`, each a function of its type, iOS's word for word but where AS0's
-Words board changes one (the claim names Bali's lock) or the owner cut one (the block screen says "Focused with Bali" alone,
-with OK and Open Bali): Focus's class and bell, its countdown over the lock verified on alone, its claim, offline's card, a
-stall, and a late unlock, whose clock line names Android's Settings path, drawn first on AS5's row as an intermediate
-state (AS5-Focus-clock); Emergency Unlock's failures; and the block screen's parts, with no website's case. No screen.
-Before it, AN10c2, the last run's lock over a storage that won't read. Next: AN10f, Unlocked's, Protection off's and
-Session over's words; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check
-on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to
-OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner
-has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-12 (Central) — AN10f, Unlocked's, Protection off's and Session over's words (#571; `docs/DECISIONS.md`,
+2026-11-12), the sixth of AN10's eight steps: in `outbox`, each a function of its type, iOS's word for word but where AS0's
+Words board names Bali's lock in Screen Time's place: Unlocked's class and bell, what is open, the reason card's captions, the
+re-tap and an unlock not sent yet; a reason's and Back to focus's failures, none said as gone; Protection off's lock off, back
+on or being checked, its steps back through Accessibility settings, Settings its one way, where the iPhone also has its own
+prompt; Session over's line; and Home's card for a class in session. Every line is iOS's or a board's, so nothing was drawn.
+No screen. Before it, AN10e, Focus's words and the block screen's. Next: AN10g, the words of Me, Leave, Sign out, Delete
+account and the 13+ stop, Delete account's new lines drawn first (Q9); AN7f and AN8's 📱 check on the owner's phones, signed
+in on dev as an account that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items,
+8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open
+owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -178,8 +178,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN10c2** The last run's lock over a storage that won't read — ✅ (#569; DECISIONS 2026-11-12)
 - **AN10d** Home's words, Tap in, and the sign-in's and the start's words — ✅ (#566; DECISIONS 2026-11-11)
 - **AN10e** Focus's words and the block screen's — ✅ (#570; DECISIONS 2026-11-12)
-- **AN10f** Unlocked's, Protection off's and Session over's words (twin: `UnlockedWords`, `ProtectionOffWords`, and
-  SyncEngine.swift's `ReasonFailure` and `RefocusFailure`) — validation: the JVM tests
+- **AN10f** Unlocked's, Protection off's and Session over's words — ✅ (#571; DECISIONS 2026-11-12)
 - **AN10g** The words of Me, Leave, Sign out, Delete account and the 13+ stop (twin: Me.swift's, Deletion.swift's and
   Age.swift's), Delete account's new lines drawn first (Q9) — validation: the JVM tests
 - **AN10h** History's words and the consent list (twin: History.swift's words, and JoinView.swift's `ConsentCard`), day

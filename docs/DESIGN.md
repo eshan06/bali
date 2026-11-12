@@ -1093,10 +1093,13 @@ words.
   AS5's row as an intermediate state (AS5-Focus-clock, AN10e).
 - **Where the words live:** as on the iPhone, in the engine's module, `outbox`
   (`android/outbox/src/main/kotlin/com/bali/outbox/`), each a function of its type beside it (AN10d
-  to AN10h): Join's in `Join.kt`; Home's, a scan's, the sign-in's and the start's in `Screen.kt`; Tap
-  in's and Emergency Unlock's failures in `SyncEngine.kt` (`TapFailure`, `UnlockFailure`); Focus's
-  in `Focus.kt` (`FocusWords`); the block screen's in `ShieldWords.kt`. `WordsTest` reads every one,
-  and fails a word that names something Android lacks or holds an em-dash or an exclamation mark.
+  to AN10h): Join's in `Join.kt`; Home's, a scan's, the sign-in's, the start's and Session over's in
+  `Screen.kt`, Home's card for a class in session among them (`inSessionCard`); Tap in's, Emergency
+  Unlock's, a reason's and Back to focus's failures in `SyncEngine.kt` (`TapFailure`,
+  `UnlockFailure`, `ReasonFailure`, `RefocusFailure`); Focus's in `Focus.kt` (`FocusWords`); the
+  block screen's in `ShieldWords.kt`; Unlocked's in `Unlocked.kt` (`UnlockedWords`); Protection
+  off's in `ProtectionOff.kt` (`ProtectionOffWords`). `WordsTest` reads every one, and fails a word
+  that names something Android lacks or holds an em-dash or an exclamation mark.
 - **The look:** the tokens in Material 3's roles: `primary` is action-primary-bg,
   `tertiaryContainer` the emergency pair, `error` the destructive red, `errorContainer` Lock off's
   chip, `surfaceContainerLowest` the card, `surfaceContainerHigh` the sunken well, `outline`

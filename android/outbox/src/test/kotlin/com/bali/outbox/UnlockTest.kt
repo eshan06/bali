@@ -114,7 +114,7 @@ class ShieldedUntilTest : OutboxFiles() {
         }
 }
 
-/** The reason sent with the unlock, and the way back (C5a): the engine's half of BaliOutbox's ReasonTests but `refiledReason` (ReasonTest's), their words AN10's. */
+/** The reason sent with the unlock, and the way back (C5a): BaliOutbox's ReasonTests but `refiledReason` (ReasonTest's), with their words (AN10f). */
 class ReasonEngineTest : EngineFiles() {
     @Test
     fun pressedInASessionTheUnlockStandsAtOnceItsSendWaitsForTheReasonGivenMeanwhileItGoesAtOnceWithItAndOnceTheServerHasItAPickIsAChangeOfIt(): Unit =
@@ -153,7 +153,10 @@ class ReasonEngineTest : EngineFiles() {
                 rig.tapIn()
                 val unlock = assertNotNull(rig.engine.record(Change.Unlock("s", UnlockReason.Nurse)))
                 rig.server.next(unlockRoute).reply(200, replay(answer))
-                assertEquals(RecordedUnlock("s", unlock.eventId, kept), rig.until { it.queued.isEmpty() }.recordedUnlock, answer)
+                val state = rig.until { it.queued.isEmpty() }
+                assertEquals(RecordedUnlock("s", unlock.eventId, kept), state.recordedUnlock, answer)
+                // Said in the reason's place, never the phone's claim (#119's review): the card's check on the one kept.
+                assertEquals(UnlockedWords.Picker.Open(kept), UnlockedWords.of(state, newYorkZone, usShortTime)?.picker, answer)
                 rig.engine.record(Change.Refocus("s"))
                 assertNull(rig.engine.updates.value.recordedUnlock, answer)
                 rig.stop()
@@ -170,6 +173,7 @@ class ReasonEngineTest : EngineFiles() {
             assertEquals(older.eventId, newer.recordedUnlock?.unlock)
             val card = assertNotNull(newer.unlockIn("s"))
             assertEquals(listOf(0, false, false), listOf(card.attempts, card.stuck, card.eventId in newer.sending))
+            assertEquals(UnlockedWords.Picker.Open(null), UnlockedWords.of(newer, newYorkZone, usShortTime)?.picker)
             // On its way, a pick waits for it: never a change of the older one's reason.
             rig.clock.advance(SyncEngine.REASON_HOLD)
             rig.server.next(unlockRoute)
@@ -189,6 +193,7 @@ class ReasonEngineTest : EngineFiles() {
             val state = other.until { it.queued.size == 1 }
             assertEquals(RecordedUnlock("s", unlock.eventId, null), state.recordedUnlock)
             assertNull(state.unlockIn("s"))
+            assertEquals(UnlockedWords.Picker.Open(null), UnlockedWords.of(state, newYorkZone, usShortTime)?.picker)
         }
 
     @Test
@@ -203,7 +208,9 @@ class ReasonEngineTest : EngineFiles() {
             val refused = async { rig.engine.explain(UnlockReason.Nurse) }
             val refusal = rig.server.next(route)
             refusal.reply(409, Answer.refused("unlock_superseded"))
-            assertEquals(ReasonFailure.NotChanged(SendResult.Status(409), ApiErrorReason.UnlockSuperseded), refused.await())
+            val superseded = refused.await()
+            assertEquals(ReasonFailure.NotChanged(SendResult.Status(409), ApiErrorReason.UnlockSuperseded), superseded)
+            assertEquals("This unlock is over, so its reason can't change.", superseded?.words)
             assertNull(rig.engine.updates.value.recordedUnlock?.reason)
             // Answered, the same pick again is a change of its own, under a new id (santa's review).
             val retried = async { rig.engine.explain(UnlockReason.Nurse) }
@@ -214,7 +221,9 @@ class ReasonEngineTest : EngineFiles() {
             val lost = async { rig.engine.explain(UnlockReason.Other) }
             val first = rig.server.next(route)
             first.reply(null)
-            assertEquals(ReasonFailure.NotChanged(SendResult.NetworkError, null), lost.await())
+            val unanswered = lost.await()
+            assertEquals(ReasonFailure.NotChanged(SendResult.NetworkError, null), unanswered)
+            assertEquals("Bali couldn't change your reason. Check your connection and try again.", unanswered?.words)
             val again = async { rig.engine.explain(UnlockReason.Other) }
             val second = rig.server.next(route)
             assertEquals(first.eventId, second.eventId)
@@ -296,7 +305,9 @@ class ReasonEngineTest : EngineFiles() {
             lostChange.reply(null)
             assertEquals(ReasonFailure.NotChanged(SendResult.NetworkError, null), lost.await())
             oldChange.reply(null)
-            assertEquals(ReasonFailure.NotChanged(SendResult.NetworkError, null), old.await())
+            val stale = old.await()
+            assertEquals(ReasonFailure.NotChanged(SendResult.NetworkError, null), stale)
+            assertEquals("Bali couldn't change your reason. Check your connection and try again.", stale?.words)
             val again = async { rig.engine.explain(UnlockReason.Other) }
             val retried = rig.server.next(route)
             assertEquals(lostChange.eventId, retried.eventId)
@@ -335,8 +346,9 @@ class ReasonEngineTest : EngineFiles() {
             rig.clock.advance(SyncEngine.REASON_HOLD)
             val first = rig.server.next(unlockRoute)
             assertNull(first.reason)
-            // On its way, never sent by the file's count: the send wouldn't carry it.
+            // On its way, never sent by the file's count: the send wouldn't carry it, so a pick waits for the unlock to arrive.
             assertEquals(ReasonFailure.OnItsWay, rig.engine.explain(UnlockReason.Nurse))
+            assertEquals("You can pick a reason once your unlock reaches your teacher.", ReasonFailure.OnItsWay.words)
             // No answer: the server may have it all the same, and would keep it without one.
             first.reply(null)
             rig.until { it.queued.firstOrNull()?.attempts == 1 }
@@ -415,7 +427,8 @@ class ReasonEngineTest : EngineFiles() {
     @Test
     fun backToFocusRefusedByTheServerIsDroppedTheTruthReadAgainItsRefusalShownWhereItLandsUntilThePhonesNextChange(): Unit =
         runBlocking {
-            // C5b; rule 5. What Protection off and Unlocked say of it is AN10's.
+            // C5b; rule 5: protection off there, it lands on Protection off, saying why and the re-tap; another refusal, the unlock
+            // still standing, on Unlocked with the re-tap in Lock my apps again's place.
             val refusals =
                 listOf(
                     Triple("protection_off", ApiErrorReason.ProtectionOff, ParticipationState.ProtectionOff),
@@ -431,8 +444,18 @@ class ReasonEngineTest : EngineFiles() {
                 rig.server.next(meRoute).reply(200, Answer.me(state = landed.wire))
                 val state = rig.until { it.standing == inSession(landed) && it.refused != null }
                 assertEquals(listOf(Change.Refocus("s"), said), listOf(state.refused?.change, state.refused?.reason), reason)
+                val words = if (landed == ParticipationState.ProtectionOff) REFOCUS_REFUSED_OFF else REFOCUS_REFUSED
+                assertEquals(words, state.refusedRefocusWords(rig.clock.now()), reason)
+                val where =
+                    if (landed == ParticipationState.ProtectionOff) {
+                        ProtectionOffWords.of(state, null, newYorkZone, usShortTime)?.refused
+                    } else {
+                        UnlockedWords.of(state, newYorkZone, usShortTime)?.retap
+                    }
+                assertEquals(words, where, reason)
                 rig.engine.record(Change.Tap("tag"))
                 assertNull(rig.engine.updates.value.refused, reason)
+                assertNull(rig.engine.updates.value.refusedRefocusWords(rig.clock.now()), reason)
                 rig.stop()
             }
         }
@@ -483,9 +506,11 @@ class ReasonEngineTest : EngineFiles() {
             rig.tapIn()
             assertNull(rig.engine.pressUnlock())
             refuseUpdates(rig.outbox)
-            assertEquals(ReasonFailure.NotSaved, rig.engine.explain(UnlockReason.Other))
+            val reason = rig.engine.explain(UnlockReason.Other)
+            assertEquals(ReasonFailure.NotSaved to "Bali couldn't save your reason. Try again.", reason to reason?.words)
             refuseRecords(rig.outbox)
-            assertEquals(RefocusFailure.NotSaved, rig.engine.backToFocus())
+            val back = rig.engine.backToFocus()
+            assertEquals(RefocusFailure.NotSaved to "Bali couldn't lock your apps. Try again.", back to back?.words)
             assertEquals(listOf(unlocked, unlocked), listOf(rig.engine.updates.value.standing, rig.outbox.standing()))
         }
 

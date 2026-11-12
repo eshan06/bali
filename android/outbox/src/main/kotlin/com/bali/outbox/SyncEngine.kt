@@ -1513,8 +1513,11 @@ fun UnlockFailure.words(paused: Boolean): String =
         UnlockFailure.NothingToUnlock -> "There was nothing to unlock, so nothing was recorded."
     }
 
-/** Why a reason the student picked didn't take (C5a; rule 5). The words are AN10's, from the approved boards. */
+/** Why a reason the student picked didn't take (C5a; rule 5), each said in its own words ([words]). */
 sealed interface ReasonFailure {
+    /** The app has no engine yet: the app's to give, never the engine's, as [UnlockFailure.NotStarted] is. */
+    data object NotStarted : ReasonFailure
+
     /** The outbox refused to keep it with the unlock: another try is the way on. */
     data object NotSaved : ReasonFailure
 
@@ -1525,8 +1528,45 @@ sealed interface ReasonFailure {
     data class NotChanged(val result: SendResult, val reason: ApiErrorReason?) : ReasonFailure
 }
 
-/** Why Back to focus didn't go through (C5a; rule 5): the outbox refused to keep the refocus. The words are AN10's. */
-enum class RefocusFailure { NotSaved }
+/**
+ * What the Unlocked screen's reason card says when a pick didn't take (rule 5), with the way on: not saved, or Bali still starting,
+ * another try; the unlock on its way, a pick once it arrives; a change the server refused, by its refusal (the unlock over, the
+ * class over, the unlock not found), each saying the reason can't change; no answer, or any other, another try. None says the
+ * unlock or its reason was dropped: the server keeps what it recorded (A1, A20). SyncEngine.swift's lines and BaliOutbox's
+ * `UnlockedWords.notChanged`, keyed on the refusal first, as iOS's are.
+ */
+val ReasonFailure.words: String
+    get() =
+        when (this) {
+            ReasonFailure.NotStarted -> Joining.Failure.NotStarted.words
+            ReasonFailure.NotSaved -> "Bali couldn't save your reason. Try again."
+            ReasonFailure.OnItsWay -> "You can pick a reason once your unlock reaches your teacher."
+            is ReasonFailure.NotChanged ->
+                when {
+                    reason == ApiErrorReason.UnlockSuperseded -> "This unlock is over, so its reason can't change."
+                    reason == ApiErrorReason.SessionNotRunning -> "Class is over, so the reason can't change."
+                    reason == ApiErrorReason.UnlockNotFound -> "Bali couldn't find this unlock, so its reason can't change."
+                    result == SendResult.NetworkError -> "Bali couldn't change your reason. Check your connection and try again."
+                    else -> "Bali couldn't change your reason. Try again in a moment."
+                }
+        }
+
+/** Why Back to focus didn't go through (C5a; rule 5), each said in its own words ([words]). */
+enum class RefocusFailure {
+    /** The app has no engine yet: the app's to give, never the engine's, as [UnlockFailure.NotStarted] is. */
+    NotStarted,
+
+    /** The outbox refused to keep the refocus, so nothing changed: another try is the way on. */
+    NotSaved,
+}
+
+/** What Unlocked says under Lock my apps again when it didn't go through (rule 5), another try the way on: SyncEngine.swift's line. */
+val RefocusFailure.words: String
+    get() =
+        when (this) {
+            RefocusFailure.NotStarted -> Joining.Failure.NotStarted.words
+            RefocusFailure.NotSaved -> "Bali couldn't lock your apps. Try again."
+        }
 
 /**
  * Why Home's Tap in recorded no tap (C3b; rule 5), [SyncEngine.tapIn]'s answer: the scan found no block, the outbox refused to

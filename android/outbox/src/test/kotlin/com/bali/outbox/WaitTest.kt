@@ -14,7 +14,7 @@ import kotlinx.coroutines.runBlocking
 
 /**
  * A wait the server has dropped is Home, never Waiting (#166): BaliOutbox's DroppedWaitTests, which screen shows by the router
- * ([shown]), and the wait's card no longer said (AN10d); the class in session's card (C3c) is AN10f's.
+ * ([shown]), the wait's card no longer said (AN10d), and the class in session's card (C3c, AN10f).
  */
 class DroppedWaitTest : EngineFiles() {
     /** Class c, its session running until 4000 s after [t0], as `GET /v1/me` names it (C3c). */
@@ -23,7 +23,7 @@ class DroppedWaitTest : EngineFiles() {
     @Test
     fun aReadSayingNoTapOfTheStudentsWaitsItsSchoolDayOverOrTakenByAStartWhoseClassIsOverTooEndsTheWait(): Unit =
         runBlocking {
-            // Home, never Waiting, and no wait said on it (C3c's card none either: AN10f's).
+            // Home, never Waiting, and no wait said on it, nor C3c's card.
             val rig = rig()
             rig.arm()
             rig.screenOn(Answer.me(null, classes = listOf(Answer.inClass("c")), armed = false, name = "Ana"))
@@ -32,12 +32,13 @@ class DroppedWaitTest : EngineFiles() {
             assertEquals(Screen.Shown(Screen.Home, true), shown(state))
             assertEquals(Screen.Shown(Screen.Home, true), shown(state, opened = listOf(Screen.Home)))
             assertNull(state.waitingCard)
+            assertNull(state.inSessionCard(rig.clock.now(), newYorkZone, usShortTime))
         }
 
     @Test
     fun aStartAfterTheTapsSchoolDayJoinsNothingTheReadNamesNoSessionAndNoTapWaitingAndTheClassInSession(): Unit =
         runBlocking {
-            // Home; its card, the class in session with Tap in (C3c), is AN10f's: the class's session, which it reads, is here.
+            // Home, and its card says the class is in session, with Tap in (C3c).
             val rig = rig()
             rig.arm()
             rig.screenOn(Answer.me(null, classes = listOf(Answer.inClass("c")), armed = true))
@@ -45,9 +46,13 @@ class DroppedWaitTest : EngineFiles() {
             rig.clock.advance(30)
             rig.server.next(meRoute).reply(200, Answer.me(null, classes = listOf(inSession), armed = false, name = "Ana"))
             val state = rig.until { it.standing != Standing.Waiting }
+            val now = rig.clock.now()
             assertEquals(Standing.Out, state.standing)
             assertEquals(at(4000), state.me?.classes?.single()?.liveSession?.endsAt)
-            assertEquals(Screen.Shown(Screen.Home, true), shown(state, now = rig.clock.now()))
+            assertEquals(Screen.Shown(Screen.Home, true), shown(state, now = now))
+            val card = assertNotNull(state.inSessionCard(now, newYorkZone, usShortTime))
+            assertEquals(false to at(4000), card.unlocked to card.bell)
+            assertEquals("Class c is in session. Tap your teacher's block to join.", card.words)
         }
 
     @Test

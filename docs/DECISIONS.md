@@ -8,6 +8,127 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **AN10f, Unlocked's, Protection off's and Session over's words: BaliOutbox's `UnlockedWords` and
+  `ProtectionOffWords`, Screen.swift's card for a class in session, refused Back to focus and Session over, and SyncEngine.swift's
+  words for `ReasonFailure` and `RefocusFailure` in Kotlin, each line a function of its type, Bali's lock where the iPhone's lines
+  name Screen Time (the conductor's calls, made in this step, marked, each awaiting the owner's look; AN10f, #571).** The owner is
+  asleep and said to take the recommended option on every regular call, so each call here is the conductor's, for the owner to
+  look at.
+
+  **Where it lives:** `outbox`, beside each type. `Unlocked.kt`: `UnlockedWords`, made by `of` (none unless the phone stands
+  unlocked in a session), its `Picker` (`Open`, `Waiting`) with its `caption`, and `retapIn`, Unlocked's own rule for the re-tap,
+  which Home's card shares. `ProtectionOff.kt`: `ProtectionOffWords`, made by `of` (none out of a session), its `Way` (`Settings`,
+  `Retap`, `Checking`). `Screen.kt`: `inSessionCard` and `InSessionCard` (C3c), `refusedRefocusWords`, and `sessionOverWords`.
+  `SyncEngine.kt`: `ReasonFailure.words` and `RefocusFailure.words`, each type gaining a `NotStarted` the app gives with no
+  engine, said with `Joining.Failure.NotStarted.words` (AN10d's call; iOS's `pick` and `backToFocus` say `Joining.notStarted`).
+  Unlocked's and Protection off's headings call `SyncState.heading` (AN10e's helper), and every time is written in the phone's
+  formatter and zone, handed in with no default, as `FocusWords`' is. `android/app` is unchanged, and no screen is built: they are
+  AS6's, Home's card AS4's.
+
+  **The words:** each iOS's, word for word, its straight apostrophes too, but where AS0's Words board names Bali's lock in Screen
+  Time's place (its rows "Screen Time becomes Bali's lock"):
+  - Protection off's headlines, "Bali's lock is off", "Bali's lock is back on" and "Checking Bali's lock…" (AS6-Off-a,
+    AS6-Off-backon, AS6-Off-checking);
+  - its bodies, "…so your teacher sees that the lock is off.", "…Until then, your teacher sees the lock as off." and "Until the
+    lock is back on, your teacher sees that it's off.", "will see" while the report is still on the phone, as iOS's; and the
+    report not saved, "Bali couldn't tell your teacher that the lock was off." (the board's "Lock off, not drawn"), with "It keeps
+    trying." on the check's way, as iOS's;
+  - its first step back, "Turn Bali back on in Accessibility settings";
+  - Unlocked's re-tap, "Bali's lock was off during this class, so tap your teacher's block to lock your apps again."
+    (AS6-Unlocked-retap), and a Back to focus refused after protection off, "Bali couldn't lock your apps again, because Bali's
+    lock was off during this class. Tap your teacher's block to lock them again." (the board's "Unlocked, not drawn").
+  The rest are iOS's lines unchanged: Unlocked's body (AS6-Unlocked, AS6-Unlocked-reason), the reason card's two captions (the
+  Reasons board), an unlock not sent yet (AS6-Unlocked-stuck), a change of the reason that didn't go (AS6-Unlocked-notchanged's,
+  and iOS's other four), "Bali couldn't save your reason. Try again.", "Bali couldn't lock your apps. Try again."
+  (AS6-Unlocked-notback), the untold line on the Settings way, Session over's (AS6-Over), and Home's card's two
+  (AS4-Home-overUnlocked, AS4-Home-insession). no-ai-slop's Edit job over the changed lines, checked against `eval.md`: each
+  passes as the board writes it, so none is reworded. The words drawn in the screens themselves (the chips, You're unlocked, the
+  reason card's title and its three, Go to Home, Lock my apps again, Tap in, To rejoin class, Open Accessibility settings, Class
+  is over, Done, See history) are AS6's, as they are iOS's views', not these types'.
+
+  **Nothing drawn on the canvas:** every line is iOS's or the Words board's, and none names an iPhone Settings path, so no line
+  needed a board first; the canvas stays at version `1794472617-4932`.
+
+  **The conductor's calls, made in this step, each awaiting the owner's look:**
+  - **iOS's way to its own prompt has no twin, so a switch starting past the grace takes Settings's way** (the brief; AN7b's
+    switch): iOS asks with its prompt where the permission reads not determined past the grace, and Android has no prompt, its
+    Accessibility settings the one place to switch the lock on. So Protection off has three ways: Settings once the check judges
+    the switch off (read off, or starting past the grace), the re-tap once it reads on and bound, and the check's while nothing has
+    judged it off. Said plainly: a switch starting past the grace is one Android lists as on that hasn't bound in the grace, so
+    "Turn Bali back on in Accessibility settings" can lead to a switch that already reads on, where turning it off and on again is
+    the way. No board draws that case. [Recommendation: AP3 checks on the phones whether a switch ever starts past the grace
+    outside a reboot; if it does, its own line, drawn first.]
+  - **The re-tap only over the switch on and bound** (`LockSwitch.On`, iOS's approved; Q3), never over one starting, which proves
+    nothing (AN7b's rule for the lock back on).
+  - **Session over's "All your apps are back." only over a check that ran and found no lock on** (`checked` and not `locked`,
+    iOS's `shielded == false`; Q3), never over a check not made yet, which iOS's defaults would claim (santa's reviewer B). The
+    router never shows Session over before the first check, so no screen differs from the iPhone's; the function keeps rule 3
+    itself.
+  - **No label quoted, Android's two** (iOS's D2j rule): Protection off's lines never quote the chip's "Lock off" nor the grid's
+    "Protection off"; the test reads every headline, body and step, in any case, where iOS's reads the body for "Screen Time off".
+  - **The board's variants change as its lines do:** the board writes the lock-off bodies with "sees" and its line not drawn
+    with "(It keeps trying.)", so iOS's "will see" while the report waits, and the re-tap's and the check's forms of that line,
+    change the same way (the board's rule for a line no board shows): no line is new.
+  - **Home's card's re-tap is Unlocked's own rule through one helper** (`retapIn`), where iOS builds Unlocked's words for it
+    (`UnlockedWords(self)?.retap`): the same answer, with no time to write.
+  - **"Bali couldn't find this unlock, so its reason can't change." stays iOS's** (a change answered `404 unlock_not_found`): it
+    says the server's answer to a change of the reason, never that the phone dropped the unlock, whose record left the outbox only
+    once the server recorded it. [Recommendation: keep.]
+
+  **The guard** (`WordsTest`) reads `UnlockedWords`, `ProtectionOffWords`, `sessionOverWords`, `refusedRefocusWords` and
+  `inSessionCard` over every standing, the classes not read, read as none and as one; an unlock of the class on the phone, stuck
+  or none, one under a tap, protection off on its way, a refused tap; one recorded or none; protection off reported or not; a
+  Back to focus refused after protection off, for anything else, or none; the classes' read failing or not; every claim the
+  check can make; and a class in session by the read: each picker, way and kind of Home's card reached, or it fails by name. And
+  `ReasonFailure.words` for every result and reason, `RefocusFailure.words` for each.
+
+  **The tests,** on the JVM, on a US phone in New York (`en_US`, `America/New_York`), never the PC's, times compared with plain
+  spaces: UnlockedTests' six (`unlockedWords`, `picker`, `retap`, `thisClass`, `stuck`, `notChanged`); ProtectionOffScreenTests'
+  seven (`protectionOffWords`, `way` with Android's three ways, `unreported`, `noLabelQuoted`, `carried`, `refusedBack`,
+  `sessionOverWords`); ScreenTests' `homeInSession`, and C3c's card in `homeWaiting` and `inNoClass`; DroppedWaitTests'
+  `dropped` and `startAfterExpiry`, their cards; and the AN10 marks: UnlockTest.kt's ReasonTests' words (`reasonKept`'s
+  pickers, `changed`, `changedLate`, `notGiven`, `refusedBack` where it lands, `notKept`), ProtectionOffTest.kt's way on
+  (`revoked` and `offWithinGrace`, Settings where iOS's is its prompt; the check's way while the switch only starts, in
+  `markerNotBack`'s Android place) and Unlocked's card after the lock back on (`stillUnlocked`), and ReadTest.kt's card for a
+  class in session (`outReads`). New: no line of Unlocked says an unlock, its
+  reason or its retry was dropped or can be taken back, and each failure says how on (another try, a pick once the unlock
+  arrives, or why the reason can't change); and a reason or Back to focus with no engine, Bali still starting. No twin:
+  `protectionOffWords`' read of iOS's view (AS6's). Tried, each failing by name, then reverted: Screen Time in "Bali's lock is
+  off" (`protectionOffWords`, `way`, `offWithinGrace`, and the guard: "ProtectionOffWords names Screen Time"), in "Checking
+  Bali's lock…" (`way`, the guard), in "Bali's lock is back on" (`protectionOffWords`), in the re-tap's line (`retap`) and in
+  the refused Back to focus's (both `refusedBack`s); "Lock off" and a quoted "Protection off" in a body (`noLabelQuoted`, each);
+  a reason not saved said as dropped, an unlock not sent said as removed, and Back to focus's and a reason change's failures
+  with no retry (the new rule's test, each, with the line's own); a reason's failure, Protection off's way and the reason
+  card's picker each with no word (the compile: "'when' expression must be exhaustive"), then each with a word and no sample
+  (the guard: "ReasonFailure's cases, each with a sample", "ProtectionOffWords.Way's cases, each reached", "Picker's cases,
+  each with a sample"); a "!" in Session over and an em-dash in a caption (the guard: "holds an exclamation mark", "holds an
+  em-dash"); and, after santa's fix, Session over's line over a check not made (`sessionOverWords`).
+
+  **For AN10g, AN10h and Phase 10:** AS6's Unlocked says `UnlockedWords.of` (under the three the caption, or a pick that
+  failed in `ReasonFailure.words`, as iOS's `pickFailed ?? picker.caption`; the re-tap's line with Tap in in Lock my apps
+  again's place; an unlock not sent yet with Try again) and `RefocusFailure.words` under Lock my apps again; Protection off
+  says `ProtectionOffWords.of` (the first step ticked on the re-tap's way; Open Accessibility settings on Settings's, Tap in on
+  the re-tap's, nothing on the check's) and what it carries with Try again; Session over says `sessionOverWords` under Class is
+  over; Home says `inSessionCard` and `refusedRefocusWords`; the app gives each `NotStarted` with no engine. Every time is the
+  phone's own pattern (`DateFormat.getBestDateTimePattern`), as Focus's is. AN10h: History's "Lock off" and "Lock back on".
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble :app:lint
+  check` green before santa's fix and on the final code, Android 10's API check with it (Animal Sniffer over `core` and `outbox`);
+  the core and outbox suites run together eleven times, each green (642 tests, sixteen of them new), six before santa's fix and
+  five on the final code, beside each `check`'s own run of the outbox's, AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…`
+  among them every time; `npm run typecheck && npm run lint && npm test` green, the portal's suite whole (78 files). No SDK
+  package was installed: the build downloads none (`android.builder.sdkDownload=false`), and the SDK's folders matched before
+  and after. The size, santa's count: 347 changed lines not counting tests and Markdown (the split guessed about 230), 603 in
+  the tests.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: `startAfterExpiry`'s check of the read's
+  bell kept beside the card's, so no assertion is lost (reviewer B); Session over's line only over a check that ran (reviewer B;
+  above); Android's stand-in for iOS's `markerNotBack` checks the screen's way too, the check's while the switch only starts
+  (reviewer A); and this entry's and the PR's placeholders, the PR's number checked once it was opened (reviewer B). The design
+  check, no-ai-slop's Detect job over the new and changed strings, found nothing: each line is iOS's or a board's, in
+  DESIGN.md's voice.
+
 - **2026-11-12** — **AN10e, Focus's words and the block screen's: BaliOutbox's `FocusWords`, `UnlockFailure`'s words and
   `ShieldWords` in Kotlin, each line a function of its type, the claim naming Bali's lock, the block screen's title alone,
   and the late unlock's clock line naming Android's Settings, drawn first (the conductor's calls, made in this step, marked,
