@@ -10,7 +10,6 @@ import android.os.IBinder
 import android.os.Parcel
 import android.os.ParcelFileDescriptor
 import android.os.SharedMemory
-import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
 import androidx.core.graphics.createBitmap
@@ -88,41 +87,49 @@ class IsolatedRenderer(private val context: Context, internal val scope: Corouti
     }
 
     /**
-     * [deck]'s bytes in one readable, seekable descriptor, rewound, which the caller closes (Q3): an anonymous memory file from
-     * Android 11, nothing on disk; on Android 10, which has no public one, or [onDisk], a file in the deck folder, deleted the moment
-     * it is open, before a byte of the deck is written to it.
+     * [deck]'s bytes in one readable, seekable descriptor, at its start, which the caller closes (Q3): an anonymous memory file from
+     * Android 11, nothing on disk; on Android 10, which has no public one, or [onDisk], a file in the deck folder, its name deleted
+     * the moment it is open, before a byte of the deck is written to it, handed over read-only, so no renderer can grow it to fill
+     * the phone's storage under Bali's own files. A memory file a renderer writes costs only that renderer's own memory.
      */
     internal fun carrying(deck: ByteBuffer, onDisk: Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.R): ParcelFileDescriptor {
-        val descriptor = if (!onDisk && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Os.memfd_create("deck", OsConstants.MFD_CLOEXEC) else unnamed()
-        try {
-            // Through a chunk of its own: `Os.write` asks a heap buffer for its array, which a read-only one refuses.
-            val bytes = deck.duplicate()
-            val chunk = ByteArray(CHUNK)
-            while (bytes.hasRemaining()) {
-                val size = minOf(CHUNK, bytes.remaining())
-                bytes.get(chunk, 0, size)
-                var written = 0
-                while (written < size) written += Os.write(descriptor, chunk, written, size - written)
+        if (!onDisk && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val memory = Os.memfd_create("deck", OsConstants.MFD_CLOEXEC)
+            try {
+                write(memory, deck)
+                Os.lseek(memory, 0, OsConstants.SEEK_SET)
+                return ParcelFileDescriptor.dup(memory)
+            } finally {
+                Os.close(memory)
             }
-            Os.lseek(descriptor, 0, OsConstants.SEEK_SET)
-            return ParcelFileDescriptor.dup(descriptor)
+        }
+        val file = File(File(context.noBackupFilesDir, DECK_FOLDER).apply { mkdirs() }, UUID.randomUUID().toString())
+        val writing = Os.open(file.path, OsConstants.O_WRONLY or OsConstants.O_CREAT or OsConstants.O_EXCL or OsConstants.O_CLOEXEC, OWNER_ONLY)
+        try {
+            val reading = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            try {
+                Os.remove(file.path)
+                write(writing, deck)
+            } catch (failed: Exception) {
+                reading.close()
+                throw failed
+            }
+            return reading
         } finally {
-            Os.close(descriptor)
+            Os.close(writing)
         }
     }
 
-    /** A new file in the deck folder, open to write and read, its name deleted at once. */
-    private fun unnamed(): FileDescriptor {
-        val folder = File(context.noBackupFilesDir, DECK_FOLDER).apply { mkdirs() }
-        val file = File(folder, UUID.randomUUID().toString()).path
-        val descriptor = Os.open(file, OsConstants.O_RDWR or OsConstants.O_CREAT or OsConstants.O_EXCL or OsConstants.O_CLOEXEC, OWNER_ONLY)
-        try {
-            Os.remove(file)
-        } catch (kept: ErrnoException) {
-            Os.close(descriptor)
-            throw kept
+    /** [deck]'s bytes into [descriptor], through a chunk of its own: `Os.write` asks a heap buffer for its array, which a read-only one refuses. */
+    private fun write(descriptor: FileDescriptor, deck: ByteBuffer) {
+        val bytes = deck.duplicate()
+        val chunk = ByteArray(CHUNK)
+        while (bytes.hasRemaining()) {
+            val size = minOf(CHUNK, bytes.remaining())
+            bytes.get(chunk, 0, size)
+            var written = 0
+            while (written < size) written += Os.write(descriptor, chunk, written, size - written)
         }
-        return descriptor
     }
 
     /** The binding, bound now if there is none, held for one more document. */
@@ -162,17 +169,17 @@ class IsolatedRenderer(private val context: Context, internal val scope: Corouti
     }
 
     /**
-     * [call] made to [binding]'s service on a thread of its own, once it is bound, within [limit]: its answer, or none where it
-     * failed, threw or never came, a call that never ends losing the binding.
+     * [call] made to [binding]'s service on a thread of its own, once it is bound: its answer, or none where it failed, threw or
+     * didn't come within [limit]. One that never ends loses the binding at the limit, timed in the renderer's own scope, so whether
+     * its caller still waits makes no difference.
      */
     internal suspend fun <T : Any> within(binding: Binding, call: (IBinder) -> T?): T? {
         val answer =
             scope.async(Dispatchers.IO) {
                 binding.service.await()?.let { service -> try { call(service) } catch (failed: Exception) { null } }
             }
-        val answered = withTimeoutOrNull(limit) { answer.await() }
-        if (!answer.isCompleted) lose(binding)
-        return answered
+        scope.launch { withTimeoutOrNull(limit) { answer.join() } ?: lose(binding) }
+        return withTimeoutOrNull(limit) { answer.await() }
     }
 
     /** One binding to the service: its process, isolated, lives while it is bound. */

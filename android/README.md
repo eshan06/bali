@@ -218,8 +218,8 @@ through `PdfRenderer` in a service of Bali's own that Android isolates (`android
 user id of its own, no permission and none of Bali's files, bound at the first open and unbound once the last document closes,
 when Android ends its process. It is given one descriptor of the deck's bytes, from memory: an anonymous memory file from
 Android 11, and on Android 10 a file in `no_backup/deck/` whose name is deleted the moment it opens, before a byte is written,
-a folder each start of Bali's process empties, never `no_backup/` itself. Its calls go over a Binder of its own, each bounded
-at 10 s, one that never ends ending that process. A page (`Deck.draw`) is drawn there off Bali's main thread onto a white
+handed over read-only, a folder each start of Bali's process empties, never `no_backup/` itself. Its calls go over a Binder of
+its own, each bounded at 10 s whoever waits, one that never ends ending that process. A page (`Deck.draw`) is drawn there off Bali's main thread onto a white
 bitmap of the size asked for, as large as fits and centred, its pixels written into memory Bali made (`SharedMemory`), past
 Binder's 1 MB, then into a bitmap Bali made, with the page's text from Android 15 (`Page.said`, TalkBack's label). Every
 failure is none, never a crash: not a PDF, a password, no pages, a page outside the count, a closed document, the process
