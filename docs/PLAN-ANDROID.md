@@ -14,18 +14,18 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-12 (Central) — AN10h, History's words and the consent list (#573; `docs/DECISIONS.md`, 2026-11-12),
-the last of AN10's eight steps, so AN10 is done: in `outbox`, each a function of its type, iOS's word for word but where AS0's
-Words board names Bali's lock: a read's failures, a teacher's account's own line and Join's for the rest, Bali still starting
-among them; each moment, "Lock off" and "Lock back on" for the lock's two kinds, a reason on an unlock alone and a class on a
-declined tap alone; each note, "The lock was off at the time" among them; a day's title, its date with its year once that isn't
-this one, and a moment's time, from the phone's own patterns (Q6); and the consent list, iOS's line for line but its focus
-status, "Bali's lock off", with what the one-time screen lists. Every line is iOS's or a board's, so nothing was drawn. No
-screen. Before it, AN10g, the words of Me, Leave, Sign out, Delete account and the 13+ stop. Next: AN11 to AN13 and Phase 10's
-screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the
-13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the
-owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the
-owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-12 (Central) — AN13a, the live lesson's poll and answer (#574; `docs/DECISIONS.md`, 2026-11-12), the
+first of AN13's seven steps: `core`'s `LiveLesson`, BaliCore's twin, in memory alone: the poll every 2 s with the last `ETag`, a
+`304` keeping the last read and the student's answer, a `429`'s wait from 2 s to a minute, one run at a time, stopped once the
+session is over and nothing said after; the answer one request a call, its id minted after the answer held and the last minted
+here, a refusal known by its reason, the answer the server took last kept over a read's older one; each outcome a type. `core`
+can't see `outbox`, so no answer enters it. No word and no screen. AN13's line is AN13a–AN13g now (Q1). Before it, AN10h,
+History's words and the consent list, AN10's last. Next: AN13b, the deck, then AN13c to AN13e; AN13f and AN13g once the owner
+has answered Q2 and Q3 (DECISIONS 2026-11-12); AN11, AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱
+check on the owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone (Q7); Android's Cognito
+clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with today's
+AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical
+path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -200,9 +200,19 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   `PushWait`, `holdRead`, `endWait` and the token's register and remove (an FCM token sent as it
   comes, never as hex), with PushTests but its words (AN5's split) — validation: the JVM tests,
   then an end-to-end check like N6's on an Android phone (📱)
-- **AN13** The live lesson's engine (twin: `LiveLesson`, L5, and M7's deck download and cache): the
-  poll and the answer, the deck downloaded, checked against its `sha256` and cached, and a page
-  drawn with `PdfRenderer`; answers never enter the outbox
+- **AN13a** The live lesson's poll and answer — ✅ (#574; DECISIONS 2026-11-12)
+- **AN13b** The deck downloaded, checked against its `sha256` and kept for the session (twin: LiveLesson.swift's
+  `deck(for:)`, M7) — validation: the JVM tests
+- **AN13c** Which lesson, its heading, and the answer card's looks and words (twin: BaliOutbox's `Lesson.swift`) —
+  validation: the JVM tests
+- **AN13d** The lesson followed: the poll while Bali is in front, the answer, Hide (twin: BaliApp.swift's `Phone`, its
+  lesson half); answers never enter the outbox — validation: the JVM tests
+- **AN13e** The slide's deck, asked for once, one document at a time (twin: BaliApp.swift's deck half and SlideView.swift's
+  `SlideDeck`) — validation: the JVM tests
+- **AN13f** The page drawn with `PdfRenderer` (twin: SlideView.swift's PDFKit page), once the owner has answered Q2 and Q3
+  (DECISIONS 2026-11-12) — validation: the instrumented tests on `Bali_Spike_API35` and `37`
+- **AN13g** The lesson in the app, AN13 done (twin: BaliApp.swift's `start` and `setForeground`), after AN13f —
+  validation: the instrumented tests on `Bali_Spike_API35` and `37`
 
 ## Phase 10, Android: the screens (from the approved boards)
 
