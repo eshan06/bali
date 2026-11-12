@@ -8,6 +8,123 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **AN10g, the words of Me, Leave, Sign out, Delete account and the 13+ stop: BaliOutbox's `Naming.words` and
+  `blank`, `Leaving`'s words, `SignOutWords`, `Deleting.said` and `saidUnderThirteen`, and `AgeCheck`'s stop in Kotlin, each line
+  a function of its type, Delete account's three new lines drawn first (the conductor's Q7 to Q9 built, and this step's own calls,
+  marked, each awaiting the owner's look; AN10g, #572).** The owner is asleep and said to take the recommended option on every
+  regular call, so each call here is the conductor's or this step's, for the owner to look at.
+
+  **Where it lives:** `outbox`, beside each type. `Me.kt`: `Naming.Failure.words` (a `NotStarted` new); `Leaving.Failure`, sealed
+  now, `NotLeft` (AN9f's result and reason) and `NotStarted`, with `words(row)`, and `Leaving.question`, `CONSEQUENCE` and
+  `inSession`; `SignOutHold.words`, with two new cases the app gives, `NotForgotten` and `NotStarted`; and
+  `Account.State.signedInAs`. `Deletion.kt`: `Deleting.said`, `saidUnderThirteen` and `Deleting.Stop.said`, each a `Said` (a title
+  and the line under it), `Deleting.QUESTION` and `CONSEQUENCE`, and `Stop.NotStarted`; `AccountDeletion.NotDeleted` and
+  `Stop.NotDeleted` carry why no answer came (`noAnswer`, Q7). `Age.kt`: `AgeCheck.NOT_YET` and `ASK_TEACHER`. `SyncEngine.kt`:
+  the deletion's `NotDeleted` carries its answer's `NoAnswer`, `sendAll`'s stop on a send with no token included. `android/app` is
+  unchanged, and no screen is built: they are AS2's and AS7's.
+
+  **The words:** each iOS's, word for word, its straight apostrophes too, but three of Delete account's, drawn first (below):
+  `Naming.words` and `blank`; `Leaving.words`, `question`, `consequence` and `inSession`; `SignOutWords`' `unsent`, `unread`,
+  `failed` and `signedIn`; `Deleting.said`, `saidUnderThirteen`, `question` and `consequence`; and `AgeCheck.notYet` and
+  `askTeacher`. Bali still starting is Join's line (`Joining.Failure.NotStarted.words`). A 409 `account_deleted` (C3d) is said as
+  any 409 is, "Something went wrong at Bali. Try again in a moment.", while the owner's call on reading it as signed out waits.
+  no-ai-slop's Edit job over the two new lines, their three new sentences, checked against `eval.md`: each passes as drawn.
+
+  **Drawn on the canvas first (Q9):** three boards on AS7's Delete account row, each "(intermediate state)", at the row's end, the
+  row's note moved three places right, the canvas at version 61 (`1794480318-6d00`): AS7-Del-changed, "Delete account · stopped,
+  this phone signed in to another account, Back"; AS7-Del-signinfirst, "Delete account · refused, this sign-in can't delete,
+  Back"; and AS7-Del-notoken, "Delete account · stopped, a sign-in Bali couldn't check, Try again". Each imports Delete account's
+  own screen (`Deleting.dc.html`), which gained the three states and nothing else. Read back byte for byte after the publish: the
+  three boards, the screen and the index as sent, the eight boards that import the screen as before, every other file its size
+  before; rendered by eye beside the teacher's stop and the no-connection stop, nothing clipped (the live canvas needs the owner's
+  sign-in). None is a new screen or shows anything new about a student: each is a stop's title and line on Delete account's
+  approved screen, and none names an account. The Words board and the row's note are left as the owner's record: the note's "the
+  iPhone's 'older version' stop has no Android twin" stays true. [Recommendation: list the three on the Words board at the owner's
+  look, with AN10e's clock line.]
+
+  **The conductor's calls, built:**
+  - **Q7, a deletion with no answer carries why** (`NotDeleted(result, noAnswer)`): no token is said with Join's 401 line, "Bali
+    couldn't check your sign-in. Try again.", under "Bali couldn't finish deleting your account", with Try again, never as no
+    connection (#553's review); no answer from Bali stays "Can't reach the server. Check your connection and try again." A stop
+    through the outbox's sends carries a send's no token too, where it carried the last answer settled before it. Under 13, a
+    deletion with no token is Me's stop, never the gap's fallback's line about the connection.
+  - **Q8, `SignInFirst`'s line:** "Bali can't delete your account with this sign-in. Sign out and sign in again, then delete your
+    account.", under "Your account isn't deleted", Back alone. iOS's first sentence names an older version, which no Android build
+    is (the Words board); on Android the stop comes of a sign-in none can read now, or a token without DeleteUser's scope (a
+    Cognito client set up without it, say). The second sentence is iOS's.
+  - **Q9, SignInChanged's line (AN9h's stop):** "This phone is signed in to another account now, so Bali stopped. Sign out and
+    sign in to your own account, then delete it.", under "Bali couldn't finish deleting your account" (a `DELETE /v1/me` with no
+    answer may have landed first, C4a), Back alone. It names no account; Me, once Back, says whose sign-in it is, as its board
+    does.
+
+  **This step's calls, each awaiting the owner's look:**
+  - **Each failure the app gives with no engine has a `NotStarted`** (AN10d's call): Me's name, Leave, Sign out and Delete
+    account, each said with Join's line, Delete account's under "Your account isn't deleted" with Try again (BaliApp.swift's
+    `deleteAccount`). Android's router shows Me only with an engine's account (Q1, Q2), so none is reached today; the types keep
+    the twin's.
+  - **Sign out's failures are `SignOutHold`'s:** `NotForgotten`, iOS's `SignOutWords.failed` ("Bali couldn't sign you out. Try
+    again."), for a store that can't forget the sign-in now (`SignIn.signOut` throws), and `NotStarted`, beside AN9f's two holds,
+    which `held` and `asked` alone give.
+  - **`Leaving.held` stays a Boolean,** its words `inSession(row)`, which iOS's `held` returns.
+  - **Whose sign-in it is reads the account** (`Account.State.signedInAs`, on the email AN10b reads at each landing), so a screen
+    can't pass another student's, as AN10d's `noClassesCard` reads it.
+  - **An Emergency Unlock unsent keeps iOS's line on Delete account,** "Your Emergency Unlock hasn't reached your teacher yet.
+    Check your connection and try again.", also where a token ran out with one queued: the unlock stops the deletion before
+    anything else is said, and its Try again sends it first. Said plainly: where Cognito refused the sign-in for good meanwhile
+    (rare: a sign-in revoked), that line points at the connection, and the next Try again says the sign-in instead ("Bali can't
+    delete your account with this sign-in…"). [Recommendation: keep; a line of its own would be a fourth drawing.]
+  - **Q7, said plainly:** no token also covers a token that expired while the phone is offline and couldn't be renewed, so that
+    case says "Bali couldn't check your sign-in. Try again." where the iPhone says "Can't reach the server…": both end on Try
+    again, and the engine's loops already read that no token as a sign-in problem (`Link.SignIn`). [Recommendation: keep Q7 as
+    built; a later step could tell a renewal Cognito never answered from one it refused, a change to `core`'s token provider.]
+
+  **For the owner, not blocking (the Mac's):** iOS has Q7's gap too: Delete account's no-answer stop says "Can't reach the
+  server…" when the token ran out partway (BaliOutbox's `Deleting.answered`, `.notDeleted(let result)`, over SyncEngine.swift's
+  `sendAll` and `deleteMe`). Nothing in `ios/` changed.
+
+  **The guard** (`WordsTest`) reads every new word over every case: a save's and a leave's answers, every result with every reason
+  and none; a class's question and lines; each of Sign out's holds; an email and none; Delete account's screen at each step, every
+  stop, each result with each reason no answer came and none, under 13 too; and the 13+ stop.
+
+  **The tests,** on the JVM (no time is written): MeTests' `saving` and `answers`, their words, and `signedInAs`; LeaveTests'
+  `words`, and the words in `sending`, `answers` and `held`; DeletingTests' `words` and `underThirteen` (DeletionTest.kt). New:
+  Bali still starting, for each; Sign out's words, each why with its way on and none saying the unlock goes; SignInChanged's line
+  with Back alone; a token run out partway said as the sign-in, never as no connection, under 13 too, no answer from Bali still
+  the connection's; SignInFirst's line with no "older version"; and through the engine, `DELETE /v1/me`'s own token run out,
+  Cognito refusing the renewal or never answering, and AN9h's case through the outbox's sends, now no token. AccountTest's two
+  stops and DeleteAccountTest's lost deletion name no answer as unreachable now, and AccountTest's "no Try again" press is
+  bounded, so a Try again offered there fails it by name rather than holding the suite. Tried, each failing by name, then
+  reverted: a token run out said as no connection, the stop said by its result alone (3: DeletingTest's, and DeleteAccountTest's
+  two through the engine); SignInChanged with Try again (4: DeletingTest's three and AccountTest's, which waited on the server for
+  good until its press was bounded); iOS's "older version" line back in SignInFirst's (its own); Sign out's unlock hold with no
+  reason, and one saying signing out drops the unlock (MeTest's Sign out words, each); a stop with no word (the compile: "'when'
+  expression must be exhaustive. Add the 'Added' branch", in `retries` and `said`), then with a word and no sample (the guard:
+  "Stop's cases, each with a sample"); and "iPhone" in SignInChanged's line (the guard: "Deleting.said names iPhone", and its own
+  test) and an em-dash in Sign out's (the guard: "SignOutHold.words holds an em-dash", and MeTest's).
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble :app:lint
+  check` green before santa's fixes and on the final code, Android 10's API check with it (Animal Sniffer over `core` and
+  `outbox`); the core and outbox suites green in each `check` and four more times on the final code (651 tests, nine of them new),
+  AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run lint && npm test`
+  green, the portal's suite whole (78 files). No SDK package was installed: the build downloads none
+  (`android.builder.sdkDownload=false`), and the SDK's folders matched before and after. The size, santa's count: 268 changed
+  lines not counting tests and Markdown (the split guessed about 180), 349 in the tests.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: no token's docs called it never a
+  connection's fault, where an expired token the phone couldn't renew offline is one of its reasons (reviewer A; reworded); the
+  deletion's cost held by its first and last sentences alone (reviewer B; pinned whole); and the count of the new sentences, three
+  in the two lines (reviewer A; fixed here and in the PR). The design check, no-ai-slop's Detect job over the new and changed
+  strings, found nothing: each line is iOS's but the three drawn, in DESIGN.md's voice.
+
+  **For AN10h and Phase 10:** AS7's Me says `Naming.Failure.words` under the field, `Leaving.question(row)` and `CONSEQUENCE` over
+  Leave class and `Leaving.Failure.words(row)` under it, `Leaving.inSession(row)` under a row `held` holds, `SignOutHold.words` by
+  Sign out with Try again, `Account.State.signedInAs` under it, and `Deleting.QUESTION` and `CONSEQUENCE` under Delete account;
+  Delete account's screen says `said`, or `saidUnderThirteen` after an answer under 13 this run, Try again where the stop
+  `retries`, Back for any stop, OK once done; AS2's Your name says `Naming.Failure.words`, and its stop screen `AgeCheck.NOT_YET`
+  and `ASK_TEACHER`. The app gives each `NotStarted` with no engine, and `SignOutHold.NotForgotten` when `SignIn.signOut` throws.
+  AN10h: History's failure with no engine gets its `NotStarted` too (AN10d's list).
+
 - **2026-11-12** — **AN10f, Unlocked's, Protection off's and Session over's words: BaliOutbox's `UnlockedWords` and
   `ProtectionOffWords`, Screen.swift's card for a class in session, refused Back to focus and Session over, and SyncEngine.swift's
   words for `ReasonFailure` and `RefocusFailure` in Kotlin, each line a function of its type, Bali's lock where the iPhone's lines

@@ -23,10 +23,11 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
-// The Me screen's rules (C6b), over A8's fixtures: BaliOutbox's MeTests, each check of a word AN10's with the words, and
-// `signedInAs` with them. New: whole characters beyond the twin's skin tone (a combining accent, a keycap, a ZWJ sequence,
-// a flag); one name from each of Default_Ignorable's ranges (Q6); a lone surrogate half; a save one at a time, and of
-// nothing; a deleted sign-in's 409 (C3d); and an unlock tried, stuck or not. And the name and the sign-in through the engine
+// The Me screen's rules (C6b), over A8's fixtures: BaliOutbox's MeTests, their words and `signedInAs` with them (AN10g). New:
+// whole characters beyond the twin's skin tone (a combining accent, a keycap, a ZWJ sequence, a flag); one name from each of
+// Default_Ignorable's ranges (Q6); a lone surrogate half; a save one at a time, and of nothing; a deleted sign-in's 409 (C3d);
+// an unlock tried, stuck or not; Bali still starting; and Sign out's words, each why with its way on, none saying the unlock
+// goes, and a sign-in the phone couldn't forget. And the name and the sign-in through the engine
 // (C6b): MeEngineTests, and new: Sign out's rule reading the file itself, its hold at the press, and a file that can't be
 // read now; a forget that leaves where the phone stands and its queue as they are, an Emergency Unlock among them; a rename
 // whose caller is cancelled, and one answered after the next student's `me` was read.
@@ -41,6 +42,8 @@ private fun inRepo(property: String) = File(checkNotNull(System.getProperty(prop
 private suspend fun renamed(client: ApiClient) = client.updateMe(request)
 
 private val taken = Naming.Failure.NotSaved(SendResult.Status(409), ApiErrorReason.DisplayNameTaken)
+private val unreachable = "Can't reach the server. Check your connection and try again."
+private val generic = "Something went wrong at Bali. Try again in a moment."
 
 /** The Me screen's rules (C6b): BaliOutbox's MeTests. */
 class MeTest : OutboxFiles() {
@@ -129,7 +132,7 @@ class MeTest : OutboxFiles() {
             val (unanswered, saved) = sending.saved(none, first)
             assertFalse(saved)
             val failure = Naming.Failure.NotSaved(SendResult.NetworkError, null)
-            assertEquals(listOf<Any?>(false, true, failure), listOf(unanswered.busy, unanswered.editing, unanswered.failure))
+            assertEquals(listOf<Any?>(false, true, failure, unreachable), listOf(unanswered.busy, unanswered.editing, unanswered.failure, unanswered.failure?.words))
             // The retry, the same name typed again too: its replay, under the same event id (rule 4), the last try's words gone.
             val (retrying, retried) = unanswered.type("Ana R.").save(at(5))
             val retry = assertNotNull(retried)
@@ -148,36 +151,47 @@ class MeTest : OutboxFiles() {
             assertNotEquals(other.eventId, back.eventId)
             val (blank, nothing) = again.saved(none, back).first.type(" \u3164 ").save(at(15))
             assertEquals(listOf<Any?>(null, Naming.Failure.Blank, false), listOf(nothing, blank.failure, blank.busy))
+            assertEquals("Type a name to save it.", blank.failure?.words)
         }
 
     @Test
     fun aSaveAsTheApiAnswersItSetAppliedOrAReplaysNameNowEditingEndsRefusedTakenInvalidATeachersTheSignInAClientsBugADeletedSignInsOrNoAnswer429OrAServerErrorEachItsResultAndReasonTheNameKeptToTryAgain(): Unit =
         runBlocking {
-            // A8's fixtures. The words for each are AN10's.
+            // A8's fixtures, each refusal said with the name kept to try again: keyed on the reason and the status, never the message.
             for (name in listOf("applied", "replay")) {
                 val (sending, sent) = Naming().edit("Eve").save(t0)
                 assertEquals(Naming() to true, sending.saved(renamed(fixture("name/$name.json")), assertNotNull(sent)), name)
             }
             val refusals =
                 listOf(
-                    fixture("name/409-display-name-taken.json") to taken,
-                    fixture("name/400-display-name-invalid.json") to
-                        Naming.Failure.NotSaved(SendResult.Status(400), ApiErrorReason.DisplayNameInvalid),
-                    fixture("name/403-teacher.json") to Naming.Failure.NotSaved(SendResult.Status(403), null),
-                    fixture("name/401-unauthorized.json") to Naming.Failure.NotSaved(SendResult.Status(401), null),
-                    fixture("name/400-invalid-request.json") to Naming.Failure.NotSaved(SendResult.Status(400), ApiErrorReason.InvalidRequest),
-                    // No iOS twin: an account deleted from another phone, its sign-in's old token refused (C3d, #558).
-                    client(Canned(409, Answer.refused("account_deleted"))) to
-                        Naming.Failure.NotSaved(SendResult.Status(409), ApiErrorReason.AccountDeleted),
-                    client(Canned(null)) to Naming.Failure.NotSaved(SendResult.NetworkError, null),
-                    client(Canned(429)) to Naming.Failure.NotSaved(SendResult.Status(429), null),
-                    client(Canned(500)) to Naming.Failure.NotSaved(SendResult.Status(500), null),
+                    Triple(fixture("name/409-display-name-taken.json"), taken, "A classmate already uses that name. Try another, like adding your last initial."),
+                    Triple(
+                        fixture("name/400-display-name-invalid.json"), Naming.Failure.NotSaved(SendResult.Status(400), ApiErrorReason.DisplayNameInvalid),
+                        "Bali can't use that name. Try another.",
+                    ),
+                    Triple(
+                        fixture("name/403-teacher.json"), Naming.Failure.NotSaved(SendResult.Status(403), null),
+                        "This is a teacher's account, and only students change their name here.",
+                    ),
+                    Triple(
+                        fixture("name/401-unauthorized.json"), Naming.Failure.NotSaved(SendResult.Status(401), null), "Bali couldn't check your sign-in. Try again.",
+                    ),
+                    Triple(fixture("name/400-invalid-request.json"), Naming.Failure.NotSaved(SendResult.Status(400), ApiErrorReason.InvalidRequest), generic),
+                    // No iOS twin: an account deleted from another phone, its sign-in's old token refused (C3d, #558), said as any 409
+                    // while the owner's call on reading it as signed out waits (C3d's "For the owner").
+                    Triple(client(Canned(409, Answer.refused("account_deleted"))), Naming.Failure.NotSaved(SendResult.Status(409), ApiErrorReason.AccountDeleted), generic),
+                    Triple(client(Canned(null)), Naming.Failure.NotSaved(SendResult.NetworkError, null), unreachable),
+                    Triple(client(Canned(429)), Naming.Failure.NotSaved(SendResult.Status(429), null), "Too many tries for now. Wait a minute, then try again."),
+                    Triple(client(Canned(500)), Naming.Failure.NotSaved(SendResult.Status(500), null), generic),
                 )
-            for ((answer, failure) in refusals) {
+            for ((answer, failure, words) in refusals) {
                 val (sending, sent) = Naming().edit("Eve").save(t0)
                 val (after, saved) = sending.saved(renamed(answer), assertNotNull(sent))
                 assertEquals(listOf<Any?>(false, failure, true, "Eve", false), listOf(saved, after.failure, after.editing, after.name, after.busy), "$failure")
+                assertEquals(words, after.failure?.words, "$failure")
             }
+            // No iOS twin as a type: a phone whose engine hasn't started, the app's to say (BaliApp.swift's `saveName`).
+            assertEquals("Bali is still starting. Try again in a moment.", Naming.Failure.NotStarted.words)
         }
 
     @Test
@@ -211,6 +225,37 @@ class MeTest : OutboxFiles() {
             assertTrue(refused.records().single().stuck)
             assertNull(SignOutHold.held(SyncState(queued = refused.records())))
         }
+
+    @Test
+    fun signOutsHoldSaysWhyWithItsWayOnTheUnlockNotWithTheTeacherYetGoingFirstNeverDroppedAFileUnreadASignInNotForgottenBaliStarting() {
+        // B4's rule and the unlock contract: Sign out waits for the unlock, so no line says or hints that signing out loses it.
+        val said = SignOutHold.entries.associateWith { it.words }
+        assertEquals(
+            mapOf(
+                SignOutHold.UnlockUnsent to "Your Emergency Unlock hasn't reached your teacher yet. You can sign out once it has.",
+                SignOutHold.Unread to "Bali can't read what your phone saved right now, so it can't sign you out yet. Try again in a moment.",
+                SignOutHold.NotForgotten to "Bali couldn't sign you out. Try again.",
+                SignOutHold.NotStarted to "Bali is still starting. Try again in a moment.",
+            ),
+            said,
+        )
+        // The unlock's hold names it and says when Sign out comes back.
+        val unsent = said.getValue(SignOutHold.UnlockUnsent)
+        for (why in listOf("Emergency Unlock", "hasn't reached your teacher", "once it has")) assertTrue(why in unsent, why)
+        for ((hold, words) in said) {
+            for (gone in listOf("lose", "lost", "drop", "delete", "discard", "gone", "cancel", "remove", "never reach")) {
+                assertFalse(gone in words.lowercase(), "$hold says the unlock goes: $words")
+            }
+        }
+    }
+
+    @Test
+    fun signOutSaysWhoseSignInThisIsTheAccountsEmailFromTheSignInThatLandedNeverAGuessNothingWhereNoEmailIsKnown() {
+        // #147: the email, so the name a student's teachers see is never taken for it; read at each sign-in that lands (AN10b).
+        assertEquals("You're signed in as ana@bali.test.", Account.State(signedIn = true, email = "ana@bali.test").signedInAs)
+        for (none in listOf(null, "")) assertNull(Account.State(signedIn = true, email = none).signedInAs, "$none")
+        assertNull(Account.State(signedIn = false).signedInAs)
+    }
 }
 
 /** `PATCH /v1/me`'s answer: the student named [name] now. */

@@ -1,10 +1,11 @@
 package com.bali.outbox
 
+import com.bali.core.NoAnswer
 import com.bali.core.SendResult
 
 // Delete account (C4), BaliOutbox's Deletion.swift: where Me's deletion stands, and the outbox's order
-// before one. Its rules alone: every failure a type, the words AN10's (C4b), the screen AS7's, and the
-// deletion itself the engine's (AN9b).
+// before one. Its rules, every failure a type, and its words, each a function of its type (AN10g's; WordsTest
+// reads every one); the screen is AS7's, and the deletion itself the engine's (AN9b).
 
 /**
  * Where Me's Delete account stands (C4): the engine's answer to it (AN9b's `deleteAccount`), in states, which
@@ -32,9 +33,12 @@ sealed interface AccountDeletion {
     /**
      * The last answer, [result], when something else the phone queued, or the deletion itself, got none that
      * settled it: nothing deleted that the phone knows of, though a deletion with no answer may have landed,
-     * which a try again settles, deleting too any account a read has made since (C3).
+     * which a try again settles, deleting too any account a read has made since (C3). [noAnswer], why none came
+     * when none did: [NoAnswer.NoToken] when the sign-in gave the try no token, so nothing went, said as the
+     * sign-in, never as no connection, though one of its reasons is a token run out partway that the phone
+     * couldn't renew offline (Q7; #553's review).
      */
-    data class NotDeleted(val result: SendResult) : AccountDeletion
+    data class NotDeleted(val result: SendResult, val noAnswer: NoAnswer? = null) : AccountDeletion
 
     /**
      * The account deleted on the server, but not its Cognito sign-in: what Cognito answered, [result]. The
@@ -58,7 +62,7 @@ sealed interface AccountDeletion {
  * own screen and nothing else ([shows]): a join or a rename landing after the deletion would make a fresh
  * account, a tap or an Emergency Unlock made meanwhile would wait for the next sign-in, and Sign out while
  * DeleteUser waits would leave the person in Cognito (`docs/DECISIONS.md`, C4a). BaliOutbox's `Deleting`, a
- * value whose every step gives the next, as Swift's mutating calls change it; its words are AN10's.
+ * value whose every step gives the next, as Swift's mutating calls change it; what its screen says is [said].
  */
 sealed interface Deleting {
     /** Nothing under way: Me shows the button. */
@@ -83,16 +87,22 @@ sealed interface Deleting {
     data object Done : Deleting
 
     /**
-     * Why a deletion stopped, each its own title and line on the screen (AN10's words). A deletion sent by a try
+     * Why a deletion stopped, each its own title and line on the screen ([said]). A deletion sent by a try
      * before, its answer lost, may have landed (C4a), so only a refusal before anything could ever be sent says
      * the account isn't deleted.
      */
     sealed interface Stop {
-        /** The sign-in is from before the scope Cognito's DeleteUser needs: a fresh one first. Nothing sent. */
+        /** The sign-in can't delete itself, or none can be read now: a fresh one first. Nothing sent. */
         data object SignInFirst : Stop
 
         /** A teacher with a class or a block: the school deletes that account. */
         data object TeacherHasClasses : Stop
+
+        /**
+         * The phone's engine hasn't started, so nothing was sent: the app's to give, never the engine's, as Join's is
+         * (AN10d's call; BaliApp.swift's `deleteAccount`).
+         */
+        data object NotStarted : Stop
 
         /** An Emergency Unlock the server hasn't recorded: the next try sends it first. */
         data object UnlockUnsent : Stop
@@ -100,8 +110,11 @@ sealed interface Deleting {
         /** The outbox file couldn't be read, so whether an unlock waits isn't known. */
         data object Unread : Stop
 
-        /** No answer settled what the phone queued, or the deletion: the last one, [result], said in Join's words for it. */
-        data class NotDeleted(val result: SendResult) : Stop
+        /**
+         * No answer settled what the phone queued, or the deletion: the last one, [result], said in Join's words for it, and
+         * why none came, [noAnswer]: no token is said as Join's 401, never as no connection (Q7).
+         */
+        data class NotDeleted(val result: SendResult, val noAnswer: NoAnswer? = null) : Stop
 
         /**
          * The gap's fallback's (a sign-in around the 13+ question, answered under 13, C7): its deletion couldn't
@@ -120,7 +133,7 @@ sealed interface Deleting {
             get() =
                 when (this) {
                     SignInFirst, TeacherHasClasses, SignInChanged -> false
-                    UnlockUnsent, Unread, is NotDeleted, Unfinished -> true
+                    NotStarted, UnlockUnsent, Unread, is NotDeleted, Unfinished -> true
                 }
     }
 
@@ -151,7 +164,8 @@ sealed interface Deleting {
 
     /**
      * The engine's answer to the deletion under way; one to no deletion is dropped. [underThirteen], the gap's
-     * fallback's: a deletion that couldn't reach Bali is its own stop ([Stop.Unfinished]), every other as Me's.
+     * fallback's: a deletion that couldn't reach Bali is its own stop ([Stop.Unfinished]), every other as Me's, one
+     * with no token among them, said as the sign-in, never as no connection (Q7).
      */
     fun answered(answer: AccountDeletion, underThirteen: Boolean = false): Deleting {
         if (this != Busy) return this
@@ -163,8 +177,10 @@ sealed interface Deleting {
             AccountDeletion.UnlockUnsent -> Stopped(Stop.UnlockUnsent)
             AccountDeletion.Unread -> Stopped(Stop.Unread)
             AccountDeletion.SignInChanged -> Stopped(Stop.SignInChanged)
-            is AccountDeletion.NotDeleted ->
-                Stopped(if (underThirteen && answer.result == SendResult.NetworkError) Stop.Unfinished else Stop.NotDeleted(answer.result))
+            is AccountDeletion.NotDeleted -> {
+                val unreached = answer.result == SendResult.NetworkError && answer.noAnswer != NoAnswer.NoToken
+                Stopped(if (underThirteen && unreached) Stop.Unfinished else Stop.NotDeleted(answer.result, answer.noAnswer))
+            }
         }
     }
 
@@ -188,7 +204,77 @@ sealed interface Deleting {
             Asking, is Stopped -> None
             None, Busy, Pending, Done -> this
         }
+
+    companion object {
+        /** The question Me asks under Delete account, pressed ([Asking]): the owner's words (2026-10-05). */
+        const val QUESTION = "Delete your account?"
+
+        /** What deleting costs, said under the question: what goes, what stays with no name on it, and that it isn't an Emergency Unlock. */
+        const val CONSEQUENCE =
+            "Bali deletes your account, your name and your sign-in. This can't be undone. Lessons you were in still count in your teachers' reports, with no name on them. If a class is running, you leave it now and your apps unlock. It isn't an Emergency Unlock."
+    }
 }
+
+/** What a screen says: its [title], and the line under it. */
+data class Said(val title: String, val body: String)
+
+/** The title of a stop that refuses before anything could ever be sent: nothing deleted, for certain. */
+private const val NOT_DELETED = "Your account isn't deleted"
+
+/** The title of every other stop: a deletion sent by a try before, its answer lost, may have landed (C4a), so it claims neither. */
+private const val NOT_FINISHED = "Bali couldn't finish deleting your account"
+
+/**
+ * What the deletion's own screen says (C4b), its title and the line under it: each stop with its way on (rule 5), the deletion
+ * under way, the sign-in still to go and done; none while no screen shows ([Deleting.shows]). BaliOutbox's `Deleting.said`.
+ */
+val Deleting.said: Said?
+    get() =
+        when (this) {
+            Deleting.None, Deleting.Asking -> null
+            Deleting.Busy -> Said("Deleting your account…", "Bali deletes your account first, then your sign-in. This takes a moment.")
+            is Deleting.Stopped -> stop.said
+            Deleting.Pending -> Said("Your account is deleted", "Bali's part is done, but your sign-in isn't deleted yet. Try again to finish.")
+            Deleting.Done -> Said("Your account is deleted", "Your sign-in is gone too. If you join Bali again, you start fresh.")
+        }
+
+/**
+ * What the screen says for the gap's fallback (the owner's words, 2026-10-06): a sign-in made around the 13+ question and answered
+ * under 13, its account deleted as Me's deletion deletes one. The stop screen's title over the deletion under way and done, final
+ * for the run; a stop, or its sign-in still to go, as [said] says it. BaliOutbox's `Deleting.saidUnderThirteen`.
+ */
+val Deleting.saidUnderThirteen: Said?
+    get() =
+        when (this) {
+            Deleting.Busy -> Said(AgeCheck.NOT_YET, "Bali is deleting your account. This takes a moment.")
+            Deleting.Done -> Said(AgeCheck.NOT_YET, "Bali deleted your account. ${AgeCheck.ASK_TEACHER}")
+            Deleting.None, Deleting.Asking, is Deleting.Stopped, Deleting.Pending -> said
+        }
+
+/**
+ * What a stop says (rule 5): its title, and why, with the way on, Back alone where no try can help ([Deleting.Stop.retries]).
+ * Only a refusal before anything could be sent says the account isn't deleted. None says an Emergency Unlock goes: one the
+ * server hasn't recorded holds the deletion back. A deletion with no token is said as Join's 401, the sign-in Bali couldn't
+ * check, never as no connection (Q7); a sign-in from before the scope, or none read now, with no "older version" (Q8); and one
+ * stopped once this phone is signed in to another account, with Back alone (AN9h). The three drawn first, as intermediate states
+ * of Delete account (AS7-Del-notoken, AS7-Del-signinfirst, AS7-Del-changed; Q9).
+ */
+val Deleting.Stop.said: Said
+    get() =
+        when (this) {
+            Deleting.Stop.SignInFirst ->
+                Said(NOT_DELETED, "Bali can't delete your account with this sign-in. Sign out and sign in again, then delete your account.")
+            Deleting.Stop.TeacherHasClasses ->
+                Said(NOT_DELETED, "A teacher's account with classes or blocks is deleted through your school. Ask your school to arrange it.")
+            Deleting.Stop.NotStarted -> Said(NOT_DELETED, Joining.Failure.NotStarted.words)
+            Deleting.Stop.UnlockUnsent -> Said(NOT_FINISHED, "Your Emergency Unlock hasn't reached your teacher yet. Check your connection and try again.")
+            Deleting.Stop.Unread ->
+                Said(NOT_FINISHED, "Bali can't read what your phone saved right now, so it can't delete your account yet. Try again in a moment.")
+            is Deleting.Stop.NotDeleted -> Said(NOT_FINISHED, Joining.words(if (noAnswer == NoAnswer.NoToken) SendResult.Status(401) else result, null))
+            Deleting.Stop.Unfinished -> Said(AgeCheck.NOT_YET, "Bali couldn't finish deleting your account. Check your connection and try again.")
+            Deleting.Stop.SignInChanged ->
+                Said(NOT_FINISHED, "This phone is signed in to another account now, so Bali stopped. Sign out and sign in to your own account, then delete it.")
+        }
 
 /**
  * A tap the server refused: kept and retried (tap step 10), but never one it recorded, so it holds no account

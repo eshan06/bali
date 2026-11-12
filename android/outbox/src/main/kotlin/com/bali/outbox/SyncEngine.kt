@@ -1046,7 +1046,7 @@ class SyncEngine private constructor(
                     DeleteMeResponse.Outcome.Deleted, DeleteMeResponse.Outcome.AlreadyDeleted -> alone { deletionId = null }
                     null -> {
                         val teacher = answer.error?.error?.reason == ApiErrorReason.TeacherHasClasses
-                        val stop = if (teacher) AccountDeletion.TeacherHasClasses else AccountDeletion.NotDeleted(answer.result)
+                        val stop = if (teacher) AccountDeletion.TeacherHasClasses else AccountDeletion.NotDeleted(answer.result, answer.noAnswer)
                         return stopped(signIn, account, stop)
                     }
                 }
@@ -1098,31 +1098,32 @@ class SyncEngine private constructor(
      * gives, every Emergency Unlock first, under [account]'s deletion token with the engine let go, each answer
      * settled and applied as the drain's is, a 401's refresh, of [account]'s sign-in alone, waited for; then what
      * holds the deletion back, if anything: an unlock still queued, one tried and stuck included, which the
-     * deleted account could never send, never let go; else a record no answer settled, with the last answer; or
-     * the file unread. A tap the server refused holds nothing back.
+     * deleted account could never send, never let go; else a record no answer settled, with the last answer and why none
+     * came, no token where the send had none (Q7); or the file unread. A tap the server refused holds nothing back.
      */
     private suspend fun sendAll(signIn: SignIn, account: String): AccountDeletion? {
         val tried = mutableSetOf<String>()
-        var last: SendResult = SendResult.NetworkError
+        var last = AccountDeletion.NotDeleted(SendResult.NetworkError)
         val renew = suspend { signIn.refresh(account) }
         while (true) {
             val (record, onItsWay) = alone { stored { nextToSend(tried) } }.getOrElse { return AccountDeletion.Unread } ?: break
             tried += record.eventId
             val sent = record.send(client.forDeletion(account))
             // No token, [account]'s sign-in no longer held among the reasons: nothing went, so nothing is settled (the
-            // drain's rule), said as no answer.
+            // drain's rule), said as no answer, the sign-in's.
             if (sent == null || sent.noAnswer == NoAnswer.NoToken) {
                 alone { if (!onItsWay) update { it.copy(sending = it.sending - record.eventId) } }
+                if (sent != null) last = AccountDeletion.NotDeleted(sent.result, sent.noAnswer)
                 break
             }
             val settled = alone { stored { outbox.settle(sent, clock.now()) }.map { answered(record, sent, it, renew) to (it?.keeps == true) } }
             val (refreshing, keeps) = settled.getOrElse { return AccountDeletion.Unread }
-            if (keeps) last = sent.result
+            if (keeps) last = AccountDeletion.NotDeleted(sent.result, sent.noAnswer)
             refreshing?.await()
         }
         val left = alone { stored { outbox.records() } }.getOrElse { return AccountDeletion.Unread }
         if (left.any { it.change.isUnlock }) return AccountDeletion.UnlockUnsent
-        return if (left.all { it.refusedForGood }) null else AccountDeletion.NotDeleted(last)
+        return if (left.all { it.refusedForGood }) null else last
     }
 
     /** The next record [sendAll] sends, none of [tried], marked on its way, and whether it was already; none: none left. */

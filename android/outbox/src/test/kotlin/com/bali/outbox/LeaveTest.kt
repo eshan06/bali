@@ -21,9 +21,9 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
-// Leaving a class (C6c), over A19's fixtures: BaliOutbox's LeaveTests, `words` AN10's with the words; and new: Cancel and
-// the same class's Leave again, its replay still, a deleted sign-in's 409 (C3d), and the not-known standing. And leaving
-// through the engine (C6c): LeaveEngineTests, and new: a leave whose caller is cancelled.
+// Leaving a class (C6c), over A19's fixtures: BaliOutbox's LeaveTests, their words with them (AN10g); and new: Cancel and
+// the same class's Leave again, its replay still, a deleted sign-in's 409 (C3d), the not-known standing, and Bali still
+// starting. And leaving through the engine (C6c): LeaveEngineTests, and new: a leave whose caller is cancelled.
 
 /** The route a leave of `e3` goes to. */
 private val leaveRoute = "DELETE /v1/enrollments/e3"
@@ -39,8 +39,25 @@ private fun classRow(id: String, name: String, enrolled: Boolean = true) = MeCla
 /** `DELETE /v1/enrollments/e3` as [client] answers it. */
 private suspend fun answered(client: ApiClient) = client.leave("e3", request)
 
+private val unreachable = "Can't reach the server. Check your connection and try again."
+private val generic = "Something went wrong at Bali. Try again in a moment."
+private val lost = "Bali couldn't find you in this class. It's checking your classes again."
+
 /** Leaving a class (C6c): BaliOutbox's LeaveTests. */
 class LeaveTest {
+    @Test
+    fun d1sWordsAndTheQuestionAskedUnderAClassBeforeItIsLeftInPlainWordsWithNoNewEmDashOfBalisOwnAClassesNameKeepsItsOwn() {
+        val p3 = classRow("3", "Period 3 \u2014 Algebra II")
+        assertEquals("Leave Period 3 \u2014 Algebra II?", Leaving.question(p3))
+        assertEquals("You'll need the class code to join it again.", Leaving.CONSEQUENCE)
+        assertEquals("Period 3 \u2014 Algebra II is in session. You can leave it once class is over.", Leaving.inSession(p3))
+        val named = classRow("5", "Chemistry")
+        val bali = listOf(Leaving.question(named), Leaving.CONSEQUENCE, Leaving.inSession(named), lost, Leaving.Failure.NotStarted.words(named))
+        for (words in bali) assertFalse('\u2014' in words || '\u2013' in words, words)
+        // No iOS twin as a type: a phone whose engine hasn't started, the app's to say (BaliApp.swift's `leave`).
+        assertEquals("Bali is still starting. Try again in a moment.", Leaving.Failure.NotStarted.words(named))
+    }
+
     @Test
     fun leaveAsksFirstTheQuestionUnderTheClassPressedWhatWentWrongBeforeGoneCancelTakesItAwayNoneForAClassWithNoEnrollmentNorWhileALeaveIsUnderWayWhichCancelWaitsOutToo(): Unit =
         runBlocking {
@@ -83,8 +100,9 @@ class LeaveTest {
             val none = answered(client(Canned(null)))
             assertEquals(sending to false, sending.left(none, "e5"))
             val (unanswered, out) = sending.left(none, "e3")
-            val failure = Leaving.Failure(SendResult.NetworkError, null)
+            val failure = Leaving.Failure.NotLeft(SendResult.NetworkError, null)
             assertEquals(listOf<Any?>(false, false, failure, p3), listOf(out, unanswered.busy, unanswered.failure, unanswered.asking))
+            assertEquals(unreachable, unanswered.failure?.words(p3))
             val (retrying, retried) = unanswered.send(at(5))
             val retry = assertNotNull(retried)
             assertEquals(listOf<Any?>(first.request.eventId, null), listOf(retry.request.eventId, retrying.failure))
@@ -104,8 +122,8 @@ class LeaveTest {
     @Test
     fun aLeaveAsTheApiAnswersItOutItEndedOrTheyWereOutAlreadyTheQuestionGoesRefusedInSessionNotTheirsNotKnownADeletedSignInsOrNoAnswer401429OrAServerErrorEachItsResultAndReasonUnderTheQuestion(): Unit =
         runBlocking {
-            // A19's fixtures. Keyed on the status as well as the reason (#134's review): a 403 whose reason this build doesn't know
-            // keeps its status, which AN10's words key on, never the join's words for a 403.
+            // A19's fixtures, each said under the question, to try again or cancel. Keyed on the status as well as the reason (#134's
+            // review): a 403 whose reason this build doesn't know is the route's own no, never the join's words for a 403.
             val p3 = classRow("3", "Period 3 \u2014 Algebra II")
             for (name in listOf("left", "left-past-bell", "already-removed")) {
                 val (sending, _) = Leaving().ask(p3).send(t0)
@@ -114,26 +132,34 @@ class LeaveTest {
             val later = """{"error":{"code":"forbidden","reason":"a_later_reason","message":"no"}}"""
             val refusals =
                 listOf(
-                    fixture("enrollments/409-class-in-session.json") to Leaving.Failure(SendResult.Status(409), ApiErrorReason.ClassInSession),
-                    fixture("enrollments/404-enrollment-not-found.json") to
-                        Leaving.Failure(SendResult.Status(404), ApiErrorReason.EnrollmentNotFound),
-                    fixture("enrollments/403-enrollment-not-yours.json") to
-                        Leaving.Failure(SendResult.Status(403), ApiErrorReason.EnrollmentNotYours),
-                    fixture("enrollments/403-unknown-user.json") to Leaving.Failure(SendResult.Status(403), ApiErrorReason.UnknownUser),
-                    client(Canned(403, later)) to Leaving.Failure(SendResult.Status(403), null),
-                    client(Canned(403)) to Leaving.Failure(SendResult.Status(403), null),
-                    // No iOS twin: an account deleted from another phone, its sign-in's old token refused (C3d, #558).
-                    client(Canned(409, Answer.refused("account_deleted"))) to
-                        Leaving.Failure(SendResult.Status(409), ApiErrorReason.AccountDeleted),
-                    client(Canned(null)) to Leaving.Failure(SendResult.NetworkError, null),
-                    client(Canned(401)) to Leaving.Failure(SendResult.Status(401), null),
-                    client(Canned(429)) to Leaving.Failure(SendResult.Status(429), null),
-                    client(Canned(500)) to Leaving.Failure(SendResult.Status(500), null),
+                    Triple(
+                        fixture("enrollments/409-class-in-session.json"), Leaving.Failure.NotLeft(SendResult.Status(409), ApiErrorReason.ClassInSession),
+                        Leaving.inSession(p3),
+                    ),
+                    Triple(
+                        fixture("enrollments/404-enrollment-not-found.json"), Leaving.Failure.NotLeft(SendResult.Status(404), ApiErrorReason.EnrollmentNotFound),
+                        lost,
+                    ),
+                    Triple(
+                        fixture("enrollments/403-enrollment-not-yours.json"), Leaving.Failure.NotLeft(SendResult.Status(403), ApiErrorReason.EnrollmentNotYours),
+                        lost,
+                    ),
+                    Triple(fixture("enrollments/403-unknown-user.json"), Leaving.Failure.NotLeft(SendResult.Status(403), ApiErrorReason.UnknownUser), lost),
+                    Triple(client(Canned(403, later)), Leaving.Failure.NotLeft(SendResult.Status(403), null), lost),
+                    Triple(client(Canned(403)), Leaving.Failure.NotLeft(SendResult.Status(403), null), lost),
+                    // No iOS twin: an account deleted from another phone, its sign-in's old token refused (C3d, #558), said as any 409
+                    // while the owner's call on reading it as signed out waits (C3d's "For the owner").
+                    Triple(client(Canned(409, Answer.refused("account_deleted"))), Leaving.Failure.NotLeft(SendResult.Status(409), ApiErrorReason.AccountDeleted), generic),
+                    Triple(client(Canned(null)), Leaving.Failure.NotLeft(SendResult.NetworkError, null), unreachable),
+                    Triple(client(Canned(401)), Leaving.Failure.NotLeft(SendResult.Status(401), null), "Bali couldn't check your sign-in. Try again."),
+                    Triple(client(Canned(429)), Leaving.Failure.NotLeft(SendResult.Status(429), null), "Too many tries for now. Wait a minute, then try again."),
+                    Triple(client(Canned(500)), Leaving.Failure.NotLeft(SendResult.Status(500), null), generic),
                 )
-            for ((answer, failure) in refusals) {
+            for ((answer, failure, words) in refusals) {
                 val (sending, _) = Leaving().ask(p3).send(t0)
                 val (after, out) = sending.left(answered(answer), "e3")
                 assertEquals(listOf<Any?>(false, failure, p3, false), listOf(out, after.failure, after.asking, after.busy), "$failure")
+                assertEquals(words, after.failure?.words(p3), "$failure")
             }
         }
 
@@ -142,6 +168,8 @@ class LeaveTest {
         val p3 = classRow("c", "Period 3")
         val focused = SyncState(standing = Standing.InSession(session(endsAt = 3000), ParticipationState.Focused))
         assertTrue(Leaving.held(p3, focused, at(10)))
+        // Said why, under the class, as the server's own no is (`409 class_in_session`).
+        assertEquals("Period 3 is in session. You can leave it once class is over.", Leaving.inSession(p3))
         assertFalse(Leaving.held(p3, focused, at(3000)))
         assertFalse(Leaving.held(classRow("d", "Period 5"), focused, at(10)))
         for (state in listOf(null, ParticipationState.Unlocked)) {
