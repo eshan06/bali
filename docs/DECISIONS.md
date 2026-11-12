@@ -80,12 +80,27 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **For AN10b to AN10h and Phase 10:** the `Router` calls `Screen.choose` with `Account.State`'s `signedIn`,
   `signedInThisRun`, `age`, `deleting.shows` and `sync`, the enforcer's `updates`, `everApproved` and the notes; it
   chooses again at each of their changes and at `Screen.bell` of the standing's session's `endsAt` (iOS's `Phone.bell`),
-  over AN10c's time-set signals, and keeps what was opened while `keepsOpened` says. Phase 10 offers Sign out where
-  `offersSignOut` says. AN12 reads `SyncState.teacher`.
+  over AN10c's looks, and keeps what was opened while `keepsOpened` says. AN10c's looks are Android's time-set broadcast
+  and the screen coming on: a `delay` doesn't count the time the phone spends in deep sleep, so a sleep alone would ring
+  late by however long it slept (santa's review). Phase 10 offers Sign out where `offersSignOut` says. AN12 reads
+  `SyncState.teacher`.
 
-  **The proof:** RUNS-TO-FILL
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble
+  :app:lint check` green, Android 10's API check with it; the core and outbox suites run PROOF-RUNS; `npm run typecheck
+  && npm run lint && npm test` PROOF-NPM. No SDK package was installed: the build downloads none
+  (`android.builder.sdkDownload=false`), and nothing under the SDK changed while it ran.
 
-  **Santa's review:** SANTA-TO-FILL
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: the bell test's cancel was
+  made before the bell ever ran (both; it now waits until the bell is asleep, the bells in a scope of the test's own, so a
+  cancel the bell ignored fails by name, tried); `bell`'s doc promised more than a `delay` keeps, since Android's doesn't
+  count deep sleep (both; the doc says so, and the screen coming on is a look, AN10c's); and this entry's placeholders
+  (both; filled). **For AN10c, from the review (reviewer B), for the owner's look:** a start that fails runs no enforcer,
+  while the app's lock goes on covering for the last run's lock, which has no end of its own (`ServiceLock`'s
+  `Instant.MAX`), so the start's problem can show over a lock with no Emergency Unlock until the student switches Bali's
+  service off in Settings, which is never covered; iOS's monitor ends its shields at the bell. An outbox that won't open
+  can't record an unlock either. [The conductor's recommendation: AN10c takes the last run's lock off when a start fails,
+  a lock the phone can no longer justify (B6b); or the problem's words, AN10d's, name the switch in Settings.]
 
 - **2026-11-11** — **AN7g, the cover test's SMS step waits out Google Messages before its call: AN7e's CoversTest,
   test-only, the race AN9i's run met once on Android 16 made impossible (the conductor's calls, marked, each awaiting

@@ -175,8 +175,9 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   bell): `Account`'s notes behind a `Notes` store, `sawList` and `email`; a `Router`, one a process (Q1), choosing again at
   each change and at the bell; a Debug engine with no account read as signed out (Q2) — validation: the JVM tests
 - **AN10c** The router in the app (twin: BaliApp.swift's start problems): the app's `Notes`, out of the backup; `BaliApp`'s
-  `problem`, one `Router` for the app's life and Android's time-set broadcast; the readout's Screen line (Q11) —
-  validation: the JVM tests, then the instrumented tests on `Bali_Spike_API35`, `36` and `37`
+  `problem`, and the last run's lock at a start that fails (DECISIONS 2026-11-11, AN10a's santa); one `Router` for the
+  app's life, the bell looked at again at Android's time-set broadcast and the screen coming on; the readout's Screen line
+  (Q11) — validation: the JVM tests, then the instrumented tests on `Bali_Spike_API35`, `36` and `37`
 - **AN10d** Home's words, Tap in, and the sign-in's and the start's words (twin: Join.swift's and Screen.swift's words, and
   SyncEngine.swift's `tapIn`), and the guard over every Android word — validation: the JVM tests
 - **AN10e** Focus's words and the block screen's (twin: `FocusWords` and `ShieldWords`) — validation: the JVM tests

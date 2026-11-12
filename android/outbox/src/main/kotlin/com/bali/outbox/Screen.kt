@@ -222,11 +222,12 @@ sealed interface Screen {
 
         /**
          * Returns at [bell] by the phone's own clock, [clock], where the router chooses again (C5a), or throws once its coroutine
-         * is cancelled: slept towards, and looked at again at each of [changes], Android saying the time was set. A sleep counts
-         * only the time that passes ([SystemClock]'s), so each look aims it afresh at the bell as the clock reads now: a clock set
-         * forward past the bell ends the wait at once, where the sleep would wait out the time left (C5a's review), and one set
-         * forward short of it, or back, is slept towards anew. [changes] is followed before the clock is first read, so a hot
-         * flow misses no change made after it.
+         * is cancelled: slept towards, and looked at again at each of [changes]. A sleep counts only the time that passes, and
+         * [SystemClock]'s, a `delay`, not the time the phone spends in deep sleep, so each look aims it afresh at the bell as the
+         * clock reads now: a clock set forward past the bell ends the wait at once, where the sleep would wait out the time left
+         * (C5a's review), and one set forward short of it, or back, is slept towards anew. [changes] are the moments the clock
+         * may have moved past what a sleep counts: Android saying the time was set, and the screen coming on after the phone
+         * slept (AN10c's). They are followed before the clock is first read, so a hot flow misses no change made after it.
          */
         suspend fun bell(bell: Instant, changes: Flow<Unit>, clock: SyncClock = SystemClock): Unit =
             coroutineScope {

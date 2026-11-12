@@ -11,13 +11,18 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.resume
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -886,19 +891,31 @@ private class PhoneClock : SyncClock {
 
 /** The bell, where the router chooses again (C5a, C5b): BaliOutbox's BellRedrawTests, and the bell aimed afresh at each look. */
 class BellRedrawTest {
+    /**
+     * The bells' own scope, apart from the test's, so a bell that ignored a cancel, or never returned, fails its test by name
+     * rather than holding the test open. Cancelled as each test ends.
+     */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @AfterTest
+    fun stopBells() = scope.cancel()
+
     @Test
     fun sleptTowardsByThePhonesOwnClockAndLookedAtAgainWheneverAndroidSaysTheTimeWasSetAClockSetPastTheBellEndsTheWaitAtOnce(): Unit =
         runBlocking {
-            // The bell reached by sleeping ends it, by the phone's clock, and so does a cancel.
+            // The bell reached by sleeping ends it, by the phone's clock, and so does a cancel, once it is asleep, its sleep let go.
             withTimeout(patience) { Screen.bell(Instant.now().plusMillis(50), emptyFlow()) }
-            val cancelled = launch { Screen.bell(Instant.now().plusSeconds(3600), emptyFlow()) }
-            cancelled.cancelAndJoin()
+            val asleep = PhoneClock()
+            val cancelled = scope.launch { Screen.bell(at(3600), emptyFlow(), asleep) }
+            eventually { asleep.sleeps.size == 1 }
+            withTimeout(patience) { cancelled.cancelAndJoin() }
             assertTrue(cancelled.isCancelled)
+            assertEquals(emptyList(), asleep.sleeps)
             // Followed and asleep, a change made now is seen, and looked at, a read of the clock, short of the bell, which ends
             // nothing: it is looked at again at the next (iOS's santa: no timing). Then the clock set forward past the bell ends
             // the wait at once, where the sleep alone would have waited out the time left (C5a's review).
             val (changes, clock) = MutableSharedFlow<Unit>() to PhoneClock()
-            val ringing = async { Screen.bell(at(3600), changes, clock) }
+            val ringing = scope.async { Screen.bell(at(3600), changes, clock) }
             eventually { changes.subscriptionCount.value == 1 && clock.sleeps.size == 1 }
             var read = clock.reads
             changes.emit(Unit)
@@ -916,7 +933,7 @@ class BellRedrawTest {
         runBlocking {
             // The bell an hour off: set forward half an hour, the sleep aimed afresh at the half hour left by the clock.
             val (changes, forward) = MutableSharedFlow<Unit>() to PhoneClock()
-            val ringing = async { Screen.bell(at(3600), changes, forward) }
+            val ringing = scope.async { Screen.bell(at(3600), changes, forward) }
             eventually { changes.subscriptionCount.value == 1 && forward.sleeps == listOf(Duration.ofSeconds(3600)) }
             forward.turn(Duration.ofSeconds(1800))
             changes.emit(Unit)
@@ -925,7 +942,7 @@ class BellRedrawTest {
             withTimeout(patience) { ringing.await() }
             // Set back an hour with no change said: the sleep ends with the bell still an hour off, and sleeps on to it.
             val back = PhoneClock()
-            val later = async { Screen.bell(at(3600), emptyFlow(), back) }
+            val later = scope.async { Screen.bell(at(3600), emptyFlow(), back) }
             eventually { back.sleeps == listOf(Duration.ofSeconds(3600)) }
             back.turn(Duration.ofSeconds(-3600))
             back.advance(Duration.ofSeconds(3600))
