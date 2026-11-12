@@ -60,8 +60,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
     outside a reboot; if it does, its own line, drawn first.]
   - **The re-tap only over the switch on and bound** (`LockSwitch.On`, iOS's approved; Q3), never over one starting, which proves
     nothing (AN7b's rule for the lock back on).
-  - **Session over's "All your apps are back." only over `Protection.locked == false`**, iOS's `shielded == false` (Q3): never
-    with no claim from the check.
+  - **Session over's "All your apps are back." only over a check that ran and found no lock on** (`checked` and not `locked`,
+    iOS's `shielded == false`; Q3), never over a check not made yet, which iOS's defaults would claim (santa's reviewer B). The
+    router never shows Session over before the first check, so no screen differs from the iPhone's; the function keeps rule 3
+    itself.
   - **No label quoted, Android's two** (iOS's D2j rule): Protection off's lines never quote the chip's "Lock off" nor the grid's
     "Protection off"; the test reads every headline, body and step, in any case, where iOS's reads the body for "Screen Time off".
   - **The board's variants change as its lines do:** the board writes the lock-off bodies with "sees" and its line not drawn
@@ -86,8 +88,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `sessionOverWords`); ScreenTests' `homeInSession`, and C3c's card in `homeWaiting` and `inNoClass`; DroppedWaitTests'
   `dropped` and `startAfterExpiry`, their cards; and the AN10 marks: UnlockTest.kt's ReasonTests' words (`reasonKept`'s
   pickers, `changed`, `changedLate`, `notGiven`, `refusedBack` where it lands, `notKept`), ProtectionOffTest.kt's way on
-  (`revoked` and `offWithinGrace`, Settings where iOS's is its prompt) and Unlocked's card after the lock back on
-  (`stillUnlocked`), and ReadTest.kt's card for a class in session (`outReads`). New: no line of Unlocked says an unlock, its
+  (`revoked` and `offWithinGrace`, Settings where iOS's is its prompt; the check's way while the switch only starts, in
+  `markerNotBack`'s Android place) and Unlocked's card after the lock back on (`stillUnlocked`), and ReadTest.kt's card for a
+  class in session (`outReads`). New: no line of Unlocked says an unlock, its
   reason or its retry was dropped or can be taken back, and each failure says how on (another try, a pick once the unlock
   arrives, or why the reason can't change); and a reason or Back to focus with no engine, Bali still starting. No twin:
   `protectionOffWords`' read of iOS's view (AS6's). Tried, each failing by name, then reverted: Screen Time in "Bali's lock is
@@ -98,8 +101,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   with no retry (the new rule's test, each, with the line's own); a reason's failure, Protection off's way and the reason
   card's picker each with no word (the compile: "'when' expression must be exhaustive"), then each with a word and no sample
   (the guard: "ReasonFailure's cases, each with a sample", "ProtectionOffWords.Way's cases, each reached", "Picker's cases,
-  each with a sample"); and a "!" in Session over and an em-dash in a caption (the guard: "holds an exclamation mark", "holds
-  an em-dash").
+  each with a sample"); a "!" in Session over and an em-dash in a caption (the guard: "holds an exclamation mark", "holds an
+  em-dash"); and, after santa's fix, Session over's line over a check not made (`sessionOverWords`).
 
   **For AN10g, AN10h and Phase 10:** AS6's Unlocked says `UnlockedWords.of` (under the three the caption, or a pick that
   failed in `ReasonFailure.words`, as iOS's `pickFailed ?? picker.caption`; the re-tap's line with Tap in in Lock my apps
@@ -109,9 +112,22 @@ a real decision? Add a dated entry at the top: what was decided and why.
   over; Home says `inSessionCard` and `refusedRefocusWords`; the app gives each `NotStarted` with no engine. Every time is the
   phone's own pattern (`DateFormat.getBestDateTimePattern`), as Focus's is. AN10h: History's "Lock off" and "Lock back on".
 
-  **The proof:** (to come)
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble :app:lint
+  check` green before santa's fix and on the final code, Android 10's API check with it (Animal Sniffer over `core` and `outbox`);
+  the core and outbox suites run together eleven times, each green (642 tests, sixteen of them new), six before santa's fix and
+  five on the final code, beside each `check`'s own run of the outbox's, AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…`
+  among them every time; `npm run typecheck && npm run lint && npm test` green, the portal's suite whole (78 files). No SDK
+  package was installed: the build downloads none (`android.builder.sdkDownload=false`), and the SDK's folders matched before
+  and after. The size, santa's count: 347 changed lines not counting tests and Markdown (the split guessed about 230), 603 in
+  the tests.
 
-  **Santa's review:** (to come)
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: `startAfterExpiry`'s check of the read's
+  bell kept beside the card's, so no assertion is lost (reviewer B); Session over's line only over a check that ran (reviewer B;
+  above); Android's stand-in for iOS's `markerNotBack` checks the screen's way too, the check's while the switch only starts
+  (reviewer A); and this entry's and the PR's placeholders, the PR's number checked once it was opened (reviewer B). The design
+  check, no-ai-slop's Detect job over the new and changed strings, found nothing: each line is iOS's or a board's, in
+  DESIGN.md's voice.
 
 - **2026-11-12** — **AN10e, Focus's words and the block screen's: BaliOutbox's `FocusWords`, `UnlockFailure`'s words and
   `ShieldWords` in Kotlin, each line a function of its type, the claim naming Bali's lock, the block screen's title alone,
