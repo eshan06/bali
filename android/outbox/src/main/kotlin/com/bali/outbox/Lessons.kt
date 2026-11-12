@@ -197,7 +197,7 @@ class Lessons(
     private fun follow() {
         val sync = account?.sync
         val listed = account?.takeIf { it.signedIn == true }?.listSeenBy
-        val session = if (listed != null && sync?.me?.user?.id == listed) sync.followed(clock.now(), notFollowed()) else null
+        val session = if (listed != null && sync?.me?.user?.id == listed) sync.followedSession(clock.now(), notFollowed()) else null
         if (session?.id != following?.live?.session) {
             drop()
             if (session != null) start(session.id)

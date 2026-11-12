@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN13d's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN13c, which lesson the phone follows, its heading, and the answer card's looks and words
+(#576; `docs/DECISIONS.md`, 2026-11-12), the third of AN13's seven steps: `outbox`'s `Lesson.kt`, BaliOutbox's `Lesson.swift`:
+the session the phone stands in, checked first, else the first class in session by `GET /v1/me`, each while its bell is ahead by
+the phone's clock and never one a read said is over; its class's heading, in the phone's own time pattern and zone; and the
+answer card, each answer open to a tap or closed with its marks, and the line under them, the iPhone's seven word for word, each
+drawn on AS8's card boards, so nothing was drawn; what a pick's request said a type, every `AnswerResult` placed in it. Nothing
+kept, no screen. Before it, AN13b, the deck. Next: AN13d and AN13e; AN13f and AN13g once the owner has answered
+Q2 and Q3 (DECISIONS 2026-11-12); AN11, AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the
+owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the
+owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
+OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN13c's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN13b, the deck downloaded, checked against its `sha256` and kept for the session (#575;
 `docs/DECISIONS.md`, 2026-11-12), the second of AN13's seven steps: `core`'s `LiveLesson.deck`, BaliCore's `deck(for:)` (M7),
 in memory alone: a fresh presigned URL for each fetch, never kept; the bytes from the bucket through the client's own transport
@@ -2830,6 +2842,11 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN13d's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12).
+
+- **AN13d** The lesson followed: the poll while Bali is in front, the answer, Hide (twin: BaliApp.swift's `Phone`, its
+  lesson half); answers never enter the outbox — validation: the JVM tests
 
 AN13c's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12).
 
