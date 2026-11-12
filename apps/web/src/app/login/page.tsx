@@ -63,7 +63,7 @@ export default function LoginPage() {
           aria-labelledby="sign-in-title"
           className="flex w-full max-w-100 flex-col gap-3.5 rounded-sign-in border border-border-default bg-surface-card px-8 py-9 shadow-sign-in"
         >
-          <h1 id="sign-in-title" className="text-h1">
+          <h1 id="sign-in-title" className="text-h1 text-balance">
             Sign in to Bali
           </h1>
           <p className="mb-2.5 text-body text-text-secondary">
