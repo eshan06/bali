@@ -28,7 +28,8 @@ const PUBLIC_PAGES = [
  * in a 52 px pill, the line for students under it, then the public pages. No Sign up: students sign
  * up in the app, where the 13+ question is. A Sign out's word sits over Sign in, a page that didn't
  * open under it (PortalStates). Narrower, the panels stack, the art on top, 240 px wide with its
- * line at 26/32, so Sign in shows on a phone's first screen (PortalPhone; PortalZoom, 200 %).
+ * line at 26/32, so Sign in shows on a 390 × 844 phone's first screen (PortalPhone; PortalZoom, the
+ * 200 % a 1440 px window zooms to).
  */
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);

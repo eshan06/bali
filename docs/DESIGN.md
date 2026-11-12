@@ -67,7 +67,8 @@ states of sign-in (its Teacher row, 2026-11-07), and for
 the portal and the student web the canvas below. The
 [Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB) (the owner, 2026-11-12)
 wins over those two for the app's Sign in screen and the portal's sign-in page, each opening
-Cognito's managed login, which PLAN's next steps rebuild from it; its boards of AWS's page draw
+Cognito's managed login: the portal's page is built from it (2026-11-12), the app's screen is
+PLAN's next step; its boards of AWS's page draw
 the managed-login style itself (`infra/cognito/managed-login/`). Changing any of
 it is the owner's call, never a side effect of a PR: every user-facing screen
 is designed in Claude Design and approved by the owner before it is built
@@ -232,13 +233,21 @@ each question in the order asked, when, whether its answer was shown, its words,
 answered" drawn by the class page's card's own pieces; its read failing on its own with LessonStates'
 line and Try again, and its other states as ReportQuestionsStates draws them (drawn on the canvas
 first).
-The entry pages are v2's since PV15 (2026-10-15): sign-in and its callback on v2's stage
+The entry pages are v2's since PV15 (2026-10-15): the sign-in callback on v2's stage
 (the mark at 40 px, Bali and "Focus sessions for your classroom" over the card, no bar),
 the invite card under v2's white bar with Sign out, and Help and the policy pages under
 that bar in one column 860 px wide, Help's sections cards, the policy outline one card
 with a Placeholder chip per section, their words unchanged. Since C2-text (2026-10-24; no new
 board, the owner's call) the policy pages hold the owner's drafted words in that card, in
 paragraphs and lists, the date under the title, the notice and the Placeholder chips gone.
+Sign-in is the sign-in redesign's since 2026-11-12 (its "The portal's sign-in page"): two panels
+side by side from 1024 px; on the left, in green-50, Bali at 72/76 over the session ring as art
+(`SessionRingArt`, `components/mark.tsx`, never a countdown: the owner's ruling) and "Quiet until
+the bell." at 40/46; on the right the card, its words, its signed-out lines over Sign in and its
+error under it as before, Sign in a 52 px pill, then the line for students and the public pages,
+and no Sign up, by design. Narrower, the panels stack, the art on top at 240 px and its line at
+26/32, so Sign in shows on a 390 × 844 phone's first screen; its states as PortalStates,
+PortalPhone and PortalZoom draw them (drawn on the canvas first).
 The student's home is v2's since W3 (2026-10-15): the side menu with Your classes and Help,
 each class in session on StudentHome's live card (its ring, its teacher, the time left and the
 bell) and the rest under it, none yet StudentHomeEmpty's card with its way to the invite page,
@@ -397,7 +406,8 @@ In this file's terms:
   `border-default` hairline and `shadow-1` (§4, Card). No grey frame takes the
   tray's place.
 - **10 px corners.** Buttons, fields and codes take `radius-sm`; chips, pills
-  and bars stay `radius-full` (Soft premium's pill buttons, superseded).
+  and bars stay `radius-full` (Soft premium's pill buttons, superseded, but the
+  sign-in page's Sign in, the sign-in redesign's 52 px pill).
 - **A soft warm shadow** (kept). `shadow-1` at rest, `shadow-2` on the
   reconnect pill, `shadow-3` on the unlock pop-up, the side panel and a
   dialog: warm black, never blue-grey, never a hard drop (§6).
@@ -429,7 +439,8 @@ the countdown 44/48, a question 34/40, its options 24/30 and a tile's lines
 (Present), at +0.16em; fields 16/24 (`input`, §3). *Radii:* cards 14; Home's
 live card and the student's lesson card 16; buttons, fields and codes 10; menu
 items and the length picker's segments 8; tables and slides 12; Present's
-question card 20; pills `radius-full`. *Shadows:* the tokens' three (above).
+question card 20; pills `radius-full`. *Shadows:* the tokens' three (above). The sign-in
+page draws its own (the sign-in redesign, below): its card at 28 with `shadow-sign-in`.
 *Icons:* lucide's at a 1.75 stroke (`.ic`; the owner, 2026-10-13; `globals.css`
 since PV4b), but the recap's marks at 2.25 and the "is ready" dialog's check at 1.5.
 *Layout:* the side menu 216 px, white with a hairline on its right, padding
@@ -470,7 +481,8 @@ session's end, with no unlock, no Screen Time off, no going silent and no
 leaving; a late tap-in still counts. Reports is a menu page: the class picked
 with pills, one class at a time, a table of sessions and each session's
 average focus as a bar; an opened session gets a page and a URL of its own
-(downloading a report waits for issue #339). Sign-in is v2's centred page. The
+(downloading a report waits for issue #339). Sign-in was v2's centred page until the sign-in
+redesign (2026-11-12) gave it two panels. The
 student web takes the teacher's layout, kept simple: the menu with Your
 classes and Help, a class under the same header with its ring and countdown,
 and the phone's state where the teacher's controls sit.
@@ -549,7 +561,7 @@ Reports' four, `pill` (13.5/18, medium: a class's pill), `bar-row` (13.5/18, reg
 under a cell's words), and the opened row's tint as the colour `row-open`
 (green-50, v2.css's `.wtable tr.is-open`), retired with the opened row in PV14; PV15 the entry pages' two, both
 semibold, `entry-title` (20/26: an entry page's card title) and `button-lg`
-(16/20: the sign-in's 48 px button's label, `Button`'s `size="lg"`); W3 the colour
+(16/20: the large buttons' label, `Button`'s `size="lg"`, 48 px, and `size="pill"`); W3 the colour
 `live-edge` (green-200, a live card's edge, v2.css's `.livecard`), its sizes all named already; L7
 a live question's results' three colours, `bar` (stone-500, an option's bar), `bar-right`
 (green-600, the correct one's) and `letter-right` (green-100, the correct option's letter, v2.css's
@@ -559,7 +571,12 @@ part 2, Present's question, three sizes, `present-kicker` (14/15, semibold, uppe
 regular: its count's words, its foot and the guard's line), and the colour `option-right` (green-50,
 the correct answer's fill once shown, v2.css's `.p-opt.right`); PV16a Classes' `card-name`
 (17/22, semibold: a class's name on its card, v2.css's `.classcard .name`); and PV16b the colour
-`ready` (green-600, the "is ready" dialog's check, as ClassesCreated draws it).
+`ready` (green-600, the "is ready" dialog's check, as ClassesCreated draws it). The sign-in
+redesign's board (the owner's approval, 2026-11-12), built as drawn the same way: the sizes
+`wordmark` (72/76, -0.04em: Bali over the art) and `tagline` (40/46, -0.02em: its line), both
+semibold; the radius `sign-in` (28: the card); the shadow `shadow-sign-in` (0 8px 24px, the
+shadows' warm black at 6 %: the card's); the colour `art-panel` (green-50: the art's panel); and
+`Button`'s `size="pill"` (52 px, `radius-full`, 24 px in, `button-lg`: its Sign in).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
@@ -728,8 +745,8 @@ where they differ (Present's included: §5); the input size stands.
   rolled back with D2h, 2026-10-06). On the web: 40 px tall, `space-4` side
   padding, a `body` semibold label. *v2's look (§1):* 10 px corners
   (`radius-sm`), 18 px side padding, a 15/20 semibold label on one line, dimmed
-  to 55% while disabled or busy; small, 34 px tall at 13.5/18; the sign-in's,
-  48 px.
+  to 55% while disabled or busy; small, 34 px tall at 13.5/18; large, the sign-in
+  callback's, 48 px; the sign-in page's Sign in a 52 px pill (the sign-in redesign).
 - **Secondary button:** the primary's shape, `surface-card` with a
   `border-strong` stroke and `text-primary` ink; hovered, `surface-sunken`;
   pressed (Present, `aria-pressed`) or open (New code, `aria-expanded`),
@@ -913,7 +930,8 @@ where they differ (Present's included: §5); the input size stands.
   `shadow-1` for resting cards, `shadow-2` for popovers, `shadow-3` for modals
   and sheets. In v2's look (§1): `shadow-2` on the reconnect pill, `shadow-3`
   on the unlock pop-up, the side panel and a dialog, whose backdrop is the same
-  warm black, `rgba(33, 28, 21, 0.32)`.
+  warm black, `rgba(33, 28, 21, 0.32)`. The sign-in page's card takes the sign-in
+  redesign's own, `shadow-sign-in`: that warm black at 6 %, 8 px down, 24 px soft.
 - **Focus ring, everywhere, no exceptions:** a 2 px page-colour gap, then a
   2 px `focus-ring-color` ring.
 - Dark values: the tokens carry them, and nothing renders them. The app, the
