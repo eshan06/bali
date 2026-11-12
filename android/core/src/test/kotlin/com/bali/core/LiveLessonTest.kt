@@ -726,8 +726,8 @@ private fun sha256Hex(bytes: ByteArray) =
 
 /**
  * A slide's deck on the wire, over a real socket: the bucket's request as the app's own transport sends it, as
- * OkHttpTransportTest checks the API's. Kotlin's own: OkHttp, like URLSession, asks for gzip by itself and decodes what an
- * answer names, so the bucket is asked for the bytes as stored (Q6).
+ * OkHttpTransportTest checks the API's. Kotlin's own: OkHttp, like URLSession, asks for gzip by itself and decodes an answer
+ * named gzip, so the bucket is asked for the bytes as stored (Q6).
  */
 class LessonDeckWireTest {
     /** How long a test waits on its local servers: answered, a request takes milliseconds. */

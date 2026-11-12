@@ -35,7 +35,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **The conductor's calls, built:**
   - **Q5, decks in memory:** every deck the session showed stays, the twin's rule (M7's note: keep only the slide's own if
     lessons ever show more than a few), each at most 25 MB; AP3 checks big decks on a low-memory phone (AN13g writes the line).
-  - **Q6, `Accept-Encoding: identity` on the bucket's GET:** OkHttp asks for gzip by itself and decodes whatever an answer names
+  - **Q6, `Accept-Encoding: identity` on the bucket's GET:** OkHttp asks for gzip by itself and decodes an answer named gzip
     before anything sees the bytes; asked for identity, it decodes nothing, so the hash sees the bytes as sent and a gzip an
     upload left stored is never inflated. The URL already asks S3 to answer identity (`response-content-encoding`, M1), which is
     all iOS has, since URLSession asks for gzip by itself too; this holds the phone's side whatever answers. Over MockWebServer,
@@ -73,9 +73,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
   **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble :app:lint
   check` green, Android 10's API check with it (Animal Sniffer over `core` and `outbox`), and no compiler or lint warning from
-  this step's code; the core and outbox suites green in each `check` and four more times on the final code (`--rerun`; 687
-  tests, eleven of them new), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck
-  && npm run lint && npm test` green, the portal's suite whole (78 files). No SDK package was installed and no library added:
+  this step's code; the core and outbox suites green in each `check` and four more times on the final code (687 tests, eleven
+  of them new), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run
+  lint && npm test` green, the portal's suite whole (78 files). **A trap found on the way:** Gradle's `--rerun` runs again only
+  the task just before it, so `./gradlew :core:test :outbox:test --rerun` left `:core:test` UP-TO-DATE, in AN13a's passes as in
+  this step's first four; core's four here ran with `--rerun` after each task (GOTCHAS, Android's SDK on Windows). No SDK package was installed and no library added:
   the build downloads none (`android.builder.sdkDownload=false`), and no build file changed. The size, santa's count: 143
   changed lines not counting tests and Markdown (the split guessed about 90), 263 in the tests.
 

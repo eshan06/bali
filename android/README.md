@@ -109,11 +109,11 @@ last, so a read made before an answer landed never takes it back. Its `deck` giv
 URL from the download route for each fetch, the bytes from the bucket through the client's own transport with no token and
 asked for as stored (`Accept-Encoding: identity`, so OkHttp decodes nothing), a bucket's `403` asking for a fresh URL once;
 the bytes checked against the slide's SHA-256 before they leave, and given read-only (`DeckResult`), a mismatch kept nowhere,
-and every deck the session showed kept by its `sha256` until a read says the session is over. Swift's actor is a lock each stretch holds, let go
-at each call to the API or the bucket; its state is a `StateFlow`, its clock and its wait handed in. `core` can't see
-`outbox`, so no answer ever enters it, and nothing words an outcome here: `outbox` does (AN13c). Its tests run over a world
-of their own (`LessonWorld`): the server's answers in order, each held, cancelling its caller or echoing the pick as a test
-says, and a clock that moves only when the poll waits; the bucket's request goes over MockWebServer too.
+and every deck the session showed kept by its `sha256` until a read says the session is over. Swift's actor is a lock each
+stretch holds, let go at each call to the API or the bucket; its state is a `StateFlow`, its clock and its wait handed in.
+`core` can't see `outbox`, so no answer ever enters it, and nothing words an outcome here: `outbox` does (AN13c). Its tests
+run over a world of their own (`LessonWorld`): the server's answers in order, each held, cancelling its caller or echoing
+the pick as a test says, and a clock that moves only when the poll waits; the bucket's request goes over MockWebServer too.
 
 **Sign-in** (`core`'s `SignIn.kt` and `TokenStore.kt`, BaliCore's `SignIn.swift`) has its parts (AN6a): the hosted UI's address with PKCE, its verifier and state from
 `SecureRandom`; the code in its answer, taken only at the redirect URI and only for its attempt, the
