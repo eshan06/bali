@@ -8,6 +8,14 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **The company's name is written Bali Focus Inc., with no comma, and the website's hero loses its line on
+  the states' phone laws (the owner).** The owner sent a screenshot of the name as the company writes it, "Bali Focus Inc.",
+  which is how the privacy policy, the terms and the website's copyright line already give it (the 2026-11-11 entry below),
+  so nothing changes, and that entry's one-word change for a name written otherwise isn't needed. The same message, with a
+  screenshot of the hero's line "At least 40 states and D.C. now require schools to restrict student phone use. See phone
+  laws by state", said "remove this": canvas version 50 takes the line out, and `demo3` follows (its README). The
+  phone-laws page keeps its own line, and the home page's research section and every page's footer still link to it.
+
 - **2026-11-12** — **The owner's answers to AN13's Q2 and Q3 (the owner, about 18:18 UTC: "Yes, take both"): pdfium parses a
   deck in an isolated service process, and the deck drawn reaches it from memory, on Android 10 through a file deleted the moment
   it opens.** Both are the conductor's recommendations (AN13a's entry, below), relayed by the conductor. AN13f builds both and
