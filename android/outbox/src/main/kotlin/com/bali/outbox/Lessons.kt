@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -161,9 +162,13 @@ class Lessons(
             follow()
         }
 
-    /** Bali's screen in front or behind: the poll runs only in front (the owner's ruling, #330), and again as Bali comes back. */
+    /**
+     * Bali's screen in front or behind: the poll runs only in front (the owner's ruling, #330), and again as Bali comes back. The
+     * value it already has changes nothing, so no second poll starts and no read is made of it.
+     */
     suspend fun setInFront(front: Boolean) =
         alone {
+            if (front == this.front) return@alone
             this.front = front
             following?.let {
                 it.poll?.cancel()
@@ -355,7 +360,9 @@ class Lessons(
 
     /**
      * The lesson's bell, [at], slept towards by the phone's clock ([Screen.bell]): there the lesson is followed afresh, so its poll
-     * stops and the card goes, Bali reached or not (Q7; L8c), and a later read with the bell moved follows it again. None: none.
+     * stops and the card goes, Bali reached or not (Q7; L8c), and a later read with the bell moved follows it again. None: none. A
+     * bell let go, by a later ring or at the run's end, follows nothing, even woken as it was let go: each let-go is a ring under
+     * [alone], so the bell's own stretch there sees it.
      */
     private fun ring(at: Instant?) {
         if (at == ringsAt) return
@@ -365,8 +372,10 @@ class Lessons(
             at?.let { rings ->
                 scope.launch {
                     Screen.bell(rings, looks, clock)
+                    val rung = coroutineContext.job
                     alone {
-                        if (ringsAt == rings) ringsAt = null
+                        if (!rung.isActive) return@alone
+                        ringsAt = null
                         follow()
                     }
                 }
