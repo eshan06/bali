@@ -113,7 +113,8 @@ hosted-UI domain and the phone's client id; neither is secret.
 checked with a public authorize request (`bali://auth/callback`, scope
 `openid email profile`, PKCE S256 → the hosted sign-in page):
 
-- **Hosted-UI domain:** `https://bali-dev.auth.us-east-1.amazoncognito.com`
+- **Hosted-UI domain:** `https://bali-dev.auth.us-east-1.amazoncognito.com`, on managed login
+  since 2026-11-12 (`infra/cognito/managed-login/README.md`)
 - **The phone's app client:** `bali-ios-dev-public`, id `7u6trs6gv805oi35ima29em6oe` — a public client, no secret. The first one, `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`), was made with a client secret, which Cognito's token endpoint then demands (`invalid_client`) and a phone must never hold; a secret cannot be removed, so it was replaced (2026-09-26, the device check). It allows `aws.cognito.signin.user.admin` too (the owner, 2026-10-05, for C4's `DeleteUser`; an authorize request asking for it reaches the login page)
 - **The portal's app client:** `bali-web-dev`, id `2f0vj9o545imu4qth5phanki1v` (created 2026-10-04): a public SPA client with PKCE and no secret (`docs/WEB.md`); access and ID tokens a day (the owner, 2026-10-13). Dev's `AUTH_AUDIENCE` is the phone's id plus this one, `7u6trs6gv805oi35ima29em6oe,2f0vj9o545imu4qth5phanki1v`, and the demo's below
 - **The demo's app client:** `bali-ios`, id `6qcvcp0ubqmb8gunkt1d6dpkeo`, which `npm run demo`'s remote run signs its actors in through (`USER_PASSWORD_AUTH`, `apps/api/scripts/demo/cognito.ts`; `DEMO_COGNITO_CLIENT_ID`). Dev's API accepted its tokens on 2026-10-14 (PV8's screenshots), and it accepts only the clients `AUTH_AUDIENCE` lists (`apps/api/src/auth/verify.ts`), so dev's list holds it too: keep this client
@@ -149,7 +150,9 @@ own pool (hosting decision 2). None of these is secret:
   read from AWS that day; `gmail.com` for the owner's testing and for pilot students with no
   Vanderbilt address). The API's `TZ` is `America/Chicago`.
 - **Hosted-UI domain:** `https://us-east-1c55e0fhx8.auth.us-east-1.amazoncognito.com`
-  (Hosted UI classic). Password policy: minimum 12 characters.
+  (Hosted UI classic until the owner switches it to managed login, both clients' styles in place
+  since 2026-11-12: `infra/cognito/managed-login/README.md`). Password policy: minimum 12
+  characters.
 - **The portal's app client:** `bali-web`, id `36meb9r9h0cdrt2a1schcv9abs` — a
   public SPA client, PKCE, SRP and refresh only; callback
   `https://app.getbali.app/auth/callback`, sign-out `https://app.getbali.app/login`, with the
@@ -172,8 +175,8 @@ How a pool's phone client is made (as production's was; for a rebuild). In the A
 console → Cognito → that user pool:
 
 1. **Hosted-UI domain**, if the pool has none: **Branding → Domain → Create
-   Cognito domain**, with a prefix such as `bali`, and choose **Hosted UI
-   (classic)**, which needs no style. The domain is
+   Cognito domain**, with a prefix such as `bali`, and choose **Managed login**,
+   on the pool's Essentials plan or above. The domain is
    `https://<prefix>.auth.<region>.amazoncognito.com`, the pool's one — the
    portal's `NEXT_PUBLIC_COGNITO_DOMAIN` too.
 2. **The phone's app client.** **Applications → App clients → Create app
@@ -188,6 +191,9 @@ console → Cognito → that user pool:
      client allows only `openid`, `email` and `phone`. The app asks for all four
      (C4a: Cognito's `DeleteUser` needs the last), so a client without one
      refuses every sign-in from the phone.
+   - **Its style,** on a managed-login domain: Bali's, by
+     `infra/cognito/managed-login/README.md` ("A new client"). Without it the
+     client shows Cognito's default look, or no page at all if the CLI made it.
 3. **Refresh-token expiration.** On the client's **App client information →
    Edit**, raise **Refresh token expiration** above Cognito's 30-day default —
    365 days, say. Cognito refusing the refresh token is the app's one

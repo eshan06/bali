@@ -1,19 +1,22 @@
 // Draws the sign-in page's two logos, logo-dev.png and logo-prod.png: the Bali lockup of
 // docs/DESIGN.md (the mark, bare, beside "Bali" in Instrument Sans 600), dev's with a Dev tag so a
-// tester knows which pool they are on. A transparent 140 x 32 px canvas drawn at 3x, so it is
-// sharp on a phone when Cognito shows it at 140 px (hosted-ui.css, .logo-customizable).
+// tester knows which pool they are on. The lockup is drawn on a transparent 140 x 32 px canvas at
+// 3x, then set on a 4:1 one, 420 x 105, since Cognito takes a form logo between 1:1 and 4:1
+// (README.md beside this file): 4 transparent rows above it and 5 below, its pixels unchanged.
 //
 // The mark's one source is apps/web/public/icon.svg (its stone-50 tile dropped, as the
 // B artboards draw the lockup). The font comes from Google Fonts at draw time, Chromium from the
 // Playwright CLI's own package (never a dependency; docs/DESIGN.md). Run from the repo:
 //
 //   npx --yes playwright@1.63.0 install chromium   # once
-//   node infra/cognito/hosted-ui/make-logo.mjs
+//   node infra/cognito/managed-login/make-logo.mjs
+import { Buffer } from 'node:buffer';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { crc32, deflateSync, inflateSync } from 'node:zlib';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..', '..', '..');
@@ -37,6 +40,44 @@ const mark = icon.replace(/<rect[^>]*\/>\s*/, '').replace(
 if (/<rect/.test(mark) || !/viewBox="222 222 580 580"/.test(mark)) {
   throw new Error('apps/web/public/icon.svg changed shape; update make-logo.mjs to match');
 }
+
+// The screenshot, 420 x 96, on the 4:1 canvas. A PNG's first row is filtered against a row of
+// zeros, so transparent rows of zeros added above and below leave every row as it was.
+const ABOVE = 4;
+const BELOW = 5;
+const chunk = (type, data) => {
+  const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+  const out = Buffer.alloc(8 + body.length); // its length, its type and data, its CRC
+  out.writeUInt32BE(data.length, 0);
+  body.copy(out, 4);
+  out.writeUInt32BE(crc32(body), 4 + body.length);
+  return out;
+};
+const fourToOne = (png) => {
+  const header = Buffer.from(png.subarray(16, 29)); // IHDR's data: width, height, then the format
+  if (header[8] !== 8 || header[9] !== 6 || header[12] !== 0) {
+    throw new Error("Chromium's screenshot is no longer an 8-bit RGBA PNG; update make-logo.mjs");
+  }
+  const row = 1 + header.readUInt32BE(0) * 4; // a filter byte, then four bytes a pixel
+  const idat = [];
+  for (let at = 8; at < png.length; at += 12 + png.readUInt32BE(at)) {
+    if (png.toString('latin1', at + 4, at + 8) === 'IDAT') {
+      idat.push(png.subarray(at + 8, at + 8 + png.readUInt32BE(at)));
+    }
+  }
+  const rows = Buffer.concat([
+    Buffer.alloc(ABOVE * row),
+    inflateSync(Buffer.concat(idat)),
+    Buffer.alloc(BELOW * row),
+  ]);
+  header.writeUInt32BE(header.readUInt32BE(4) + ABOVE + BELOW, 4);
+  return Buffer.concat([
+    png.subarray(0, 8),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(rows)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+};
 
 const page = (dev) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -69,7 +110,7 @@ try {
     if (width > 140)
       throw new Error(`the ${env} lockup is ${width} px wide, over the 140 px canvas`);
     const path = resolve(here, `logo-${env}.png`);
-    await tab.screenshot({ path, omitBackground: true });
+    writeFileSync(path, fourToOne(await tab.screenshot({ omitBackground: true })));
     console.log(`${path}  ${statSync(path).size} bytes`);
   }
 } finally {

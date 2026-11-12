@@ -8,7 +8,8 @@ collects), plus Bali's design tooling at the end.
 **Scope: user-facing UI only.** That means the portal's pages and components
 (`apps/web/src/app`, `apps/web/src/components`), the student app's screens
 (`ios/Bali/UI`), the shield (`ios/BaliShield`), the Cognito sign-in page (its
-logo and CSS; D2d, `docs/PLAN-ARCHIVE.md`), a future demo site, and **user-facing
+managed-login style and logo, `infra/cognito/managed-login/`, since 2026-11-12; its words are
+AWS's), a future demo site, and **user-facing
 strings wherever they live**. Several live outside those folders (found by
 grep, 2026-10-05; a new one joins this list). In
 `ios/BaliOutbox/Sources/BaliOutbox/`: `ShieldWords.swift`; the `words` in
@@ -63,7 +64,11 @@ screen designs win over both for the screens they draw: D1 for the student app
 question, the intro, the gap's fallback, Your name and Home in no class (the owner, 2026-10-06
 and 2026-10-07; drawn in D1's look), with a teacher's account's screen drawn there as intermediate
 states of sign-in (its Teacher row, 2026-11-07), and for
-the portal and the student web the canvas below. Changing any of
+the portal and the student web the canvas below. The
+[Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB) (the owner, 2026-11-12)
+wins over those two for the app's Sign in screen and the portal's sign-in page, each opening
+Cognito's managed login, which PLAN's next steps rebuild from it; its boards of AWS's page draw
+the managed-login style itself (`infra/cognito/managed-login/`). Changing any of
 it is the owner's call, never a side effect of a PR: every user-facing screen
 is designed in Claude Design and approved by the owner before it is built
 (CLAUDE.md, Working rules).
@@ -592,7 +597,7 @@ Use the semantic tokens; the primitives (green, stone, orange, blue, red,
 every text field's edge, 3:1 against the card, the page and the field's own
 well (WCAG 1.4.11), where `border-default` is 1.3:1. A refused field's edge
 stays `text-primary`. Cognito's sign-in fields take it too
-(`infra/cognito/hosted-ui/hosted-ui.css`, PB2a).
+(`infra/cognito/managed-login/settings.json`, whose test holds it at 3:1).
 `globals.css` holds it, pinned by `tokens.test.ts`, until the design system's
 next export carries it (`bali-tokens.json` is that export, byte for byte, never
 edited by hand).
