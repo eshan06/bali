@@ -31,6 +31,9 @@ const COULDNT_OPEN = "Bali couldn't open the sign-in page. Try again.";
 const before = (a: Node, b: Node) =>
   (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 
+/** The card, as a screen reader offers it: a region named by its title. */
+const card = () => screen.getByRole('region', { name: 'Sign in to Bali' });
+
 describe('the sign-in page', () => {
   it('says the board’s words in its order: Bali and its line, the card, the line for students, the public pages', () => {
     render(<LoginPage />);
@@ -50,6 +53,10 @@ describe('the sign-in page', () => {
     expect(screen.getAllByRole('heading').map((h) => [h.tagName, h.textContent])).toEqual([
       ['H1', 'Sign in to Bali'],
     ]);
+    // The card is a region a screen reader names by its title.
+    expect(card().textContent).toBe(
+      'Sign in to BaliTeachers and students sign in here to see their classes.Sign in',
+    );
     // Sign in is its one button: no Sign up, by design (students sign up in the app).
     expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Sign in']);
     const links = within(screen.getByRole('navigation', { name: 'Help and policies' }))
@@ -104,7 +111,7 @@ describe('the sign-in page', () => {
     expect(alert.textContent).toBe(COULDNT_OPEN);
     expect(before(signIn, alert)).toBe(true);
     // In the card with Sign in, so it reads as Sign in's.
-    expect(alert.closest('section')).toBe(signIn.closest('section'));
+    expect(card().contains(alert)).toBe(true);
 
     // Pressed again: the line goes as the sign-in starts again.
     await user.click(signIn);
@@ -130,6 +137,6 @@ describe('the sign-in page', () => {
     const signIn = screen.getByRole('button', { name: 'Sign in' });
     expect(line.textContent).toBe(said);
     expect(before(line, signIn)).toBe(true);
-    expect(line.closest('section')).toBe(signIn.closest('section'));
+    expect(card().contains(line)).toBe(true);
   });
 });
