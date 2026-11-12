@@ -281,6 +281,39 @@ class LockServiceTest {
         }
 
     @Test
+    fun aStartThatFailsTakesOffTheLockTheLastRunLeftOnAndALaterStartThatWorksPutsItBackFromTheOutboxsStanding(): Unit =
+        runBlocking {
+            // AN10a's santa (reviewer B), the conductor's call for AN10c: a start that fails runs no enforcer, so a lock the last
+            // run left on would hold with no Emergency Unlock the phone can offer or record, until the student switched Bali's
+            // service off in Settings. It comes off: its file gone, the service covering nothing. A later start that works puts
+            // it back from where the outbox says the phone stands, as a relaunch does.
+            switchOn()
+            tapIn()
+            until { enforcer.updates.value.takeIf { it.locked && it.until == view.endsAt } }
+            // The run ends as Bali stops, its lock left on to the bell.
+            end()
+            val file = File(context.noBackupFilesDir, LOCK_FILE)
+            assertTrue(file.exists())
+            assertEquals(view.endsAt, app.lock.until)
+            app.begin { throw IOException("the disk refused the outbox") }
+            assertFalse(file.exists())
+            assertNull(app.lock.until)
+            assertEquals("", until { listening()?.takeIf { it.isEmpty() } })
+            // Tried again, a start that works, over the outbox the last run left, as a relaunch opens it: on again to the bell.
+            outbox = Outbox.open(Room.databaseBuilder(context, OutboxDatabase::class.java, FILE))
+            app.begin { outbox }
+            try {
+                val claim = until { app.running.value?.enforcer?.updates?.value?.takeIf { it.locked } }
+                assertEquals(view.endsAt, claim.until)
+                assertTrue(file.exists())
+                assertEquals(WIDE, until { listening()?.takeIf { it == WIDE } })
+            } finally {
+                // That run is the app's, in its scope: ended before the outbox closes (the engine rig's teardown, AN5c).
+                app.running.value?.job?.cancelAndJoin()
+            }
+        }
+
+    @Test
     fun baliComingToTheFrontReadsTheTruthAndRunsTheCheckWhichFindsTheSwitchOff(): Unit =
         runBlocking {
             // In a session, the service never switched on: no screen heard and the list unchanged, so no wake checks
