@@ -31,9 +31,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 
-// Which screen the app shows (C1a): the router halves of BaliOutbox's ScreenTests, and BellRedrawTests' timeSet. iOS's
-// permission is the lock's switch here (approved its On, denied its Off, not determined its Starting) and its shields the lock
-// (Q3). The words are AN10d's to AN10h's; waitingWords and ridersWiring read iOS's views and have no twin; MoveTests are AS2's.
+// Which screen the app shows (C1a): the router halves of BaliOutbox's ScreenTests, AppTests' `offersSignOut`, and
+// BellRedrawTests' timeSet, with a test of its own for a clock set short of the bell or back. iOS's permission is the lock's
+// switch here (approved its On, denied its Off, not determined its Starting) and its shields the lock (Q3). The words are
+// AN10d's to AN10h's; waitingWords and ridersWiring read iOS's views and have no twin; MoveTests are AS2's.
 
 /**
  * The router's answer for what the phone knows at [now]: no intro Sign up shows, signed in, kept from the last run unless
@@ -904,7 +905,11 @@ class BellRedrawTest {
     fun sleptTowardsByThePhonesOwnClockAndLookedAtAgainWheneverAndroidSaysTheTimeWasSetAClockSetPastTheBellEndsTheWaitAtOnce(): Unit =
         runBlocking {
             // The bell reached by sleeping ends it, by the phone's clock, and so does a cancel, once it is asleep, its sleep let go.
-            withTimeout(patience) { Screen.bell(Instant.now().plusMillis(50), emptyFlow()) }
+            val slept = PhoneClock()
+            val rang = scope.async { Screen.bell(at(60), emptyFlow(), slept) }
+            eventually { slept.sleeps == listOf(Duration.ofSeconds(60)) }
+            slept.advance(Duration.ofSeconds(60))
+            withTimeout(patience) { rang.await() }
             val asleep = PhoneClock()
             val cancelled = scope.launch { Screen.bell(at(3600), emptyFlow(), asleep) }
             eventually { asleep.sleeps.size == 1 }

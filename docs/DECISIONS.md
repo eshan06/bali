@@ -45,16 +45,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
     Focus, by the lock's own rule (`shieldedUntil`), shows whatever the switch reads, before any pass, as on iOS.
   - **`SyncState.teacher`** (additive): a teacher's account as `GET /v1/me` last named it, where iOS reads the role at each
     use. The router reads it, and AN12 registers no device token while it holds.
-  - **`bell` takes the time-set signals as a `Flow<Unit>`** (AN10c's broadcast) and sleeps by the `SyncClock` it's given;
-    it follows the flow before its first read of the clock, as iOS registers its observer first, and throws once
-    cancelled, where iOS's returns. Its test's clock sleeps by the time that passes, as the phone's does: the rig's
-    `TestClock` wakes a sleep its clock is turned past, which would hide a change never looked at.
+  - **`bell` takes its looks as a `Flow<Unit>`** (AN10c's: the time-set broadcast, and the screen coming on, below) and
+    sleeps by the `SyncClock` it's given; it follows the flow before its first read of the clock, as iOS registers its
+    observer first, and throws once cancelled, where iOS's returns. Its test's clock sleeps by the time that passes, as the
+    phone's does: the rig's `TestClock` wakes a sleep its clock is turned past, which would hide a change never looked at.
   - **`bell` aims its sleep afresh at each look** (this step's call, found in the port): iOS's sleeps out the span it
     began with, so a clock set forward short of the bell asks the router again late by the change, until then showing
-    the class's screen (Unlocked, say) past the bell by the phone's clock. Android's, at each time-set signal, sleeps
-    toward the bell as the clock reads then, so the router is asked again at the bell by the phone's clock, as the rule
-    says. For the owner, the iPhone's twin has that gap, the Mac's change: it needs a student to set the clock forward in
-    class, and only the screen is late, never the lock, which keeps its own end.
+    the class's screen (Unlocked, say) past the bell by the phone's clock. Android's, at each look, sleeps toward the bell
+    as the clock reads then, so the router is asked again at the bell by the phone's clock, as the rule says. For the
+    owner, the iPhone's twin has that gap, the Mac's change: it needs a student to set the clock forward in class, and
+    only the screen is late, never the lock, which keeps its own end.
   - **`offersSignOut` is the screen's** (iOS's is `Phone`'s, of the screen shown): Me, Your name and the teacher's screen.
     **The router's answer is `Screen.Shown`**, iOS's tuple of the screen and its tab bar.
 
@@ -71,11 +71,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `waitingWords` and `ridersWiring`, which read iOS's views. Every word and card (Home's, Waiting's) is AN10d's to AN10h's.
   Tried, each failing by name, then reverted: the home a standing not read keeps not shown over the last run's lock (4
   tests); Focus by the standing and a tap alone, a countdown over nothing locked past the bell or the cap (13); the bell
-  not looked at again at a time-set signal, and never ended by its sleep (both bell tests, each), and iOS's sleep kept on
-  its first span (the new one); a teacher's account shown a
-  student's screens (4); "approved" claimed after `switchedOff` (Q3's case); a problem said as a string (`storage`), and
-  every problem flattened into one (8); starting never routed as on once read on (2, `settles` among them); `rings` to the
-  millisecond (2); `keepsOpened` blind to a tap; and Home offering Sign out.
+  not looked at again at a time-set signal, never ended by its sleep, and deaf to a cancel (both bell tests, each), and
+  iOS's sleep kept on its first span (the new one); a teacher's account shown a student's screens (4); "approved" claimed
+  after `switchedOff` (Q3's case); a problem said as a string (`storage`), and every problem flattened into one (8);
+  starting never routed as on once read on (2, `settles` among them); `rings` to the millisecond (2); `keepsOpened` blind
+  to a tap; and Home offering Sign out.
 
   **For AN10b to AN10h and Phase 10:** the `Router` calls `Screen.choose` with `Account.State`'s `signedIn`,
   `signedInThisRun`, `age`, `deleting.shows` and `sync`, the enforcer's `updates`, `everApproved` and the notes; it
