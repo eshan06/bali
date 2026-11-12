@@ -10,7 +10,8 @@ import type { ComponentProps } from 'react';
  * a class (its tokens name no hover shade, so it has none). Dimmed to 55 %, as v2.css draws it,
  * while disabled, or while busy but kept focusable with `aria-disabled`. Small (PV6, the class
  * page's Reports, Copy and New code) is 34 px tall, 14 px in, its label 13.5/18; large (PV15, the
- * sign-in's Sign in and its callback's Back to sign in) 48 px tall, its label 16/20.
+ * sign-in callback's Back to sign in) 48 px tall, its label 16/20; the pill (the sign-in redesign,
+ * 2026-11-12: the sign-in page's Sign in) 52 px tall and round, 24 px in, its label 16/20.
  */
 const VARIANTS = {
   primary:
@@ -21,9 +22,10 @@ const VARIANTS = {
 };
 
 const SIZES = {
-  md: 'h-10 px-4.5 text-button',
-  sm: 'h-8.5 px-3.5 text-button-sm',
-  lg: 'h-12 px-4.5 text-button-lg',
+  md: 'h-10 rounded-sm px-4.5 text-button',
+  sm: 'h-8.5 rounded-sm px-3.5 text-button-sm',
+  lg: 'h-12 rounded-sm px-4.5 text-button-lg',
+  pill: 'h-13 rounded-full px-6 text-button-lg',
 };
 
 type Variant = keyof typeof VARIANTS;
@@ -35,7 +37,7 @@ export function buttonClass(
   className = '',
   size: Size = 'md',
 ): string {
-  return `inline-flex ${SIZES[size]} cursor-pointer items-center justify-center gap-2 rounded-sm whitespace-nowrap transition-colors disabled:cursor-default disabled:opacity-55 aria-disabled:cursor-default aria-disabled:opacity-55 motion-reduce:transition-none ${VARIANTS[variant]} ${className}`;
+  return `inline-flex ${SIZES[size]} cursor-pointer items-center justify-center gap-2 whitespace-nowrap transition-colors disabled:cursor-default disabled:opacity-55 aria-disabled:cursor-default aria-disabled:opacity-55 motion-reduce:transition-none ${VARIANTS[variant]} ${className}`;
 }
 
 /** A button's own props, its `ref` included (React 19 passes it as one), so focus can come back. */

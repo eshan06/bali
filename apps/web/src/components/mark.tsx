@@ -19,6 +19,49 @@ export function Mark({ size = 24 }: { size?: number }) {
 }
 
 /**
+ * The session ring as art (the sign-in redesign's, the owner, 2026-11-12; the app's Sign in draws
+ * the same): the mark's green-200 track and green-600 arc, round-capped from the top and 62 % of the
+ * way round, on a white disc in one stone-200 hairline circle. Never a countdown, and no numbers, so
+ * it never looks like a real session (the owner, 2026-11-12). Its board's geometry, 390 × 340
+ * around (195, 170): the hairline r 164 at 1.5, the disc r 132, the ring r 118 stroked 22, the arc
+ * 460 of its 742. As wide as its box, at that shape; decorative, so hidden from readers.
+ */
+export function SessionRingArt() {
+  return (
+    <svg viewBox="0 0 390 340" aria-hidden="true" className="block h-auto w-full">
+      <circle
+        cx="195"
+        cy="170"
+        r="164"
+        fill="none"
+        stroke="var(--bali-border-default)"
+        strokeWidth="1.5"
+      />
+      <circle cx="195" cy="170" r="132" fill="var(--bali-surface-card)" />
+      <circle
+        cx="195"
+        cy="170"
+        r="118"
+        fill="none"
+        stroke="var(--bali-green-200)"
+        strokeWidth="22"
+      />
+      <circle
+        cx="195"
+        cy="170"
+        r="118"
+        fill="none"
+        stroke="var(--bali-green-600)"
+        strokeWidth="22"
+        strokeLinecap="round"
+        strokeDasharray="460 742"
+        transform="rotate(-90 195 170)"
+      />
+    </svg>
+  );
+}
+
+/**
  * v2's bar over a page with no side menu (v2.css's `.topbar`: Help, the policy pages and the
  * invite page): white, 60 px tall with its hairline, Bali 32 px in, 16 on a phone, and whatever
  * the page holds at its other end.

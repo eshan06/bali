@@ -116,6 +116,8 @@
   --radius-item: 8px; /* a menu item, a segment of the length picker */
   --radius-frame: 12px; /* a table's box, a slide, Present's join code */
   --radius-live: 16px; /* Home's live card, the student's lesson card */
+  /* The sign-in redesign's (the owner, 2026-11-12), as its board draws it, portal-only. */
+  --radius-sign-in: 28px; /* the sign-in page's card */
 
   --shadow-*: initial;
 
@@ -280,7 +282,7 @@
   --text-cell-sub--font-weight: 400;
 
   /* The entry pages' two (PV15), as v2.css draws them and §1's facts don't list: an entry page's
-     card title ("Sign in to Bali") and the sign-in's 48 px button's label. */
+     card title and the large buttons' label (the callback's 48 px button, the sign-in's pill). */
   --text-entry-title: 20px;
   --text-entry-title--line-height: 26px;
   --text-entry-title--font-weight: 600;
@@ -312,6 +314,17 @@
   --text-card-name: 17px;
   --text-card-name--line-height: 22px;
   --text-card-name--font-weight: 600;
+
+  /* The sign-in page's two (the sign-in redesign, the owner, 2026-11-12), as its board draws them:
+     the wordmark, Bali over the art, and the art's line, "Quiet until the bell.". */
+  --text-wordmark: 72px;
+  --text-wordmark--line-height: 76px;
+  --text-wordmark--font-weight: 600;
+  --text-wordmark--letter-spacing: -0.04em;
+  --text-tagline: 40px;
+  --text-tagline--line-height: 46px;
+  --text-tagline--font-weight: 600;
+  --text-tagline--letter-spacing: -0.02em;
 }
 
 @theme inline {
@@ -388,6 +401,9 @@
   /* The correct answer on the projector once students are shown it (L7, part 2): its fill, the
      primitive v2.css's `.p-opt.right` draws with; its 2 px edge is the correct bar's green. */
   --color-option-right: var(--bali-green-50);
+  /* The sign-in page's art panel, behind Bali and the session ring (the sign-in redesign,
+     2026-11-12), the primitive its board fills it with. */
+  --color-art-panel: var(--bali-green-50);
 }
 
 /* §6: the three shadows, by name. */
@@ -399,6 +415,11 @@
 }
 @utility shadow-3 {
   box-shadow: var(--bali-shadow-3);
+}
+/* And the sign-in page's card (the sign-in redesign, 2026-11-12), as its board draws it: the
+   shadows' warm black at 6 %, as wide as shadow-3's first layer. */
+@utility shadow-sign-in {
+  box-shadow: 0 8px 24px rgba(33, 28, 21, 0.06);
 }
 
 /*
