@@ -8,6 +8,110 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-11** — **AN10d, Home's words, Tap in, and the sign-in's and the start's words: BaliOutbox's Join.swift and
+  Screen.swift words and SyncEngine.swift's `tapIn` in Kotlin, each a function of its type, and the guard over every Android
+  word (the conductor's Q10 built, and this step's own calls, marked, each awaiting the owner's look; AN10d, #566).** The
+  owner is asleep and said to take the recommended option on every regular call, so each call here is the conductor's or
+  this step's, for the owner to look at.
+
+  **Where it lives:** `outbox`, beside each type. `Join.kt`: `Joining.words`, iOS's, and `Joining.Failure.words`;
+  `Joining.Failure` is a sealed type now, `NoClass` (AN9d's result and reason) and `NotStarted`. `Screen.kt`: the start's
+  (`Problem.words`); Home's, a stuck tap's kind (`StuckTap`, `SyncState.stuckTap`) with `refusedTapWords`, `waitingCard`,
+  `noClassesCard` with `Account.State.noClassesCard`, and `meWords`; a scan's (`BlockRead.words`); the sign-in's
+  (`SignInError.words`). `SyncEngine.kt`: `tapIn` and its answer, `TapFailure` (`NoBlock`, `NotKept`, `NotStarted`), with
+  its words. The guard: `WordsTest`. `android/app` is unchanged, and no screen is built: they are AS2's and AS4's.
+
+  **The words:** each iOS's, word for word, its straight apostrophes too, but two from AS0's canvas: a phone with no NFC,
+  "This phone can't read Bali blocks, so it can't tap in. Ask your teacher." (the Words board's "Home, no NFC"), and NFC
+  off, Android's alone, "Turn on NFC in Settings to read your teacher's block." (AS4's NFC sheet, AS4-Tap-nfcoff, whose
+  title "NFC is off" and button "Open NFC settings" are the sheet's own, AS4's). The start's line names its cause as AS2's
+  Storage board draws it (below). No line needed drawing: each is iOS's or a board's. no-ai-slop's Edit job over the two
+  canvas lines and the start's, checked against `eval.md`: each passes as drawn.
+
+  **The conductor's call, built (Q10):** Android's three ways a sign-in page doesn't open (another sign-in page open, the
+  Auth Tab's own end with its code, no browser to open it) each say iOS's two lines, keyed on the page. The dropped
+  answer's line is AS2's.
+
+  **This step's calls, each awaiting the owner's look:**
+  - **A phone whose engine hasn't started is a type now**, iOS's `Joining.notStarted` ("Bali is still starting. Try again in
+    a moment."): `Joining.Failure.NotStarted`, so Join's failure holds it as iOS's does, and `TapFailure.NotStarted`, each
+    the app's to give, as AN5e's `UnlockFailure.NotStarted` is. AN9f's note gave the type to AN10g; Join.swift's lines 20 to
+    22 are this step's twin and Tap in says it too, so it comes here. AN10e to AN10h add a `NotStarted` to each failure of
+    theirs the app gives with no engine (a reason's, Back to focus, Me's name, Leave, Sign out, History's), each said by
+    `Joining.Failure.NotStarted.words`.
+  - **A stuck tap's kind is a type** (`StuckTap`: `UnknownBlock`, `Refused`, `StillSending`): iOS's `refusedTapWords` split
+    into its rule (`stuckTap`) and its words (`StuckTap.words(inNoClass)`), so the guard reads every case;
+    `refusedTapWords` says it as iOS's does.
+  - **Tap in's answer is a type** (`TapFailure`): the scan's read said in its own words (`NoBlock(read)`,
+    `BlockRead.words`), the tap the file refused (`NotKept`, iOS's `BlockRead.notKept`), or no engine. Its words are none
+    only for a read `tapIn` never wraps, a block's code or a scan closed.
+  - **The start that failed names its cause briefly:** a file's error (an `IOException`) by its message, as the Storage board
+    draws it ("disk I/O error"), anything else by its type alone, never empty, where iOS's line puts its error whole
+    (`\(error)`). So no other text an exception carries reaches a student's screen (santa's reviewer B: the start catches
+    whatever making or starting the engine throws, wider than iOS's catch of the outbox's open, so a later change could
+    put a decoding error quoting its input there). SQLite's own error is named by its type: on a phone its class is a
+    typealias of Android's (`androidx.sqlite`'s Android artifact has no class of that name), so an `is` in `outbox` would
+    pass the JVM's tests and could fail on a phone, as AN7g's regular expressions did. Said plainly: a support request
+    gets the type, and the message only for a file's error; the Debug readout names both.
+  - **Home's empty state reads the account** (`Account.State.noClassesCard`, keyed on `everInClass`), so a screen can't pass
+    another student's flag; `SyncState.noClassesCard(everInClass)` stays iOS's twin.
+  - **Waiting's card with the class-started alert's check-in** ("You're tapped in. Your apps lock in a few seconds, as long
+    as Bali is open.", AS4-Waiting-homecard) waits for AN12, whose push brings `checkingIn` to the engine's state, and
+    PushTests' word checks with it. Today the card has its one line.
+  - **DESIGN.md's Android section names where the words live**, as its scope asks of a new place.
+
+  **The guard** (`WordsTest`): every word function read for every case of the types it keys on, never a list of the words:
+  each sealed type's samples checked against the cases it declares, so a case given a word but no sample fails by name, and
+  a case with no word stops its function's `when` compiling; every enum's entries; every status from 100 to 599 and none;
+  every reason and none; every standing, with the classes not read, read as none and read as one. None names Screen Time,
+  iOS, iPhone, FaceTime or Emergency SOS, or holds an em-dash or "!". Each later AN10 step adds its words to `everyWord`.
+
+  **The tests,** on the JVM (no time is formatted here): JoinTests' `words`, and the word checks AN9d left (not found, the
+  400's and the 401's, no answer, no token, an answer that doesn't decode, the join's gone and offline, the renewal's 401);
+  ScreenTests' `homeWords` (NFC off's line new), `refusedTapInNoClass`, `retriedTap`, `refusalKept`, `refusedTap`,
+  `refusedTapNewest` and `words` (Q10's three `NotOpened`s new), and the cards of `homeWaiting` and `inNoClass`; TapInTests'
+  three (NFC off among the scans that record nothing); DroppedWaitTests' `dropped`, its card; and AppTests' `everInClass`,
+  its cards (RouterTest). New: the start's words, Home's empty state read from the account, and the guard. C3c's card
+  (`inSessionCard`, Screen.swift's lines 363 to 388) and its checks in `homeWaiting`, `inNoClass` and `startAfterExpiry` are
+  AN10f's. Tried, each failing by name, then reverted: a line iOS has and the board keeps changed (`homeWords`); iOS's "This
+  iPhone can't read Bali blocks…" back (`homeWords`, and the guard: "BlockRead.words names iPhone"); FaceTime in the
+  sign-in's line (`words`); an em-dash, and a "!" (`homeWords`, and the guard: "holds an em-dash", "holds an exclamation
+  mark"); a `TapFailure` case with no word (the compile: "'when' expression must be exhaustive. Add the 'Added' branch"),
+  then with a word and no sample (the guard: "TapFailure's cases"); an unknown block said with another refusal's line (5:
+  `refusedTap`, `refusalKept`, `refusedTapNewest`, `inNoClass` and TapInTests' second); an older refusal's line over the
+  newest (`refusedTapNewest`, TapInTests' second and third); the empty state blind to `everInClass` (`inNoClass`,
+  RouterTest's), and the account's flag left out (the account's test, RouterTest's); the sign-up page said as the
+  sign-in's (`words`); a 401 said as any other status (JoinTests' two); the cause in Kotlin's whole form, and any cause's
+  message shown (the start's, each); a tap the file refused said as made (TapInTests' first); and the waiting card said off
+  Waiting (`homeWaiting`, `inNoClass`, `dropped`).
+
+  **For AN10e to AN10h:** add each step's words to `WordsTest`'s `everyWord`, each type's cases through `each`; a failure
+  the app gives with no engine gets a `NotStarted`; C3c's card is AN10f's. **For AN12:** Waiting's card's second line,
+  with `checkingIn`. **For Phase 10:** AS4's Home says `refusedTapWords`, `waitingCard`, the account's `noClassesCard`,
+  `meWords` and `tapIn`'s `TapFailure.words`, its NFC sheet `BlockRead.words` beside its own title and buttons; Join says
+  `Joining.Failure.words`, the app setting `NotStarted` with no engine (iOS's AppTests); AS2's Sign in says
+  `SignInError.words(page)`, and its Storage screen `Problem.words` under "Bali couldn't start".
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble
+  :app:lint check` green, Android 10's API check with it, before santa's fix and on the final code; the core and outbox
+  suites run seven times, each green, once before santa's fix and six times on the final code (610 tests), AN9h's
+  AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run lint && npm test`
+  green, the portal's suite whole. No SDK package was installed: the build downloads none
+  (`android.builder.sdkDownload=false`), and the SDK's folders matched before and after.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: the start's cause shown word for word, with
+  no bound, from a catch wider than iOS's (reviewer B; taken, above, its break tried); DESIGN.md's scope paragraph
+  not pointing to Android's words (reviewer A; taken); and `TapFailure.NoBlock` taking any read, so its words are none for
+  the two reads `tapIn` never wraps (reviewer A; left, as said above). **For the owner (reviewer B), not a defect of this
+  step:** on Android a storage that won't open never reaches `Problem.StartFailed`. Room opens the file at its first read,
+  and every read the engine makes as it opens is inside `load()`'s `tried`, so that failure shows as the engine's own
+  (`Link.StorageFailed`), the engine running, where iOS's GRDB opens its file at the start. So the start's line, "Bali
+  couldn't open its storage on this phone (…)", the approved board's and iOS's, is reached only by another start failure,
+  none realistic today, which it would call a storage failure. [The recommendation, taken with the owner away: keep the
+  approved line; if the owner wants it exact, a later step words that path as the start's own failure, drawn on AS2's
+  row first.]
+
 - **2026-11-11** — **AN10c, the router in the app: the phone's notes in its own SharedPreferences, one `Router` for the
   app's life asked again at Android's time, zone and screen signals, a start's problem as a type with the last run's lock
   taken off, and Delete account's notes off the disk before it sends anything (the conductor's two calls from #563's and

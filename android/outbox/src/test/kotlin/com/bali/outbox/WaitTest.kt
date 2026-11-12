@@ -14,7 +14,7 @@ import kotlinx.coroutines.runBlocking
 
 /**
  * A wait the server has dropped is Home, never Waiting (#166): BaliOutbox's DroppedWaitTests, which screen shows by the router
- * ([shown]); the cards Home says are AN10d's.
+ * ([shown]), and the wait's card no longer said (AN10d); the class in session's card (C3c) is AN10f's.
  */
 class DroppedWaitTest : EngineFiles() {
     /** Class c, its session running until 4000 s after [t0], as `GET /v1/me` names it (C3c). */
@@ -23,7 +23,7 @@ class DroppedWaitTest : EngineFiles() {
     @Test
     fun aReadSayingNoTapOfTheStudentsWaitsItsSchoolDayOverOrTakenByAStartWhoseClassIsOverTooEndsTheWait(): Unit =
         runBlocking {
-            // Home, never Waiting; no wait said on it is AN10d's.
+            // Home, never Waiting, and no wait said on it (C3c's card none either: AN10f's).
             val rig = rig()
             rig.arm()
             rig.screenOn(Answer.me(null, classes = listOf(Answer.inClass("c")), armed = false, name = "Ana"))
@@ -31,12 +31,13 @@ class DroppedWaitTest : EngineFiles() {
             assertEquals(Standing.Out, state.standing)
             assertEquals(Screen.Shown(Screen.Home, true), shown(state))
             assertEquals(Screen.Shown(Screen.Home, true), shown(state, opened = listOf(Screen.Home)))
+            assertNull(state.waitingCard)
         }
 
     @Test
     fun aStartAfterTheTapsSchoolDayJoinsNothingTheReadNamesNoSessionAndNoTapWaitingAndTheClassInSession(): Unit =
         runBlocking {
-            // Home; its card, the class in session with Tap in (C3c), is AN10d's: the class's session, which it reads, is here.
+            // Home; its card, the class in session with Tap in (C3c), is AN10f's: the class's session, which it reads, is here.
             val rig = rig()
             rig.arm()
             rig.screenOn(Answer.me(null, classes = listOf(Answer.inClass("c")), armed = true))

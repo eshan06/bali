@@ -72,7 +72,7 @@ class Account internal constructor(
         /** The changes of who is signed in, counted: at each, the router's tab goes back to Home, as iOS's `signed` sends it. */
         val signIns: Int = 0,
     ) {
-        /** Whether the student `GET /v1/me` names has been listed in a class on this phone (#143): Home's empty state's words, AN10d's. */
+        /** Whether the student `GET /v1/me` names has been listed in a class on this phone (#143): which of Home's empty states ([noClassesCard]). */
         val everInClass: Boolean get() = inClass != null && sync?.me?.user?.id == inClass
     }
 

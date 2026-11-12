@@ -9,15 +9,15 @@ import java.text.BreakIterator
 import java.util.Locale
 
 // The Join screen (C2b), BaliOutbox's Join.swift: the code as codes are written, what it opens, and why a look or a join
-// gave no class, as types; and a screen's own call, renewed once on a 401 (`send`). Its rules alone: every word is AN10's,
-// the screen with its consent preview AS4's, and the calls the engine's (SyncEngine.kt's `lookUp` and `join`).
+// gave no class, as types, each said by its words (AN10d's); and a screen's own call, renewed once on a 401 (`send`). The
+// screen with its consent preview is AS4's, and the calls the engine's (SyncEngine.kt's `lookUp` and `join`).
 
 /**
  * The Join screen (C2b) as the phone keeps it: the code as the student typed it; what it opens, once looked up (`GET
  * /v1/join-codes/{code}`): the class, its teacher and whether they are in it already, which the preview shows, the consent
  * list beside it, before anything is joined; and why the last look or join gave no class ([failure], rule 5). A value
- * whose every step gives the next, as AN9a's `Deleting` is, where Swift's mutating calls change it; its words are AN10's.
- * BaliOutbox's `Joining`.
+ * whose every step gives the next, as AN9a's `Deleting` is, where Swift's mutating calls change it; what it says is
+ * [Failure.words]. BaliOutbox's `Joining`.
  */
 data class Joining(
     val code: String = "",
@@ -31,8 +31,17 @@ data class Joining(
      */
     val busy: Boolean = false,
 ) {
-    /** Why a look or a join gave no class: its answer's [result] and its error's [reason], which AN10's words key on, never its message. */
-    data class Failure(val result: SendResult, val reason: ApiErrorReason?)
+    /** Why a look or a join gave no class, each said in words of its own ([words]). */
+    sealed interface Failure {
+        /** The look or the join answered with no class: its answer's [result] and its error's [reason], which the words key on, never its message. */
+        data class NoClass(val result: SendResult, val reason: ApiErrorReason?) : Failure
+
+        /**
+         * The phone's engine hasn't started, so nothing was sent: said in place of a press that did nothing (rule 5; #106's
+         * review), the app's to give (BaliApp.swift's `lookUp` and `join`), never the engine's. iOS's `Joining.notStarted`.
+         */
+        data object NotStarted : Failure
+    }
 
     /** A whole code, which Continue looks up. */
     val complete: Boolean get() = code.length == CODE_LENGTH
@@ -85,11 +94,38 @@ data class Joining(
             val answer = send()
             return if (answer.result == SendResult.Status(401) && hooked(false, renewing)) send() else answer
         }
+
+        /**
+         * What the screen says when a look or a join gave no class (rule 5): the kind of failure in plain words, and the way on,
+         * keyed on the status and the error's [reason], never its message. Home's read of `GET /v1/me` says it too
+         * ([meWords]). BaliOutbox's `Joining.words`.
+         */
+        fun words(result: SendResult, reason: ApiErrorReason?): String {
+            if (reason == ApiErrorReason.ClassNotFound) return "No class has that code. Check it with your teacher and try again."
+            return when (result) {
+                SendResult.NetworkError -> "Can't reach the server. Check your connection and try again."
+                is SendResult.Status ->
+                    when (result.code) {
+                        401 -> "Bali couldn't check your sign-in. Try again."
+                        403 -> "This is a teacher's account, and only students can join a class."
+                        429 -> "Too many tries for now. Wait a minute, then try again."
+                        else -> "Something went wrong at Bali. Try again in a moment."
+                    }
+            }
+        }
     }
 }
 
+/** What the Join screen says of [Joining.failure], under the button that tries again (rule 5). */
+val Joining.Failure.words: String
+    get() =
+        when (this) {
+            is Joining.Failure.NoClass -> Joining.words(result, reason)
+            Joining.Failure.NotStarted -> "Bali is still starting. Try again in a moment."
+        }
+
 /** Why an answer gave no class, as [Joining.Failure] keeps it. */
-private val ApiResponse<*>.failure: Joining.Failure get() = Joining.Failure(result, error?.error?.reason)
+private val ApiResponse<*>.failure: Joining.Failure get() = Joining.Failure.NoClass(result, error?.error?.reason)
 
 /**
  * [text]'s whole characters, as Swift's `Character`s are: a BreakIterator's grapheme clusters, by the rules of the phone's own

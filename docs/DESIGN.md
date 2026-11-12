@@ -34,7 +34,8 @@ cards (`classes.tsx`, PV16a) and New class's dialog (`new-class.tsx`, PV16b), th
 ("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
 Bali block.", "Bali block read.", "A scan is under way."); the `problem` a
 start that failed shows in `BaliApp.swift` (RootView's "Bali couldn't start"); and
-`Info.plist`'s `NFCReaderUsageDescription`, iOS's own NFC prompt. The
+`Info.plist`'s `NFCReaderUsageDescription`, iOS's own NFC prompt. Android's, in
+`android/outbox/src/main/kotlin/com/bali/outbox/`, are listed in the Android section. The
 Debug readout's words are not user-facing. Their voice follows this file;
 their logic does not. It never
 covers the API, `packages/`, or `apps/web/src/lib` and the iOS engine and
@@ -1088,6 +1089,11 @@ words.
   texts and emergency calls always work" for "Calls, FaceTime, Messages and Emergency SOS always
   work", on the intro's first page alone; and the new lines as drawn, Open Bali on the block screen
   among them.
+- **Where the words live:** as on the iPhone, in the engine's module, `outbox`
+  (`android/outbox/src/main/kotlin/com/bali/outbox/`), each a function of its type beside it (AN10d
+  to AN10h): Join's in `Join.kt`; Home's, a scan's, the sign-in's and the start's in `Screen.kt`; Tap
+  in's in `SyncEngine.kt` (`TapFailure`). `WordsTest` reads every one, and fails a word that names
+  something Android lacks or holds an em-dash or an exclamation mark.
 - **The look:** the tokens in Material 3's roles: `primary` is action-primary-bg,
   `tertiaryContainer` the emergency pair, `error` the destructive red, `errorContainer` Lock off's
   chip, `surfaceContainerLowest` the card, `surfaceContainerHigh` the sunken well, `outline`
