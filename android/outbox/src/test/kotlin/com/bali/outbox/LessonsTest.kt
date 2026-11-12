@@ -224,7 +224,7 @@ class LessonsTest : EngineFiles() {
             rig.until { it.lesson == null }
             assertFalse(lessons.polling())
             lessons.followed(ana(signIns = 3, meReads = 2))
-            assertNull(lessons.state.value.lesson, "followed past the bell")
+            assertNull(lessons.state.value.lesson, "followed after a read said it was over")
             eventually { rig.clock.deadlines.isEmpty() }
         }
 
@@ -241,10 +241,11 @@ class LessonsTest : EngineFiles() {
             rig.asleep()
             // The poll stopped, so only the picks reach the server.
             lessons.setInFront(false)
+            // Each answer taken shows on the card the moment its tap ends, never the one held before it for a moment.
             val one = rig.pick(1)
-            rig.until { it.answered(1) }
+            assertTrue(lessons.state.value.answered(1), "${lessons.state.value.card?.looks}")
             val two = rig.pick(2)
-            rig.until { it.answered(2) }
+            assertTrue(lessons.state.value.answered(2), "${lessons.state.value.card?.looks}")
             assertEquals(listOf(1, 2), listOf(option(one), option(two)))
             assertTrue(assertNotNull(one.eventId) < assertNotNull(two.eventId), "${one.eventId}, ${two.eventId}")
             // The answer Bali holds: a tap on it sends nothing again.
