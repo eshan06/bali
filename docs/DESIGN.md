@@ -1105,7 +1105,10 @@ words.
   off's in `ProtectionOff.kt` (`ProtectionOffWords`); Me's name, Leave, Sign out and whose sign-in
   it is in `Me.kt` (`Naming.Failure.words`, `Leaving`, `SignOutHold.words`,
   `Account.State.signedInAs`); Delete account's in `Deletion.kt` (`Deleting.said`); the 13+ stop's
-  in `Age.kt` (`AgeCheck`). `WordsTest` reads every one, and fails a word
+  in `Age.kt` (`AgeCheck`); History's in `History.kt` (a read's failures, each moment and its note,
+  a day's title and a moment's time, from the phone's own patterns); the consent list in
+  `Consent.kt` (`ConsentList`), iOS's line for line but its focus status, "Bali's lock off", which
+  ConsentTest holds to JoinView.swift's. `WordsTest` reads every one, and fails a word
   that names something Android lacks or holds an em-dash or an exclamation mark.
 - **The look:** the tokens in Material 3's roles: `primary` is action-primary-bg,
   `tertiaryContainer` the emergency pair, `error` the destructive red, `errorContainer` Lock off's
