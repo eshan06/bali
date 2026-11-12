@@ -227,10 +227,36 @@ class ReadoutTest {
             // Tried again, the app's own start, over its own file.
             readout.onActivity { it.tryAgain.performClick() }
             until { ReadoutActivity.note.value.takeIf { it == "started" } }
-            assertNull(app.startFailed.value)
+            assertNull(app.problem.value)
             until { readout.lines().takeIf { "Engine: over no token, as a signed-out phone" in it } }
             assertFalse(until { readout.shows { it.tryAgain }.takeIf { !it } })
         }
+
+    // Q11: the screen the app's router shows, in developer words, as the readout's other lines are. The Debug engine over no
+    // token is a signed-out phone, so Sign in; a typed tap Focus, by the lock's own rule, until Emergency Unlock; and a start
+    // that failed the storage screen, its problem as the Engine line says it.
+    @Test
+    fun theScreenLineSaysWhatTheAppsRouterShowsSignInThenFocusForATypedTapAndAStartThatFailedItsStorageScreen() {
+        val readout = open()
+        until { readout.lines().takeIf { "Screen: SignIn\n" in it } }
+        readout.onActivity {
+            it.blockTag.setText("04:A2:1B")
+            it.tap.performClick()
+        }
+        until { readout.lines().takeIf { "Screen: Focus\n" in it } }
+        until { readout.shows { it.unlock }.takeIf { it } }
+        readout.onActivity { it.unlock.performClick() }
+        until { readout.lines().takeIf { "Screen: SignIn\n" in it } }
+        runBlocking {
+            withTimeout(PATIENCE) { scope.coroutineContext.job.cancelAndJoin() }
+            app.begin { throw IOException("the disk refused the outbox") }
+        }
+        until { readout.lines().takeIf { "Screen: Storage, start failed: java.io.IOException: the disk refused the outbox\n" in it } }
+        // Tried again, the app's own start, so no later test finds the problem standing.
+        runBlocking { app.begin() }
+        assertNull(app.problem.value)
+        until { readout.lines().takeIf { "Screen: SignIn\n" in it } }
+    }
 
     // Q3: the Signed in line reads the run's account and names the 13+ check where it stands, which no button answers before
     // AS2's question; nor is Delete account here (AS7's).

@@ -94,7 +94,10 @@ private suspend fun EngineFiles.relaunched(rig: SignedRig, file: File): SignedRi
 /** A birth month and year under 13 by [SignedRig.clock]: this month, this year. */
 private fun SignedRig.thisMonth(): Pair<Int, Int> = clock.now().atZone(clock.zone()).let { it.monthValue to it.year }
 
-/** The notes in [kept], each write recorded as it's made, in order, with the value it set ([writes]). */
+/**
+ * The notes in [kept], each write recorded as it's made, in order ([writes]): a value set, as the app's store writes behind, or
+ * the student's two forgotten, written through ([Notes.forgetStudent]).
+ */
 private class RecordedNotes(private val kept: Notes = MemoryNotes()) : Notes by kept {
     val writes = CopyOnWriteArrayList<String>()
 
@@ -118,6 +121,15 @@ private class RecordedNotes(private val kept: Notes = MemoryNotes()) : Notes by 
             writes += "listSeenBy=$value"
             kept.listSeenBy = value
         }
+
+    override fun forgetStudent() {
+        writes += FORGOT
+        kept.forgetStudent()
+    }
+
+    companion object {
+        const val FORGOT = "the student's forgotten, written through"
+    }
 }
 
 /** The phone's account half: BaliApp.swift's `Phone`'s, its engine halves (AppTests). */
@@ -473,9 +485,9 @@ class AccountTest : EngineFiles() {
             account.synced(checkNotNull(listed))
             assertEquals(listOf(null, null), listOf(notes.inClass, account.state.value.inClass))
 
-            // A relaunch over the same keychain, the notes still there, as an app closed between the server's deletion and its
-            // own answer leaves them: the deletion's screen at once, before any press, the notes gone at once, never left for a
-            // Try again (the owner's ruling, 2026-10-23), the list's note alone too. Try again finishes it.
+            // A relaunch over the same keychain, the notes there, as no deletion leaves them now (they leave the store as it
+            // starts, AN10c, below), as iOS's can: the deletion's screen at once, before any press, the notes gone at once,
+            // never left for a Try again (the owner's ruling, 2026-10-23), the list's note alone too. Try again finishes it.
             val listOnly = MemoryNotes().apply { listSeenBy = "u" }
             val first = relaunched(rig, file)
             assertEquals(Deleting.Pending, account(first, listOnly).state.value.deleting)
@@ -513,9 +525,12 @@ class AccountTest : EngineFiles() {
             rig.through(account, scoped("a1"), me = Answer.me(null, classes = listOf(Answer.inClass("p3"))))
             assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy))
             account.deleting { it.ask() }
+            notes.writes.clear()
             val stopping = scope.async { account.deleteAccount() }
-            // Its first request on the wire, unanswered: the notes off the store by then, the screens reading them as before.
+            // Its first request on the wire, unanswered: the notes off the store by then, written through and nothing written
+            // since, the screens reading them as before.
             val lost = rig.pastReads(deleteMeRoute)
+            assertEquals(listOf(RecordedNotes.FORGOT), notes.writes)
             assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
             assertEquals(listOf("u", "u"), account.state.value.let { listOf(it.inClass, it.listSeenBy) })
             lost.reply(null)
@@ -532,6 +547,34 @@ class AccountTest : EngineFiles() {
             assertEquals(listOf(null, null), account.state.value.let { listOf(it.inClass, it.listSeenBy) })
             assertTrue(notes.everApproved)
             assertTrue(notes.writes.none { it.startsWith("everApproved") }, "${notes.writes}")
+            rig.stop()
+        }
+
+    @Test
+    fun aReadLandingWhileTheDeletionRunsKeepsItsStudentInAClassOffTheStoreTheScreensSeeingItAndAStopWritesItBack(): Unit =
+        runBlocking {
+            // This step's call (AN10c): from the press on, nothing writes a note under the student to the store, so a read on its
+            // way as the deletion starts, which the deletion waits out (AN9b), can't put the student's id back on the disk.
+            val notes = RecordedNotes()
+            val rig = signedRig(gated = true)
+            val account = account(rig, notes)
+            rig.through(account, scoped("a1"))
+            assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
+            rig.engine.retryNow()
+            val read = rig.server.next(meRoute)
+            account.deleting { it.ask() }
+            notes.writes.clear()
+            val stopping = scope.async { account.deleteAccount() }
+            eventually { notes.writes.isNotEmpty() }
+            read.reply(200, Answer.me(null, classes = listOf(Answer.inClass("p3"))))
+            val lost = rig.pastReads(deleteMeRoute)
+            account.until { it.inClass == "u" }
+            assertEquals(listOf(RecordedNotes.FORGOT), notes.writes)
+            assertNull(notes.inClass)
+            lost.reply(null)
+            withTimeout(patience) { stopping.await() }
+            assertEquals(Deleting.Stopped(Deleting.Stop.NotDeleted(SendResult.NetworkError)), account.state.value.deleting)
+            assertEquals("u", notes.inClass)
             rig.stop()
         }
 

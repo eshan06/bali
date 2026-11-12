@@ -27,7 +27,9 @@ import com.bali.outbox.Account
 import com.bali.outbox.AgeCheck
 import com.bali.outbox.Change
 import com.bali.outbox.Enforcer
+import com.bali.outbox.Problem
 import com.bali.outbox.Protection
+import com.bali.outbox.Screen
 import com.bali.outbox.Standing
 import com.bali.outbox.SyncState
 import com.bali.outbox.SystemClock
@@ -55,8 +57,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * it tells the app ([BaliApp.front]), which reads the truth and runs rule 3's check. Its Scan reads a block over
  * NFC and taps it, and Read block code only reads one, for registering it (AN8). Its Join joins a typed code,
  * and History reads the last five moments (AN9i); its Signed in line reads the run's account and names the 13+
- * check (Q3), which has no button before AS2's question, and Delete account isn't here: AS7's. Not here: iOS's
- * marker, asks and monitor, which have no twin.
+ * check (Q3), which has no button before AS2's question, and Delete account isn't here: AS7's. Its Screen line
+ * says what the app's router shows (Q11), the screen Phase 10 will draw there. Not here: iOS's marker, asks and
+ * monitor, which have no twin.
  */
 // Lint's SetTextI18n guards the words a student reads and a translator translates: these are a developer's alone.
 @SuppressLint("SetTextI18n")
@@ -95,7 +98,7 @@ class ReadoutActivity : ComponentActivity() {
         unlock = button("Emergency Unlock") { if (app.running.value?.engine?.emergencyUnlock() == null) "nothing to unlock" else "recorded" }
         history = button("History") { history() }
         shortCap = CheckBox(this).apply { text = "Cap a tap at 15 min (phone check)"; isChecked = cap(context) != null; setOnCheckedChangeListener { _, on -> capped(on) } }
-        tryAgain = button("Try again") { app.begin(); app.startFailed.value?.let { "start failed again: $it" } ?: "started" }
+        tryAgain = button("Try again") { app.begin(); app.problem.value?.let { "not started again: ${problem(it)}" } ?: "started" }
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(PAD, PAD, PAD, PAD) }
         listOf(lines, row(signIn, signOut), settings, row(joinCode, join), row(scan, readCode), row(blockTag, tap), unlock, history, shortCap, tryAgain)
             .forEach(column::addView)
@@ -109,6 +112,7 @@ class ReadoutActivity : ComponentActivity() {
         drawing =
             lifecycleScope.launch {
                 launch { note.collect { draw() } }
+                launch { app.router.shown.collect { draw() } }
                 launch { app.running.collectLatest { run -> run?.account?.state?.collect { draw() } } }
                 while (true) {
                     draw()
@@ -142,6 +146,7 @@ class ReadoutActivity : ComponentActivity() {
             listOf(
                 "Debug readout — temporary",
                 "Engine: ${engine(run)}",
+                "Screen: ${screen(app.router.shown.value)}",
                 "Link: ${state?.link ?: "no exchange yet"}",
                 "Server last answered: ${state?.heardAt?.let(::time) ?: "never"}",
                 "Signed in: ${signedIn(run?.account?.state?.value)}",
@@ -154,7 +159,7 @@ class ReadoutActivity : ComponentActivity() {
             ).joinToString("\n")
         // Filed where decision 11 says: under a tap not yet answered, else the session.
         unlock.isVisible = state?.emergencyUnlock(null) != null
-        tryAgain.isVisible = run == null && app.startFailed.value != null
+        tryAgain.isVisible = run == null && app.problem.value != null
     }
 
     /** Who is signed in, and the 13+ check as the run's account has it (Q3): there's no button for it before AS2. */
@@ -177,10 +182,23 @@ class ReadoutActivity : ComponentActivity() {
     // The run's own: an engine with no sign-in has no account.
     private fun engine(run: BaliApp.Running?): String =
         when {
-            run == null -> app.startFailed.value?.let { "start failed: $it" } ?: "not running"
+            run == null -> app.problem.value?.let(::problem) ?: "not running"
             run.account == null -> "over no token, as a signed-out phone: sign-in isn't set up, so nothing is sent"
             else -> "over the sign-in"
         }
+
+    /** Why the start runs nothing (AN10a's [Problem]), a failure's cause as its exception names it. */
+    private fun problem(problem: Problem): String =
+        when (problem) {
+            Problem.NotSetUp -> "not set up: no config, so no engine"
+            is Problem.StartFailed -> "start failed: ${problem.cause}"
+        }
+
+    /** What the router shows now (Q11), as Phase 10's screens will draw it: the screen's type, and the tab bar where it shows. */
+    private fun screen(shown: Screen.Shown): String {
+        val screen = (shown.screen as? Screen.Storage)?.let { "Storage, ${problem(it.problem)}" } ?: shown.screen.toString()
+        return screen + if (shown.tabbed) " · tab bar" else ""
+    }
 
     private fun standing(state: SyncState?): String =
         when (val stood = state?.standing) {
