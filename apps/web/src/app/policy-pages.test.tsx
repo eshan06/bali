@@ -15,7 +15,8 @@ import TermsPage, { metadata as termsMetadata } from './terms/page';
 /*
  * The privacy policy and the terms (C2-text) as a reader meets them, signed out (the owner's
  * decision of 2026-10-22: the portal's tests drive the page): the owner's drafted words of
- * 2026-10-24 under each title and its date, every section in the draft's order, the sections the
+ * 2026-10-24 under each title and its date, who runs Bali (Bali Focus Inc. since 2026-11-11, in the
+ * opening and the terms' California notice), every section in the draft's order, the sections the
  * owner named at the outline's ids, the privacy draft's table as a list, its section 2's lists the
  * app's and the help page's own (#130), the owner's two later lines (section 1's clock set ahead,
  * section 6's records at another school), PostHog named wherever its counts change what a line says
@@ -47,6 +48,8 @@ interface Policy {
   metadata: typeof privacyMetadata;
   title: string;
   date: string;
+  /** The intro's first paragraph, whole: who runs Bali, Bali Focus Inc. since 2026-11-11. */
+  opening: string;
   /** Every section's title, in the draft's order, Contact's last. */
   sections: string[];
   /** The sections the owner named for the outline (C2a), each at the outline's id. */
@@ -63,7 +66,8 @@ const POLICIES: Policy[] = [
     Page: PrivacyPage,
     metadata: privacyMetadata,
     title: 'Privacy policy',
-    date: 'Effective November 9, 2026',
+    date: 'Effective November 11, 2026',
+    opening: 'Who we are: Bali is run by Bali Focus Inc. (“Bali”, “we”, “us”).',
     sections: [
       'The short version',
       '1. What Bali collects',
@@ -99,7 +103,9 @@ const POLICIES: Policy[] = [
     Page: TermsPage,
     metadata: termsMetadata,
     title: 'Terms of use',
-    date: 'Last updated November 9, 2026',
+    date: 'Last updated November 11, 2026',
+    opening:
+      "These terms are an agreement between you and Bali Focus Inc., which runs Bali (“Bali”, “we”, “us”), for using the Bali iPhone app and the Bali portal (together, “Bali”). By creating an account or using Bali, you agree to them. If you don't agree, don't use Bali. Our privacy policy is part of these terms.",
     sections: [
       '1. Who Bali is for',
       '2. Your account',
@@ -136,14 +142,17 @@ const linksIn = (part: HTMLElement) =>
     .map((link) => [link.getAttribute('href'), link.textContent]);
 
 describe.each(POLICIES)('$path, the owner’s drafted words', (policy) => {
-  it('opens on its title, its date under it in the quiet meta line, then who runs Bali', () => {
+  it('opens on its title, its date under it in the quiet meta line, then who runs Bali: Bali Focus Inc. (2026-11-11)', () => {
     render(<policy.Page />);
     const title = screen.getByRole('heading', { level: 1 });
     expect(title.textContent).toBe(policy.title);
     const date = title.nextElementSibling as HTMLElement;
     expect(date.textContent).toBe(policy.date);
     expect([...date.classList]).toEqual(['mt-0.5', 'text-meta', 'text-text-secondary']);
-    expect(screen.getByRole('main').textContent).toContain('Eshan Shah and Jonathan Bani');
+    const intro = title.parentElement?.nextElementSibling as HTMLElement;
+    expect(intro.firstElementChild?.textContent).toBe(policy.opening);
+    // The two founders ran Bali until the company did, and no line names them now.
+    expect(screen.getByRole('main').textContent).not.toMatch(/\b(Eshan|Shah|Jonathan|Bani)\b/);
   });
 
   it('has every section of the draft, in its order, each a region its title names', () => {
@@ -462,6 +471,18 @@ describe('the terms link the privacy policy as this portal’s own page', () => 
     render(<TermsPage />);
     expect(screen.getByRole('link', { name: 'privacy policy' }).getAttribute('href')).toBe(
       '/privacy',
+    );
+  });
+});
+
+describe('the terms’ California notice names the provider, Bali Focus Inc. (2026-11-11)', () => {
+  it('as the first of section 12’s state notices', () => {
+    render(<TermsPage />);
+    const notices = within(screen.getByRole('region', { name: '12. State notices' }))
+      .getAllByRole('listitem')
+      .map((item) => item.textContent ?? '');
+    expect(notices[0]).toContain(
+      'California. Bali is provided by Bali Focus Inc. and is free to students. To complain or ask about Bali, email us.',
     );
   });
 });

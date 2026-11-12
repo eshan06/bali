@@ -8,6 +8,24 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-11** — **Bali Focus Inc. runs Bali, and the privacy policy and terms name it (the
+  owner).** Bali is incorporated as Bali Focus Inc. (the owner, 2026-11-11: "we're also
+  incorporated now as bali focus inc so make the appropriate changes for that too"); the brand
+  stays Bali. The privacy policy's "Who we are", and the terms' opening paragraph and California
+  notice (section 12), name Bali Focus Inc. as the party that runs Bali, in place of Eshan Shah and
+  Jonathan Bani, the operators since the drafts of 2026-10-24; both pages' dates move to November
+  11, 2026, as the privacy policy's section 11 and the terms' section 6 promise of any change. The
+  website's copyright line reads "© 2026 Bali Focus Inc." in place of "© 2026 Bali", built on
+  `demo3` the same day, apart from this change. App Store Connect's seller and copyright fields
+  (its copyright reads `2026 Eshan Shah`, `docs/APP-STORE.md`) are the owner's to change there.
+  Nothing in `ios/`, `android/` or `packages/` names an operator or carries a copyright line of
+  Bali's. The pages give the name alone, with no address, state of incorporation or registration
+  number, none of which the repo holds; the California notice's statute, Cal. Civ. Code § 1789.3,
+  asks for the provider's address and telephone number too, the owner's to give
+  (`docs/legal/terms-of-use.md`, note 5). If the certificate of incorporation writes the name
+  otherwise (for example "Bali Focus, Inc."), that is a one-word change on each page and in their
+  test.
+
 - **2026-11-11** — **AN10d, Home's words, Tap in, and the sign-in's and the start's words: BaliOutbox's Join.swift and
   Screen.swift words and SyncEngine.swift's `tapIn` in Kotlin, each a function of its type, and the guard over every Android
   word (the conductor's Q10 built, and this step's own calls, marked, each awaiting the owner's look; AN10d, #566).** The
