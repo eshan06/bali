@@ -86,8 +86,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `SyncState.teacher`.
 
   **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble
-  :app:lint check` green, Android 10's API check with it; the core and outbox suites run PROOF-RUNS; `npm run typecheck
-  && npm run lint && npm test` PROOF-NPM. No SDK package was installed: the build downloads none
+  :app:lint check` green, Android 10's API check with it, three times as the code moved; the core and outbox suites run
+  twelve times, each green, five before the bell's sleep was aimed afresh, five after it and two on the final code (582
+  tests), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run
+  lint && npm test` green, the portal's suite whole. No SDK package was installed: the build downloads none
   (`android.builder.sdkDownload=false`), and nothing under the SDK changed while it ran.
 
   **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
