@@ -8,6 +8,93 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-11** — **AN10b, the router's inputs and its run: BaliApp.swift's `shown`, `remember` and notes in Kotlin, a
+  `Router` choosing again at each change, a tap's cap and the bell, and `Account`'s notes, `sawList`, email, and Me's name
+  and Leave (the conductor's calls Q1 to Q3 built, and this step's own, marked, each awaiting the owner's look; AN10b,
+  #564).** The owner is asleep and said to take the recommended option on every regular call, so each call here is the
+  conductor's or this step's, for the owner to look at.
+
+  **Where it lives:** `outbox`'s new `Router.kt`: `Router`, one a process (Q1), over the app's run (`Router.Run`: the
+  engine, its enforcer and the account, none over an engine with none), the start's problem, the notes, the screens'
+  inputs (`Router.Input`: a screen opened, Back, a tab chosen) and Android's looks; what it chose is `shown`. Its new
+  `Notes.kt`: the `Notes` store (`everApproved`, `inClass`, `listSeenBy`) and `MemoryNotes`. `Account.kt` gains the notes
+  under the student (`inClass` kept at each state listing the student in a class, `listSeenBy` at `sawList`), both
+  forgotten once the account is deleted on Bali's server, at Delete account and at a relaunch finding it so; the
+  sign-in's `email`; Me's `naming` and `leaving`; the 13+ ask's condition; and `State.everInClass`. Nothing runs the
+  router yet: AN10c runs one for the app's life, and Phase 10 draws what it shows. No word and no screen. Where Kotlin
+  differs, said plainly:
+  - **Q2:** a run with no account reads as signed out, the age unanswered, the router choosing over the engine's own
+    state: Sign in, never Starting; Focus still first for a typed tap.
+  - **Q3:** `everApproved` is set at a pass that read the switch on, cleared once the check judges it off
+    (`switchedOff`), left at a starting read; kept in the notes, so a relaunch reads it back, as iOS keeps
+    `screenTimeApproved` in the phone's own defaults, and never forgotten with the account, as iOS's isn't: it's the
+    phone's, not the student's. `notifyDue`, which iOS's `remember` sets beside it, is AN12's.
+  - **The riskiest part:** the account's 13+ ask at a wake reads the router's last screen (`Account.routedBy`, which the
+    router sets as it takes up a run), never while the question shows; the router reads the account's, the enforcer's
+    and the engine's last published values. Neither holds its own lock across the other's read, nor waits on the
+    other's. The router holds no lock at all (this step's call): one coroutine chooses, a bell's wake included, and its
+    state is that coroutine's own. The ask's read of the router is a `suspend` call made with the account let go; the
+    account's `alone` takes no suspending block, so its lock can't be held across one without a `withLock` of its own.
+
+  **This step's calls, each awaiting the owner's look:**
+  - **The router wakes at a tap's cap too,** by the same `Screen.bell` and its looks, where iOS's `Phone.bell` is the
+    session's alone and its Focus ends at the cap through the enforcer's pass at the shields' end. Android's enforcer
+    wakes there on a plain sleep, which deep sleep stretches (AN10a's santa), so the router wakes itself at the cap, as
+    at the bell.
+  - **The screens' inputs are moves the router folds** (`Router.Input`), so what was opened and the tab are the router's
+    own, closed in one place as `keepsOpened` says, the tab sent Home at each change of who is signed in
+    (`Account.State.signIns`), as iOS's `Phone` holds `opened` and `tab`. Sign up's intro and Session over closed
+    (`closeSessionOver`, `seeHistory`) are AS2's and AS6's inputs to add; iOS's `open` also ends the class-started
+    alert's wait, AN12's.
+  - **Me's name and Leave are the account's** (`naming(step)`, `leaving(step)`, each a step of the value's own): AS2 and
+    AS7 send `save`'s request and `send`'s leave through the engine, as AN9f's note has it, and hand each answer back
+    through `saved` and `left`, which drop it once a sign-in has started both afresh.
+  - **The email is read at each sign-in that lands,** where iOS reads it at each yield of its stream, which yields at a
+    renewal too, so iOS's Me takes up a renewal's ID token naming an email that tokens kept by a build before #147
+    lacked. Android's landings never yield at a renewal (AN9e's Q2), and every Android build has kept the ID token's
+    email from its first sign-in, so that case can't arise here; an email changed in Cognito shows at the next sign-in
+    or launch.
+  - **The notes default to memory** (`Account.of`'s `notes`), so `android/app` stays unchanged until AN10c hands the
+    app's store to the account and the router alike. **A store never blocks** (its doc): both read and write it in
+    their own stretches, as iOS writes its defaults in the main actor's.
+
+  **For AN10c:** one `Router` for the app's life in the app's scope, over `running` mapped to `Router.Run`, its
+  `problems` the start's (`NotSetUp`, `StartFailed`), its looks Android's time-set broadcast and the screen coming on;
+  the app's SharedPreferences `Notes`, out of the backup, handed to `Account.of` and the router alike, kept in memory and
+  written behind (`apply`), its first read made before either reads it. **For AN10d to AN10h:** Home's empty state
+  reads `Account.State.everInClass`, Me's Sign out line its `email`, and a phone whose engine hasn't started still has
+  no type (AN9f's note). **For Phase 10:** the screens send `Router.Input` and read `shown`; AS4, AS7 and the
+  list-changed screen call `sawList`; AS2 and AS7 take Me's name and Leave through `naming` and `leaving`; AS2 adds the
+  intro's input and AS6 Session over's. **For AN12:** iOS's `notifyDue`, set as the switch first reads on outside a
+  session, beside `everApproved`.
+
+  **The tests,** on the JVM, by the rig's clock in Central: AppTests' everApproved (set, read back by a fresh router,
+  starting routed as on, gone once judged off, the grace's and the switch's), everInClass (kept, read back, Join and
+  History each kept at a read saying none, the tab Home at a sign-in, Me's tab bar gone while its name is edited, keyed
+  on the student, a late state of the last one's classes keeping nobody), listOnce's rule (once, keyed on the student,
+  nothing kept before a read names them), deleteAccountWiring's notes (gone at the deletion, a late state keeping
+  nobody, and at a relaunch finding it deleted, the list's note alone too), signedInAs's email (each sign-in's, none
+  signed out or where the tokens name none) and ageAgainInClass's router half (asked again over Focus, never while the
+  question shows, two wakes marked). New: a start's problem with no engine, each a type, then each change of the
+  account, the enforcer and the engine chosen again; a Debug engine with no account (Q2), Sign in, Focus for a typed
+  tap, Sign in again at its cap by the router's own wake, the enforcer's pass there held; the bell over Unlocked, by the
+  time passing and by a clock set past it at Android's signal; a sign-in change dropping the last student's save and
+  leave; and the riskiest part both ways: the ask's read of the router calling the account itself and returning, and the
+  router choosing while the account's lock is held in a notes write. Tried, each failing by name, then reverted: a note
+  kept after Delete account, and after a relaunch finding the account deleted (deleteAccountWiring's, each at its own
+  check); the router not choosing again at a change (8 of RouterTest's 9), at a tap's cap (Q2's) and at the bell (the
+  bell's and Q2's); `everApproved` kept after `switchedOff` (everApproved's); the ask while the question shows
+  (ageAgainInClass's router half, and the riskiest part's first, its read never made); the account holding its lock
+  across its read of the router (that one's, no ask ever came); the router waiting on the account's lock to read it (the
+  riskiest part's second, no choice while held); the last student's save or leave answer landing after a sign-in change
+  (its own); a Debug engine with no account read as Starting (Q2's); and the email kept past a sign-out (signedInAs's).
+  The riskiest part's second test first passed under its break, the notes' write held no longer than the test's own wait,
+  so the router took the lock as the hold gave up: the hold now outlasts the wait, and the test fails by name.
+
+  **The proof:** PROOF_HERE
+
+  **Santa's review:** SANTA_HERE
+
 - **2026-11-11** — **AN10a, the router: BaliOutbox's `Screen.choose` in Kotlin, which screen shows when, the lock's switch in
   Screen Time's place; the bell by the phone's clock; and `SyncState.teacher` (the conductor's calls Q1 to Q3, and this
   step's own, marked, each awaiting the owner's look; AN10a, #563).** The owner is asleep and said to take the recommended

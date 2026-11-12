@@ -592,15 +592,16 @@ class AccountTest : EngineFiles() {
             val renamed = rig.server.next("PATCH /v1/me")
             val leaving = scope.async { rig.engine.leave(leave.enrollmentId, leave.request) }
             val left = rig.server.next("DELETE /v1/enrollments/e3")
-            // b1's sign-in lands before either answer: both start afresh.
+            // b1's sign-in lands before either answer, the account following it, then both answers come.
+            val signIns = account.state.value.signIns
             rig.signStudentIn(accessToken("b1"), refresh = "refresh-b")
-            account.until { it.naming == Naming() && it.leaving == Leaving() }
+            account.until { it.signIns > signIns }
             renamed.reply(200, """{"outcome":"applied","user":{"id":"u","role":"student","displayName":"Ana B"}}""")
             left.reply(200, """{"outcome":"ended","reason":"left_class","endedParticipation":false}""")
             val (saved, out) = renaming.await() to leaving.await()
             assertTrue(saved.answer != null && out.answer != null)
-            assertFalse(account.naming { it.saved(saved, request) })
-            assertFalse(account.leaving { it.left(out, leave.enrollmentId) })
+            assertFalse(account.naming { it.saved(saved, request) }, "the last student's save landed")
+            assertFalse(account.leaving { it.left(out, leave.enrollmentId) }, "the last student's leave landed")
             assertEquals(listOf(Naming(), Leaving()), account.state.value.let { listOf(it.naming, it.leaving) })
             rig.stop()
         }

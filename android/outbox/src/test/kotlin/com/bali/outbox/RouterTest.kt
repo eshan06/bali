@@ -4,6 +4,9 @@ import com.bali.core.ParticipationState
 import com.bali.core.SendResult
 import java.io.IOException
 import java.time.Duration
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,6 +15,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
@@ -80,14 +84,34 @@ private suspend fun SignedRig.reread(me: String, done: () -> Boolean) {
     readsAnswered(me, done)
 }
 
-/** The notes, their consent list's write held while [write] says, as a slow disk would hold it: the account's lock with it. */
-private class HeldNotes(private val write: HeldWrite, private val kept: Notes = MemoryNotes()) : Notes by kept {
+/**
+ * The notes, a write of the consent list's note held once [arm]ed until [release], as a slow disk would hold it, the account's
+ * lock with it: for twice the test's patience at most, so a router that waits on that lock fails its own wait by name first.
+ */
+private class HeldNotes(private val kept: Notes = MemoryNotes()) : Notes by kept {
+    private val armed = AtomicBoolean(false)
+    private val begun = CompletableDeferred<Unit>()
+    private val released = CountDownLatch(1)
+
     override var listSeenBy: String?
         get() = kept.listSeenBy
         set(value) {
-            write.hold()
+            if (armed.get()) {
+                begun.complete(Unit)
+                released.await(2 * patience.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+            }
             kept.listSeenBy = value
         }
+
+    fun arm() = armed.set(true)
+
+    /** Waits for the write to begin; none in time fails the test. */
+    suspend fun began() = withTimeoutOrNull(patience) { begun.await() } ?: fail("no write began")
+
+    fun release() {
+        armed.set(false)
+        released.countDown()
+    }
 }
 
 /** The router's run (AN10b). */
@@ -386,18 +410,21 @@ class RouterTest : EngineFiles() {
             // The riskiest part, the router's half: it holds no lock of its own (one coroutine chooses), and reads the account's last
             // published state, so it never waits on the account's lock: held here in a write of the notes, a slow disk's.
             val rig = signedRig(gated = true)
-            val write = HeldWrite()
-            val notes = HeldNotes(write)
+            val notes = HeldNotes()
             val phone = routed(rig.engine, rig.clock, notes = notes)
             val account = checkNotNull(phone.account)
             rig.through(account, accessToken("a1"), me = Answer.me(null, name = "Ana"))
             phone.until { it == Screen.Shown(Screen.Home, true) }
-            write.arm()
+            notes.arm()
             val seen = scope.async { account.sawList() }
-            write.began()
-            phone.switched(LockSwitch.Off)
-            phone.until { it == Screen.Shown(Screen.Permission, false) }
-            write.release()
+            try {
+                notes.began()
+                phone.switched(LockSwitch.Off)
+                phone.until { it == Screen.Shown(Screen.Permission, false) }
+                assertFalse(seen.isCompleted, "the account's lock was let go before the router chose")
+            } finally {
+                notes.release()
+            }
             withTimeout(patience) { seen.await() }
             assertEquals("u", notes.listSeenBy)
             rig.stop()

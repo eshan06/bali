@@ -294,7 +294,15 @@ reached and the sign-in isn't through; holds an answer under 13 in memory for th
 another student's `me`, a state counting fewer forgets shown without it; and runs Delete account through the engine,
 a stop answered once another account's sign-in landed since the press taken as `SignInChanged`. `BaliApp`'s `start`
 makes one and runs it in the run's job (AN9i); none over an engine with no sign-in, a Debug build's while sign-in isn't
-set up.
+set up. It keeps the notes under the student (AN10b, `Notes.kt`): who was listed in a class here and who has seen the
+consent list (`sawList`), forgotten once the account is deleted on Bali's server, at a relaunch finding it so too; says
+whose email the sign-in is; and holds Me's name and Leave, started afresh at each change of who is signed in.
+
+**The router** (`outbox`'s `Screen.kt` and `Router.kt`, BaliOutbox's `Screen.swift` and BaliApp.swift's `shown`, AN10a and
+AN10b): which screen shows, a type, chosen from the run's account, enforcer and engine, the start's problem, the notes
+and what the screens opened, again at each change and at each moment the phone's clock may change it, the bell and a
+tap's cap, looked at again at each signal the app gives. One a process; it keeps `everApproved` in the notes. It holds
+no lock, and reads each part by the value it last published, as the account's 13+ ask reads it.
 
 **The lock's rules** (`outbox`'s `Enforcer.kt` and `Lock.kt`, BaliOutbox's `Enforcement`, AN7a): the
 enforcer follows the engine's state and keeps the lock where it says, through a seam of the lock's own
