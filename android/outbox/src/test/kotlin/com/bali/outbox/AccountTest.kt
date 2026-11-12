@@ -554,7 +554,8 @@ class AccountTest : EngineFiles() {
     fun aReadLandingWhileTheDeletionRunsKeepsItsStudentInAClassOffTheStoreTheScreensSeeingItAndAStopWritesItBack(): Unit =
         runBlocking {
             // This step's call (AN10c): from the press on, nothing writes a note under the student to the store, so a read on its
-            // way as the deletion starts, which the deletion waits out (AN9b), can't put the student's id back on the disk.
+            // way as the deletion starts, which the deletion waits out (AN9b), can't put the student's id back on the disk, nor
+            // can the consent list seen meanwhile.
             val notes = RecordedNotes()
             val rig = signedRig(gated = true)
             val account = account(rig, notes)
@@ -569,12 +570,14 @@ class AccountTest : EngineFiles() {
             read.reply(200, Answer.me(null, classes = listOf(Answer.inClass("p3"))))
             val lost = rig.pastReads(deleteMeRoute)
             account.until { it.inClass == "u" }
+            account.sawList()
+            assertEquals("u", account.state.value.listSeenBy)
             assertEquals(listOf(RecordedNotes.FORGOT), notes.writes)
-            assertNull(notes.inClass)
+            assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
             lost.reply(null)
             withTimeout(patience) { stopping.await() }
             assertEquals(Deleting.Stopped(Deleting.Stop.NotDeleted(SendResult.NetworkError)), account.state.value.deleting)
-            assertEquals("u", notes.inClass)
+            assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy))
             rig.stop()
         }
 
