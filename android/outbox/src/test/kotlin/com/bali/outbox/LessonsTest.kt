@@ -1131,24 +1131,24 @@ class SlideTest : EngineFiles() {
             assertEquals("Bearer ${scoped("a1")}", server.next(downloadRoute()).also { it.reply(200, presigned()) }.token)
             server.next(bucketRoute()).reply(200, deck)
             world.document()
-            renderer.holds(lessons, "her deck in")
-            // Bob signs in over her: her slide goes, its document closed.
+            renderer.holds(lessons, "Ana's deck in")
+            // Bob signs in over Ana: Ana's slide goes, its document closed.
             rig.signStudentIn(scoped("b1"), refresh = "refresh-b")
             world.until { it.lesson == null && it.slide == null }
             renderer.holds(lessons, "another student's sign-in")
             rig.server.next(ageCheckRoute).reply(200, ageCheckPassed)
             rig.readsAnswered(meInSession("bob")) { account.state.value.sync?.me?.user?.id == "bob" }
             account.sawList()
-            // His lesson, the same deck shown: loading, nothing of hers, fetched afresh under his own token.
+            // Bob's lesson, the same deck shown: loading, nothing of Ana's, fetched afresh under Bob's own token.
             world.read(presentation(slide = slideOf(deck)))
-            val his = assertNotNull(world.until { it.slide != null }.slide)
-            assertEquals(Loading, his.phase)
-            lessons.ask(his.slide)
+            val bobs = assertNotNull(world.until { it.slide != null }.slide)
+            assertEquals(Loading, bobs.phase)
+            lessons.ask(bobs.slide)
             assertEquals("Bearer ${scoped("b1")}", server.next(downloadRoute()).also { it.reply(200, presigned()) }.token)
             server.next(bucketRoute()).reply(200, deck)
             world.document()
-            renderer.holds(lessons, "his deck in")
-            // Delete account: his slide goes with the account, its document closed.
+            renderer.holds(lessons, "Bob's deck in")
+            // Delete account: Bob's slide goes with the account, its document closed.
             account.deleting { it.ask() }
             val deleting = scope.async { account.deleteAccount() }
             rig.past(deleteMeRoute, meInSession("bob")).reply(200, deletedAnswer)
