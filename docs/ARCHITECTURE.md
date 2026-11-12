@@ -1272,6 +1272,12 @@ out, and no token reaches Bali's API before the 13+ check but the check's own re
 - **The bell needs no extension.** The lock covers apps only inside the session's window, by the
   phone's clock as on iOS (a changed clock detected, not prevented), so at the bell it simply stops
   covering; nothing has to wake at the bell to take it off.
+- **The last run's lock comes off where no Emergency Unlock could be recorded over it.** Kept across a
+  restart, it has no end of its own, where iOS's monitor ends the shields at the bell. It comes off at a
+  start that runs nothing, and where the phone's storage fails to give back where it stood (Room opens
+  its file at the first read, so that is the engine's load, never the start); a later read that works
+  puts it back from the standing, and a lock this run put on still ends at its own end. The conductor's
+  calls, awaiting the owner (`docs/DECISIONS.md`, 2026-11-11 and 2026-11-12).
 - **A reinstall starts signed out, with an outbox of its own.** Android deletes an app's files and
   its Keystore keys with the app, but its backup can bring the files back on a reinstall or a new
   phone. Bali leaves its own out of the backup and of a transfer to a new phone (the outbox, its

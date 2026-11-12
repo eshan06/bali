@@ -36,8 +36,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **Where it lives:** `outbox`. `SyncState.standingFailed`, set by `load()` and `readStanding()` from the read of the
   standing that failed, cleared once the standing is known (`update`); `Enforcer.changes` counts it as the standing known,
   so the last run's lock comes off where nothing locks, or takes the end of what does. `android/app` changes by
-  `ServiceLock`'s doc and a test. No word and no screen: a standing unread with the lock off is a state the router already
-  chooses (Home signed in, Sign in signed out), and iOS's Home offers Emergency Unlock there only over the lock verified on.
+  `ServiceLock`'s doc and its tests, and ARCHITECTURE's Android rules name the difference from iOS. No word and no screen:
+  a standing unread with the lock off is a state the router already chooses (Home signed in, Sign in signed out), and iOS's
+  Home offers Emergency Unlock there only over the lock verified on.
 
   **This step's calls, each awaiting the owner's look:**
   - **What a storage failure is:** a read of the standing that fails with anything but a `SerializationException`, which
@@ -67,9 +68,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
     (`Outbox.BACKOFF_CAP`), 30 s with the screen on, or at Try again. Nothing is sent meanwhile, no read able to take its
     stamp, so the grid shows the phone gone quiet.
   - Whether a student can cause one: Bali's storage is private, and my reading finds one way that might, filling the phone's
-    storage so the file can't open at the next launch, not shown either way here. It gains nothing a force-stop doesn't, which
-    switches the lock off too, the grid showing the phone gone quiet the same; and Settings' Clear storage deletes the outbox
-    and the lock's file alike and ends Bali's process, so no last run's lock is left to hold.
+    storage so the file can't open at the next launch, not shown either way here. It would be quieter than a force-stop,
+    which switches the lock off too: a force-stop takes Bali's service off Android's list, so Bali opened again in the session
+    reports protection off, where a storage that fails records nothing (no write lands, and the switch stays on, so the check
+    has nothing to report), the grid showing the phone gone quiet until a read works and the lock comes back by itself.
+    Settings' Clear storage deletes the outbox and the lock's file alike and ends Bali's process, so no last run's lock is left
+    to hold.
   - Not this call's: a standing this build can't read beside writes the storage refuses keeps today's behavior, the lock held
     and the unlock `NotSaved`, Settings' switch the way out. It needs a corrupt kept value and a failing disk at once.
 
@@ -92,9 +96,30 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`Protection.locked`), as iOS's does, so a storage that failed shows Home's line with Try again (`retryNow`, which reads the
   standing again) and no unlock. AN10e to AN10h: no word changes here.
 
-  **The proof:** PROOF.
+  **AN10c's BaliAppTest race, found on API 36's first run** (61 of 62): `theNotesARunKeeps…` timed out waiting for the account
+  to show the student in a class, its one read of `GET /v1/me` answered, my new test passing in the same run. The cause, read
+  from the code (it doesn't fail on demand): once the 13+ check lets a sign-in through, two reads of the truth can reach the
+  server, one the read loop began before `letThrough`'s `forgetMe` and sent once `passed()` let its token through, and the one
+  after that forget. The engine counts the first as no read (AN9d's `meChanges`), and the test answered only the first
+  `GET /v1/me` it saw. Nothing of this step's runs there (a fresh outbox, its standing read). Fixed in the test, which now
+  answers each read until one lands; no product change, the phone reading again after the forget. Then the whole suite again
+  on all three emulators.
 
-  **Santa's review:** SANTA.
+  **The proof:** the whole instrumented suite, 62 of 62, on each of `Bali_Spike_API35`, `36` and `37` (61 before this step), on
+  the final code; `./gradlew assemble :app:assembleDebugAndroidTest :app:lint check` green, Android 10's API check with it; the
+  core and outbox suites run six times, each green (616 tests), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among
+  them every time; `npm run typecheck && npm run lint && npm test` green, the portal's suite whole. No SDK package was
+  installed: the build downloads none (`android.builder.sdkDownload=false`), and the SDK's folders matched before and after.
+  Each emulator after its runs: Bali and its test app uninstalled, AN1's spike apps kept, every setting as found (the
+  accessibility list and switch, the font scale, Airplane mode, the screen's timeout, automatic time and zone, the zone, the
+  call log), stopped.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: the difference from iOS named only here,
+  where ARCHITECTURE's parity rule names each in "Rules that keep the phone honest, where Android's differ", AN10c's start
+  that runs nothing the same (both reviewers; a rule there now, marked as the conductor's calls awaiting the owner); and the
+  weak spot's comparison with a force-stop, which left out that a force-stop is reported as protection off once Bali is opened
+  again, where a storage failure records nothing (reviewer B; said above).
 
 - **2026-11-11** — **Bali Focus Inc. runs Bali, and the privacy policy and terms name it (the
   owner).** Bali is incorporated as Bali Focus Inc. (the owner, 2026-11-11: "we're also
