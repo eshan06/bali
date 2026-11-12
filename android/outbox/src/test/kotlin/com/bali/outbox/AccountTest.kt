@@ -1,11 +1,13 @@
 package com.bali.outbox
 
+import com.bali.core.HostedPage
 import com.bali.core.Landing
 import com.bali.core.ParticipationState
 import com.bali.core.SendResult
 import com.bali.core.SignIn
 import java.io.File
 import java.net.URI
+import java.util.Base64
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -24,6 +26,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -32,27 +35,29 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 
 // The phone's account half (AN9e), over the engine as the app makes it, its sign-in gated as the app's is, and the API and
-// Cognito answered by hand: AppTests' ageFromServer, ageAgainInClass, forgetsAnother and deleteAccountWiring, their engine
-// halves, the screens and their words AN10's and Phase 10's. And new: each sign-in that lands counted, a renewal never (Q2);
-// a deletion answered once another account's sign-in landed (AN9h's window); an answer under 13 held for the run alone
-// (Q5); the check asked again at each wake while unanswered (Q8); and an Emergency Unlock queued across another's sign-in.
+// Cognito answered by hand: AppTests' ageFromServer, ageAgainInClass, forgetsAnother, deleteAccountWiring with its notes
+// (AN10b) and signedInAs, their engine halves, the screens and their words AN10d's to AN10h's and Phase 10's. And new: each
+// sign-in that lands counted, a renewal never (Q2); a deletion answered once another account's sign-in landed (AN9h's
+// window); an answer under 13 held for the run alone (Q5); the check asked again at each wake while unanswered (Q8); an
+// Emergency Unlock queued across another's sign-in; and Me's name and Leave started afresh at a sign-in, the last student's
+// answers dropped (AN10b). The router's half, the ask never while the question shows, is RouterTest's.
 
 val notPassed = """{"passed":false}"""
 
-/** The app's account half over [rig]'s engine and sign-in, run as the app runs it: back once it knows who is signed in. */
-private suspend fun EngineFiles.account(rig: SignedRig): Account {
-    val account = checkNotNull(Account.of(rig.engine, scope, rig.clock))
+/** The app's account half over [rig]'s engine and sign-in, the notes [notes], run as the app runs it: back once it knows who is signed in. */
+private suspend fun EngineFiles.account(rig: SignedRig, notes: Notes = MemoryNotes()): Account {
+    val account = checkNotNull(Account.of(rig.engine, scope, rig.clock, notes))
     scope.launch { account.run() }
     account.until { it.signedIn != null }
     return account
 }
 
 /** Waits for a state [condition] holds for, and returns it; none in time fails the test. */
-private suspend fun Account.until(condition: (Account.State) -> Boolean): Account.State =
+suspend fun Account.until(condition: (Account.State) -> Boolean): Account.State =
     withTimeoutOrNull(patience) { state.first(condition) } ?: fail("the account never reached the state waited for: ${state.value}")
 
 /** Each read of the truth answered with [me] as it comes, until [done]. */
-private suspend fun SignedRig.readsAnswered(me: String = Answer.me(null), done: () -> Boolean) =
+suspend fun SignedRig.readsAnswered(me: String = Answer.me(null), done: () -> Boolean) =
     eventually {
         if (meRoute in server.waiting) server.next(meRoute).reply(200, me)
         done()
@@ -69,7 +74,7 @@ private suspend fun SignedRig.pastReads(route: String): Server.Exchange {
 }
 
 /** [access]'s student signed in and let through the 13+ check on Bali's yes, the truth read with [me] until the account shows it. */
-private suspend fun SignedRig.through(account: Account, access: String, refresh: String = "refresh-1", me: String = Answer.me(null)) {
+suspend fun SignedRig.through(account: Account, access: String, refresh: String = "refresh-1", me: String = Answer.me(null)) {
     signStudentIn(access, refresh)
     server.next(ageCheckRoute).reply(200, ageCheckPassed)
     readsAnswered(me) { account.state.value.let { it.age == AgeCheck.Answer.Passed && it.sync?.me != null } }
@@ -241,8 +246,9 @@ class AccountTest : EngineFiles() {
     @Test
     fun theCheckBaliCouldntBeReachedForIsAskedAgainAtEachWakeAYesLetsItThroughBeforeTheBellTheUnlockMadeMeanwhileSentAtOnce(): Unit =
         runBlocking {
-            // AppTests' ageAgainInClass, Bali back with a yes (#300's review; Q8): over Focus the question can't show (AN10's
-            // router), so Bali is asked again at the engine's wakes, and a yes sends the Emergency Unlock it held.
+            // AppTests' ageAgainInClass, Bali back with a yes (#300's review; Q8): over Focus the question can't show, so Bali is
+            // asked again at the engine's wakes, and a yes sends the Emergency Unlock it held. With no router reading the account,
+            // each wake asks; the router's half, never while the question shows, is RouterTest's.
             val (outbox, _) = makeOutbox()
             outbox.keep(Standing.InSession(session(), ParticipationState.Focused))
             val rig = signedRig(outbox, gated = true)
@@ -407,11 +413,15 @@ class AccountTest : EngineFiles() {
     @Test
     fun deleteAccountShowsItsScreenUntilTheAnswerDeleteUserUnansweredLeavesItPendingARelaunchLandsThereAtOnceAndTryAgainFinishesIt(): Unit =
         runBlocking {
-            // AppTests' deleteAccountWiring, its engine half (C4b): the notes kept under the student are AN10's.
+            // AppTests' deleteAccountWiring, its engine half (C4b), with the notes under the student (AN10b): listed in a class
+            // and having seen the consent list here.
             val (outbox, file) = makeOutbox()
             val rig = signedRig(outbox, gated = true)
-            val account = account(rig)
-            rig.through(account, scoped("a1"))
+            val notes = MemoryNotes().apply { listSeenBy = "u" }
+            val account = account(rig, notes)
+            rig.through(account, scoped("a1"), me = Answer.me(null, classes = listOf(Answer.inClass("p3"))))
+            val listed = account.state.value.sync
+            assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy))
             account.deleting { it.ask() }
             assertEquals(Deleting.Asking, account.state.value.deleting)
             assertFalse(account.state.value.deleting.shows)
@@ -425,14 +435,31 @@ class AccountTest : EngineFiles() {
             assertEquals(Deleting.Pending, account.state.value.deleting)
             assertTrue(rig.signIn.deletionPending())
             assertFalse(rig.keychain.isEmpty)
-            // The deleted account's `me` goes, as iOS's `forgetNotes` forgets it: shown at once, the engine's after.
+            // The deleted account's notes go from the store, and its `me`, as iOS's `forgetNotes` forgets them: shown at once, the
+            // engine's after (the owner's rulings, 2026-10-23).
             assertNull(account.state.value.sync?.me)
+            assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
+            assertEquals(listOf(null, null), account.state.value.let { listOf(it.inClass, it.listSeenBy) })
             rig.until { it.me == null }
+            // A state the engine sent before it forgot her, still listing her in Period 3, landing late: she isn't kept in a
+            // class again.
+            account.synced(checkNotNull(listed))
+            assertEquals(listOf(null, null), listOf(notes.inClass, account.state.value.inClass))
 
-            // A relaunch over the same keychain: the deletion's screen at once, before any press; Try again finishes it.
-            val relaunch = relaunched(rig, file)
-            val again = account(relaunch)
+            // A relaunch over the same keychain, the notes still there, as an app closed between the server's deletion and its
+            // own answer leaves them: the deletion's screen at once, before any press, the notes gone at once, never left for a
+            // Try again (the owner's ruling, 2026-10-23), the list's note alone too. Try again finishes it.
+            val listOnly = MemoryNotes().apply { listSeenBy = "u" }
+            val first = relaunched(rig, file)
+            assertEquals(Deleting.Pending, account(first, listOnly).state.value.deleting)
+            assertNull(listOnly.listSeenBy)
+            notes.inClass = "u"
+            notes.listSeenBy = "u"
+            val relaunch = relaunched(first, file)
+            val again = account(relaunch, notes)
             assertEquals(Deleting.Pending, again.state.value.deleting)
+            assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
+            assertEquals(listOf(null, null), again.state.value.let { listOf(it.inClass, it.listSeenBy) })
             val retried = scope.async { again.deleteAccount() }
             relaunch.server.next(deleteUserRoute).reply(200, "{}")
             withTimeout(patience) { retried.await() }
@@ -441,6 +468,7 @@ class AccountTest : EngineFiles() {
             again.deleting { it.close() }
             assertEquals(Deleting.None, again.state.value.deleting)
             relaunch.stop()
+            first.stop()
             rig.stop()
         }
 
@@ -521,7 +549,73 @@ class AccountTest : EngineFiles() {
             assertTrue(rig.signIn.checked())
             rig.stop()
         }
+
+    @Test
+    fun meSaysWhoseSignInThisIsTheEmailItsTokensNameReadAtEachSignInNoneSignedOutAnotherStudentsTheirsOrNoneNeverTheLastOnes(): Unit =
+        runBlocking {
+            // AppTests' signedInAs, its engine half (#147): the email the tokens name, read with who is signed in at each sign-in
+            // that lands. Its words are AN10g's.
+            val rig = signedRig(gated = true)
+            val account = account(rig)
+            assertNull(account.state.value.email)
+            rig.signInNaming(accessToken("a1"), "ana@bali.test")
+            account.until { it.signedIn == true && it.email == "ana@bali.test" }
+            rig.signIn.signOut()
+            assertNull(account.until { it.signedIn == false }.email)
+            rig.signInNaming(accessToken("a1"), "ana@bali.test")
+            account.until { it.email == "ana@bali.test" }
+            rig.signInNaming(accessToken("b1"), "bea@bali.test", refresh = "refresh-b")
+            account.until { it.email == "bea@bali.test" }
+            // Tokens naming no email say none, never the last student's.
+            rig.signInNaming(accessToken("c1"), null, refresh = "refresh-c")
+            assertNull(account.until { it.email != "bea@bali.test" }.email)
+            assertEquals("c1", rig.signIn.account())
+            rig.stop()
+        }
+
+    @Test
+    fun aChangeOfWhoIsSignedInStartsMeNameAndLeaveAfreshSoTheLastStudentsSaveOrLeaveAnsweredAfterItIsDropped(): Unit =
+        runBlocking {
+            // AN9f's note, BaliApp.swift's `signed`: `Naming()` and `Leaving()` started afresh at a change of who is signed in, so
+            // an answer to the last student's save or leave, sent through the engine as Your name and Me send them, is dropped.
+            val rig = signedRig(gated = true)
+            val account = account(rig)
+            val classes = listOf(Answer.inClass("c", enrollment = "e3"))
+            rig.through(account, accessToken("a1"), me = Answer.me(null, classes = classes, name = "Ana"))
+            account.naming { it.edit("Ana") to Unit }
+            account.naming { it.type("Ana B") to Unit }
+            val request = assertNotNull(account.naming { it.save(rig.clock.now()) })
+            account.leaving { it.ask(checkNotNull(account.state.value.sync?.me).classes.single()) to Unit }
+            val leave = assertNotNull(account.leaving { it.send(rig.clock.now()) })
+            assertEquals(listOf(true, true), account.state.value.let { listOf(it.naming.busy, it.leaving.busy) })
+            val renaming = scope.async { rig.engine.rename(request) }
+            val renamed = rig.server.next("PATCH /v1/me")
+            val leaving = scope.async { rig.engine.leave(leave.enrollmentId, leave.request) }
+            val left = rig.server.next("DELETE /v1/enrollments/e3")
+            // b1's sign-in lands before either answer: both start afresh.
+            rig.signStudentIn(accessToken("b1"), refresh = "refresh-b")
+            account.until { it.naming == Naming() && it.leaving == Leaving() }
+            renamed.reply(200, """{"outcome":"applied","user":{"id":"u","role":"student","displayName":"Ana B"}}""")
+            left.reply(200, """{"outcome":"ended","reason":"left_class","endedParticipation":false}""")
+            val (saved, out) = renaming.await() to leaving.await()
+            assertTrue(saved.answer != null && out.answer != null)
+            assertFalse(account.naming { it.saved(saved, request) })
+            assertFalse(account.leaving { it.left(out, leave.enrollmentId) })
+            assertEquals(listOf(Naming(), Leaving()), account.state.value.let { listOf(it.naming, it.leaving) })
+            rig.stop()
+        }
 }
+
+/** The student signs in, Cognito answering with [access] and [refresh], its ID token naming [email], or none. */
+private suspend fun SignedRig.signInNaming(access: String, email: String?, refresh: String = "refresh-1") =
+    coroutineScope {
+        val signingIn = async { signIn.signIn(HostedPage.SignIn, null, hostedUi) }
+        val claims = email?.let { """{"sub":"x","email":"$it"}""" } ?: """{"sub":"x"}"""
+        val idToken = "h.${Base64.getUrlEncoder().withoutPadding().encodeToString(claims.encodeToByteArray())}.s"
+        val grant = """{"access_token":"$access","refresh_token":"$refresh","id_token":"$idToken","expires_in":3600,"token_type":"Bearer"}"""
+        server.next(tokenRoute).reply(200, grant)
+        signingIn.await()
+    }
 
 /** [test] over an account of [rig]'s whose own calls run on [ExecutorService]'s one thread, which the test can hold, and its follow's job. */
 private suspend fun EngineFiles.onAHeldThread(rig: SignedRig, test: suspend (Account, ExecutorService, Job) -> Unit) {

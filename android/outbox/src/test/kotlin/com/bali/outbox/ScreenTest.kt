@@ -839,7 +839,7 @@ class ScreenTest : OutboxFiles() {
  * and a sleep that counts only the time that passes ([advance]), as the phone's does ([SystemClock]), so a clock set never
  * ends one. The rig's [TestClock] wakes a sleep its clock is turned past, which would hide a change never looked at.
  */
-private class PhoneClock : SyncClock {
+class PhoneClock : SyncClock {
     private class Sleeper(val ends: Duration, val wake: CancellableContinuation<Unit>)
 
     private val lock = Any()
