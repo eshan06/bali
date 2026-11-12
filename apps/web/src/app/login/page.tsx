@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/button';
-import { CARD_ENTRY } from '@/components/card';
-import { EntryPage, STAGE_FOOT } from '@/components/entry-page';
+import { SessionRingArt } from '@/components/mark';
 import { TextLink } from '@/components/text-link';
 import { type SignedOut, signedOut, startLogin } from '@/lib/auth';
 
@@ -23,9 +22,14 @@ const PUBLIC_PAGES = [
 ];
 
 /**
- * Sign in, for teachers and students (SignIn, EntryStates; PV15): v2's stage, its card with the
- * words for both (W3's, decision 13), the line for students under it, then the public pages. A Sign
- * out's word sits over Sign in, a page that didn't open under it, as Entry & info placed them.
+ * Sign in, for teachers and students (the sign-in redesign's "The portal's sign-in page", the
+ * owner, 2026-11-12): two panels, side by side from 1024 px. On the art's, green-50, Bali over the
+ * session ring and its line; on the other, the card in W3's words for both (decision 13), its Sign
+ * in a 52 px pill, the line for students under it, then the public pages. No Sign up: students sign
+ * up in the app, where the 13+ question is. A Sign out's word sits over Sign in, a page that didn't
+ * open under it (PortalStates). Narrower, the panels stack, the art on top, 240 px wide with its
+ * line at 26/32, so Sign in shows on a 390 × 844 phone's first screen (PortalPhone; PortalZoom, the
+ * 200 % a 1440 px window zooms to).
  */
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -40,39 +44,59 @@ export default function LoginPage() {
   }
 
   return (
-    <EntryPage>
-      <section aria-labelledby="sign-in-title" className={CARD_ENTRY}>
-        <h1 id="sign-in-title" className="text-entry-title">
-          Sign in to Bali
-        </h1>
-        <p className="-mt-2.5 text-body text-text-secondary">
-          Teachers and students sign in here to see their classes.
+    <main className="flex min-h-dvh flex-col lg:flex-row">
+      <div className="flex min-w-0 flex-col gap-4 bg-art-panel px-[clamp(24px,4vw,56px)] py-8 lg:flex-[1_1_560px] lg:gap-8 lg:py-12">
+        <p translate="no" className="text-wordmark">
+          Bali
         </p>
-        {left ? (
-          <p role="status" className="text-body text-pretty">
-            {SIGNED_OUT[left]}
+        <div className="flex flex-auto flex-col items-center justify-center gap-2 lg:pb-12">
+          <div className="w-full max-w-60 lg:max-w-125">
+            <SessionRingArt />
+          </div>
+          <p className="text-center text-page-title text-balance lg:text-tagline">
+            Quiet until the bell.
           </p>
-        ) : null}
-        <Button size="lg" onClick={onSignIn} className="w-full">
-          Sign in
-        </Button>
-        {error ? (
-          <p role="alert" className="text-body text-pretty">
-            {error}
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-5 px-6 pt-8 pb-10 lg:flex-[1_1_480px] lg:pt-12 lg:pb-12">
+        <section
+          aria-labelledby="sign-in-title"
+          className="flex w-full max-w-100 flex-col gap-3.5 rounded-sign-in border border-border-default bg-surface-card px-8 py-9 shadow-sign-in"
+        >
+          <h1 id="sign-in-title" className="text-h1 text-balance">
+            Sign in to Bali
+          </h1>
+          <p className="mb-2.5 text-body text-text-secondary">
+            Teachers and students sign in here to see their classes.
           </p>
-        ) : null}
-      </section>
-      <p className={STAGE_FOOT}>Students: set up Bali in the app on your iPhone first.</p>
-      {/* The public pages, under the card: the card keeps to signing in. */}
-      <nav aria-label="Help and policies" className="w-full pt-2.5">
-        <ul className="flex flex-wrap justify-center gap-x-4.5 gap-y-1.5 text-meta">
-          {PUBLIC_PAGES.map((page) => (
-            <li key={page.href}>
-              <TextLink href={page.href}>{page.label}</TextLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
-    </EntryPage>
+          {left ? (
+            <p role="status" className="text-body text-pretty">
+              {SIGNED_OUT[left]}
+            </p>
+          ) : null}
+          <Button size="pill" onClick={onSignIn} className="w-full">
+            Sign in
+          </Button>
+          {error ? (
+            <p role="alert" className="text-body text-pretty">
+              {error}
+            </p>
+          ) : null}
+        </section>
+        <p className="max-w-100 text-center text-caption text-text-tertiary">
+          Students: set up Bali in the app on your iPhone first.
+        </p>
+        {/* The public pages, under the card: the card keeps to signing in. */}
+        <nav aria-label="Help and policies">
+          <ul className="flex flex-wrap justify-center gap-x-4.5 gap-y-1.5 text-caption">
+            {PUBLIC_PAGES.map((page) => (
+              <li key={page.href}>
+                <TextLink href={page.href}>{page.label}</TextLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+    </main>
   );
 }

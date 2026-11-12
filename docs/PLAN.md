@@ -8,14 +8,14 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-12 (Central) — Cognito's sign-in pages move to its managed login, in Bali's
-style, the username and password on one page (#581; DECISIONS 2026-11-12): dev's domain switched,
-both pools' four clients styled (`infra/cognito/managed-login/`). Before it, App Review approved
-Bali 1.0, build 14, held unreleased (#579). Next: the owner's switch of prod's domain, the release
-call and disabling the review account (Open owner items); the portal's sign-in page, then the app's
-Sign in, from the approved sign-in redesign; a session builds the retire-a-block command; the owner
-the sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02);
-AN11–AN13; AN1's part 2 on the owner's phones; the audit's polish waits._
+_Last updated: 2026-11-12 (Central) — The portal's sign-in page rebuilt from the approved sign-in
+redesign: two panels, the session ring as art, Sign in a pill, its intermediate states drawn first
+(#582; DECISIONS 2026-11-12). Before it, Cognito's sign-in pages on its managed login (#581).
+Next: the owner's switch of prod's domain, the release call and disabling the review account (Open
+owner items); the app's Sign in from the same redesign (the Mac's); a session builds the
+retire-a-block command; the owner the sitting's findings' calls; GA5's known limit, the owner's
+call (DECISIONS 2026-11-02); AN11–AN13; AN1's part 2 on the owner's phones; the audit's polish
+waits._
 
 ## Now
 
@@ -62,9 +62,9 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
 - **The sign-in pages on Cognito's managed login (the owner, 2026-11-12)** ✅ (#581; DECISIONS
   2026-11-12): Bali's style on both pools' four clients, the username and password on one page
   (`infra/cognito/managed-login/`); dev's domain switched, prod's the owner's (Open owner items).
-  Next, each rebuilt from the approved
+  Rebuilt from the approved
   [Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB): the portal's sign-in
-  page, then the app's Sign in screen (the Mac's).
+  page ✅ (#582; DECISIONS 2026-11-12); next, the app's Sign in screen (the Mac's).
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04); part 2 on

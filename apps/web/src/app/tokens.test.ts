@@ -84,8 +84,11 @@ const bytes = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2)
  */
 const RULED = new Set(['--bali-softpulse-glow', '--bali-border-input']);
 
-/** v2's look's radii (DESIGN.md §1, Style facts), beside the tokens' five: built exactly as drawn. */
-const V2_RADII = { item: '8px', frame: '12px', live: '16px' };
+/**
+ * v2's look's radii (DESIGN.md §1, Style facts), beside the tokens' five: built exactly as drawn;
+ * and the sign-in redesign's card's (the owner, 2026-11-12), as its board draws it.
+ */
+const V2_RADII = { item: '8px', frame: '12px', live: '16px', 'sign-in': '28px' };
 /**
  * v2's look's sizes off the tokens' scale (DESIGN.md §1, Style facts), built exactly as drawn (the
  * owner, 2026-10-12): size, line height, weight and tracking, as v2.css draws each.
@@ -125,7 +128,8 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   'bar-row': ['13.5px', '18px', 400],
   cell: ['14px', '19px', 400],
   'cell-sub': ['12px', '16px', 400],
-  // The entry pages' (PV15): an entry page's card title and the sign-in's 48 px button's label.
+  // The entry pages' (PV15): an entry page's card title and the large buttons' label (the
+  // callback's 48 px button, the sign-in's pill).
   'entry-title': ['20px', '26px', 600],
   'button-lg': ['16px', '20px', 600],
   // The recap's (PV12b): its axis's times.
@@ -137,6 +141,10 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   'present-line': ['20px', '28px', 400],
   // Classes' (PV16a): a class's name on its card (`.classcard .name`).
   'card-name': ['17px', '22px', 600],
+  // The sign-in page's (the sign-in redesign, the owner, 2026-11-12), as its board draws them: the
+  // wordmark over the art and the art's line.
+  wordmark: ['72px', '76px', 600, '-0.04em'],
+  tagline: ['40px', '46px', 600, '-0.02em'],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -251,6 +259,14 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     );
   });
 
+  it('beside them, only the sign-in page’s card’s shadow (the sign-in redesign), the shadows’ warm black as its board draws it', () => {
+    const utilities = [...css.matchAll(/@utility (shadow-[\w-]+)/g)].map((m) => m[1]);
+    expect(utilities.sort()).toEqual(['shadow-1', 'shadow-2', 'shadow-3', 'shadow-sign-in']);
+    expect(css).toMatch(
+      /@utility shadow-sign-in\s*\{\s*box-shadow: 0 8px 24px rgba\(33, 28, 21, 0\.06\);\s*\}/,
+    );
+  });
+
   it('every --bali- variable the stylesheet or a component references is declared on :root', () => {
     const refs = new Set<string>();
     for (const file of sources(fileURLToPath(new URL('../', import.meta.url)))) {
@@ -304,7 +320,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('the radii are the tokens’ five and v2’s three (8, 12, 16), and no other', () => {
+  it('the radii are the tokens’ five, v2’s three (8, 12, 16) and the sign-in’s card’s (28), and no other', () => {
     expect(theme.get('--radius-*')).toBe('initial');
     const radii = [...theme.keys()].filter((k) => k.startsWith('--radius-') && k !== '--radius-*');
     expect(radii.sort()).toEqual(
@@ -443,12 +459,13 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), a live card’s edge (W3), a question’s bars and correct letter (L7; the letter on Your questions too, L7b), the correct answer’s fill on the projector (L7, part 2), and the "is ready" dialog’s check (PV16b)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), a live card’s edge (W3), a question’s bars and correct letter (L7; the letter on Your questions too, L7b), the correct answer’s fill on the projector (L7, part 2), the "is ready" dialog’s check (PV16b), and the sign-in page’s art panel (the sign-in redesign)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
     );
     expect(named.filter((k) => !semanticNames.includes(k)).sort()).toEqual([
+      '--color-art-panel',
       '--color-avatar-bg',
       '--color-avatar-fg',
       '--color-bar',
@@ -489,6 +506,9 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(contrast(hexOf('text-primary', 'light'), hexOf('green-50', 'light'))).toBeGreaterThan(
       4.5,
     );
+    // The sign-in page's art panel (the sign-in redesign, 2026-11-12): green-50, as its board fills
+    // it, under Bali and the art's line in the primary ink, checked just above.
+    expect(inline.get('--color-art-panel')).toBe('var(--bali-green-50)');
     // The recap's marks' rings, as v2.css's `.mk` draws them: stone-400, and red-300 for a
     // protection off (an unlock's is `unlock-edge`). Graphics, not text: 1.4.11 asks 3:1 of a
     // control's edge, and a mark is no control; its icon is in its state's ink.
@@ -769,7 +789,15 @@ describe('the buttons in v2’s look (DESIGN.md §1 and §4, PV4)', () => {
     expect(small).not.toEqual(expect.arrayContaining(['text-button']));
   });
 
-  it('come large too (PV15, the sign-in’s): 48 px tall, 18 px in, a 16/20 label, the rest as the others', () => {
+  it('come as a pill too (the sign-in redesign’s Sign in): 52 px tall and round, 24 px in, a 16/20 label', () => {
+    const pill = buttonClass('primary', '', 'pill').split(' ');
+    expect(pill).toEqual(
+      expect.arrayContaining(['h-13', 'rounded-full', 'px-6', 'text-button-lg', 'gap-2']),
+    );
+    expect(pill).not.toEqual(expect.arrayContaining(['rounded-sm']));
+  });
+
+  it('come large too (PV15, the callback’s): 48 px tall, 18 px in, a 16/20 label, the rest as the others', () => {
     const large = buttonClass('primary', '', 'lg').split(' ');
     expect(large).toEqual(
       expect.arrayContaining(['h-12', 'px-4.5', 'text-button-lg', 'rounded-sm', 'gap-2']),

@@ -8,6 +8,28 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **The portal's sign-in page is rebuilt from the sign-in redesign's board, "The portal's sign-in page"
+  (the owner's approval, 2026-11-12), built as drawn.** Two panels side by side from 1024 px: green-50 with Bali, the
+  session ring as art and "Quiet until the bell."; the card with today's words, its lines in today's places, Sign in a
+  52 px pill, then the line for students and the public pages; no Sign up, by design (below). The behaviour is today's:
+  `startLogin`, `signedOut` and the error line unchanged.
+
+  **Its values, as drawn:** the board's sizes, radius, shadow and colour off the tokens' scale are each a portal token,
+  named and pinned by `tokens.test.ts`, as v2's were (DESIGN.md §1, Its call): `wordmark` (72/76), `tagline` (40/46),
+  the radius `sign-in` (28), `shadow-sign-in` (0 8px 24px at 6 %), `art-panel` (green-50) and `Button`'s `size="pill"`
+  (52 px). The page's links stay `TextLink`'s, medium weight where the board drew them regular: DESIGN.md §4's links.
+
+  **The ring is one component, `SessionRingArt`** (`components/mark.tsx`, beside the mark), for the app's Sign in to
+  mirror: the live header's `Ring` doesn't fit, its track being the countdown's stone-200 where the art's is the mark's
+  green-200, on a white disc in a hairline circle. It shows no numbers (the owner's ruling, 2026-11-12), and the page's
+  test fails on any.
+
+  **Its intermediate states, drawn on the canvas first** (version 12): PortalStates (the two signed-out lines over Sign
+  in, the line under it when AWS's page didn't open), PortalPhone (390 px) and PortalZoom (200 %, 720 px). Below 1024 px
+  the panels stack, the art on top at 240 px and its line at 26/32 (the app's own size for it), so Sign in shows on a
+  390 × 844 phone's first screen; at 200 % it is a scroll away. The board's wrap would stack them below 1040 px; the
+  portal's `lg` breakpoint, 1024, is the line, 16 px off.
+
 - **2026-11-12** — **Cognito's sign-in pages move from the classic hosted UI to its managed login, in a softer Bali style,
   with the username and password on one page (the owner's ask and approval).** The owner asked for a sign-in page that looks
   like Bali, not like AWS's default.
