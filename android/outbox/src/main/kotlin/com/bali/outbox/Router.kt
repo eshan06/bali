@@ -21,11 +21,12 @@ import kotlinx.coroutines.launch
  * Which screen shows now ([shown]), chosen by [Screen.choose] over what the phone knows: one a process (Q1), so it says a start's
  * problem with no engine. It reads the app's run ([runs]: the engine, its enforcer, and the account over its sign-in), the start's
  * problem ([problems], AN10c's), the phone's [notes] and the screens' [inputs] (Phase 10's), and chooses again at each of their
- * changes and wherever the phone's clock may change the answer: the bell of the session the phone stands in, and a tap's cap,
- * each slept towards and looked at again at each of [looks], Android saying the time was set and the screen coming on (AN10c's),
- * as [Screen.bell] has it. It keeps `everApproved` in the notes (Q3), and what the student opened while `keepsOpened` says. One
- * coroutine chooses, a bell's wake included, so the router holds no lock; it reads the account, the enforcer and the engine by
- * the value each last published, so it never waits on one, and the account's 13+ ask reads it the same way ([Account.routedBy]).
+ * changes, at each of [looks], Android saying the time was set and the screen coming on (AN10c's), and wherever the phone's clock
+ * may change the answer: the bell of the session the phone stands in, and a tap's cap, each slept towards and aimed afresh at
+ * each look, as [Screen.bell] has it. It keeps `everApproved` in the notes (Q3), and what the student opened while `keepsOpened`
+ * says. One coroutine chooses, a bell's wake included, so the router holds no lock; it reads the account, the enforcer and the
+ * engine by the value each last published, so it never waits on one, and the account's 13+ ask reads it the same way
+ * ([Account.routedBy]).
  */
 class Router(
     private val runs: Flow<Run?>,
@@ -72,6 +73,8 @@ class Router(
             val changes = Channel<Change>(Channel.UNLIMITED)
             launch { problems.collect { changes.send(Change.Failed(it)) } }
             launch { inputs.collect { changes.send(Change.Asked(it)) } }
+            // Each look too, a bell waiting or not: a clock set back past a bell already rung puts the lock's own rule on again.
+            launch { looks.collect { changes.send(Change.Read) } }
             launch {
                 runs.collectLatest { run ->
                     changes.send(Change.Ran(run))
