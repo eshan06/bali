@@ -9,7 +9,7 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
 _Last updated: 2026-11-12 (Central) — Cognito's sign-in pages move to its managed login, in Bali's
-style, the username and password on one page (#PRNUM; DECISIONS 2026-11-12): dev's domain switched,
+style, the username and password on one page (#581; DECISIONS 2026-11-12): dev's domain switched,
 both pools' four clients styled (`infra/cognito/managed-login/`). Before it, App Review approved
 Bali 1.0, build 14, held unreleased (#579). Next: the owner's switch of prod's domain, the release
 call and disabling the review account (Open owner items); the portal's sign-in page, then the app's
@@ -59,7 +59,7 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
 - **A teacher's account on the iPhone (the owner, 2026-11-07)** ✅ (#541; DECISIONS 2026-11-07):
   once `GET /v1/me` names a teacher's account, one screen, the app is for students, with Open the
   portal and Sign out, and no device token registered; the server unchanged. Left: Android's twin.
-- **The sign-in pages on Cognito's managed login (the owner, 2026-11-12)** ✅ (#PRNUM; DECISIONS
+- **The sign-in pages on Cognito's managed login (the owner, 2026-11-12)** ✅ (#581; DECISIONS
   2026-11-12): Bali's style on both pools' four clients, the username and password on one page
   (`infra/cognito/managed-login/`); dev's domain switched, prod's the owner's (Open owner items).
   Next, each rebuilt from the approved
