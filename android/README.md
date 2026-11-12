@@ -305,7 +305,7 @@ ASCII letters and digits in upper case, each whole character a BreakIterator's g
 dropped; and why a look or a join gave no class, as its result and reason, or no engine started, each in its
 words (AN10d).
 
-**The words** (`outbox`, AN10d to AN10h): what a student reads, each a function of the type it says, beside it, as
+**The words** (`outbox`, AN10d to AN10h and AN13c): what a student reads, each a function of the type it says, beside it, as
 BaliOutbox keeps them: iOS's lines word for word, but where the Android canvas's Words board changes or adds one.
 AN10d's are Join's, Home's (a refused tap, the waiting and empty-state cards, a read's failure), a scan's and Tap in's
 (`SyncEngine.tapIn`, its answer a type), the sign-in's and the start's. AN10e's are Focus's (`FocusWords`: the class,
@@ -318,8 +318,11 @@ question and refusals, Sign out's holds and whose sign-in it is), Delete account
 token said as the sign-in Bali couldn't check, never as no connection) and the 13+ stop's. AN10h's are History's (a read's
 failures, each moment and its note, "Lock off" and "Lock back on" among them, a day's title and a moment's time, from the
 phone's own patterns) and the consent list (`ConsentList`, iOS's line for line but its focus status, read against
-JoinView.swift's in place). `WordsTest` reads every one for every case of its type: none names Screen Time, iOS, an iPhone,
-FaceTime or Emergency SOS, or holds an em-dash or an exclamation mark.
+JoinView.swift's in place). AN13c's are the live lesson's (`Lesson.kt`): which lesson the phone follows, the session it stands
+in first, else the first class in session by `GET /v1/me` (`lessonSession`), its class's heading (`lessonHeading`), and the
+answer card's looks and the line under them, state by state (`AnswerCard`), what a pick's request said a type of its own
+(`Said`), every `AnswerResult` placed in it. `WordsTest` reads every one for every case of its type: none names Screen Time,
+iOS, an iPhone, FaceTime or Emergency SOS, or holds an em-dash or an exclamation mark.
 
 **History's rules** (`outbox`'s `History.kt`, BaliOutbox's `History.swift`, AN9g): the pages as they came, from
 the top or Show earlier's, each moment once; which read may start, Show earlier only while a page follows those read

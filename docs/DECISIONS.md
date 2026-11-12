@@ -8,6 +8,102 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **AN13c, which lesson the phone follows, its heading, and the answer card's looks and words: BaliOutbox's
+  `Lesson.swift` in Kotlin, in `outbox`, each line a function of its type, the iPhone's seven word for word, nothing drawn and
+  nothing kept, the third of AN13's seven steps (this step's calls, marked, each the conductor's, awaiting the owner's look;
+  AN13c, #576).** The owner is asleep and said to take the recommended option on every regular call, so each call here is the
+  conductor's, for the owner to look at.
+
+  **Where it lives:** `outbox`'s new `Lesson.kt`: `SyncState.lessonSession` (which session's lesson the phone follows),
+  `SyncState.lessonHeading` (its class's heading, over AN10e's `SyncState.heading`), and `AnswerCard`, with its `Look` (`Open`,
+  `Closed`) and `Said` (`TooLate`, `Failed`), each a type as iOS's are, and `Said.of`, Swift's failable init. Nothing is kept or
+  sent: the card's own state (the pick on its way, what the last one said, Hide) is the lesson half's (AN13d), and no answer
+  reaches the outbox. No screen: the card on screen is AS8's, its own words with it (Question, Question · Closed, Hide, Correct
+  answer, Your answer), as AnswerCardView.swift's are iOS's. `android/app` is unchanged, so no emulator ran.
+
+  **The rules, each the twin's with its test:** the lesson followed is the session the phone stands in, checked first whatever
+  its state, else the first class in session by `GET /v1/me`, tapped in or not (decision 2), each only while its bell is ahead by
+  the phone's clock and never one a read said is over; its heading is that class's, as a session's screens head theirs, none with
+  no lesson to follow or a class the read doesn't name, the first session of that id taken, the one stood in before a class's,
+  as the twin finds it. The card is open until a read says it closed or Bali said the last pick came too late; open, an answer is
+  picked (the one on its way, else the one Bali holds) and never marked, the API sending the correct answer only once shown;
+  closed, the correct one is marked once shown and the student's own as theirs, never red, no count ever. Its line: closed, the
+  too-late line, else the teacher's close, shown or not; open, a pick on its way, a pick that didn't send (until Bali holds an
+  answer made since: it landed, its reply lost, or another device's stands), the poll's no answer (any `PollProblem`), the
+  answer in, or none (the owner's cut, 2026-11-04). What a pick's request said: taken says nothing, `409 question_closed` too late,
+  anything else didn't send.
+
+  **The words,** each iOS's, word for word, each drawn on the Android canvas's AS8 card boards, the Words board changing none:
+  "Sending your answer…" (AS8-Card-sending); "Bali couldn't send your answer. Check your connection and tap it again."
+  (AS8-Card-failed); "No connection right now, so Bali can't send your answer. It keeps trying." (AS8-Card-offline, with its
+  icon); "This question closed before your answer reached Bali, so it wasn't counted." (AS8-Card-toolate); "Your teacher closed
+  this question." (AS8-Card-closed); "Your teacher closed it and showed the answer." (AS8-Focus-revealed, AS8-Card-noanswer);
+  "Your answer is in. You can change it until the question closes." (AS8-Focus-answered); none on an open question with nothing
+  picked (AS8-Focus-q). The heading is `SyncState.heading`'s ("with Ms. Rivera · ends 10:45 AM"), as AS3-Lesson draws it over the
+  card on the permission step, the Screen Time ask's twin. no-ai-slop's Edit job, checked against `eval.md`: each passes as
+  drawn, so none is reworded. Nothing was drawn: the canvas stays at version `1794480318-6d00`.
+
+  **This step's calls, each the conductor's, awaiting the owner's look:**
+  - **`Said.of` names every `AnswerResult`,** where Swift's init ends on `default`: a result added later stops the compile until
+    it has its place, as AN10d's guard asks of every word function, never falling to "couldn't send" unseen. The mapping is the
+    twin's.
+  - **The heading's time is handed in, with no default** (AN10e's call): a formatter from the phone's own pattern and its zone,
+    since java.time's localized pattern ignores Android's 24-hour setting; the heading a pair, (title, subtitle), Focus.kt's
+    `heading`'s own shape, where Swift names its tuple.
+  - **`AnswerCard` is a plain class, as `FocusWords` is,** made from what iOS's init takes, with no equality of its own (Swift's
+    is `Hashable`): AN13d keeps the card's inputs in its own state, as iOS's `Phone` does, and makes the card from them.
+  - **The tests read a little past the twin's:** the lesson followed over a standing that won't read and a state not known; the
+    heading over a class in session beside the one stood in, before that one's bell and once it has rung or is said over, and
+    over a class the read doesn't name with the read in; the couldn't-send line kept while Bali holds the answer it held as the
+    pick was made; and each line's whole text on every board.
+  - **A known limit, the twin's, kept for parity (santa's reviewer B):** the heading takes the first session of the id followed,
+    the one stood in before a class's, as iOS's does. So past the bell of the session the phone stands in, by its own clock,
+    after a teacher's extend that a read of `GET /v1/me` applied while the standing wasn't reconciled (a record of the phone's
+    on its way holds a read's standing back), the class is followed under the same id but headed with the old bell, gone by,
+    until a read reconciles the standing, about one read on a working network. On Android only the permission step heads a
+    lesson (AS3-Lesson), shown past the bell with the lock's switch off. Recommendation, taken with the owner away: the twin's
+    in this step, since the parity rule names every difference and Android's steps edit nothing in `ios/`; a later step heads
+    the entry `lessonSession` matched, in both apps at once.
+
+  **The guard** (`WordsTest`) reads `SyncState.lessonHeading` wherever the phone may stand, the classes not read, read as none,
+  as one and as one in session, before the bell and at it, said over or not; and `AnswerCard.line` for every question a read can
+  show (open or closed, its answer shown or not, the student's own or none), under each `PollProblem` and none, a pick on its way
+  or none, and every `Said` and every `AnswerResult` through `Said.of`, held or not; each `Look` reached.
+
+  **The tests** (`LessonTest.kt`, the JVM, on a US phone in New York, never the PC's zone or locale, times compared with plain
+  spaces): LessonTests' six, each named as the iOS description in one camelCase sentence, loops in place of the parameterized
+  ones. **Tried, each failing by name, then reverted:** a pick's line placed under the offline line (the poll's no-answer test:
+  the failed pick said as offline); the couldn't-send line kept after Bali holds a later answer (the said test: "Bali couldn't
+  send…" for "Your answer is in."); a mark on an open card, the closed looks drawn open (the open test, and the guard:
+  "Look's cases, each with a sample"); the session the phone stands in not checked first (the lesson-followed test, "live" for
+  "tapped", and the heading test, Period 3's for the one stood in); an em-dash in a line (the closed test, and the guard:
+  "AnswerCard.line holds an em-dash"); a too-late card left open (the said test); an `AnswerResult` added with no place (the
+  compile: "'when' expression must be exhaustive. Add the 'Added' branch"); and, after santa's review, the heading taken from
+  the session stood in whenever there is one (the heading test: its class for the class in session's, once its bell rang).
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble :app:lint
+  check` green, Android 10's API check with it (Animal Sniffer over `core` and `outbox`), and no compiler or lint warning from
+  this step's code; the core and outbox suites green in the `check` and four more times on the final code, each task run again
+  (`./gradlew :core:test --rerun :outbox:test --rerun`, neither UP-TO-DATE; 693 tests, six of them new), AN9h's AgeFallbackTest
+  `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run lint && npm test` green. No SDK package
+  was installed and no library added: the build downloads none (`android.builder.sdkDownload=false`), and no build file changed.
+  The size, santa's count: 134 changed lines not counting tests and Markdown (the split guessed about 120), 249 in the tests.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): 0 blockers. Their WARNs: the heading test never headed a lesson whose session
+  stood in had rung, or was said over, beside a class in session, so a heading of the session stood in whenever there is one
+  would have passed (reviewer A; taken: two assertions, their break tried); and the heading's lookup, the twin's known limit
+  above (reviewer B; left as the twin's). The design check, no-ai-slop's Detect job over the new strings, found nothing: each
+  line is iOS's and a board's, in DESIGN.md's voice.
+
+  **For AN13d to AN13g and AS8:** AN13d follows `lessonSession(now, over)`, `over` its own set of sessions a read said are over
+  (iOS's `notFollowed`), and makes the card from the lesson's state, `AnswerCard(question, state.problem, sending, said)`, `said`
+  from `Said.of(result, held)`, `held` the id of the answer Bali held as the pick was made; Hide is its own, the card's state
+  too. AS8 draws `looks`, `line` in the primary ink where `alert` and with the no-connection icon where `offline`, and its own
+  words (Question, Question · Closed, Hide, "Hide this question" to TalkBack, Correct answer, Your answer); AS3's permission step
+  heads its card and slide with `lessonHeading`, its time from the phone's own pattern, as AS5's Focus. Q2 and Q3 still wait for
+  the owner (AN13f and AN13g); nothing here waited on them.
+
 - **2026-11-12** — **AN13b, the deck downloaded, checked against its `sha256` and kept for the session: BaliCore's `deck(for:)`
   (M7) in Kotlin, in `core`, every outcome a type and nothing on disk, the second of AN13's seven steps (the conductor's Q5 and
   Q6 built, and this step's own calls, marked, each awaiting the owner's look; AN13b, #575).** The owner is asleep and said to

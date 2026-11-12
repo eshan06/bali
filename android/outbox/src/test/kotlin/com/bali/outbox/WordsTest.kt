@@ -1,5 +1,6 @@
 package com.bali.outbox
 
+import com.bali.core.AnswerResult
 import com.bali.core.ApiErrorReason
 import com.bali.core.BaliJson
 import com.bali.core.BlockRead
@@ -9,8 +10,11 @@ import com.bali.core.MeClass
 import com.bali.core.MeResponse
 import com.bali.core.NoAnswer
 import com.bali.core.ParticipationState
+import com.bali.core.PollProblem
 import com.bali.core.SendResult
 import com.bali.core.SignInError
+import com.bali.core.StudentAnswer
+import com.bali.core.StudentQuestion
 import com.bali.core.UnlockReason
 import java.io.IOException
 import java.time.LocalDate
@@ -20,7 +24,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-// The guard over every Android word (AN10d's, each later AN10 step adding its own to `everyWord`): none names what Android
+// The guard over every Android word (AN10d's, each later step adding its own to `everyWord`): none names what Android
 // lacks (Screen Time, iOS, an iPhone, FaceTime, Emergency SOS: DESIGN.md's Android section, the canvas's Words board) nor holds
 // an em-dash or an exclamation mark (DESIGN.md, section 7). It reads each word function for every case of the types it keys on,
 // never a list of the words themselves: a case added later with no word stops its function's `when` compiling, and one given
@@ -44,7 +48,7 @@ private fun me(json: String): MeResponse = BaliJson.decodeFromString(MeResponse.
  * Home's, a scan's, Tap in's, the sign-in's and the start's; AN10e's, Focus's, Emergency Unlock's failures and the block
  * screen's; AN10f's, Unlocked's, a reason's and Back to focus's failures, Protection off's, Session over's and Home's card for a
  * class in session; AN10g's, Me's name, Leave and Sign out, whose sign-in it is, Delete account and the 13+ stop; AN10h's,
- * History's and the consent list.
+ * History's and the consent list; AN13c's, the live lesson's heading and the answer card's line.
  */
 private fun everyWord(): Map<String, List<String>> {
     // Every result an answer can have, a status from 100 to 599 or none, and every reason with none.
@@ -153,6 +157,31 @@ private fun everyWord(): Map<String, List<String>> {
         }
     val titles =
         each(History.Title::class, History.Title.Today, History.Title.Yesterday, History.Title.On(LocalDate.of(2026, 9, 16)), History.Title.On(LocalDate.of(2025, 12, 15)))
+    // The live lesson's: its heading wherever the phone may stand, with the classes as above and one in session by the last read,
+    // before the bell and at it, said over or not; and the answer card for every question a read can show, open or closed, its
+    // answer shown or not, the student's own or none, under each poll's problem and none, a pick on its way or none, and what the
+    // last pick said, every `Said` and every `AnswerResult` through `Said`, each look reached.
+    val headings =
+        (states + standings.map { SyncState(standing = it, me = live) }).flatMap { state ->
+            listOf(t0, at(3000)).flatMap { now -> listOf(emptySet(), setOf("s")).mapNotNull { state.lessonHeading(now, it, newYorkZone, usShortTime) } }
+        }
+    val answers = listOf(null, StudentAnswer(1, "e1"), StudentAnswer(2, "e2"))
+    val questions =
+        listOf(true, false).flatMap { open ->
+            listOf(null, 1).flatMap { correct -> answers.map { StudentQuestion("q", "Which value of x solves it?", listOf("1", "2", "3", "6"), open, correct, it) } }
+        }
+    val polls = listOf(null) + each(PollProblem::class, *NoAnswer.entries.map { PollProblem.Unreachable(it) }.toTypedArray(), PollProblem.RateLimited, PollProblem.Refused(503, null))
+    val outcomes =
+        each(
+            AnswerResult::class, AnswerResult.Answered(StudentAnswer(2, "e2")), AnswerResult.QuestionClosed, AnswerResult.InvalidOption, AnswerResult.EventIdConflict,
+            AnswerResult.AccountDeleted, *NoAnswer.entries.map { AnswerResult.Unreachable(it) }.toTypedArray(), AnswerResult.Refused(500, null),
+        )
+    val saids =
+        (listOf(null) + each(AnswerCard.Said::class, AnswerCard.Said.TooLate, AnswerCard.Said.Failed(null), AnswerCard.Said.Failed("e1")) +
+            outcomes.flatMap { outcome -> listOf(null, "e1").map { AnswerCard.Said.of(outcome, it) } }).distinct()
+    val answerCards =
+        questions.flatMap { question -> polls.flatMap { problem -> listOf(null, 0).flatMap { sending -> saids.map { AnswerCard(question, problem, sending, it) } } } }
+    each(AnswerCard.Look::class, *answerCards.flatMap { it.looks }.distinct().toTypedArray())
     return mapOf(
         "Joining.Failure.words" to each(Joining.Failure::class, *failures.toTypedArray()).map { it.words },
         "SyncState.meWords" to each(SendResult::class, *results.toTypedArray()).map { SyncState(meFailed = it).meWords },
@@ -191,6 +220,8 @@ private fun everyWord(): Map<String, List<String>> {
         "History.Note.words" to History.Note.entries.map { it.words },
         "History.Title.words" to titles.map { it.words(t0, newYorkZone, usDate, usDateWithYear) },
         "ConsentList" to listOf(ConsentList.WHOLE, ConsentList.ADDED).flatMap { it.sees + it.neverSees },
+        "SyncState.lessonHeading" to headings.flatMap { listOf(it.first, it.second) },
+        "AnswerCard.line" to answerCards.map { it.line },
     ).mapValues { (_, words) -> words.filterNotNull() }
 }
 

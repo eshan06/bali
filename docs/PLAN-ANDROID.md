@@ -14,13 +14,13 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-12 (Central) — AN13b, the deck downloaded, checked against its `sha256` and kept for the session (#575;
-`docs/DECISIONS.md`, 2026-11-12), the second of AN13's seven steps: `core`'s `LiveLesson.deck`, BaliCore's `deck(for:)` (M7),
-in memory alone: a fresh presigned URL for each fetch, never kept; the bytes from the bucket through the client's own transport
-with no token, asked for as stored (Q6); a bucket's `403` asks for a fresh URL once; the bytes checked against the slide's
-SHA-256 before they leave, a mismatch kept nowhere; every deck the session showed kept by its `sha256` (Q5), emptied once a
-read says the session is over, a fetch that ends after it included; each outcome a type. Nothing on disk, no word and no
-screen. Before it, AN13a, the live lesson's poll and answer. Next: AN13c to AN13e; AN13f and AN13g once the owner has answered
+_Last updated: 2026-11-12 (Central) — AN13c, which lesson the phone follows, its heading, and the answer card's looks and words
+(#576; `docs/DECISIONS.md`, 2026-11-12), the third of AN13's seven steps: `outbox`'s `Lesson.kt`, BaliOutbox's `Lesson.swift`:
+the session the phone stands in, checked first, else the first class in session by `GET /v1/me`, each while its bell is ahead by
+the phone's clock and never one a read said is over; its class's heading, in the phone's own time pattern and zone; and the
+answer card, each answer open to a tap or closed with its marks, and the line under them, the iPhone's seven word for word, each
+drawn on AS8's card boards, so nothing was drawn; what a pick's request said a type, every `AnswerResult` placed in it. Nothing
+kept, no screen. Before it, AN13b, the deck. Next: AN13d and AN13e; AN13f and AN13g once the owner has answered
 Q2 and Q3 (DECISIONS 2026-11-12); AN11, AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the
 owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the
 owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
@@ -201,8 +201,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   then an end-to-end check like N6's on an Android phone (📱)
 - **AN13a** The live lesson's poll and answer — ✅ (#574; DECISIONS 2026-11-12)
 - **AN13b** The deck downloaded, checked against its `sha256` and kept for the session — ✅ (#575; DECISIONS 2026-11-12)
-- **AN13c** Which lesson, its heading, and the answer card's looks and words (twin: BaliOutbox's `Lesson.swift`) —
-  validation: the JVM tests
+- **AN13c** Which lesson, its heading, and the answer card's looks and words — ✅ (#576; DECISIONS 2026-11-12)
 - **AN13d** The lesson followed: the poll while Bali is in front, the answer, Hide (twin: BaliApp.swift's `Phone`, its
   lesson half); answers never enter the outbox — validation: the JVM tests
 - **AN13e** The slide's deck, asked for once, one document at a time (twin: BaliApp.swift's deck half and SlideView.swift's
