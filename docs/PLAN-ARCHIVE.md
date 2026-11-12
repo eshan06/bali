@@ -10,6 +10,19 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN13a's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN10h, History's words and the consent list (#573; `docs/DECISIONS.md`, 2026-11-12),
+the last of AN10's eight steps, so AN10 is done: in `outbox`, each a function of its type, iOS's word for word but where AS0's
+Words board names Bali's lock: a read's failures, a teacher's account's own line and Join's for the rest, Bali still starting
+among them; each moment, "Lock off" and "Lock back on" for the lock's two kinds, a reason on an unlock alone and a class on a
+declined tap alone; each note, "The lock was off at the time" among them; a day's title, its date with its year once that isn't
+this one, and a moment's time, from the phone's own patterns (Q6); and the consent list, iOS's line for line but its focus
+status, "Bali's lock off", with what the one-time screen lists. Every line is iOS's or a board's, so nothing was drawn. No
+screen. Before it, AN10g, the words of Me, Leave, Sign out, Delete account and the 13+ stop. Next: AN11 to AN13 and Phase 10's
+screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the
+13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the
+owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the
+owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN10h's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN10g, the words of Me, Leave, Sign out, Delete account and the 13+ stop (#572;
 `docs/DECISIONS.md`, 2026-11-12), the seventh of AN10's eight steps: in `outbox`, each a function of its type, iOS's word for
 word: a name's refusals, Leave's question and refusals, Sign out's holds, none saying the unlock goes, and whose sign-in it is;
@@ -2792,6 +2805,34 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN13a's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12). The conductor split AN13's
+line into AN13a–AN13g that day (Q1), one short line each in `docs/PLAN-ANDROID.md`, and AN13's line comes here whole,
+below it.
+
+- **AN13a** The live lesson's poll and answer (twin: LiveLesson.swift's `LessonState`, `PollProblem`, `AnswerResult`,
+  `run`, `poll`, `answer` and `later`, L5): `core`'s `LiveLesson`, in memory alone, the poll every 2 s with
+  `If-None-Match`, a `429`'s wait bounded, one run at a time, over is over; the answer one request a call, minted after the
+  answer held and the last minted here, a refusal keyed on its reason; every outcome a type, no word. Tests:
+  LiveLessonTests' poll and answer suites, over a `LessonWorld` transport — validation: the JVM tests
+
+AN13's line, as it read until the conductor split it (2026-11-12), word for word.
+
+- **AN13** The live lesson's engine (twin: `LiveLesson`, L5, and M7's deck download and cache): the
+  poll and the answer, the deck downloaded, checked against its `sha256` and cached, and a page
+  drawn with `PdfRenderer`; answers never enter the outbox
+
+`docs/PLAN.md`'s Now line for Android, as it read until AN13a (2026-11-12), word for word: AN13a moved its list of what
+AN2–AN10's code is here, to make room in PLAN.md.
+
+- **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
+  AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
+  2026-11-03); AN1b ✅ (DECISIONS 2026-11-04); part 2 on
+  a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱), before
+  launch; AN2–AN10's code, the core, the unlock contract, the outbox, the engine, sign-in,
+  the lock, the tap, ✅ (#488–#573); AN11–AN13 next. AS0, the
+  screens' canvas, ✅ approved as it stands
+  (#484, #486; DECISIONS 2026-11-04). Not on the pilot's critical path.
 
 AN10h's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12).
 

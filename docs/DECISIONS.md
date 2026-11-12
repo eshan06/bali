@@ -8,6 +8,78 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **AN13a, the live lesson's poll and answer: BaliCore's `LiveLesson` (L5) in Kotlin, in `core`, every
+  outcome a type and nothing stored, the first of AN13's seven steps (the conductor's Q1 built, and this step's own calls,
+  marked, each awaiting the owner's look; AN13a, #574).** The owner is asleep and said to take the recommended option on
+  every regular call, so each call here is the conductor's or this step's, for the owner to look at.
+
+  **Where it lives:** `core`'s new `LiveLesson.kt`: `LessonState`, `PollProblem` and `AnswerResult`, each a type as iOS's
+  are, and `LiveLesson` with `run` (the poll), `answer`, `INTERVAL` (2 s) and `LONGEST_WAIT` (a minute). Swift's actor is a
+  lock each stretch holds (`alone`, under `NonCancellable`), let go at each call to the API, as `Account`'s and the engine's
+  are; `state` is one `StateFlow`, Swift's `state` and `updates` both, each change a copy (`Presentation` and its question
+  changed through `copy`); `now` and `sleep` are handed in as functions, not `outbox`'s `SyncClock`, as L5 did. `ApiClient`
+  is unchanged: its `presentation` (`If-None-Match` sent, the answer's `ETag` and a `429`'s `Retry-After` read) and `answer`
+  are AN3d's, all the twin needs. **Answers never enter the outbox** (ARCHITECTURE, "Live lesson", decision 5): `core` can't
+  see `outbox`, so nothing here reaches it or any store, and the lesson lives in memory alone. No word and no screen: AN13c
+  words each outcome in `outbox`, AS8 draws them. `android/app` is unchanged, so no emulator ran.
+
+  **The rules, each the twin's with its test:** a read every 2 s with the last `200`'s `ETag` as `If-None-Match`, a `304`
+  keeping the last read and the student's answer with it; a `429` waits its `Retry-After` from 2 s to a minute, a longer one,
+  none or a date the minute; every other failure said beside what is kept (`PollProblem`) and tried again in 2 s; stopped
+  once a read says the session isn't running, and over is over: a read failing after it says nothing; one run at a time, a
+  newer one taking over and the older stopping at its next read, saying nothing of it; a read that comes back as its
+  coroutine is cancelled kept nowhere. The answer is one request a call, its id minted after the answer held and after the
+  last minted here (`EventId.mint(at, after)`), so two quick taps from a clock behind sort in the order made; a refusal is
+  known by its reason, never its message; and the answer kept is the one whose id sorts last, so a read the server made
+  before an answer landed never takes it back, a laptop's later one does, and a pick on one question never shows on the
+  next.
+
+  **The conductor's call, built (Q1):** AN13 takes BaliOutbox's `Lesson.swift` and the iPhone `Phone`'s lesson half (AN13c,
+  AN13d, AN13e, AN13g), as ARCHITECTURE's decision 5 keeps every rule off the screens and AN10 put every screen's words in
+  `outbox`; AS8 keeps the views and calls `lessonHeading`. PLAN-ANDROID's AN13 line is now AN13a–AN13g, one short line each
+  naming its twin, the full line in PLAN-ARCHIVE word for word. **Q2 and Q3 wait for the owner:** where a deck's PDF is
+  parsed (the conductor recommends an isolated service process, since Bali's own holds the lock's Accessibility service and
+  the sign-in's tokens) and how its bytes reach the renderer (the conductor recommends an anonymous memory file on Android 11
+  and later, and on Android 10 a `no_backup/` file deleted the moment it opens), a security call and one that stores a deck
+  beyond the twin. AN13f and AN13g wait for the owner's answers; AN13b to AN13e don't, and nothing of this step does.
+
+  **This step's calls, each awaiting the owner's look:**
+  - **A cancelled run ends by throwing,** as coroutines end, where Swift's `run()` returns; nothing of the read under way is
+    kept either way. A read that came back just as its coroutine was cancelled (the app gone behind then) is dropped by a
+    check right after it (`ensureActive`), Swift's `Task.isCancelled`.
+  - **`state` never ends,** a `StateFlow`, where Swift's stream finishes as the lesson goes: the owner's scope ends what reads
+    it (AN13d).
+  - **A `429`'s `Retry-After` is read as the client reads it,** whole seconds, so a negative one waits 2 s, and a date, none,
+    or one past an `Int` the minute, as iOS's `Int(...)` reads it.
+  - **`LessonState` has a public constructor,** Swift's public init (L8b-1), for the app's fixtures and tests.
+  - **One run at a time is the twin's to the letter:** an older run asleep when a newer one starts reads once more before it
+    stops, saying nothing. The owner cancels a run as Bali goes behind, and a cancelled sleep throws at once, so only a run
+    left uncancelled meets it.
+
+  **The tests** (`LiveLessonTest.kt`, the JVM): LiveLessonTests.swift's poll and answer suites, eighteen, each named as the
+  iOS description in one camelCase sentence, loops in place of the parameterized ones, each failure naming its case. They
+  run over iOS's `LessonWorld` as a transport: the server's replies in order, each able to be held on a `CompletableDeferred`
+  until the test lets it go, to cancel its caller's coroutine, or to echo the pick it was sent; a clock that moves only when
+  the poll waits; and a wait that throws once no reply is left or at the 20th (`Stopped`, a `CancellationException`, as the
+  owner's cancel ends a run). A test waiting for something to happen waits for the world's own mark, a reply held, never a
+  window of real time. **Tried, each failing by name, then reverted:** `If-None-Match` dropped (the cadence test, and three
+  more that read it); the `429`'s wait unbounded (the `429` test, "Retry-After: 600"); `run != runs` removed (one run at a
+  time: a third wait, the stale read kept); the still-active check after the read removed (the cancelled test: the read under
+  way kept); the read's answer taken over the one held (the kept-answer test and the answer-during-a-poll one); a mint without
+  the last id minted here (the quick taps, and the pick-after-the-pick test); "over is over" removed (the over-stays-over
+  test, "offline"); and a refusal keyed on its message (the by-reason test: `event_id_conflict` said "the question is
+  closed").
+
+  **The proof:** PROOF
+
+  **Santa's review:** SANTA
+
+  **For AN13b to AN13g and AS8:** AN13b adds the deck beside the poll: `DeckResult`, the decks kept by `sha256` and emptied
+  where over is over, `deck(slide)` and its fetch, with `ApiClient`'s `transport` and `timeout` made `internal` for it. AN13d
+  runs `run()` in its own scope while Bali's screen is in front and cancels it as the screen goes behind, calls `answer` in
+  its own scope too, so a screen leaving never cuts an answer short, and reads `state`. AN13c words `PollProblem` and
+  `AnswerResult`. Nothing here polls or answers by itself.
+
 - **2026-11-12** — **AN10h, History's words and the consent list: BaliOutbox's `History.words`, `notUpdated`, the moments'
   and notes' words and the day titles, and JoinView.swift's `ConsentCard` lists in Kotlin, each a function of its type, the
   last of AN10's eight steps (the conductor's Q6 built, and this step's own calls, marked, each awaiting the owner's look;

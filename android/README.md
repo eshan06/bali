@@ -7,12 +7,12 @@ lock's service with its cover and a readout for the phone checks (both in the De
 NFC reader, the engine with the enforcer and the account it starts, and the backup rules that keep them on
 the phone: no screen a student sees, no icon.
 
-| Folder                      | What it is                                                                                                                |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `core/`                     | BaliCore's twin: the wire types, the vocabulary, event ids, the API client and `BlockTag` (AN3) — tests on the JVM        |
-| `outbox/`                   | BaliOutbox's twin: the outbox, the sync engine, the lock's rules and which screen shows when (AN4–AN7) — tests on the JVM |
-| `app/`                      | The app, `com.bali.bali`: the screens, the lock's service, NFC, sign-in and push                                          |
-| `gradle/libs.versions.toml` | Every version the build names                                                                                             |
+| Folder                      | What it is                                                                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `core/`                     | BaliCore's twin: the wire types, the vocabulary, event ids, the API client, `BlockTag` (AN3) and the live lesson (AN13) — tests on the JVM |
+| `outbox/`                   | BaliOutbox's twin: the outbox, the sync engine, the lock's rules and which screen shows when (AN4–AN7) — tests on the JVM                  |
+| `app/`                      | The app, `com.bali.bali`: the screens, the lock's service, NFC, sign-in and push                                                           |
+| `gradle/libs.versions.toml` | Every version the build names                                                                                                              |
 
 The app's id is `com.bali.bali`, iOS's `com.bali.Bali` lowercased; it runs on Android 10 and later
 (minSdk 29), targets Android 16 (targetSdk 36, Play's rule for new apps and updates since
@@ -97,6 +97,19 @@ request with a body goes once, whatever comes back; a read goes again on a fresh
 its pooled one turns out closed, as URLSession's does. Its tests run against MockWebServer on a
 local port. Gradle picks OkHttp's Android build for the app and its JVM build for `core`'s tests.
 Its calls suspend (kotlinx.coroutines), as Swift's are async.
+
+**The live lesson** (`core`'s `LiveLesson.kt`, BaliCore's `LiveLesson.swift`, AN13a): one running session's lesson as the
+phone follows it, in memory alone. Its poll (`run`) reads the presentation every 2 s with the last answer's `ETag` as
+`If-None-Match`, a `304` keeping the last read and the student's answer with it; waits out a `429`'s `Retry-After`, from 2 s
+to a minute; says every other failure as a `PollProblem` beside what it keeps; and stops once a read says the session is
+over, a failure after it said as nothing. One run at a time, the newest taking over; a read that comes back after its run
+was cancelled changes nothing. Its `answer` sends one request a call, under an id minted after the answer held and after the
+last minted here, a refusal known by its reason, never its message (`AnswerResult`), and keeps the answer whose id sorts
+last, so a read made before an answer landed never takes it back. Swift's actor is a lock each stretch holds, let go at each
+call to the API; its state is a `StateFlow`, its clock and its wait handed in. `core` can't see `outbox`, so no answer ever
+enters it, and nothing words an outcome here: `outbox` does (AN13c). Its tests run over a world of their own
+(`LessonWorld`): the server's answers in order, each held, cancelling its caller or echoing the pick as a test says, and a
+clock that moves only when the poll waits.
 
 **Sign-in** (`core`'s `SignIn.kt` and `TokenStore.kt`, BaliCore's `SignIn.swift`) has its parts (AN6a): the hosted UI's address with PKCE, its verifier and state from
 `SecureRandom`; the code in its answer, taken only at the redirect URI and only for its attempt, the
