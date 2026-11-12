@@ -165,6 +165,14 @@ test('the hero’s Bali block has no rings around it, at any width', async ({ pa
   await expect(page.locator('.hs-rings')).toHaveCount(0);
 });
 
+test('the hero has no line on the states’ phone laws, and the research section still links to them', async ({ page }) => {
+  await open(page, '/');
+  // The owner, 2026-11-12: "remove this".
+  await expect(page.locator('.bs-hero')).not.toContainText('40 states');
+  await expect(page.locator('.bs-hero a[href="/phone-laws"]')).toHaveCount(0);
+  await expect(page.locator('#problem a[href="/phone-laws"]')).toHaveCount(1);
+});
+
 test('the words inside the pictures of the product can’t be selected, and the page’s own words can', async ({ page }) => {
   for (const path of ['/', '/guides/first-class', '/guides/emergency-unlock']) {
     await open(page, path);
