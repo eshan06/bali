@@ -85,7 +85,8 @@ the Kids category brings its own rules (guideline 1.3) for under-13 apps.
 - Marketing URL: the website, `https://www.getbali.app`.
 - Privacy policy URL: C2's privacy policy page, `https://app.getbali.app/privacy`, given with the
   App Privacy answers (section 3). ⚖️ its words.
-- Copyright: `2026 Eshan Shah`.
+- Copyright: `2026 Eshan Shah`. Bali is Bali Focus Inc. since 2026-11-11 (`docs/DECISIONS.md`): the owner
+  changes it to `2026 Bali Focus Inc.` here, and the seller's name with the developer account.
 - Content Rights: "Yes, it contains, shows, or accesses third-party content, and I have the
   necessary rights": a teacher's slides and questions. `/terms` has teachers upload only what they
   have the right to share (section 3), and give Bali permission to show it to their class
