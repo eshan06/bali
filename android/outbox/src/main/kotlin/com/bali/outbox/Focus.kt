@@ -1,6 +1,7 @@
 package com.bali.outbox
 
 import com.bali.core.ParticipationState
+import com.bali.core.SessionView
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -8,7 +9,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 // What the Focus screen says (C4), BaliOutbox's Focus.swift: `FocusWords`, from the engine's truth and what rule 3's check
-// verified, each line a function of their types (WordsTest reads every one). iOS's `unscheduled` has no twin: nothing has to
+// verified, each line a function of their types (WordsTest reads every one), and the session's `heading`, which the other
+// screens of a session share (AN10f's, AS8's). iOS's `unscheduled` has no twin: nothing has to
 // wake at the bell (the Words board). Emergency Unlock's failures are said beside their type (`UnlockFailure.words`,
 // SyncEngine.kt) and the block screen's in ShieldWords.kt; the screen, the hold and the words drawn in it (its chips, Almost
 // done, While offline, Open Accessibility settings, the time left as TalkBack says it) are AS5's.
@@ -88,11 +90,9 @@ class FocusWords(
             title = "You're in"
             subtitle = "Your class shows here once Bali hears back."
         } else {
-            // The class, where `GET /v1/me` names it, and under it its teacher and bell (C4, C5a).
-            val named = sync.me?.classes?.firstOrNull { it.id == session.classId }
-            val bell = "ends ${time.format(session.endsAt.atZone(zone))}"
-            title = named?.name ?: "In focus"
-            subtitle = named?.teacher?.displayName?.let { "with $it · $bell" } ?: bell
+            val (named, line) = sync.heading(session, zone, time)
+            title = named ?: "In focus"
+            subtitle = line
         }
         // Each line one string, as the boards and iOS write it.
         superseded =
@@ -148,4 +148,15 @@ class FocusWords(
             return Countdown(seconds, digits, fraction, until, final = left <= Duration.ofMinutes(2))
         }
     }
+}
+
+/**
+ * A session's class, where `GET /v1/me` names it (none where it doesn't), and under it its teacher and bell (C4, C5a), the bell
+ * in [time] at [zone]: BaliOutbox's `SyncState.heading`, which Focus says, and Unlocked's, Protection off's and the lesson's
+ * headings with it, so the headings can't drift apart.
+ */
+internal fun SyncState.heading(session: SessionView, zone: ZoneId, time: DateTimeFormatter): Pair<String?, String> {
+    val named = me?.classes?.firstOrNull { it.id == session.classId }
+    val bell = "ends ${time.format(session.endsAt.atZone(zone))}"
+    return named?.name to (named?.teacher?.displayName?.let { "with $it · $bell" } ?: bell)
 }
