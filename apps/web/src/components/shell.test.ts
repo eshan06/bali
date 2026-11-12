@@ -698,8 +698,10 @@ describe('one `<main>` on a page, in every state (the owner’s follow-up, 2026-
       .filter((file) => /<main\b|'main'/.test(code(file)))
       .map((file) => relative(src, file).split(sep).join('/'))
       .sort();
-    // The shell's, and Help's, a policy's and sign-in's own (`EntryPage` signed out).
+    // The shell's, and Help's, a policy's, sign-in's own (its two panels, the sign-in redesign) and
+    // the callback's (`EntryPage` signed out).
     expect(drawers).toEqual([
+      'app/login/page.tsx',
       'app/support/page.tsx',
       'components/entry-page.tsx',
       'components/policy-draft.tsx',
