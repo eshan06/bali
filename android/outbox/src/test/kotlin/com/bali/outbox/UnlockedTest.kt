@@ -401,14 +401,17 @@ class ProtectionOffScreenTest : OutboxFiles() {
 
     @Test
     fun sessionOverSaysTheClassThatEndedAndWhenByItsBellAndThatEveryAppIsBackOnlyOnceTheCheckFoundNoLockOnAClassNotReadIsYourClassInNoSessionNothing() {
-        // AS6-Over. Nothing checked, nothing claimed of the apps.
+        // AS6-Over. Nothing checked, nothing claimed of the apps (rule 3): no check yet, nor one not made, which iOS's defaults
+        // would claim (santa's review).
         val rung = synced(inBell1042(ParticipationState.Focused))
         assertEquals(
             "$period3 ended at 10:42 AM. All your apps are back.",
             plain(rung.sessionOverWords(checked(LockSwitch.On), newYorkZone, usShortTime)),
         )
         assertEquals("$period3 ended at 10:42 AM.", plain(rung.sessionOverWords(checked(LockSwitch.On, locked = true), newYorkZone, usShortTime)))
-        assertEquals("$period3 ended at 10:42 AM.", plain(rung.sessionOverWords(null, newYorkZone, usShortTime)))
+        for (unchecked in listOf(null, Protection())) {
+            assertEquals("$period3 ended at 10:42 AM.", plain(rung.sessionOverWords(unchecked, newYorkZone, usShortTime)), "$unchecked")
+        }
         val unread = synced(inBell1042(ParticipationState.Unlocked), me = false)
         assertEquals(
             "Your class ended at 10:42 AM. All your apps are back.",

@@ -48,6 +48,7 @@ class DroppedWaitTest : EngineFiles() {
             val state = rig.until { it.standing != Standing.Waiting }
             val now = rig.clock.now()
             assertEquals(Standing.Out, state.standing)
+            assertEquals(at(4000), state.me?.classes?.single()?.liveSession?.endsAt)
             assertEquals(Screen.Shown(Screen.Home, true), shown(state, now = now))
             val card = assertNotNull(state.inSessionCard(now, newYorkZone, usShortTime))
             assertEquals(false to at(4000), card.unlocked to card.bell)

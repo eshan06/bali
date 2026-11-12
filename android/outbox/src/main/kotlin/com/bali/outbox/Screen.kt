@@ -454,14 +454,15 @@ internal fun SyncState.refusedRefocus(session: String): String? {
 
 /**
  * What Session over says (C5b; AS6's Session over) of the session the phone stands in, its bell rung: the class and when, and that
- * every app is back only once rule 3's check found no lock on ([Protection.locked], iOS's `shielded`); none standing in none. The
- * bell in [time] at [zone], as the phone writes it ([FocusWords]). BaliOutbox's `sessionOverWords`.
+ * every app is back only once rule 3's check has run and found no lock on ([Protection.locked], iOS's `shielded`), never over a
+ * check not made yet, which iOS's defaults would claim; none standing in none. The bell in [time] at [zone], as the phone writes it
+ * ([FocusWords]). BaliOutbox's `sessionOverWords`.
  */
 fun SyncState.sessionOverWords(protection: Protection?, zone: ZoneId, time: DateTimeFormatter): String? {
     val session = (standing as? Standing.InSession)?.session ?: return null
     val name = me?.classes?.firstOrNull { it.id == session.classId }?.name ?: "Your class"
     val ended = "$name ended at ${time.format(session.endsAt.atZone(zone))}."
-    return if (protection?.locked == false) "$ended All your apps are back." else ended
+    return if (protection?.checked == true && !protection.locked) "$ended All your apps are back." else ended
 }
 
 /**

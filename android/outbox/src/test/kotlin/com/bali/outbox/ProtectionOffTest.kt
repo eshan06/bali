@@ -576,6 +576,9 @@ class LockBackOnTest : EngineFiles() {
             phone.enforcer.check()
             assertEquals(emptyList(), rig.outbox.records())
             assertEquals(inSession(ParticipationState.ProtectionOff), rig.engine.updates.value.standing)
+            // The screen claims nothing yet and offers nothing (AN10f): the check's way, never the re-tap over a switch starting.
+            val claim = phone.until { it.switch == LockSwitch.Starting && !it.switchedOff }
+            assertEquals(ProtectionOffWords.Way.Checking, ProtectionOffWords.of(rig.engine.updates.value, claim, newYorkZone, usShortTime)?.way)
             phone.lock.set(LockSwitch.On)
             phone.enforcer.check()
             assertEquals(listOf(Change.ProtectionOn("s")), rig.outbox.records().map { it.change })
