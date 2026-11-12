@@ -36,7 +36,8 @@ private fun me(json: String): MeResponse = BaliJson.decodeFromString(MeResponse.
 
 /**
  * Every word the app says, by the function that says it, each read for every case of the types it keys on: AN10d's, Join's,
- * Home's, a scan's, Tap in's, the sign-in's and the start's. Each later AN10 step adds its own.
+ * Home's, a scan's, Tap in's, the sign-in's and the start's; AN10e's, Focus's, Emergency Unlock's failures and the block
+ * screen's. Each later AN10 step adds its own.
  */
 private fun everyWord(): Map<String, List<String>> {
     // Every result an answer can have, a status from 100 to 599 or none, and every reason with none.
@@ -60,6 +61,26 @@ private fun everyWord(): Map<String, List<String>> {
             SignInError::class, SignInError.Cancelled, SignInError.NotOpened("another sign-in page is open"), SignInError.Unreachable,
             *refusals.toTypedArray(), SignInError.NotKept,
         )
+    // Focus where the phone may stand, with a tap held or none, a late unlock of its session or none, every link and sign-in, and
+    // each claim the check can make, the switch off with its report kept or not; each claim reached, so each one's words are read.
+    val synced =
+        standings.flatMap { standing ->
+            classes.flatMap { me ->
+                listOf(emptyList(), listOf(queued(Change.Tap("tag")))).flatMap { queue ->
+                    listOf(null, Superseded("s", ordered = true), Superseded("s", ordered = false)).flatMap { late ->
+                        (Link.entries + null).map { SyncState(standing = standing, queued = queue, link = it, superseded = late, me = me) }
+                    }
+                }
+            }
+        }
+    val protections =
+        listOf(null, Protection(), Protection(checked = true, switch = LockSwitch.On, locked = true)) +
+            listOf(false, true).map { Protection(checked = true, switch = LockSwitch.Off, switchedOff = true, unreported = it) }
+    val focus =
+        synced.flatMap { state ->
+            protections.flatMap { protection -> listOf(null, false, true).map { FocusWords(state, protection, t0, newYorkZone, usShortTime, it) } }
+        }
+    assertEquals(FocusWords.Claim.entries.toSet(), focus.map { it.claim }.toSet(), "FocusWords.Claim's cases, each reached")
     return mapOf(
         "Joining.Failure.words" to each(Joining.Failure::class, *failures.toTypedArray()).map { it.words },
         "SyncState.meWords" to each(SendResult::class, *results.toTypedArray()).map { SyncState(meFailed = it).meWords },
@@ -70,6 +91,10 @@ private fun everyWord(): Map<String, List<String>> {
         "SyncState.noClassesCard" to states.flatMap { state -> listOf(false, true).map { state.noClassesCard(everInClass = it) } },
         "SignInError.words" to signIns.flatMap { error -> HostedPage.entries.map { error.words(it) } },
         "Problem.words" to each(Problem::class, Problem.NotSetUp, Problem.StartFailed(IOException("disk I/O error"))).map { it.words },
+        "FocusWords" to
+            focus.flatMap { listOf(it.title, it.subtitle, it.claimWords, it.countdown?.digits, it.countdown?.until, it.offline, it.stalled, it.superseded) },
+        "UnlockFailure.words" to UnlockFailure.entries.flatMap { failure -> listOf(false, true).map { failure.words(paused = it) } },
+        "ShieldWords.words" to ShieldWords.entries.map { it.words },
     ).mapValues { (_, words) -> words.filterNotNull() }
 }
 

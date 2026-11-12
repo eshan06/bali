@@ -8,6 +8,112 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **AN10e, Focus's words and the block screen's: BaliOutbox's `FocusWords`, `UnlockFailure`'s words and
+  `ShieldWords` in Kotlin, each line a function of its type, the claim naming Bali's lock, the block screen's title alone,
+  and the late unlock's clock line naming Android's Settings, drawn first (the conductor's calls, made in this step, marked,
+  each awaiting the owner's look; AN10e, #570).** The owner is asleep and said to take the recommended option on every
+  regular call, so each call here is the conductor's, for the owner to look at.
+
+  **Where it lives:** `outbox`, beside each type. `Focus.kt`: `FocusWords`, from the engine's truth (`SyncState`) and what
+  rule 3's check verified (`Protection`), with its `Claim` (`Paused`, `LockOff`, `Unverified`: iOS's `screenTimeOff` named
+  for Android's lock, `locked` standing for `shielded` and `switchedOff` for `permissionOff`, Q3) and its `Countdown`.
+  `SyncEngine.kt`: `UnlockFailure.words(paused)`, beside AN5e's type, a phone not started said with
+  `Joining.Failure.NotStarted.words` (AN10d's call; `UnlockFailure.NotStarted` was already there). `ShieldWords.kt`: the
+  block screen's parts as a type (`Title`, `Ok`, `OpenBali`), their words a function of it. `android/app` is unchanged, and
+  no screen is built: Focus, the hold and the block screen are AS5's.
+
+  **The words:** each iOS's, word for word, its straight apostrophes too, but four from the Android canvas:
+  - the switch off, "Bali's lock is off, so no app is paused. Turn it back on in Settings → Accessibility → Bali." (the
+    Words board's "Focus"; AS5-Focus-lockoff-a);
+  - nothing verified yet, "Checking Bali's lock…" (the Words board's "Focus, lock off"; AS5-Focus-checking);
+  - the block screen, "Focused with Bali" alone, with OK (the iPhone shield's button) and Open Bali (the Words board's new
+    line), the line under the title cut by the owner (2026-11-04), where the iPhone keeps "This app is paused for class.
+    Open Bali to Emergency Unlock.";
+  - a late unlock with the phone's clock behind, its second sentence Android's (below; AS5-Focus-clock).
+  iOS's `unscheduled` has no twin (the Words board's "No Android twin": nothing has to wake at the bell). The words drawn in
+  the screen itself (Focused, Almost done, No connection, While offline, Open Accessibility settings, the time left as
+  TalkBack says it) are AS5's, as they are iOS's view's, not `FocusWords`'.
+
+  **The conductor's calls, made in this step, each awaiting the owner's look:**
+  - **The late unlock's clock line names Android's own way** (the brief: "superseded's Settings path is Android's own"):
+    "Bali recorded your unlock, but this phone's clock was behind, so it counted as before you went back to focus. Turn on
+    automatic time in Settings → System → Date & time, then hold to unlock again." iOS's "Turn on Set Automatically in
+    Settings → General → Date & Time" has no Android twin, and no board drew Android's. Read on the emulators
+    (`Bali_Spike_API35` and `_API37`, a Pixel's Settings, nothing there changed): the path is Settings → System → Date & time
+    on both, but its switch says "Set time automatically" on Android 15 and "Automatic date and time" on 17. So the line
+    names the setting plainly, "automatic time", which reads true on both, and the Pixel's path, as the Words board's own
+    lines do ("Settings → Accessibility → Bali"); its first sentence is iOS's. A Samsung's path is General management →
+    Date and time, for AP3's look. no-ai-slop's Edit job, checked against `eval.md`: it passes. **Drawn first:** a rare-case
+    variant of Focus's notes (AS5-Focus-notes), so an intermediate state, and nothing new about a student (the iPhone says
+    the same of its own clock): AS5-Focus-clock, "Focus · a late unlock, this phone's clock behind (intermediate state)",
+    at the end of AS5's Focus row, the row's note moved one place right, at the canvas's version 60 (`1794472617-4932`).
+    Read back byte for byte and rendered by eye, nothing clipped (the live canvas needs the owner's sign-in). The Words
+    board isn't changed, its counts being the owner's record (27 changed, 14 new, 5 gone); DESIGN.md names the line beside
+    them. [Recommendation: add it to the board's "Changed" rows at the owner's look.]
+  - **No countdown over nothing locked is the type's rule:** `countdown` is none unless the claim is `Paused`, the lock
+    verified on, where iOS computes it always and its view draws the ring and the strip only over the shields verified on
+    (FocusView's `claim == .paused`). ARCHITECTURE puts every rule where the JVM tests reach it, never in a screen
+    (Android's decision 5), so AS5 can't draw a countdown over a lock off or not checked yet. The offline card's "Focus
+    still ends at…" and the heading's bell stay iOS's over any claim: they say when the class ends, not that apps are
+    paused.
+  - **The time is the phone's, handed in:** `FocusWords` takes a `DateTimeFormatter` and a zone, with no default, where
+    iOS's defaults to the phone's short time. java.time's localized pattern doesn't follow Android's 24-hour setting, so AS5
+    hands it one from the phone's own pattern (`DateFormat.getBestDateTimePattern`), as Q6 does for History's day titles.
+  - **Every line of an unlock offers it again, as a test of its own** (the brief's rule that Focus's words always offer
+    Emergency Unlock): an unlock not saved and Bali still starting each end on another try, and a late unlock's two lines
+    each say to hold to unlock again. "There was nothing to unlock, so nothing was recorded." is said only once nothing the
+    phone knows locks (`pressUnlock`). No line says the unlock can be missing, used up or refused. The block screen's Open
+    Bali opens on Focus wherever the lock is on by its own rule, or on Home over the last run's lock with the standing
+    unread, both holding Emergency Unlock; only a start that failed and a deletion come first, and each takes the lock off
+    (`Screen.choose`, AN10a's tests).
+  - **The block screen's parts are a type** (`ShieldWords`), so the guard reads each and a part with no word stops the
+    compile; it has no website's case, Android's lock covering apps alone.
+
+  **The guard** (`WordsTest`) reads `FocusWords` over every standing (the classes not read, read as none and as one), a tap
+  held or none, a late unlock with the phone's order, without and none, every link and none, signed in, out and not known,
+  and every claim (no protection, unchecked, the lock on, the switch off with its report kept and not), each claim reached
+  or it fails by name; `UnlockFailure.words` for each failure, paused and not; and each part of the block screen.
+
+  **The tests,** on the JVM, on a US phone in New York (`en_US`, `America/New_York`), never the PC's: FocusTests' `focused`,
+  `countdown`, `names`, `tapHeld`, `claim` (no countdown over the switch off or nothing checked, new), `unlockFailed`,
+  `offline` and `stalled` (the unsaved report's whole line), comparing times with plain spaces, since JDK 20 and later write
+  U+202F before "AM" and Android 10 a space; new, every line of an unlock offering it again; ShieldWordsTests' `words`, the
+  title alone with OK and Open Bali, none naming a website or a time; and UnlockTest.kt's superseded mark (ReasonEngineTest's
+  late unlock: both lines, and none in another session). No twin: `releaseHasBoth` and `unlockHold`, which read iOS's views
+  (AS5's), `unscheduled`, and ShieldWordsTests' `readsNothing`, which reads iOS's shield extension. Tried, each failing by
+  name, then reverted: iOS's line under the block screen's title (`ShieldWordsTest`); a website's part (the same); Screen
+  Time in the switch-off line (`claim`, `stalled`, and the guard: "FocusWords names Screen Time") and in "Checking Screen
+  Time…" (`claim`, the guard); an unlock not saved with no way on (the new rule's test, `unlockFailed`), and the clock line
+  with no hold (the new rule's test, the superseded mark); a countdown over nothing locked (`claim`); a failure, a claim
+  and a block screen's part with no word (the compile: "'when' expression must be exhaustive"); a claim with a word no
+  sample reaches (the guard: "FocusWords.Claim's cases, each reached"); and an em-dash in a Focus line and a "!" on the
+  block screen (the guard: "holds an em-dash", "holds an exclamation mark").
+
+  **For AN10f to AN10h and Phase 10:** AS5's Focus says `FocusWords` (its `countdown` the ring's and the strip's, drawn only
+  where it isn't none) and `UnlockFailure.words(paused = claim == Claim.Paused)` under the hold; the block screen says
+  `ShieldWords`' words, a picture-in-picture cover its title alone (AS5-Block-pip-a). The view's own words above are AS5's,
+  from iOS's FocusView. AN10f: Unlocked's and Protection off's headings call `SyncState.heading` (Focus.kt, internal), iOS's
+  one helper, as AS8's lesson heading will. AN10f to AN10h: a line whose iPhone Settings path no board redraws names
+  Android's own, drawn first, as the clock line was here. PLAN.md is at 7,990 of its 8,000 words: the next step that adds
+  to it moves finished detail to the archive first.
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof: `./gradlew assemble :app:lint check` green
+  before santa's fix and on the final code, Android 10's API check with it (Animal Sniffer over `core` and `outbox`); the
+  core and outbox suites run seven times, each green, once before santa's fix and six times on the final code (626 tests,
+  ten of them new), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck &&
+  npm run lint && npm test` green, the portal's suite whole. Two emulators, `Bali_Spike_API35` and `_API37`, ran only to
+  read Android's Settings labels (Date & time and System, by `uiautomator dump`): nothing installed and no setting changed,
+  the two dumps deleted, each stopped. No SDK package was installed: the build downloads none
+  (`android.builder.sdkDownload=false`), and the SDK's folders matched before and after.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: the session's heading written inline where
+  iOS shares one helper (reviewer B; taken: `SyncState.heading`, above); the clock line on no board but this step's, so the
+  Words board's count leaves it out, and a Samsung's path differing (both; said above, for the owner's look); this entry's
+  and the PR's placeholders (reviewer A; filled); and PLAN.md's 10 words of room (reviewer B; above, for AN10f). The design
+  check, no-ai-slop's Detect job over the new and changed strings, found nothing: each line is iOS's or a board's but the
+  clock line's second sentence, in DESIGN.md's voice.
+
 - **2026-11-12** — **AN10c2, the last run's lock over a storage that won't read: where the phone's storage fails to give
   back where it stood, the last run's lock comes off as the engine loads, as at a start that runs nothing, and a later read
   that works puts it back from the standing (the conductor's call from #566's review, and this step's own, marked, each

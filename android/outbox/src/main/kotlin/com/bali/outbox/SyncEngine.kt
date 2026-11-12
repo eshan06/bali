@@ -1486,7 +1486,7 @@ class SyncEngine private constructor(
 /**
  * Why an Emergency Unlock didn't go through (rule 5), Focus.swift's `UnlockFailure`: the app's engine
  * hasn't started, the outbox refused to keep it, or nothing the phone knows locked by the end of the press
- * (its tap answered meanwhile, say: #116's review). The words are AN10's, from the approved boards.
+ * (its tap answered meanwhile, say: #116's review). Each said in its own words ([words]).
  */
 enum class UnlockFailure {
     /** The app has no engine yet: the app's to say, never the engine's. */
@@ -1498,6 +1498,20 @@ enum class UnlockFailure {
     /** Nothing locked, so nothing was recorded: iOS's `nothing`. */
     NothingToUnlock,
 }
+
+/**
+ * What Focus says under Emergency Unlock when a press didn't go through (rule 5), with the way on: the outbox refused the write,
+ * so nothing changed, the apps "still paused" only where the check verified the lock on ([paused], the claim's
+ * [FocusWords.Claim.Paused]: rule 3), holding again the way on; or Bali still starting. Nothing locked by the end of the press is
+ * said of the unlock, never the lock, which only the check may claim. BaliOutbox's `UnlockFailure.words`.
+ */
+fun UnlockFailure.words(paused: Boolean): String =
+    when (this) {
+        UnlockFailure.NotStarted -> Joining.Failure.NotStarted.words
+        UnlockFailure.NotSaved ->
+            if (paused) "Bali couldn't save your unlock, so your apps are still paused. Hold to try again." else "Bali couldn't save your unlock. Hold to try again."
+        UnlockFailure.NothingToUnlock -> "There was nothing to unlock, so nothing was recorded."
+    }
 
 /** Why a reason the student picked didn't take (C5a; rule 5). The words are AN10's, from the approved boards. */
 sealed interface ReasonFailure {
