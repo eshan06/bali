@@ -9,6 +9,7 @@ import com.bali.core.SignInError
 import com.bali.core.TapDisposition
 import com.bali.core.UserRole
 import com.bali.core.tapDisposition
+import java.io.IOException
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.CoroutineStart
@@ -265,19 +266,24 @@ sealed interface Problem {
 
 /**
  * What the storage screen says of why Bali couldn't start (rule 5), over its Try again: BaliApp.swift's `problem`. The start that
- * failed names its cause in parentheses, as iOS's line names its error, for a support request: its message, as AS2's Storage board
- * draws one ("disk I/O error"), else its type, so never empty. Never that the apps are locked: a start that runs nothing has taken
- * the last run's lock off (AN10c).
+ * failed names its cause in parentheses, as iOS's line names its error, for a support request ([named]). Never that the apps are
+ * locked: a start that runs nothing has taken the last run's lock off (AN10c).
  */
 val Problem.words: String
     get() =
         when (this) {
             Problem.NotSetUp -> "This copy of Bali isn't set up right. Ask your teacher."
-            is Problem.StartFailed -> {
-                val named = cause.message?.takeIf { it.isNotBlank() } ?: cause.javaClass.name
-                "Bali couldn't open its storage on this phone ($named). Try again, or ask your teacher."
-            }
+            is Problem.StartFailed -> "Bali couldn't open its storage on this phone (${cause.named}). Try again, or ask your teacher."
         }
+
+/**
+ * A start's failure as the storage screen names it: a file's error (an `IOException`) by its message, as AS2's Storage board draws
+ * one ("disk I/O error"), anything else by its type alone, so no other text an exception carries reaches a student's screen
+ * (santa's review); never empty. SQLite's own error is named by its type: on a phone its class is a typealias of Android's, which
+ * no `is` in `outbox` may name.
+ */
+private val Throwable.named: String
+    get() = message?.takeIf { this is IOException && it.isNotBlank() } ?: javaClass.simpleName.ifEmpty { javaClass.name }
 
 /**
  * Whether [other] is this session with the same bell: to the second, since an extension moves it by minutes, while the copy the

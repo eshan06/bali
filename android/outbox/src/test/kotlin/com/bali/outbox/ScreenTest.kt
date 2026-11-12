@@ -1,5 +1,6 @@
 package com.bali.outbox
 
+import androidx.sqlite.SQLiteException
 import com.bali.core.BaliJson
 import com.bali.core.BlockRead
 import com.bali.core.HostedPage
@@ -1065,17 +1066,21 @@ class ScreenTest : OutboxFiles() {
     }
 
     @Test
-    fun theStartsProblemInItsOwnWordsNotSetUpOrTheStorageThatWouldntOpenNamedByItsCausesMessageElseItsTypeNeverTheLock() {
+    fun theStartsProblemInItsOwnWordsNotSetUpOrTheStorageThatWouldntOpenNamedByAFilesMessageElseItsTypeAloneNeverTheLock() {
         // BaliApp.swift's `problem`, under AS2's Storage board's "Bali couldn't start", with Try again: the cause in parentheses,
-        // as iOS's line names its error for a support request, by its message as the board draws it, else by its type, never
-        // empty. A start that fails has taken the last run's lock off (AN10c), so neither line speaks of the lock.
+        // as iOS's line names its error for a support request; a file's error by its message, as the board draws it, anything
+        // else by its type alone, never the text it carries (santa's review), and never empty. A start that fails has taken the
+        // last run's lock off (AN10c), so neither line speaks of the lock.
         assertEquals("This copy of Bali isn't set up right. Ask your teacher.", Problem.NotSetUp.words)
         assertEquals("Bali couldn't open its storage on this phone (disk I/O error). Try again, or ask your teacher.", failed.words)
-        for (cause in listOf(IllegalStateException(), IOException(" "))) {
-            assertEquals(
-                "Bali couldn't open its storage on this phone (${cause.javaClass.name}). Try again, or ask your teacher.",
-                Problem.StartFailed(cause).words,
+        val anonymous = object : RuntimeException("held") {}
+        val named =
+            listOf(
+                IllegalStateException("a token: t0k3n") to "IllegalStateException", SQLiteException("no such table: outbox") to "SQLiteException",
+                IOException(" ") to "IOException", anonymous to anonymous.javaClass.name,
             )
+        for ((cause, name) in named) {
+            assertEquals("Bali couldn't open its storage on this phone ($name). Try again, or ask your teacher.", Problem.StartFailed(cause).words)
         }
         for (problem in listOf(Problem.NotSetUp, failed)) assertFalse("lock" in problem.words, problem.words)
     }
