@@ -252,7 +252,8 @@ class BaliAppTest {
                 until { account.state.value.takeIf { it.inClass == "u1" && it.sync?.me != null } }
                 account.sawList()
                 assertEquals(listOf("u1", "u1"), app.notes.run { listOf(inClass, listSeenBy) })
-                until { file.readText().takeIf { """name="inClass">u1<""" in it && """name="listSeenBy">u1<""" in it } }
+                // Written behind: on the disk once the write lands.
+                until { file.takeIf { it.exists() }?.readText()?.takeIf { """name="inClass">u1<""" in it && """name="listSeenBy">u1<""" in it } }
                 // A later run, nobody signed in: its account reads them back.
                 val (again, later) = run(outbox, server, scope)
                 assertEquals(listOf("u1", "u1"), later.state.value.run { listOf(inClass, listSeenBy) })
@@ -261,7 +262,10 @@ class BaliAppTest {
                 server.next(AGE_CHECK).reply(200, PASSED)
                 later.deleting { it.ask() }
                 val deleting = scope.async { later.deleteAccount() }
-                server.pastReads("DELETE /v1/me").reply(200, """{"outcome":"deleted"}""")
+                // Its first request on its way: the notes already off the disk, written through.
+                val delete = server.pastReads("DELETE /v1/me")
+                assertFalse(file.readText(), "u1" in file.readText())
+                delete.reply(200, """{"outcome":"deleted"}""")
                 server.next("POST /").reply(200, "{}")
                 withTimeout(30.seconds) { deleting.await() }
                 assertEquals(Deleting.Done, later.state.value.deleting)
