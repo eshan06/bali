@@ -5,7 +5,7 @@ the product lives on `main`. It replaces `demo2`, the one-page demo.
 
 The design is the Claude Design canvas "Bali website"
 (https://claude.ai/artifact/5Aohc3RHe7j69mVgXwyZhj). `canvas/` is a copy of the files the site uses
-(canvas version 46, 2026-11-11). The owner approved the site as drawn and asked for it to go live on
+(canvas version 48, 2026-11-11). The owner approved the site as drawn and asked for it to go live on
 2026-11-06 (version 35). Version 36 fixes what the browser tests found (the phone-law map's contrast,
 the comparison table's keyboard reach, the pictures' resize loop in Safari); versions 37 and 38 add
 `SiteStates.dc.html`, the two intermediate states: a page that didn't load, and JavaScript off. Version 40 is
@@ -16,7 +16,9 @@ for the hero ("One tap locks a student's apps until the bell.", one button, a so
 states), the mission, How it works, the teacher rows and the guides; the labels above the page
 titles gone; "© 2026 Bali Focus Inc."; the words inside the product pictures can't be selected; a
 Menu on narrower screens, with Sign in in it on phones; on phones the hero shows the teacher's screen
-alone; and a tile's old word leaves as its new state comes in.
+alone; and a tile's old word leaves as its new state comes in. Versions 47 and 48 are the review's
+fixes: only a phone crops the hero, and the Menu closes on Escape, on a tap outside it (an iPhone's
+too) and on Back, but stays open while the page is still loading.
 
 A design change is drawn on the canvas and approved by the owner first, then the changed files are
 copied in here. An intermediate state of an approved page (an error line, a narrow width) is drawn
