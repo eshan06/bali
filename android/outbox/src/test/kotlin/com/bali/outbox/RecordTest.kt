@@ -111,16 +111,20 @@ object Answer {
 
     /**
      * `GET /v1/me`'s answer: the live session [view] in [state] (none: none), [classes], each as [inClass]
-     * writes one, and whether a tap of the student's waits for a Start, [armed] (none: an older API's,
-     * which says nothing of one).
+     * writes one, whether a tap of the student's waits for a Start, [armed] (none: an older API's,
+     * which says nothing of one), and the student's [name] (none: none).
      */
-    fun me(view: SessionView? = session(), state: String = "focused", classes: List<String> = emptyList(), armed: Boolean? = null): String {
+    fun me(
+        view: SessionView? = session(), state: String = "focused", classes: List<String> = emptyList(), armed: Boolean? = null,
+        name: String? = null,
+    ): String {
         val live =
             view?.let {
                 BaliJson.encodeToString(MeResponse.Session.serializer(), MeResponse.Session(it.id, it.classId, it.endsAt, OrUnknown.Unknown(state)))
             }
         val waits = armed?.let { ""","armed":$it""" }.orEmpty()
-        return """{"user":{"id":"u","role":"student","displayName":null},"classes":[${classes.joinToString(",")}],"session":$live$waits}"""
+        val named = name?.let { "\"$it\"" } ?: "null"
+        return """{"user":{"id":"u","role":"student","displayName":$named},"classes":[${classes.joinToString(",")}],"session":$live$waits}"""
     }
 
     /** Class [id] as `GET /v1/me` names it, with its teacher, and the enrollment [enrollment] leaving it ends (none: none). */

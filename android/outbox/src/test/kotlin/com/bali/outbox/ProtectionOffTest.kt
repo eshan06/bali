@@ -26,8 +26,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 // Rule 3's report (AN7b): BaliOutbox's ProtectionOffTests, RevokedWhileRunningTests, BackOnTests and
 // LaunchGraceTests, the lock's switch in Screen Time's permission's and its marker's place: off is the
-// marker gone, on and bound the marker there, starting a launch's not determined. The words and the
-// screens they check are AN10's.
+// marker gone, on and bound the marker there, starting a launch's not determined. The screen `settles`
+// chooses is the router's (AN10a); the words they check are AN10f's.
 
 /** In session s, ending 3000 s after [t0], in [state]. */
 private fun inSession(state: ParticipationState) = Standing.InSession(session(), state)
@@ -719,7 +719,7 @@ class LockBackOnTest : EngineFiles() {
 /**
  * #145's twin: a switch starting at a launch, off once that lasts the grace, read again every second
  * meanwhile, never over a service that binds within it; and on or off deciding at once.
- * BaliOutbox's LaunchGraceTests, the screen `settles` chooses AN10's.
+ * BaliOutbox's LaunchGraceTests, with the screen `settles` chooses.
  */
 class LaunchGraceTest : EngineFiles() {
     /**
@@ -857,7 +857,20 @@ class LaunchGraceTest : EngineFiles() {
                 phone.enforcer.check()
                 assertEquals(emptyList(), rig.outbox.records(), "$standing")
                 watching.cancelAndJoin()
-                for (claim in claims.toList()) if (claim.checked) assertFalse(claim.switchedOff, "$standing")
+                // No claim routes as the switch off: out of a session, starting routes as on, the switch read on before
+                // (`everApproved`, Q3), so Home, never the permission step; in one, Focus.
+                val sync = rig.engine.updates.value
+                for (claim in claims.toList()) {
+                    if (!claim.checked) continue
+                    assertFalse(claim.switchedOff, "$standing")
+                    val shown =
+                        Screen.choose(
+                            problem = null, deleting = false, age = AgeCheck.Answer.Passed, intro = false, signedIn = true,
+                            signedInThisRun = false, protection = claim, everApproved = true, sync = sync, listSeenBy = "u",
+                            sessionOverClosed = null, opened = emptyList(), tab = Screen.Home, now = rig.clock.now(),
+                        )
+                    assertEquals(if (standing == Standing.Out) Screen.Home else Screen.Focus, shown.screen, "$standing $claim")
+                }
                 phone.stop()
             }
         }

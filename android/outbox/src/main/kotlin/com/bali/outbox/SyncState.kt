@@ -5,12 +5,14 @@ import com.bali.core.MeResponse
 import com.bali.core.ParticipationState
 import com.bali.core.SendResult
 import com.bali.core.UnlockReason
+import com.bali.core.UserRole
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 
 // What the sync engine knows, SyncEngine.swift's `SyncState`: its core, AN5a's, the read loop's, AN5c's,
-// the wait's, AN5d's, Emergency Unlock's, AN5e's, and the sign-ins that forgot `me`, AN9d's, with
+// the wait's, AN5d's, Emergency Unlock's, AN5e's, the sign-ins that forgot `me`, AN9d's, and whether `me`
+// names a teacher's account, AN10a's (`teacher`, which iOS reads where it's used), with
 // Enforcement.swift's rules of when the lock is on (`shieldedUntil`) and when the student's unlock takes the
 // last run's off (`unlockedLast`, AN7a's), which the enforcer follows (Enforcer.kt).
 
@@ -100,6 +102,13 @@ data class SyncState(
 ) {
     /** Whether the student is in any class, as [me] says: none until a read answers (C3). */
     val hasClasses: Boolean? get() = me?.let { it.classes.isNotEmpty() }
+
+    /**
+     * Whether the last read of `GET /v1/me` named the account a teacher's (`MeResponse.user.role`): the app is the students' (the
+     * owner, 2026-11-07), so the router shows the teacher's screen alone, and the engine registers no device token for it (AN12).
+     * False until a read names one.
+     */
+    val teacher: Boolean get() = me?.user?.role?.known == UserRole.Teacher
 
     /** A tap the server hasn't answered yet: the lock covers apps for it at once, to decision 7's cap (B5). */
     val pendingTap: OutboxRecord? get() = queued.lastOrNull { it.change is Change.Tap && !it.stuck }

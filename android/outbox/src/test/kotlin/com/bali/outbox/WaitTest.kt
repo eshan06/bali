@@ -7,13 +7,14 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlinx.coroutines.runBlocking
 
 /**
- * A wait the server has dropped is Home, never Waiting (#166): the engine's half of BaliOutbox's
- * DroppedWaitTests, which screen shows AN10's.
+ * A wait the server has dropped is Home, never Waiting (#166): BaliOutbox's DroppedWaitTests, which screen shows by the router
+ * ([shown]); the cards Home says are AN10d's.
  */
 class DroppedWaitTest : EngineFiles() {
     /** Class c, its session running until 4000 s after [t0], as `GET /v1/me` names it (C3c). */
@@ -22,36 +23,42 @@ class DroppedWaitTest : EngineFiles() {
     @Test
     fun aReadSayingNoTapOfTheStudentsWaitsItsSchoolDayOverOrTakenByAStartWhoseClassIsOverTooEndsTheWait(): Unit =
         runBlocking {
-            // Home, never Waiting, and no wait said on it: AN10's.
+            // Home, never Waiting; no wait said on it is AN10d's.
             val rig = rig()
             rig.arm()
-            rig.screenOn(Answer.me(null, classes = listOf(Answer.inClass("c")), armed = false))
-            assertEquals(Standing.Out, rig.engine.updates.value.standing)
+            rig.screenOn(Answer.me(null, classes = listOf(Answer.inClass("c")), armed = false, name = "Ana"))
+            val state = rig.engine.updates.value
+            assertEquals(Standing.Out, state.standing)
+            assertEquals(Screen.Shown(Screen.Home, true), shown(state))
+            assertEquals(Screen.Shown(Screen.Home, true), shown(state, opened = listOf(Screen.Home)))
         }
 
     @Test
     fun aStartAfterTheTapsSchoolDayJoinsNothingTheReadNamesNoSessionAndNoTapWaitingAndTheClassInSession(): Unit =
         runBlocking {
-            // Home's card, the class in session with Tap in (C3c), is AN10's: the class's session, which it reads, is here.
+            // Home; its card, the class in session with Tap in (C3c), is AN10d's: the class's session, which it reads, is here.
             val rig = rig()
             rig.arm()
             rig.screenOn(Answer.me(null, classes = listOf(Answer.inClass("c")), armed = true))
             assertEquals(Standing.Waiting, rig.engine.updates.value.standing)
             rig.clock.advance(30)
-            rig.server.next(meRoute).reply(200, Answer.me(null, classes = listOf(inSession), armed = false))
+            rig.server.next(meRoute).reply(200, Answer.me(null, classes = listOf(inSession), armed = false, name = "Ana"))
             val state = rig.until { it.standing != Standing.Waiting }
             assertEquals(Standing.Out, state.standing)
             assertEquals(at(4000), state.me?.classes?.single()?.liveSession?.endsAt)
+            assertEquals(Screen.Shown(Screen.Home, true), shown(state, now = rig.clock.now()))
         }
 
     @Test
     fun aReadNamingAClassOverByThePhonesClockTheSweepYetToRunAndNoTapWaitingIsThatClassNeverWaiting(): Unit =
         runBlocking {
-            // A Start took the tap and the class has rung: Session over, AN10's (santa's round 1).
+            // A Start took the tap and the class has rung: Session over (santa's round 1).
             val rig = rig()
             rig.arm()
             rig.screenOn(Answer.me(session(endsAt = -60), armed = false))
-            assertEquals(Standing.InSession(session(endsAt = -60), ParticipationState.Focused), rig.engine.updates.value.standing)
+            val state = rig.engine.updates.value
+            assertEquals(Standing.InSession(session(endsAt = -60), ParticipationState.Focused), state.standing)
+            assertEquals(Screen.Shown(Screen.SessionOver, false), shown(state))
         }
 
     @Test
@@ -72,10 +79,12 @@ class DroppedWaitTest : EngineFiles() {
             rig.clock.advance(Duration.between(rig.clock.now(), ends).minusSeconds(1))
             rig.server.next(meRoute).reply(null)
             rig.sleeping(ends.plusSeconds(29))
-            assertEquals(Standing.Waiting, rig.engine.updates.value.standing)
-            // Home, the screen's, is AN10's.
+            val waiting = rig.engine.updates.value
+            assertEquals(Standing.Waiting, waiting.standing)
+            assertEquals(Screen.Shown(Screen.Waiting, false), shown(waiting, now = rig.clock.now()))
             rig.clock.advance(30)
-            rig.until { it.standing == Standing.Out }
+            val state = rig.until { it.standing == Standing.Out }
+            assertEquals(Screen.Shown(Screen.Home, true), shown(state, now = rig.clock.now()))
         }
 
     @Test
@@ -99,7 +108,6 @@ class DroppedWaitTest : EngineFiles() {
     @Test
     fun theEndIsKeptWithTheWaitBaliOpenedAgainPastItOfflineIsOutAndAWaitKeptWithNoEndWaitsUntilAReadEndsIt(): Unit =
         runBlocking {
-            // Home, the screen's, is AN10's.
             val rig = rig()
             rig.arm()
             rig.stop()
@@ -109,7 +117,8 @@ class DroppedWaitTest : EngineFiles() {
             relaunched.clock.advance(Duration.between(t0, ends))
             relaunched.engine.setScreenOn(true)
             relaunched.server.next(meRoute).reply(null)
-            relaunched.until { it.standing == Standing.Out }
+            val state = relaunched.until { it.standing == Standing.Out }
+            assertEquals(Screen.Shown(Screen.Home, true), shown(state, now = relaunched.clock.now()))
 
             // A wait the file holds no end for, or none it can read (on iOS, an earlier build's): only a read ends it.
             val (earlier, _) = makeOutbox()
@@ -161,22 +170,28 @@ class DroppedWaitTest : EngineFiles() {
         }
 }
 
-/** Waiting's Back to home, and the Start (#151): the engine's half of BaliOutbox's WaitingHomeTests, the screens' AN10's. */
+/** Waiting's Back to home, and the Start (#151): BaliOutbox's WaitingHomeTests, which screen shows by the router ([shown]). */
 class WaitingHomeTest : EngineFiles() {
     @Test
-    fun baliOpenedAgainWhileWaitingStartsWaitingAndTheReadEvery30SWhileTheScreenIsOnFindsTheStartThePhoneInTheSession(): Unit =
+    fun baliOpenedAgainWhileWaitingLandsOnWaitingAndTheReadEvery30SWhileTheScreenIsOnFindsTheStartFocusTheHomeOpenedClosed(): Unit =
         runBlocking {
             // Where the phone stands is kept in the file, and nothing the student opened is: the Home opened
-            // over Waiting is no input of the engine's (#151). Which screen shows, and that Home closed, AN10's.
+            // over Waiting is no input of the engine's (#151), and the Start the read finds closes it.
             val rig = rig()
             rig.arm()
             rig.stop()
             val relaunched = rig(rig.outbox)
-            assertEquals(Standing.Waiting, relaunched.engine.updates.value.standing)
+            val waiting = relaunched.engine.updates.value
+            assertEquals(Standing.Waiting, waiting.standing)
+            assertEquals(Screen.Shown(Screen.Waiting, false), shown(waiting))
+            assertEquals(Screen.Shown(Screen.Home, true), shown(waiting, opened = listOf(Screen.Home)))
             relaunched.screenOn(Answer.me(null))
             relaunched.clock.advance(30)
             relaunched.server.next(meRoute).reply(200, Answer.me(session(endsAt = 4000)))
             val started = relaunched.until { it.standing != Standing.Waiting }
+            val now = relaunched.clock.now()
             assertEquals(Standing.InSession(session(endsAt = 4000), ParticipationState.Focused), started.standing)
+            assertFalse(started.keepsOpened(waiting, now))
+            assertEquals(Screen.Shown(Screen.Focus, false), shown(started, opened = listOf(Screen.Home), now = now))
         }
 }
