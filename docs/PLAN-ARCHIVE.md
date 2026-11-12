@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN10b's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN10a, the router (#563; `docs/DECISIONS.md`, 2026-11-11), the first of AN10's
+eight steps: `outbox`'s `Screen.kt`, which screen shows when, iOS's `Screen.choose` with the lock's switch in Screen
+Time's place (Q3): Focus whenever the lock's own rule says it's on, the home a standing not read keeps over the last
+run's lock, a teacher's account its screen alone, a start's problem a type; the bell by the phone's clock, looked at
+again at each time-set signal; and `SyncState.teacher`. No word and no screen. Before it, AN7g, the cover test's SMS
+step. Next: AN10b, the router's inputs and its run; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an
+account that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android
+17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner
+items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN10a's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN7g, the cover test's SMS step waiting out Google Messages (#562;
 `docs/DECISIONS.md`, 2026-11-11), test-only, Bali's code unchanged: AN7e's CoversTest now calls at once after the SMS
 step, as a student who has texted for help calls, once Android has resumed the last activity Messages opens for the
@@ -2700,6 +2710,12 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN10b's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11).
+
+- **AN10b** The router's inputs, and its run (twin: BaliApp.swift's notes, `everApproved` and `shown`, and RootView.swift's
+  bell): `Account`'s notes behind a `Notes` store, `sawList` and `email`; a `Router`, one a process (Q1), choosing again at
+  each change and at the bell; a Debug engine with no account read as signed out (Q2) — validation: the JVM tests
 
 AN10a's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11). The conductor split AN10's
 line into AN10a–AN10h that day, one short line each in `docs/PLAN-ANDROID.md`, and AN10's line comes here whole, below
