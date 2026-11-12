@@ -17,7 +17,7 @@ body{margin:0;background:#F7F5F2}
 .pg-hero{padding:64px 0 88px}
 .pg-hero .bs-wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center}
 .pg-eyebrow{font-size:13px;line-height:18px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--brand)}
-.pg-h1{margin-top:14px;font-size:clamp(40px,2.4vw + 28px,64px);line-height:1.05;font-weight:600;letter-spacing:-0.03em;text-wrap:balance}
+.pg-h1{margin-top:0;font-size:clamp(40px,2.4vw + 28px,64px);line-height:1.05;font-weight:600;letter-spacing:-0.03em;text-wrap:balance}
 .pg-lead{margin-top:20px;max-width:30em;font-size:20px;line-height:31px;color:var(--ink2);text-wrap:pretty}
 .pg-art{min-width:0}
 .pg-art > *{width:100%;min-width:0}
@@ -54,14 +54,13 @@ body{margin:0;background:#F7F5F2}
 <div class="bs-wrap">
 <a class="bs-brand" href="Main.dc.html" translate="no" aria-label="Bali, home"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" fill="none" stroke="#BCDCCA" stroke-width="10"></circle><path d="M26.6 8.61A24 24 0 1 1 8.61 26.6" fill="none" stroke="#2C6F51" stroke-width="10" stroke-linecap="round"></path></svg><span>Bali</span></a>
 <nav class="bs-nav" aria-label="Sections"><a href="Main.dc.html#how">How it works</a><a href="Main.dc.html#teachers">For teachers</a><a href="Main.dc.html#students">For students</a><a href="Main.dc.html#privacy">Privacy</a><a href="Main.dc.html#faq">Questions</a><a href="GuideFirstClass.dc.html">Guides</a></nav>
-<div class="bs-end"><a class="bs-btn bs-btn-s" href="https://bali-portal.vercel.app/login">Sign in</a><a class="bs-btn bs-btn-p" href="Main.dc.html#contact">Talk to us</a></div>
+<div class="bs-end"><details class="bs-menu"><summary>Menu</summary><nav class="bs-menu-panel" aria-label="Pages"><a href="Main.dc.html#how">How it works</a><a href="Main.dc.html#teachers">For teachers</a><a href="Main.dc.html#students">For students</a><a href="Main.dc.html#privacy">Privacy</a><a href="Main.dc.html#faq">Questions</a><a href="GuideFirstClass.dc.html">Guides</a><hr><a href="https://bali-portal.vercel.app/login">Sign in</a></nav></details><a class="bs-btn bs-btn-s" href="https://bali-portal.vercel.app/login">Sign in</a><a class="bs-btn bs-btn-p" href="Main.dc.html#contact">Talk to us</a></div>
 </div>
 </header>
 <main id="main">
 <section class="pg-hero pg-solo" aria-labelledby="h-page" style="padding-bottom: 40px;">
 <div class="bs-wrap">
 <div>
-<p class="pg-eyebrow">Resources</p>
 <h1 id="h-page" class="pg-h1">How schools keep phones out of class.</h1>
 <p class="pg-lead">The common ways, side by side: how each works, who controls it, what it costs and what schools have reported.</p>
 </div>
@@ -84,11 +83,11 @@ body{margin:0;background:#F7F5F2}
 <nav aria-labelledby="f-guides"><h2 id="f-guides">Guides</h2><ul><li><a href="GuideFirstClass.dc.html">Run your first class</a></li><li><a href="GuideUnlock.dc.html">Emergency Unlock, explained</a></li><li><a href="GuideFamilies.dc.html">A note for families</a></li></ul></nav>
 <nav aria-labelledby="f-legal"><h2 id="f-legal">Legal</h2><ul><li><a href="https://bali-portal.vercel.app/privacy">Privacy policy</a></li><li><a href="https://bali-portal.vercel.app/terms">Terms of use</a></li><li><a href="Main.dc.html#privacy">Privacy at Bali</a></li></ul></nav>
 </div>
-<div class="bs-foot-bar"><div class="bs-wrap"><span translate="no">© 2026 Bali</span></div></div>
+<div class="bs-foot-bar"><div class="bs-wrap"><span translate="no">© 2026 Bali Focus Inc.</span></div></div>
 </footer>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2259}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2227}}'>
 class Component extends DCLogic {
   renderVals() {
     if (!this.uid) this.uid = 'pg' + Math.random().toString(36).slice(2, 9);

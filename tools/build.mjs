@@ -108,7 +108,7 @@ cpSync(join(root, 'static'), out, { recursive: true });
 
 for (const [name, path] of Object.entries(ROUTES)) {
   const p = parts[name];
-  const title = escapeHtml(name === 'Main.dc.html' ? 'Bali: Lock the phone. Train the mind.' : `${p.title} · Bali`);
+  const title = escapeHtml(name === 'Main.dc.html' ? "Bali: One tap locks a student's apps until the bell." : `${p.title} · Bali`);
   const description = escapeHtml(DESCRIPTIONS[name]);
   const links = [...new Set(sheets(name))].map((href) => `<link rel="stylesheet" href="${href}" data-src="${href}">`).join('\n');
   const html = `<!doctype html>

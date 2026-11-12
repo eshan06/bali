@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 const EMAIL = 'team@getbali.app';
 // Each page: its path, its title and its heading.
 const PAGES = [
-  ['/', 'Bali: Lock the phone. Train the mind.', 'Lock the phone. Train the mind.'],
+  ['/', "Bali: One tap locks a student's apps until the bell.", "One tap locks a student's apps until the bell."],
   ['/guides/first-class', 'Run your first class with Bali · Bali', 'Run your first class with Bali.'],
   ['/guides/emergency-unlock', 'Emergency Unlock, explained · Bali', 'Emergency Unlock, explained.'],
   ['/guides/families', 'A note for families · Bali', 'A note for families.'],
@@ -75,7 +75,7 @@ test('an address with a section opens at that section, from any page', async ({ 
 
 test('an address with a malformed #section still opens the page', async ({ page }) => {
   await open(page, '/#%E0%A4%A');
-  await expect(page.getByRole('heading', { level: 1, name: 'Lock the phone. Train the mind.' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: PAGES[0][2] })).toBeVisible();
 });
 
 test('every link goes somewhere real', async ({ page }) => {
@@ -160,8 +160,75 @@ test('a copy that fails says so, and the address stays on screen', async ({ page
 
 test('the hero’s Bali block has no rings around it, at any width', async ({ page }) => {
   await open(page, '/');
-  await expect(page.locator('.hs-block')).toBeVisible();
+  // On phones the hero shows the teacher's screen alone (the owner, 2026-11-11), so the block shows on wider screens.
+  if (page.viewportSize().width >= 600) await expect(page.locator('.hs-block')).toBeVisible();
   await expect(page.locator('.hs-rings')).toHaveCount(0);
+});
+
+test('the words inside the pictures of the product can’t be selected, and the page’s own words can', async ({ page }) => {
+  for (const path of ['/', '/guides/first-class', '/guides/emergency-unlock']) {
+    await open(page, path);
+    const found = await page.evaluate(() => {
+      const how = (el) => { const s = getComputedStyle(el); return s.userSelect || s.webkitUserSelect; };
+      const shots = [...document.querySelectorAll('.bs-shot')];
+      const all = shots.concat(...shots.map((el) => [...el.querySelectorAll('*')]));
+      return { shots: shots.length, selectable: all.filter((el) => how(el) !== 'none').length, heading: how(document.querySelector('main h1')) };
+    });
+    expect(found.shots, path).toBeGreaterThan(0);
+    expect(found.selectable, path).toBe(0);
+    expect(found.heading, path).not.toBe('none');
+  }
+});
+
+test('a triple-click on a name in the hero’s picture selects nothing, and on the headline selects it', async ({ page }) => {
+  await open(page, '/');
+  await page.locator('.hs-card .hs-cname').click({ clickCount: 3 });
+  expect(await page.evaluate(() => String(getSelection()))).toBe('');
+  await page.locator('#h-hero').click({ clickCount: 3 });
+  expect(await page.evaluate(() => String(getSelection()))).toContain('One tap locks');
+});
+
+test('narrower screens get a Menu: it opens, its links go where they say, and it closes on a choice', async ({ page }) => {
+  await open(page, '/');
+  const width = page.viewportSize().width;
+  const summary = page.locator('.bs-menu > summary');
+  if (width >= 1080) {
+    await expect(summary).toBeHidden();
+    await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
+    return;
+  }
+  const signIn = page.locator('.bs-end > .bs-btn-s');
+  if (width < 600) await expect(signIn).toBeHidden();
+  else await expect(signIn).toBeVisible();
+  await summary.click();
+  const panel = page.getByRole('navigation', { name: 'Pages' });
+  await expect(panel.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', 'https://bali-portal.vercel.app/login');
+  await expect(panel.getByRole('link', { name: 'Guides' })).toHaveAttribute('href', '/guides/first-class');
+  await panel.getByRole('link', { name: 'Questions' }).click();
+  await expect(panel).toBeHidden();
+  await expect(page.locator('#faq')).toBeInViewport();
+});
+
+test('on phones the hero shows the teacher’s screen on its own, large enough to read', async ({ page }) => {
+  await open(page, '/');
+  const cropped = () => page.locator('.hs').evaluate((el) => el.hasAttribute('data-crop'));
+  if (page.viewportSize().width < 600) {
+    expect(await cropped()).toBe(true);
+    await expect(page.locator('.hs-phone')).toBeHidden();
+    // The tiles' names draw at 12 px or more on the screen.
+    const size = await page.locator('.hs-card .hs-nm').first().evaluate((el) => (parseFloat(getComputedStyle(el).fontSize) * el.getBoundingClientRect().width) / el.offsetWidth);
+    expect(size).toBeGreaterThanOrEqual(12);
+  } else {
+    expect(await cropped()).toBe(false);
+    await expect(page.locator('.hs-phone')).toBeVisible();
+  }
+});
+
+test('every page’s footer names Bali Focus Inc.', async ({ page }) => {
+  for (const path of PATHS) {
+    await open(page, path);
+    await expect(page.locator('.bs-foot-bar')).toContainText('© 2026 Bali Focus Inc.');
+  }
 });
 
 test('the questions open', async ({ page }) => {
@@ -259,9 +326,7 @@ test('no serious accessibility problems', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const path of PATHS) {
     await open(page, path);
-    // The big step numbers on the home page and in the guide (01, 02, …) are drawn faint on purpose and
-    // hidden from screen readers: decoration, which WCAG's contrast rule leaves out.
-    const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).exclude('.bs-step-n').exclude('.pg-step-n').analyze();
+    const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
     const serious = violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
     expect(serious.map((v) => `${path} ${v.id}: ${v.nodes.length} × ${v.nodes[0].target.join(' ')}`)).toEqual([]);
   }

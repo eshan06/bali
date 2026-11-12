@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
 <style>
 body{margin:0}
-.hs{--k:1;position:relative;width:100%;max-width:620px;font-family:'Instrument Sans',-apple-system,'Segoe UI',sans-serif;color:#211F1B;-webkit-font-smoothing:antialiased}
+.hs{--k:1;position:relative;width:100%;max-width:620px;font-family:'Instrument Sans',-apple-system,'Segoe UI',sans-serif;color:#211F1B;-webkit-font-smoothing:antialiased;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:default}
 .hs *{box-sizing:border-box}
 .hs :where(p,ul,li){margin:0;padding:0}
 .hs ul{list-style:none}
@@ -63,6 +63,11 @@ body{margin:0}
 .hs-lab-block{left:118px;transform:translateX(-50%)}
 .hs-lab-card{left:236px}
 .hs-lab-phone{left:118px;top:528px;transform:translateX(-50%)}
+/* Phones show the teacher's screen on its own, large enough to read. */
+.hs[data-crop] .hs-box{width:calc(380px * var(--k));height:calc(512px * var(--k));overflow:hidden}
+.hs[data-crop] .hs-stage{left:calc(-232px * var(--k))}
+.hs[data-crop] .hs-card,.hs[data-crop] .hs-locked,.hs[data-crop] .hs-pop{box-shadow:0 0 0 1px #E3DFD8}
+.hs[data-crop] .hs-phone,.hs[data-crop] .hs-block,.hs[data-crop] .hs-ripple,.hs[data-crop] .hs-lab-block,.hs[data-crop] .hs-lab-phone,.hs[data-crop] .hs-arrow,.hs[data-crop] .hs-sig,.hs[data-crop] .hs-dot{display:none}
 </style>
 </helmet>
 <div class="hs" data-hs="{{uid}}" role="img" aria-label="A sample class with Bali. A student taps their iPhone on the Bali block and their apps lock. On the teacher's screen each student's tile turns from Not here to Focused. One student uses Emergency Unlock, and at the bell the phone says class is over.">
@@ -110,10 +115,14 @@ class Component extends DCLogic {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     const root = document.querySelector('[data-hs="' + this.uid + '"]');
     if (!root) return;
-    // Scale the 620 × 560 scene to the width it is given.
+    // Scale the 620 × 560 scene to the width it is given. Below 560 px it crops to the teacher's screen
+    // (380 px of the scene), so the tiles stay readable on a phone.
     const fit = () => {
       const w = root.clientWidth;
-      if (w > 0) root.style.setProperty('--k', Math.min(1, w / 620).toFixed(4));
+      if (!(w > 0)) return;
+      const crop = w < 560;
+      if (crop) root.setAttribute('data-crop', ''); else root.removeAttribute('data-crop');
+      root.style.setProperty('--k', Math.min(1, w / (crop ? 380 : 620)).toFixed(4));
     };
     fit();
     if (window.ResizeObserver) {
@@ -169,8 +178,8 @@ class Component extends DCLogic {
     const ripple = (el, d) => run(el, [[0, { transform: 'scale(1)', opacity: 0 }], [1150 + d, { transform: 'scale(1)', opacity: 0 }], [1210 + d, { transform: 'scale(1.06)', opacity: 0.85 }], [2350 + d, { transform: 'scale(2.9)', opacity: 0 }], [T, { transform: 'scale(2.9)', opacity: 0 }]]);
     ripple(q('.hs-r1'), 0);
     ripple(q('.hs-r2'), 240);
-    fade(q('.hs-scr-home'), [[0, 1], [1550, 1], [1850, 0], [14600, 0], [15100, 1], [T, 1]]);
-    fade(q('.hs-scr-focus'), [[0, 0], [1550, 0], [1850, 1], [12000, 1], [12300, 0], [T, 0]]);
+    fade(q('.hs-scr-home'), [[0, 1], [1550, 1], [1700, 0], [14600, 0], [15100, 1], [T, 1]]);
+    fade(q('.hs-scr-focus'), [[0, 0], [1700, 0], [1850, 1], [12000, 1], [12300, 0], [T, 0]]);
     // Right after the tap: an arrow and a pill point at Ana's phone, now locked.
     run(q('.hs-arrow-p'), [[0, { strokeDashoffset: 1 }], [1950, { strokeDashoffset: 1 }], [2350, { strokeDashoffset: 0 }], [6800, { strokeDashoffset: 0 }], [7200, { strokeDashoffset: 0 }], [T, { strokeDashoffset: 1 }]]);
     fade(q('.hs-arrow'), [[0, 1], [6800, 1], [7200, 0], [T - 1, 0], [T, 1]]);
@@ -189,11 +198,14 @@ class Component extends DCLogic {
       const t = at[Number(tile.getAttribute('data-i'))];
       if (t === undefined) return;
       fade(tile.querySelector('.hs-t-on'), [[0, 0], [t, 0], [t + 150, 1], [14600, 1], [15100, 0], [T, 0]]);
+      // The old state's words leave the moment the new state fades in, so two words never overlap.
+      Array.prototype.forEach.call(tile.querySelectorAll('.hs-t-not > *'), (el) => fade(el, [[0, 1], [t, 1], [t + 1, 0], [15100, 0], [15101, 1], [T, 1]]));
       run(tile, [[0, { transform: 'scale(1)' }], [t, { transform: 'scale(1)' }], [t + 90, { transform: 'scale(0.94)' }], [t + 320, { transform: 'scale(1)' }], [T, { transform: 'scale(1)' }]]);
     });
     const k = q('.hs-tile[data-i="6"]');
     if (k) {
       fade(k.querySelector('.hs-t-unl'), [[0, 0], [7500, 0], [7650, 1], [14600, 1], [15100, 0], [T, 0]]);
+      Array.prototype.forEach.call(k.querySelectorAll('.hs-t-on > *'), (el) => fade(el, [[0, 1], [7500, 1], [7501, 0], [15100, 0], [15101, 1], [T, 1]]));
       // bali-softpulse: the glow ring swells and fades, 1.2 s, exactly twice.
       const g0 = '0 0 0 0px rgba(219, 147, 71, 0)';
       const g1 = '0 0 0 6px rgba(219, 147, 71, 0.35)';

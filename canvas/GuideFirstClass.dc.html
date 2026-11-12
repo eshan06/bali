@@ -17,7 +17,7 @@ body{margin:0;background:#F7F5F2}
 .pg-hero{padding:64px 0 88px}
 .pg-hero .bs-wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center}
 .pg-eyebrow{font-size:13px;line-height:18px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--brand)}
-.pg-h1{margin-top:14px;font-size:clamp(40px,2.4vw + 28px,64px);line-height:1.05;font-weight:600;letter-spacing:-0.03em;text-wrap:balance}
+.pg-h1{margin-top:0;font-size:clamp(40px,2.4vw + 28px,64px);line-height:1.05;font-weight:600;letter-spacing:-0.03em;text-wrap:balance}
 .pg-lead{margin-top:20px;max-width:30em;font-size:20px;line-height:31px;color:var(--ink2);text-wrap:pretty}
 .pg-art{min-width:0}
 .pg-art > *{width:100%;min-width:0}
@@ -33,11 +33,11 @@ body{margin:0;background:#F7F5F2}
 .pg-need span{display:block;margin-top:6px;font-size:15px;line-height:23px;color:var(--ink2)}
 @media (max-width:1079px){.pg-need{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:559px){.pg-need{grid-template-columns:minmax(0,1fr)}}
-.pg-steps{margin-top:56px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:64px 72px;counter-reset:none}
-.pg-step-n{display:block;margin-left:-4px;font-size:120px;line-height:0.76;font-weight:600;letter-spacing:-0.06em;color:#DCEDE3;font-variant-numeric:tabular-nums;user-select:none}
-.pg-step h3{margin-top:20px;font-size:26px;line-height:32px;font-weight:600;letter-spacing:-0.02em}
+.pg-steps{margin-top:56px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:48px 72px;counter-reset:none}
+.pg-n{display:inline-block;min-width:1.4em;color:var(--brand);font-variant-numeric:tabular-nums}
+.pg-step h3{margin-top:0;font-size:26px;line-height:32px;font-weight:600;letter-spacing:-0.02em}
 .pg-step p{margin-top:10px;max-width:27em;font-size:17px;line-height:27px;color:var(--ink2);text-wrap:pretty}
-@media (max-width:899px){.pg-steps{grid-template-columns:minmax(0,1fr);gap:48px}.pg-step-n{font-size:92px}}
+@media (max-width:899px){.pg-steps{grid-template-columns:minmax(0,1fr);gap:48px}}
 .pg-start{margin-top:36px}
 .pg-start > *{width:100%;min-width:0}
 .pg-cta{align-self:end;padding:28px 28px 30px;border-radius:20px;background:#FFFFFF;box-shadow:inset 0 0 0 1px var(--line)}
@@ -58,25 +58,24 @@ body{margin:0;background:#F7F5F2}
 <div class="bs-wrap">
 <a class="bs-brand" href="Main.dc.html" translate="no" aria-label="Bali, home"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="24" fill="none" stroke="#BCDCCA" stroke-width="10"></circle><path d="M26.6 8.61A24 24 0 1 1 8.61 26.6" fill="none" stroke="#2C6F51" stroke-width="10" stroke-linecap="round"></path></svg><span>Bali</span></a>
 <nav class="bs-nav" aria-label="Sections"><a href="Main.dc.html#how">How it works</a><a href="Main.dc.html#teachers">For teachers</a><a href="Main.dc.html#students">For students</a><a href="Main.dc.html#privacy">Privacy</a><a href="Main.dc.html#faq">Questions</a><a href="GuideFirstClass.dc.html">Guides</a></nav>
-<div class="bs-end"><a class="bs-btn bs-btn-s" href="https://bali-portal.vercel.app/login">Sign in</a><a class="bs-btn bs-btn-p" href="Main.dc.html#contact">Talk to us</a></div>
+<div class="bs-end"><details class="bs-menu"><summary>Menu</summary><nav class="bs-menu-panel" aria-label="Pages"><a href="Main.dc.html#how">How it works</a><a href="Main.dc.html#teachers">For teachers</a><a href="Main.dc.html#students">For students</a><a href="Main.dc.html#privacy">Privacy</a><a href="Main.dc.html#faq">Questions</a><a href="GuideFirstClass.dc.html">Guides</a><hr><a href="https://bali-portal.vercel.app/login">Sign in</a></nav></details><a class="bs-btn bs-btn-s" href="https://bali-portal.vercel.app/login">Sign in</a><a class="bs-btn bs-btn-p" href="Main.dc.html#contact">Talk to us</a></div>
 </div>
 </header>
 <main id="main">
 <section class="pg-hero" aria-labelledby="h-page">
 <div class="bs-wrap">
 <div>
-<p class="pg-eyebrow">Guide</p>
 <h1 id="h-page" class="pg-h1">Run your first class with Bali.</h1>
 <p class="pg-lead">Five steps, from the first tap to the recap after the bell.</p>
 </div>
-<div class="pg-art" aria-hidden="true"><dc-import name="MissionScene" hint-size="720px,560px"></dc-import></div>
+<div class="pg-art bs-shot" aria-hidden="true"><dc-import name="MissionScene" hint-size="720px,560px"></dc-import></div>
 </div>
 </section>
 <section class="bs-sec" style="padding-top: 8px;" aria-labelledby="h-start">
 <div class="bs-wrap">
 <h2 id="h-start" class="pg-h2">How a class starts</h2>
 <p class="pg-sub">What happens on the teacher's screen, on the Bali block and on a student's phone, in order.</p>
-<div class="pg-start"><dc-import name="StartScene" hint-size="1160px,580px"></dc-import></div>
+<div class="pg-start bs-shot"><dc-import name="StartScene" hint-size="1160px,580px"></dc-import></div>
 </div>
 </section>
 <section class="bs-sec bs-band" aria-labelledby="h-need">
@@ -87,8 +86,8 @@ body{margin:0;background:#F7F5F2}
 </section>
 <section class="bs-sec" aria-labelledby="h-steps">
 <div class="bs-wrap">
-<h2 id="h-steps" class="pg-h2">Five steps, start to finish</h2>
-<ol class="pg-steps"><li class="pg-step"><span class="pg-step-n" aria-hidden="true">01</span><h3>Start class from any browser.</h3><p>The teacher signs in to the portal and starts the session. The live grid opens with a tile for every student in the class.</p></li><li class="pg-step"><span class="pg-step-n" aria-hidden="true">02</span><h3>New students join once.</h3><p>A student new to the class joins once with the class code. After that, a tap is all it takes.</p></li><li class="pg-step"><span class="pg-step-n" aria-hidden="true">03</span><h3>Students tap in.</h3><p>Each student holds their phone to the teacher's Bali block. Their apps lock on the spot, even without Wi-Fi, and their tile turns to Focused.</p></li><li class="pg-step"><span class="pg-step-n" aria-hidden="true">04</span><h3>Teach, and watch the room.</h3><p>The grid shows who is focused, who has unlocked and who is not here yet. Slides and questions reach every phone and the student web.</p></li><li class="pg-step"><span class="pg-step-n" aria-hidden="true">05</span><h3>The bell rings.</h3><p>When class ends, the apps open on their own and the teacher gets a recap, every unlock included.</p></li><li class="pg-cta"><h3>Planning the first class?</h3><p>We can help set up the class, the roster and the Bali block before day one.</p><a class="bs-btn bs-btn-p" href="Main.dc.html#contact">Talk to us</a></li></ol>
+<h2 id="h-steps" class="pg-h2">The first class, step by step</h2>
+<ol class="pg-steps"><li class="pg-step"><h3><span class="pg-n" aria-hidden="true">1</span>Start class from any browser.</h3><p>The teacher signs in to the portal and starts the session. The live grid opens with a tile for every student in the class.</p></li><li class="pg-step"><h3><span class="pg-n" aria-hidden="true">2</span>New students join once.</h3><p>A student new to the class joins once with the class code. After that, a tap is all it takes.</p></li><li class="pg-step"><h3><span class="pg-n" aria-hidden="true">3</span>Students tap in.</h3><p>Each student holds their phone to the teacher's Bali block. Their apps lock on the spot, even without Wi-Fi, and their tile turns to Focused.</p></li><li class="pg-step"><h3><span class="pg-n" aria-hidden="true">4</span>Teach, and watch the room.</h3><p>The grid shows who is focused, who has unlocked and who is not here yet. Slides and questions reach every phone and the student web.</p></li><li class="pg-step"><h3><span class="pg-n" aria-hidden="true">5</span>The bell rings.</h3><p>When class ends, the apps open on their own and the teacher gets a recap, every unlock included.</p></li><li class="pg-cta"><h3>Planning the first class?</h3><p>We can help set up the class, the roster and the Bali block before day one.</p><a class="bs-btn bs-btn-p" href="Main.dc.html#contact">Talk to us</a></li></ol>
 </div>
 </section>
 <section class="bs-sec pg-callout" aria-labelledby="h-unlock">
@@ -110,11 +109,11 @@ body{margin:0;background:#F7F5F2}
 <nav aria-labelledby="f-guides"><h2 id="f-guides">Guides</h2><ul><li><a href="GuideFirstClass.dc.html">Run your first class</a></li><li><a href="GuideUnlock.dc.html">Emergency Unlock, explained</a></li><li><a href="GuideFamilies.dc.html">A note for families</a></li></ul></nav>
 <nav aria-labelledby="f-legal"><h2 id="f-legal">Legal</h2><ul><li><a href="https://bali-portal.vercel.app/privacy">Privacy policy</a></li><li><a href="https://bali-portal.vercel.app/terms">Terms of use</a></li><li><a href="Main.dc.html#privacy">Privacy at Bali</a></li></ul></nav>
 </div>
-<div class="bs-foot-bar"><div class="bs-wrap"><span translate="no">© 2026 Bali</span></div></div>
+<div class="bs-foot-bar"><div class="bs-wrap"><span translate="no">© 2026 Bali Focus Inc.</span></div></div>
 </footer>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3920}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3666}}'>
 class Component extends DCLogic {
   renderVals() {
     if (!this.uid) this.uid = 'pg' + Math.random().toString(36).slice(2, 9);

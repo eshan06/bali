@@ -10,7 +10,7 @@ export const ROUTES = {
 };
 
 export const DESCRIPTIONS = {
-  'Main.dc.html': 'With phones locked, teachers spend the period teaching instead of chasing screens. Every class gets more done.',
+  'Main.dc.html': 'With phones locked, teachers spend the period teaching instead of chasing screens.',
   'GuideFirstClass.dc.html': 'Five steps, from the first tap to the recap after the bell.',
   'GuideUnlock.dc.html': 'A student can always get to their phone, and every unlock is recorded.',
   'GuideFamilies.dc.html': 'A short letter a teacher can send home before the first class with Bali.',
