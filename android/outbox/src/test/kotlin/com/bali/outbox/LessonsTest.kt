@@ -104,6 +104,17 @@ private fun ana(
     signIns = signIns,
 )
 
+/** Ana, signed in and shown the list, with Period 3 in session until [first], its session s, and Period 4 until [bell], s2. */
+private fun twoInSession(first: Instant = at(3)): Account.State {
+    val classes =
+        """[{"id":"p3","name":"Period 3","teacher":{"displayName":"Ms. Rivera"},"liveSession":{"id":"s","endsAt":"${wire(first)}"}},""" +
+            """{"id":"p4","name":"Period 4","teacher":{"displayName":"Mr. Chen"},"liveSession":{"id":"s2","endsAt":"${wire(bell)}"}}]"""
+    val me = """{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":$classes,"session":null}"""
+    return Account.State(
+        signedIn = true, sync = SyncState(me = BaliJson.decodeFromString(MeResponse.serializer(), me), meReads = 1), listSeenBy = "ana", signIns = 1,
+    )
+}
+
 /**
  * Session s's presentation, [running] or over: [question] open or closed, four answers, no answer of the student's read; the
  * [slide] shown ([slideOf]), none by default; the [phone].
@@ -773,6 +784,60 @@ class LessonsTest : EngineFiles() {
                     release.countDown()
                 }
             }
+        }
+
+    @Test
+    fun setInFrontWithTheValueItAlreadyHasChangesNothingNoSecondPollAndNoExtraRead(): Unit =
+        runBlocking {
+            // Claude Review's WARN on #577: Bali's screen said in front twice cancelled the poll asleep and ran another, which read
+            // at once, as the app's `front` read again could.
+            val rig = lessonRig()
+            val lessons = rig.lessons
+            lessons.setInFront(true)
+            lessons.followed(ana())
+            rig.read()
+            rig.until { it.card != null }
+            val next = rig.clock.now() + LiveLesson.INTERVAL.toJavaDuration()
+            rig.asleep(next)
+            lessons.setInFront(true)
+            // A cancelled poll lets go of its sleep at once, so a sleep still there is the first poll's.
+            assertTrue(next in rig.clock.deadlines, "a second poll ran, the first one's sleep let go")
+            lessons.setInFront(false)
+            lessons.setInFront(false)
+            assertFalse(lessons.polling())
+            lessons.setInFront(true)
+            rig.server.next(pollRoute).reply(304)
+            rig.asleep()
+            assertEquals(2, rig.server.sent.count { it.route == pollRoute })
+        }
+
+    @Test
+    fun aBellLetGoAsTheRunEndsFollowsNothingEvenOnceItHasWokenSoNoLessonStartsAfterTheRunEnded(): Unit =
+        runBlocking {
+            // Claude Review's WARN on #577: the bell's job is the lesson half's scope's, not the run's, so a bell woken as the run
+            // ends could follow the next lesson after the run's end. Staged with no window of time: the run's end holds the lesson
+            // half's lock, closing the slide's document, as the bell wakes on this thread (the rig's scope is Unconfined) and waits
+            // there for the lock; then the run's end lets the bell go, and the lock. At Period 3's bell, Period 4's would follow.
+            val accounts = MutableStateFlow(twoInSession())
+            val rig = deckRig(accounts)
+            val lessons = rig.lessons
+            val deck = pdf("Factoring", 3)
+            val running = scope.launch { lessons.run() }
+            lessons.setInFront(true)
+            rig.read(presentation(slide = slideOf(deck)))
+            lessons.ask(rig.until { it.slide != null }.slide?.slide ?: fail("no slide shown"))
+            rig.fetch(deck)
+            rig.document()
+            lessons.setInFront(false)
+            val closing = rig.renderer.holdClose()
+            rig.clock.advance(3, holdingWakes = true)
+            running.cancel()
+            closing.taken()
+            rig.clock.releaseWakes()
+            closing.release()
+            withTimeout(patience) { running.join() }
+            assertNull(lessons.state.value.lesson, "a bell let go as the run ended followed a lesson after it")
+            assertFalse(lessons.polling())
         }
 }
 
