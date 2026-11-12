@@ -38,7 +38,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 
 // Which screen the app shows (C1a): BaliOutbox's ScreenTests, the router's halves and the words of Home, a scan, the sign-in
-// and the start (AN10d), iOS's word for word but where AS0's Words board changes one; AppTests' `offersSignOut`; TapInTests;
+// and the start (AN10d) and of Home's card for a class in session (AN10f), iOS's word for word but where AS0's Words board
+// changes one; AppTests' `offersSignOut`; TapInTests;
 // and BellRedrawTests' timeSet, with a test of its own for a clock set short of the bell or back. iOS's permission is the
 // lock's switch here (approved its On, denied its Off, not determined its Starting) and its shields the lock (Q3). The other
 // screens' words are AN10e's to AN10h's; waitingWords and ridersWiring read iOS's views and have no twin; MoveTests are AS2's.
@@ -131,6 +132,9 @@ private val failed = Problem.StartFailed(IOException("disk I/O error"))
 
 /** A session whose bell is at 10:42 AM in New York, 1,720 s after [t0]: BaliOutbox's tests' `bell1042`. */
 private val bell1042 = session(endsAt = 1720)
+
+/** Class c's name, as its teacher wrote it: BaliOutbox's tests' Period 3. */
+private val period3 = "Period 3 ${Char(0x2014)} Algebra II"
 
 /** [first], then where else the phone may stand: its standing not read, and in a session in each state there is. BaliOutbox's ScreenTests' `others`. */
 private fun elsewhere(first: Standing): List<Standing> =
@@ -703,6 +707,34 @@ class ScreenTest : OutboxFiles() {
     }
 
     @Test
+    fun homesCardWhileAClassIsInSessionAndTheStudentIsntFocusedInItUnlockedThereUntilWhenOutAClassInSessionItsWayInGoneAtTheBellAndNoneElsewhere() {
+        // C3c (AS4-Home-overUnlocked, AS4-Home-insession), at the bell by the phone's clock: none focused, under protection off,
+        // in a state not known, waiting, unread, or with no class running.
+        val algebra = """{"id":"c","name":"$period3","teacher":{"displayName":"Ms. Rivera"}}"""
+        val unlocked = SyncState(standing = inSession(ParticipationState.Unlocked, bell1042), me = user(classes = listOf(algebra)))
+        val card = assertNotNull(unlocked.inSessionCard(t0, newYorkZone, usShortTime))
+        assertEquals(listOf(true, bell1042.endsAt, null), listOf(card.unlocked, card.bell, card.retap))
+        assertEquals("You're unlocked in $period3 until 10:42 AM.", plain(card.words))
+        // Protection off reported in the class, or its refocus refused: as on Unlocked, the way back is a re-tap, never a refocus the
+        // server refuses (santa's round 1 on iOS).
+        val reported = unlocked.copy(reportedOff = bell1042.id)
+        assertEquals(UnlockedWords.of(reported, newYorkZone, usShortTime)?.retap, reported.inSessionCard(t0, newYorkZone, usShortTime)?.retap)
+        assertNotNull(reported.inSessionCard(t0, newYorkZone, usShortTime)?.retap)
+        assertNull(unlocked.inSessionCard(bell1042.endsAt, newYorkZone, usShortTime))
+        assertEquals("You're unlocked in your class until 10:42 AM.", plain(unlocked.copy(me = null).inSessionCard(t0, newYorkZone, usShortTime)?.words))
+        val live = """{"id":"c","name":"$period3","liveSession":{"id":"s","endsAt":"${wire(bell1042.endsAt)}"}}"""
+        val out = SyncState(standing = Standing.Out, me = user(classes = listOf("""{"id":"p5","name":"Period 5"}""", live)))
+        val notIn = assertNotNull(out.inSessionCard(t0, newYorkZone, usShortTime))
+        assertEquals(false to bell1042.endsAt, notIn.unlocked to notIn.bell)
+        assertEquals("$period3 is in session. Tap your teacher's block to join.", notIn.words)
+        assertNull(out.inSessionCard(bell1042.endsAt, newYorkZone, usShortTime))
+        assertNull(SyncState(standing = Standing.Out, me = user(classes = listOf(algebra))).inSessionCard(t0, newYorkZone, usShortTime))
+        val others =
+            listOf(inSession(ParticipationState.Focused, bell1042), inSession(ParticipationState.ProtectionOff, bell1042), inSession(null, bell1042), Standing.Waiting, Standing.Unread)
+        for (standing in others) assertNull(out.copy(standing = standing).inSessionCard(t0, newYorkZone, usShortTime), "$standing")
+    }
+
+    @Test
     fun homeOverUnlockedItsPrimaryWayOnWithItsTabBarAndJoinOverItOnlyWhileUnlockedIsTheRoutersOwn() {
         // C5c; the owner's ruling, 2026-09-30: the apps still open, History and Me honoured there; never over Focus, Protection
         // off or Session over.
@@ -727,10 +759,11 @@ class ScreenTest : OutboxFiles() {
     @Test
     fun waitingsBackToHomeTheRegularHomeItsTabBarNeverAHomeStackedOverWaitingAndTheStartFoundIsFocusWhateverWasOpened() {
         // #151, the owner's decision, 2026-10-01: History and Me honoured there, Join over it as over any Home; Waiting itself
-        // stays the tap's answer, with no bar. Home's card says the wait in the hero's place, only while waiting (C3c's card
-        // never then: AN10f's checks).
+        // stays the tap's answer, with no bar. Home's card says the wait in the hero's place, only while waiting, C3c's card never
+        // then.
         val waiting = SyncState(standing = Standing.Waiting, me = user(classes = listOf(Answer.inClass("c"))))
         assertEquals("You're tapped in. Your phone locks when class starts, as long as Bali is open.", waiting.waitingCard)
+        assertNull(waiting.inSessionCard(t0, newYorkZone, usShortTime))
         for (standing in elsewhere(Standing.Out)) assertNull(waiting.copy(standing = standing).waitingCard, "$standing")
         assertEquals(Screen.Waiting, screen(standing = Standing.Waiting))
         assertFalse(tabbed(standing = Standing.Waiting))
@@ -764,21 +797,23 @@ class ScreenTest : OutboxFiles() {
             assertEquals(Screen.Permission, screen(switch = LockSwitch.Off, me = none))
             assertEquals(Screen.SignIn, screen(signedIn = false, me = none))
             // Its card in the hero's place, with Join a class: not in a class yet, or in none any more, as the approved Sign in &
-            // sign up design's Home boards say (AS4's Home, new and removed). Home's other cards stand as they were: the wait's
-            // (#151), and a refused tap said (#146); a class in session's (C3c) is AN10f's.
+            // sign up design's Home boards say (AS4's Home, new and removed). Home's other cards stand as they were: a class in
+            // session (C3c), the wait's (#151), and a refused tap said (#146).
             val out = SyncState(standing = Standing.Out, me = none)
             assertEquals("You're not in a class yet. Join one with the class code from your teacher.", out.noClassesCard(everInClass = false))
             assertEquals("You're not in any classes. Join one with the class code from your teacher.", out.noClassesCard(everInClass = true))
             assertNull(out.waitingCard)
+            assertNull(out.inSessionCard(t0, newYorkZone, usShortTime))
             for (standing in elsewhere(Standing.Waiting)) {
                 for (ever in listOf(false, true)) assertNull(out.copy(standing = standing).noClassesCard(ever), "$standing")
             }
             // The wait's card in no class too: an armed tap needs no enrollment (#151).
             assertNotNull(out.copy(standing = Standing.Waiting).waitingCard)
-            // The classes not read, or one of them: none.
+            // The classes not read, or one of them: none; C3c's card where that class is in session.
             assertNull(out.copy(me = null).noClassesCard(everInClass = false))
             val running = me("""{"user":{"id":"u","role":"student","displayName":null},"classes":[{"id":"c","name":"Period 3","liveSession":{"id":"s","endsAt":"${wire(bell1042.endsAt)}"}}],"session":null}""")
             assertNull(out.copy(me = running).noClassesCard(everInClass = true))
+            assertNotNull(out.copy(me = running).inSessionCard(t0, newYorkZone, usShortTime))
             // A scan of a block no teacher set up is still said under it (#146).
             val (outbox, _) = makeOutbox()
             send(outbox, record(outbox, Change.Tap("NOCLASS123")), 404, Answer.unknownBlock)

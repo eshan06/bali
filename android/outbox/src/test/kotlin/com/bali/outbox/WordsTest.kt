@@ -8,6 +8,7 @@ import com.bali.core.MeResponse
 import com.bali.core.ParticipationState
 import com.bali.core.SendResult
 import com.bali.core.SignInError
+import com.bali.core.UnlockReason
 import java.io.IOException
 import kotlin.reflect.KClass
 import kotlin.test.Test
@@ -37,7 +38,8 @@ private fun me(json: String): MeResponse = BaliJson.decodeFromString(MeResponse.
 /**
  * Every word the app says, by the function that says it, each read for every case of the types it keys on: AN10d's, Join's,
  * Home's, a scan's, Tap in's, the sign-in's and the start's; AN10e's, Focus's, Emergency Unlock's failures and the block
- * screen's. Each later AN10 step adds its own.
+ * screen's; AN10f's, Unlocked's, a reason's and Back to focus's failures, Protection off's, Session over's and Home's card for a
+ * class in session. Each later AN10 step adds its own.
  */
 private fun everyWord(): Map<String, List<String>> {
     // Every result an answer can have, a status from 100 to 599 or none, and every reason with none.
@@ -81,6 +83,47 @@ private fun everyWord(): Map<String, List<String>> {
             protections.flatMap { protection -> listOf(null, false, true).map { FocusWords(state, protection, t0, newYorkZone, usShortTime, it) } }
         }
     assertEquals(FocusWords.Claim.entries.toSet(), focus.map { it.claim }.toSet(), "FocusWords.Claim's cases, each reached")
+    // Unlocked, Protection off and Session over where the phone may stand, with the classes as above: an unlock of its class on
+    // the phone, stuck or none, one under a tap, protection off on its way, a refused tap; one recorded there or none; protection
+    // off reported there or not; a Back to focus refused after protection off, for anything else, or none; and the classes' read
+    // failing or not. Under every claim the check can make, each picker, way and kind of Home's card reached.
+    val unlock = queued(Change.Unlock("s", UnlockReason.Nurse))
+    val queues =
+        listOf(
+            emptyList(), listOf(unlock), listOf(unlock.copy(attempts = 1, stuck = true)), listOf(queued(Change.UnlockUnderTap("t", null))),
+            listOf(queued(Change.ProtectionOff("s"))), listOf(queued(Change.Tap("tag")).copy(stuck = true)),
+        )
+    val backs = listOf(null) + listOf(ApiErrorReason.ProtectionOff, ApiErrorReason.EventIdConflict).map { Refusal(Change.Refocus("s"), 409, it, null) }
+    val sessions =
+        standings.flatMap { standing ->
+            classes.flatMap { me ->
+                queues.flatMap { queue ->
+                    listOf(null, RecordedUnlock("s", "u", UnlockReason.Bathroom)).flatMap { kept ->
+                        listOf(null, "s").flatMap { off ->
+                            backs.flatMap { back ->
+                                listOf(null, SendResult.NetworkError).map {
+                                    SyncState(standing = standing, queued = queue, refused = back, reportedOff = off, recordedUnlock = kept, me = me, meFailed = it)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    val claims =
+        listOf(null, Protection(), Protection(checked = true, switch = LockSwitch.On, locked = true)) +
+            LockSwitch.entries.flatMap { switch ->
+                listOf(false, true).flatMap { off -> listOf(false, true).map { Protection(checked = true, switch = switch, switchedOff = off, unreported = it) } }
+            }
+    val unlocked = sessions.mapNotNull { UnlockedWords.of(it, newYorkZone, usShortTime) }
+    val pickers = each(UnlockedWords.Picker::class, *unlocked.mapNotNull { it.picker }.distinct().toTypedArray())
+    val off = sessions.flatMap { state -> claims.mapNotNull { ProtectionOffWords.of(state, it, newYorkZone, usShortTime) } }
+    assertEquals(ProtectionOffWords.Way.entries.toSet(), off.map { it.way }.toSet(), "ProtectionOffWords.Way's cases, each reached")
+    // Out, a class of the student's in session by the last read.
+    val live = me(Answer.me(null, classes = listOf("""{"id":"c","name":"Class c","teacher":null,"liveSession":{"id":"s","endsAt":"${wire(at(3000))}"}}""")))
+    val cards = (sessions + standings.map { SyncState(standing = it, me = live) }).flatMap { state -> listOf(t0, at(3000)).mapNotNull { state.inSessionCard(it, newYorkZone, usShortTime) } }
+    assertEquals(setOf(false, true), cards.map { it.unlocked }.toSet(), "InSessionCard's kinds, each reached")
+    val changes = results.flatMap { result -> reasons.map { ReasonFailure.NotChanged(result, it) } }
     return mapOf(
         "Joining.Failure.words" to each(Joining.Failure::class, *failures.toTypedArray()).map { it.words },
         "SyncState.meWords" to each(SendResult::class, *results.toTypedArray()).map { SyncState(meFailed = it).meWords },
@@ -95,6 +138,15 @@ private fun everyWord(): Map<String, List<String>> {
             focus.flatMap { listOf(it.title, it.subtitle, it.claimWords, it.countdown?.digits, it.countdown?.until, it.offline, it.stalled, it.superseded) },
         "UnlockFailure.words" to UnlockFailure.entries.flatMap { failure -> listOf(false, true).map { failure.words(paused = it) } },
         "ShieldWords.words" to ShieldWords.entries.map { it.words },
+        "UnlockedWords" to unlocked.flatMap { listOf(it.title, it.subtitle, it.body, it.picker?.caption, it.retap, it.stuck) },
+        "UnlockedWords.Picker.caption" to pickers.map { it.caption },
+        "ProtectionOffWords" to off.flatMap { listOf(it.title, it.subtitle, it.headline, it.body, it.refused) + it.steps + it.problems },
+        "ReasonFailure.words" to
+            each(ReasonFailure::class, ReasonFailure.NotStarted, ReasonFailure.NotSaved, ReasonFailure.OnItsWay, *changes.toTypedArray()).map { it.words },
+        "RefocusFailure.words" to RefocusFailure.entries.map { it.words },
+        "SyncState.inSessionCard" to cards.flatMap { listOf(it.words, it.retap) },
+        "SyncState.refusedRefocusWords" to sessions.flatMap { state -> listOf(t0, at(3000)).map { state.refusedRefocusWords(it) } },
+        "SyncState.sessionOverWords" to sessions.flatMap { state -> claims.map { state.sessionOverWords(it, newYorkZone, usShortTime) } },
     ).mapValues { (_, words) -> words.filterNotNull() }
 }
 

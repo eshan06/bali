@@ -27,7 +27,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 // Rule 3's report (AN7b): BaliOutbox's ProtectionOffTests, RevokedWhileRunningTests, BackOnTests and
 // LaunchGraceTests, the lock's switch in Screen Time's permission's and its marker's place: off is the
 // marker gone, on and bound the marker there, starting a launch's not determined. The screen `settles`
-// chooses is the router's (AN10a); the words they check are AN10f's.
+// chooses is the router's (AN10a), and the words they check AN10f's: Protection off's way on, Unlocked's card.
 
 /** In session s, ending 3000 s after [t0], in [state]. */
 private fun inSession(state: ParticipationState) = Standing.InSession(session(), state)
@@ -391,7 +391,8 @@ class RevokedWhileRunningTest : EngineFiles() {
     @Test
     fun switchedOffInSettingsWithTheScreenOnTheNextCheckReportsProtectionOffAndNeverPutsTheLockBackOverIt(): Unit =
         runBlocking {
-            // Android unbinds the service, and the lock ends with it. The screen's way on is AN10's.
+            // Android unbinds the service, and the lock ends with it. The screen's way on is Settings, Android's Accessibility
+            // settings, where iOS's is its own prompt.
             val (rig, phone) = focused()
             val locks = phone.lock.locks
             phone.lock.set(LockSwitch.Off)
@@ -402,7 +403,8 @@ class RevokedWhileRunningTest : EngineFiles() {
             assertFalse(now.locked)
             report.reply(200, Answer.protectionOff())
             rig.server.next(checkInRoute).reply(200, Answer.live(state = "protection_off"))
-            rig.until { it.queued.isEmpty() && it.standing == inSession(ParticipationState.ProtectionOff) }
+            val state = rig.until { it.queued.isEmpty() && it.standing == inSession(ParticipationState.ProtectionOff) }
+            assertEquals(ProtectionOffWords.Way.Settings, ProtectionOffWords.of(state, phone.enforcer.updates.value, newYorkZone, usShortTime)?.way)
             assertEquals(locks, phone.lock.locks)
             assertFalse(phone.lock.holds)
         }
@@ -583,14 +585,15 @@ class LockBackOnTest : EngineFiles() {
     @Test
     fun unlockedBeforeTheSwitchWentOffStillUnlockedOnceItIsBackOnNeverLockedOverTheEmergencyUnlockAtOnceAndByTheServersAnswer(): Unit =
         runBlocking {
-            // A20; the Unlocked card's picker is AN10's.
+            // A20: its reason still changeable as before, the card open at the one on record (santa's round 1 on iOS).
             val (rig, phone) = off(unlocked = true)
             val locks = phone.lock.locks
             phone.lock.set(LockSwitch.On)
             phone.enforcer.check()
             rig.until { it.standing == inSession(ParticipationState.Unlocked) }
             rig.server.next(protectionOnRoute).reply(200, Answer.protectionOn(state = "unlocked"))
-            rig.until { it.queued.isEmpty() && it.standing == inSession(ParticipationState.Unlocked) }
+            val state = rig.until { it.queued.isEmpty() && it.standing == inSession(ParticipationState.Unlocked) }
+            assertEquals(UnlockedWords.Picker.Open(null), UnlockedWords.of(state, newYorkZone, usShortTime)?.picker)
             val now = phone.until { it.switch == LockSwitch.On && !it.switchedOff }
             assertFalse(now.locked)
             assertNull(now.until)
@@ -781,7 +784,10 @@ class LaunchGraceTest : EngineFiles() {
             val claim = phone.until { it.switchedOff }
             assertEquals(LockSwitch.Starting, claim.switch)
             assertFalse(claim.locked)
-            rig.until { it.queued.isEmpty() && it.standing == inSession(ParticipationState.ProtectionOff) }
+            val state = rig.until { it.queued.isEmpty() && it.standing == inSession(ParticipationState.ProtectionOff) }
+            // The screen says Bali's lock is off, its way on Settings, where iOS's is its own prompt for a grant never given.
+            val off = assertNotNull(ProtectionOffWords.of(state, claim, newYorkZone, usShortTime))
+            assertEquals(ProtectionOffWords.Way.Settings to "Bali's lock is off", off.way to off.headline)
             // Judged off, nothing is read every second: the engine's wakes check from here.
             rig.sleeping()
         }

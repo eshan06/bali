@@ -686,7 +686,7 @@ class ClassesTest : EngineFiles() {
     @Test
     fun outOfASessionInAClassTheTruthIsReadAtEachWakeWhileTheScreenIsOnAndWithItOffOrInNoClassNothing(): Unit =
         runBlocking {
-            // C3c: so Home says a class of theirs is in session (its card is AN10's).
+            // C3c: so Home says a class of theirs is in session, its card.
             val rig = rig()
             rig.screenOn(Answer.me(null, classes = listOf(Answer.inClass("c"))))
             assertEquals(Standing.Out, rig.engine.updates.value.standing)
@@ -695,6 +695,7 @@ class ClassesTest : EngineFiles() {
             rig.server.next(meRoute).reply(200, Answer.me(null, classes = listOf(live)))
             val state = rig.until { it.me?.classes?.firstOrNull()?.liveSession != null }
             assertEquals(Standing.Out, state.standing)
+            assertEquals(false, state.inSessionCard(rig.clock.now(), newYorkZone, usShortTime)?.unlocked)
             // Its going off rings a wake that no deadline marks: a moment, in real time, for what it would send
             // (AN5d's review of this test, which read the server before that wake could).
             rig.engine.setScreenOn(false)
