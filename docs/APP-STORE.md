@@ -15,6 +15,9 @@ checked it and submitted. ✅ with that date marks what App Store Connect holds.
 for the Family Controls entitlement (ISSUES #3), with new screenshots and a header (section 1).
 "Waiting for Review".
 
+**Approved 2026-11-12:** build 14, "Pending Developer Release" (ISSUES #3). Not released: the
+owner presses Release when they choose.
+
 **The framing rule (ISSUES #3).** Apple's developer agreement §3.3.3(P) allows Family
 Controls for "individuals the ability to manage their devices to enable focus and
 productivity", and says the framework "may not be used … in organizational settings". So

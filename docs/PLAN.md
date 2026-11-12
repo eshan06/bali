@@ -8,13 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-09 (Central) — Bali 1.0, build 13, is submitted to the App Store, "Waiting
-for Review" (Before the pilot, items 5 and 6; #548; DECISIONS 2026-11-09): the listing branded
-around focus, the privacy label published, rated 13+, the United States only, released by hand.
-Before it, every session's bell on a whole minute (#546). Next: App Review's verdict, the
-§3.3.3(P) answer (Open owner items); a session builds the retire-a-block command; the owner the
-sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11–AN13; AN1's
-part 2 on the owner's phones; the audit's polish waits._
+_Last updated: 2026-11-12 (Central) — App Review approved Bali 1.0, build 14 (Before the pilot,
+item 5; ISSUES #3, so Apple's §3.3.3(P) answer is in): "Pending Developer Release", not released,
+the owner's hold. Before it, the resubmission on build 14 after an automated scan refused build 13
+for the Family Controls entitlement (#550, #551). Next: the owner's release call and disabling the
+review account (Open owner items); a session builds the retire-a-block command; the owner the
+sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11–AN13;
+AN1's part 2 on the owner's phones; the audit's polish waits._
 
 ## Now
 
@@ -145,12 +145,12 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
    their lines in full in `docs/PLAN-ARCHIVE.md`. The notice `/privacy`'s section 11 promises: owed
    to no one yet, every prod account being the team's, and due for any change that matters from
    the first pilot user on (the owner; DECISIONS 2026-11-07).
-5. The App Store submission — ✅ the owner's, 2026-11-09 (#548; DECISIONS 2026-11-09): Bali 1.0,
-   build 13, "Waiting for Review", as `docs/APP-STORE.md`'s sections 1–4 record it; released by
-   hand once approved. App Review's verdict is Apple's answer on §3.3.3(P) (ISSUES #3). No external
-   beta for now (the owner, 2026-11-04). App Review's automated scan refused build 13 on 2026-11-10
-   ("not submitted with the Family Controls entitlement"); `testflight.yml` now fails a build whose
-   exported app or either extension is signed without it (#551).
+5. The App Store submission — ✅ the owner's, 2026-11-09 (#548; DECISIONS 2026-11-09), resubmitted
+   on build 14 (#550) and approved 2026-11-12, as `docs/APP-STORE.md`'s sections 1–4 record it;
+   released by hand, not yet (the owner). The approval is Apple's answer on §3.3.3(P) (ISSUES #3).
+   No external beta for now (the owner, 2026-11-04). App Review's automated scan refused build 13
+   on 2026-11-10 ("not submitted with the Family Controls entitlement"); `testflight.yml` now fails a
+   build whose exported app or either extension is signed without it (#551).
 6. The App Store privacy label — ✅ published 2026-11-09, `docs/APP-STORE.md` §3's answers: seven
    types, all linked, none tracking, the policy `https://app.getbali.app/privacy`.
 7. Production backups on (L0b), before the pilot's first class: `/privacy` (sections 4, 6 and 7)
@@ -333,7 +333,7 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 
 **Phase 6's owner list** (not PRs — the owner, the lawyer and the school):
 
-- 🚨 Apple's §3.3.3(P) (ISSUES #3): ask App Review whether a teacher-started session and the teacher's grid are allowed, and settle a fallback design if not — **gate**, and the first thing to do — asked by the owner 2026-10-13, case 102994872143 (`docs/APP-STORE.md` §5.6, as sent); **answered** (the owner, 2026-11-03): submit it for review, since App Review decides only once it sees the build, so App Review is the answer; submitted 2026-11-09, its verdict pending
+- ✅ Apple's §3.3.3(P) (ISSUES #3): ask App Review whether a teacher-started session and the teacher's grid are allowed, and settle a fallback design if not — **gate**, and the first thing to do — asked by the owner 2026-10-13, case 102994872143 (`docs/APP-STORE.md` §5.6, as sent); **answered** (the owner, 2026-11-03): submit it for review, since App Review decides only once it sees the build, so App Review is the answer; submitted 2026-11-09, approved 2026-11-12
 - Confirm the later K-12 pilot's state (likely Los Angeles or New Jersey) and the school's phone policy (ISSUES #4); the first, preliminary pilot is adults at Vanderbilt, on their own phones
 - ⚖️ The privacy policy and terms; the school's data agreement (FERPA's school-official terms, the state's law or the SDPC NDPA); a breach plan; opinions on the state's phone-ban and app-store age laws
 - Decision: who sees unlock reasons. (How accounts are made: decided 2026-10-04, self sign-up gated to `@vanderbilt.edu`, S11, and `@gmail.com` since 2026-11-07 (Now); MFA Optional with TOTP; the portal on `app.getbali.app` since 2026-11-07)
@@ -361,9 +361,8 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
     (`apps/web/src/app/layout.tsx`), on every page but `/privacy`, `/terms` and `/support`. A UI
     step's fix, its words through `no-ai-slop`.
   - 🔧 Vercel's previews carry prod's values: the overnight investigation's item 6, above.
-- **The App Store review (submitted 2026-11-09; `docs/APP-STORE.md`):**
-  - Apple's §3.3.3(P) answer (ISSUES #3, case 102994872143) is still open: App Review's verdict
-    gives it. Record it in ISSUES #3 when it comes.
+- **The App Store review (approved 2026-11-12; `docs/APP-STORE.md`):**
+  - Release: by hand, held until the owner says (2026-11-12).
   - The student review account is a Gmail address the owner made and confirmed in the AWS console,
     whose inbox the owner can't open, so whoever holds that inbox could reset its password. After
     review, disable it in Cognito (`docs/APP-STORE.md` §5.4, step 6) and re-enable it for the next
