@@ -98,18 +98,22 @@ its pooled one turns out closed, as URLSession's does. Its tests run against Moc
 local port. Gradle picks OkHttp's Android build for the app and its JVM build for `core`'s tests.
 Its calls suspend (kotlinx.coroutines), as Swift's are async.
 
-**The live lesson** (`core`'s `LiveLesson.kt`, BaliCore's `LiveLesson.swift`, AN13a): one running session's lesson as the
-phone follows it, in memory alone. Its poll (`run`) reads the presentation every 2 s with the last answer's `ETag` as
+**The live lesson** (`core`'s `LiveLesson.kt`, BaliCore's `LiveLesson.swift`, AN13a and AN13b): one running session's lesson as
+the phone follows it, in memory alone. Its poll (`run`) reads the presentation every 2 s with the last answer's `ETag` as
 `If-None-Match`, a `304` keeping the last read and the student's answer with it; waits out a `429`'s `Retry-After`, from 2 s
 to a minute; says every other failure as a `PollProblem` beside what it keeps; and stops once a read says the session is
 over, a failure after it said as nothing. One run at a time, the newest taking over; a read that comes back after its run
 was cancelled changes nothing. Its `answer` sends one request a call, under an id minted after the answer held and after the
 last minted here, a refusal known by its reason, never its message (`AnswerResult`), and keeps the answer whose id sorts
-last, so a read made before an answer landed never takes it back. Swift's actor is a lock each stretch holds, let go at each
-call to the API; its state is a `StateFlow`, its clock and its wait handed in. `core` can't see `outbox`, so no answer ever
-enters it, and nothing words an outcome here: `outbox` does (AN13c). Its tests run over a world of their own
-(`LessonWorld`): the server's answers in order, each held, cancelling its caller or echoing the pick as a test says, and a
-clock that moves only when the poll waits.
+last, so a read made before an answer landed never takes it back. Its `deck` gives the deck a slide names: a fresh presigned
+URL from the download route for each fetch, the bytes from the bucket through the client's own transport with no token and
+asked for as stored (`Accept-Encoding: identity`, so OkHttp decodes nothing), a bucket's `403` asking for a fresh URL once;
+the bytes checked against the slide's SHA-256 before they leave, and given read-only (`DeckResult`), a mismatch kept nowhere,
+and every deck the session showed kept by its `sha256` until a read says the session is over. Swift's actor is a lock each
+stretch holds, let go at each call to the API or the bucket; its state is a `StateFlow`, its clock and its wait handed in.
+`core` can't see `outbox`, so no answer ever enters it, and nothing words an outcome here: `outbox` does (AN13c). Its tests
+run over a world of their own (`LessonWorld`): the server's answers in order, each held, cancelling its caller or echoing
+the pick as a test says, and a clock that moves only when the poll waits; the bucket's request goes over MockWebServer too.
 
 **Sign-in** (`core`'s `SignIn.kt` and `TokenStore.kt`, BaliCore's `SignIn.swift`) has its parts (AN6a): the hosted UI's address with PKCE, its verifier and state from
 `SecureRandom`; the code in its answer, taken only at the redirect URI and only for its attempt, the

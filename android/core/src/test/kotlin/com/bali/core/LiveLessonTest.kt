@@ -1,25 +1,36 @@
 package com.bali.core
 
 import com.bali.core.LessonWorld.Reply
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.URI
+import java.nio.ReadOnlyBufferException
+import java.security.MessageDigest
 import java.time.Instant
+import java.util.concurrent.TimeUnit.MILLISECONDS
+import java.util.zip.GZIPOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import okio.Buffer
 
 /** When a lesson test starts, by the phone's clock. */
 private val start: Instant = Instant.ofEpochSecond(1_790_000_000)
@@ -121,9 +132,14 @@ class LessonWorld(replies: List<Reply>, now: Instant = start) : HttpTransport {
         }
     }
 
-    /** Session `s1`'s lesson in this world, its client signed in with [token]. */
-    fun lesson(token: String? = "t") =
-        LiveLesson("s1", ApiClient(URI("https://api.bali.test"), FixedToken(token), this), now = { now() }, sleep = { sleep(it) })
+    /** Session `s1`'s lesson in this world, its client signed in with [token], each request's wait [timeout]. */
+    fun lesson(token: String? = "t", timeout: Duration = ApiClient.REQUEST_TIMEOUT) =
+        LiveLesson(
+            "s1",
+            ApiClient(URI("https://api.bali.test"), FixedToken(token), this, timeout),
+            now = { now() },
+            sleep = { sleep(it) },
+        )
 }
 
 /** A fixture's body, as the API sends it. */
@@ -529,5 +545,246 @@ class LessonAnswerTest {
             assertEquals(AnswerResult.Answered(StudentAnswer(1, ids[1])), second)
             // The first tap's answer came back last; the second's, sorting after it, is the one kept.
             assertEquals(StudentAnswer(1, ids[1]), lesson.state.value.presentation?.question?.answer)
+        }
+}
+
+/** A deck's bytes in a test, and their SHA-256 as the API gives a slide's. */
+private val pdf = "%PDF-1.7 Factoring quadratics"
+private val pdfSha256 = "bb00f1264482b1749c27e894811b96e133b8f53a83f9794981f20455b7037afc"
+
+/** What a slide is given once that deck is in. */
+private val ready = DeckResult.Ready(pdf.encodeToByteArray())
+
+/** A page of that deck, shown. */
+private fun slide(page: Int = 4) = Slide("d1", pdfSha256, page, 12)
+
+/** The bucket's answer: the deck's bytes. */
+private val bucket = Reply(200, body = pdf)
+
+/** Where the download fixture sends the phone, and where the route is. */
+private val fixtureUrl = "https://deck-storage.invalid/decks%2F00000000-0000-7000-8000-000000000001.pdf?signature=fixture"
+private val route = "https://api.bali.test/v1/decks/d1/download"
+
+/** A slide's deck: LiveLessonTests.swift's LessonDeckTests. */
+class LessonDeckTest {
+    @Test
+    fun itAsksForAUrlFetchesTheBytesWithNoTokenAndKeepsThemTheNextPageAsksNothing() =
+        inTime {
+            val world = LessonWorld(listOf(Reply.ok(wire("download/shown.json")), bucket))
+            val lesson = world.lesson(timeout = 7.seconds)
+            assertEquals(ready, lesson.deck(slide(page = 4)))
+            assertEquals(ready, lesson.deck(slide(page = 5)))
+
+            val sent = world.sent
+            assertEquals(listOf(route, fixtureUrl), sent.map { it.url.toString() })
+            assertEquals(listOf("GET", "GET"), sent.map { it.method })
+            assertEquals(listOf("Bearer t", null), sent.map { it.headers["Authorization"] })
+            // The bucket's request carries one header, its ask for the bytes as stored (Q6), and waits as the client's do.
+            assertEquals(mapOf("Accept-Encoding" to "identity"), sent[1].headers)
+            assertEquals(listOf(7.seconds, 7.seconds), sent.map { it.timeout })
+        }
+
+    @Test
+    fun aDeckIsGivenReadOnlySoNothingGivenItCanChangeTheOneKeptForTheNextAsk() =
+        inTime {
+            // Kotlin's own: Swift's `Data` is a value, where the array kept here is the one given, so it goes out read-only.
+            val world = LessonWorld(listOf(Reply.ok(wire("download/shown.json")), bucket))
+            val lesson = world.lesson()
+            val given = (lesson.deck(slide()) as? DeckResult.Ready)?.buffer() ?: fail("the deck was not given")
+            assertTrue(given.isReadOnly)
+            assertFailsWith<ReadOnlyBufferException> { given.put(0, 0) }
+            assertEquals(pdf, ByteArray(given.remaining()).also { given.get(it) }.decodeToString())
+            assertEquals(ready, lesson.deck(slide()))
+        }
+
+    @Test
+    fun bytesWhoseSha256IsNotTheSlidesAreRefusedAndKeptNowhereTheNextAskFetchesAgain() =
+        inTime {
+            val shown = Reply.ok(wire("download/shown.json"))
+            val world = LessonWorld(listOf(shown, Reply(200, body = "%PDF-1.7 Something else"), shown, bucket))
+            val lesson = world.lesson()
+            assertEquals(DeckResult.Mismatch, lesson.deck(slide()))
+            assertEquals(ready, lesson.deck(slide()))
+            assertEquals(4, world.sent.size)
+        }
+
+    @Test
+    fun aUrlTheBucketRefusesAsItRefusesOneExpiredIsAskedForAgainOnceRefusedAgainItIsSaid() =
+        inTime {
+            val expired = Reply(403, body = "<Error><Code>AccessDenied</Code><Message>Request has expired</Message></Error>")
+            val freshUrl = "https://deck-storage.invalid/decks%2Fd1.pdf?signature=fresh"
+            val fresh = Reply.ok("""{"url":"$freshUrl"}""")
+            val world = LessonWorld(listOf(Reply.ok(wire("download/shown.json")), expired, fresh, bucket))
+            assertEquals(ready, world.lesson().deck(slide()))
+            assertEquals(listOf(route, fixtureUrl, route, freshUrl), world.sent.map { it.url.toString() })
+
+            // The fresh URL refused too: said, and never asked for a third time.
+            world.then(fresh, expired, fresh, expired)
+            assertEquals(DeckResult.Refused(403, null), world.lesson().deck(slide()))
+            assertEquals(8, world.sent.size)
+        }
+
+    @Test
+    fun eachRefusalOfTheDownloadIsSaidByItsStatusAndReasonAskedOnceAndKeptNowhere() =
+        inTime {
+            val cases =
+                listOf(
+                    "download/403-not-shown.json" to DeckResult.Refused(403, null),
+                    "download/404-deck-not-found.json" to DeckResult.Refused(404, ApiErrorReason.DeckNotFound),
+                    "download/503-deck-storage-off.json" to DeckResult.Refused(503, ApiErrorReason.DeckStorageOff),
+                )
+            for ((fixture, result) in cases) {
+                val refused = Reply(Contract.load(fixture).status, body = wire(fixture))
+                val world = LessonWorld(listOf(refused, refused))
+                val lesson = world.lesson()
+                assertEquals(result, lesson.deck(slide()), fixture)
+                assertEquals(result, lesson.deck(slide()), fixture)
+                assertEquals(2, world.sent.size, fixture)
+            }
+        }
+
+    @Test
+    fun noAnswerAnAnswerItCannotReadOrTheBucketsOwnRefusalIsSaidWithNoTokenNothingIsSent() =
+        inTime {
+            val shown = Reply.ok(wire("download/shown.json"))
+            val elsewhere = Reply(302, mapOf("Location" to "https://elsewhere.test/"))
+            val cases =
+                listOf(
+                    Triple("offline", listOf(Reply.offline), DeckResult.Unreachable(NoAnswer.Unreachable)),
+                    Triple("a 200 it can't read", listOf(Reply.ok("<html>OK</html>")), DeckResult.Refused(200, null)),
+                    Triple("a URL it can't read", listOf(Reply.ok("""{"url":"not a url"}""")), DeckResult.Refused(200, null)),
+                    Triple("the bucket offline", listOf(shown, Reply.offline), DeckResult.Unreachable(NoAnswer.Unreachable)),
+                    Triple("the bucket's 500", listOf(shown, Reply(500)), DeckResult.Refused(500, null)),
+                    Triple("the bucket's redirect", listOf(shown, elsewhere), DeckResult.Refused(302, null)),
+                )
+            for ((case, replies, result) in cases) {
+                val world = LessonWorld(replies)
+                assertEquals(result, world.lesson().deck(slide()), case)
+                assertEquals(replies.size, world.sent.size, case)
+            }
+            val signedOut = LessonWorld(emptyList())
+            assertEquals(DeckResult.Unreachable(NoAnswer.NoToken), signedOut.lesson(token = null).deck(slide()))
+            assertTrue(signedOut.sent.isEmpty())
+        }
+
+    @Test
+    fun theSessionsEndEmptiesWhatItKeptOnceAReadSaysItIsOverTheDeckIsAskedForAgain() =
+        inTime {
+            val world = LessonWorld(listOf(Reply.ok(wire("download/shown.json")), bucket))
+            val lesson = world.lesson()
+            assertEquals(ready, lesson.deck(slide()))
+            world.then(Reply.ok(wire("presentation/over.json"), etag = "\"b\""))
+            lesson.run()
+
+            world.then(Reply(403, body = wire("download/403-not-shown.json")))
+            assertEquals(DeckResult.Refused(403, null), lesson.deck(slide()))
+            assertEquals(4, world.sent.size)
+        }
+
+    @Test
+    fun aDeckStillOnItsWayWhenTheSessionEndsGoesToItsAskerAndIsKeptNowhere() =
+        inTime {
+            val world = LessonWorld(listOf(Reply.ok(wire("download/shown.json")), bucket.held))
+            val lesson = world.lesson()
+            val fetching = async { lesson.deck(slide()) }
+            world.held(1)
+            world.then(Reply.ok(wire("presentation/over.json"), etag = "\"b\""))
+            lesson.run()
+            world.release()
+            assertEquals(ready, fetching.await())
+
+            world.then(Reply(403, body = wire("download/403-not-shown.json")))
+            assertEquals(DeckResult.Refused(403, null), lesson.deck(slide()))
+            assertEquals(4, world.sent.size)
+        }
+
+    @Test
+    fun anAskCancelledOnItsWayEndsByThrowingSayingNothingAndKeepsNothingTheNextAskFetchesAgain() =
+        inTime {
+            // Kotlin's own: a cancelled coroutine's ask throws, as the client's calls do, where Swift's says it is unreachable.
+            val world = LessonWorld(listOf(Reply.ok(wire("download/shown.json")), bucket.held))
+            val lesson = world.lesson()
+            var said: DeckResult? = null
+            val asking = launch { said = lesson.deck(slide()) }
+            world.held(1)
+            asking.cancelAndJoin()
+            assertNull(said)
+
+            world.then(Reply.ok(wire("download/shown.json")), bucket)
+            assertEquals(ready, lesson.deck(slide()))
+            assertEquals(4, world.sent.size)
+        }
+}
+
+/** [bytes] gzipped, as an upload naming `Content-Encoding: gzip` could leave them stored. */
+private fun gzipped(bytes: ByteArray): ByteArray =
+    ByteArrayOutputStream().also { out -> GZIPOutputStream(out).use { it.write(bytes) } }.toByteArray()
+
+/** [bytes]' SHA-256 in lower-case hex, as the API gives a slide's. */
+private fun sha256Hex(bytes: ByteArray) =
+    MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+/**
+ * A slide's deck on the wire, over a real socket: the bucket's request as the app's own transport sends it, as
+ * OkHttpTransportTest checks the API's. Kotlin's own: OkHttp, like URLSession, asks for gzip by itself and decodes an answer
+ * named gzip, so the bucket is asked for the bytes as stored (Q6).
+ */
+class LessonDeckWireTest {
+    /** How long a test waits on its local servers: answered, a request takes milliseconds. */
+    private val stall = 1.minutes
+
+    /** Session `s1`'s lesson, its client of [api] signed in, on the app's own transport, waits only a broken test outlasts. */
+    private fun lesson(api: MockWebServer): LiveLesson {
+        val client = OkHttpTransport.makeClient().newBuilder().callTimeout(stall.inWholeMilliseconds, MILLISECONDS).build()
+        return LiveLesson("s1", ApiClient(api.url("/").toUri(), FixedToken("token-real"), OkHttpTransport(client), stall))
+    }
+
+    /** The URL of [target] on [storage], written out by hand, so the API's answer names exactly it. */
+    private fun presigned(storage: MockWebServer, target: String) = storage.url("/").toString().trimEnd('/') + target
+
+    @Test
+    fun thePresignedUrlReachesTheBucketAsTheApiWroteItEachPercent2FUnchangedAndNoAuthorizationHeader(): Unit =
+        inTime {
+            MockWebServer().use { api ->
+                MockWebServer().use { storage ->
+                    storage.enqueue(MockResponse(body = pdf))
+                    storage.start()
+                    // The key's slash escaped, as the fixture and the API's stand-in write it, the credential's as S3's do.
+                    val target =
+                        "/decks%2Fd1.pdf?X-Amz-Credential=AKIDEXAMPLE%2F20261112%2Fus-east-1%2Fs3%2Faws4_request" +
+                            "&X-Amz-Signature=fe5f80f77d5fa3beca038a248ff027d0445342fe2855ddc963176630326f1024"
+                    api.enqueue(MockResponse(body = """{"url":"${presigned(storage, target)}"}"""))
+                    api.start()
+                    assertEquals(ready, lesson(api).deck(slide()))
+                    assertEquals("Bearer token-real", api.takeRequest().headers["Authorization"])
+                    val fetched = storage.takeRequest()
+                    assertEquals("GET $target HTTP/1.1", fetched.requestLine)
+                    assertNull(fetched.headers["Authorization"])
+                }
+            }
+        }
+
+    @Test
+    fun itAsksTheBucketForIdentityAndAnAnswerNamedGzipIsLeftUndecodedSoTheHashSeesItsBytesAsSent(): Unit =
+        inTime {
+            // Gzipped, as S3 keeps an encoding an upload names unsigned: decoded, these would be the deck itself.
+            val stored = gzipped(pdf.encodeToByteArray())
+            MockWebServer().use { api ->
+                MockWebServer().use { storage ->
+                    storage.start()
+                    api.start()
+                    repeat(2) {
+                        val gzip = MockResponse.Builder().addHeader("Content-Encoding", "gzip").body(Buffer().write(stored))
+                        storage.enqueue(gzip.build())
+                        api.enqueue(MockResponse(body = """{"url":"${presigned(storage, "/decks%2Fd1.pdf?signature=s")}"}"""))
+                    }
+                    val lesson = lesson(api)
+                    // Hashed as sent: a slide naming the stored bytes' hash is given those bytes, never their decoding,
+                    assertEquals(DeckResult.Ready(stored), lesson.deck(Slide("d1", sha256Hex(stored), 4, 12)))
+                    // and one naming the deck's own refuses them: nothing decodes them into a match.
+                    assertEquals(DeckResult.Mismatch, lesson.deck(slide()))
+                    repeat(2) { assertEquals("identity", storage.takeRequest().headers["Accept-Encoding"]) }
+                }
+            }
         }
 }

@@ -8,6 +8,93 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **AN13b, the deck downloaded, checked against its `sha256` and kept for the session: BaliCore's `deck(for:)`
+  (M7) in Kotlin, in `core`, every outcome a type and nothing on disk, the second of AN13's seven steps (the conductor's Q5 and
+  Q6 built, and this step's own calls, marked, each awaiting the owner's look; AN13b, #575).** The owner is asleep and said to
+  take the recommended option on every regular call, so each call here is the conductor's or this step's, for the owner to look
+  at.
+
+  **Where it lives:** `core`'s `LiveLesson.kt`, beside AN13a's poll: `DeckResult` (`Ready`, `Mismatch`, `Unreachable` and
+  `Refused`), each a type as iOS's are, `Ready` equal by its bytes' content, as Swift's `Data` is, where a data class would
+  compare the array itself, and giving them read-only (`buffer()`); `deck(slide)` and its fetch; and the decks the session
+  showed, by `sha256`, emptied where "over is over" sits in the poll. `ApiClient`'s `transport` and `timeout` went from
+  `private` to `internal`, the visibility iOS has, so the bucket's request rides the client's own transport and wait. **Decks in
+  memory only,** as the twin keeps them (M7): nothing is written to the disk or any store, and nothing reaches `outbox`, which
+  `core` can't see. No word and no screen (AN13c, AN13e, AS8). `android/app` is unchanged, so no emulator ran.
+
+  **The rules, each the twin's with its test:** a fresh URL from `GET /v1/decks/{id}/download` for each fetch, never kept; the
+  bytes fetched with no bearer token, the URL its own credential, on the client's 15 s wait and its transport's 30 s bound, no
+  redirect followed; a bucket's `403`, as S3 answers an expired URL, asks the route once more, and a fresh URL refused again is
+  said, never asked a third time; only a bucket's `200` is hashed, any other status its refusal; nothing leaves before its
+  SHA-256 (`MessageDigest`, its hex written by hand, since `HexFormat` is Android 14's) is the slide's, and a mismatch is kept
+  nowhere, so the next ask fetches anew; a deck kept is given again with no request, the next page asking nothing; and once a
+  read says the session is over the decks are emptied, a fetch that ends after it given to its asker and kept nowhere. The
+  download's refusals are said by status and reason (`403` not shown, `404 deck_not_found`, `503 deck_storage_off`), no answer
+  as unreachable, and no token as nothing sent.
+
+  **The conductor's calls, built:**
+  - **Q5, decks in memory:** every deck the session showed stays, the twin's rule (M7's note: keep only the slide's own if
+    lessons ever show more than a few), each at most 25 MB; AP3 checks big decks on a low-memory phone (AN13g writes the line).
+  - **Q6, `Accept-Encoding: identity` on the bucket's GET:** OkHttp asks for gzip by itself and decodes an answer named gzip
+    before anything sees the bytes; asked for identity, it decodes nothing, so the hash sees the bytes as sent and a gzip an
+    upload left stored is never inflated. The URL already asks S3 to answer identity (`response-content-encoding`, M1), which is
+    all iOS has, since URLSession asks for gzip by itself too; this holds the phone's side whatever answers. Over MockWebServer,
+    without it OkHttp decoded an answer named gzip, and the hash saw the deck inside it.
+
+  **This step's calls, each awaiting the owner's look:**
+  - **`Ready` gives its bytes read-only** (`buffer()`, a read-only `ByteBuffer` over them), never the array the lesson keeps for
+    its next ask, and never a copy: each deck is in memory once, as Swift's `Data` shares its buffer, and nothing given a deck
+    can change a kept one past its check (santa's two reviewers). A copy for each ask would hold a deck twice in Android's heap,
+    which Q5 watches.
+  - **The hash runs on `Dispatchers.Default`,** off its caller's thread, which may be a screen's: a deck is up to 25 MB, and
+    Swift's actor is never the main one (santa's reviewer A). No test sees which thread it takes, so none pins it.
+  - **A cancelled ask ends by throwing,** as the client's calls do (AN3d) and AN13a's run does, where Swift's says unreachable;
+    nothing of it is kept, and the next ask fetches again (a test of Kotlin's own). Bytes already in and checked when the cancel
+    lands are kept for the session, as the twin keeps them.
+  - **A URL the phone can't read as one** (`URISyntaxException`) is the answer's status alone, `Refused(200)`, as the twin's
+    `URL(string:)` failing is, and nothing goes to the bucket. No outcome, error or log carries a presigned URL: it is a
+    credential for its few minutes.
+
+  **The tests** (`LiveLessonTest.kt`, the JVM): LiveLessonTests.swift's deck suite, seven, over AN13a's `LessonWorld`, each
+  named as the iOS description in one camelCase sentence, a loop in place of the parameterized one, each failure naming its
+  case, the bucket's request checked to carry one header, `Accept-Encoding: identity`, on the client's own wait (a client of 7
+  s, so the default can't pass for it). Kotlin's own, four: the cancelled ask; the deck given read-only; and over MockWebServer,
+  one server as the API and one as the bucket, the presigned URL reaching the bucket as the API wrote it (the `%2F` of its key
+  and of its credential, the request line exact) with no `Authorization`, and `Accept-Encoding: identity` going out, so an
+  answer named gzip is left undecoded (a slide naming the stored bytes' hash is given them; one naming the deck's own refuses
+  them). **Tried, each failing by name, then reverted:** the bearer token sent to the bucket (the fetch-and-keep test, and the
+  wire test's `Authorization`); the hash skipped (the mismatch test, and the gzip test's refusal); a deck that failed the hash
+  kept (the mismatch test's second ask); no fresh URL after a `403` (the expired test), and a third ask (the expired test: a
+  request with no answer left); the decks not emptied at the session's end (the session-end test), and a fetch that ends after
+  it kept (the mid-fetch test); `Accept-Encoding: identity` dropped (the fetch-and-keep test, and the gzip test, decoded into a
+  mismatch); the URL decoded before it goes (the fetch-and-keep, expired and `%2F` tests); `Ready` compared by reference (nine
+  tests); a cancel caught as unreachable (the cancelled-ask test); the deck given writable (the read-only test); and the
+  bucket's request on the default wait, not the client's (the fetch-and-keep test).
+
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble :app:lint
+  check` green, Android 10's API check with it (Animal Sniffer over `core` and `outbox`), and no compiler or lint warning from
+  this step's code; the core and outbox suites green in each `check` and four more times on the final code (687 tests, eleven
+  of them new), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run
+  lint && npm test` green, the portal's suite whole (78 files). **A trap found on the way:** Gradle's `--rerun` runs again only
+  the task just before it, so `./gradlew :core:test :outbox:test --rerun` left `:core:test` UP-TO-DATE, in AN13a's passes as in
+  this step's first four; core's four here ran with `--rerun` after each task (GOTCHAS, Android's SDK on Windows). No SDK package was installed and no library added:
+  the build downloads none (`android.builder.sdkDownload=false`), and no build file changed. The size, santa's count: 143
+  changed lines not counting tests and Markdown (the split guessed about 90), 263 in the tests.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each fixed: `Ready`'s array was the deck kept, so
+  whatever was given it could write into a kept deck past its check (both; now read-only); the hash ran on its caller's thread
+  (reviewer A; now `Dispatchers.Default`); and the wait check passed for the default wait either way (reviewer A; the test's
+  client now waits 7 s).
+
+  **For AN13c to AN13g and AS8:** AN13e asks `deck` once per `sha256`, in the lesson half's own scope, treats a cancel's throw
+  as a normal stop, never an error shown, and shows any `DeckResult` but `Ready` as the slide's failed state with Try again
+  (iOS's `SlideDeck.Phase`: one line for every failure, AS8's to draw); the renderer is handed `Ready.buffer()`, the bytes
+  read-only, to write into its file descriptor (AN13f, Q3). The fetch goes to the bucket's host, not the API's, so on the app's
+  one transport it never waits in the API's per-host queue AN13d weighs (OkHttp lets 5 requests a host go at once); it is
+  bounded at 30 s whole, so a 25 MB deck needs about 7 Mbit/s, which AN13g's AP3 line checks on several phones through one
+  access point. Q2 and Q3 still wait for the owner; nothing here waited on them.
+
 - **2026-11-12** — **AN13a, the live lesson's poll and answer: BaliCore's `LiveLesson` (L5) in Kotlin, in `core`, every
   outcome a type and nothing stored, the first of AN13's seven steps (the conductor's Q1 built, and this step's own calls,
   marked, each awaiting the owner's look; AN13a, #574).** The owner is asleep and said to take the recommended option on

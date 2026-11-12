@@ -170,6 +170,10 @@ The PC whose clone is `C:\dev\bali` holds Android's SDK and its test emulators
   and `adb exec-out cat /sdcard/ui.xml` reach adb as `C:/Program Files/Git/sdcard/ui.xml`, so the
   dump lands nowhere and the read fails, or reads an old file. Prefix such a command with
   `MSYS_NO_PATHCONV=1`.
+- **Gradle's `--rerun` runs again only the task just before it.** `./gradlew :core:test :outbox:test
+  --rerun` runs `:outbox:test` again and leaves `:core:test` UP-TO-DATE, so a pass meant to run both
+  suites again runs one (AN13a's and AN13b's first passes). Put it after each task, `./gradlew
+  :core:test --rerun :outbox:test --rerun`, and check the log says neither is UP-TO-DATE.
 
 ## Cloud sessions / dev environment
 

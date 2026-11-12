@@ -1,8 +1,14 @@
 package com.bali.core
 
+import java.io.IOException
+import java.net.URI
+import java.net.URISyntaxException
+import java.nio.ByteBuffer
+import java.security.MessageDigest
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -14,10 +20,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-// A live lesson as the student's phone follows it (Phase 7; ARCHITECTURE, "Live lesson", decisions 1, 2 and 4 to 6), BaliCore's
-// LiveLesson.swift (L5): the poll of what a running session shows, and the student's answer. No screen and no word: `outbox`
-// words each outcome (AN13c), and the app's lesson half runs the poll only while Bali's screen is in front and sends each tap
-// through `answer` (AN13d). The deck a slide names joins them here (AN13b). `core` can't see `outbox`, so no answer reaches it.
+// A live lesson as the student's phone follows it (Phase 7; ARCHITECTURE, "Live lesson", decisions 1, 2, 4 to 6 and 8),
+// BaliCore's LiveLesson.swift (L5 and M7): the poll of what a running session shows, the student's answer, and the deck a slide
+// names. No screen and no word: `outbox` words each outcome (AN13c), and the app's lesson half runs the poll only while Bali's
+// screen is in front, sends each tap through `answer` (AN13d) and asks for a slide's deck (AN13e). `core` can't see `outbox`, so
+// no answer reaches it.
 
 /** What the phone knows of a live lesson: a value, each change a copy. */
 data class LessonState(
@@ -74,9 +81,47 @@ sealed interface AnswerResult {
 }
 
 /**
- * One running session's live lesson, as the student's phone follows it: [run] keeps [state], and [answer] sends the student's
- * pick. Swift's actor is a lock each stretch holds ([alone]), let go at each call to the API, so a tap goes while a read is on
- * its way. Nothing is stored: the lesson lives in memory, and goes with its owner, as at sign-out.
+ * How the deck a slide names came: its bytes, checked, or why not, each said on the slide with a Try again (rule 5), and a
+ * failure kept nowhere, so the next ask fetches the deck anew.
+ */
+sealed interface DeckResult {
+    /**
+     * The PDF, its SHA-256 the slide's: the only bytes a slide is given, drawn with no link in them followed (decision 8).
+     * Equal by the bytes' content, as Swift's `Data` is, where a data class would compare the array itself.
+     */
+    class Ready(internal val bytes: ByteArray) : DeckResult {
+        /**
+         * The bytes, read-only: the array is the one the lesson keeps for its next ask, never a copy, so each deck is in memory
+         * once, as Swift's `Data` shares its buffer, and nothing given it can change a kept deck past its check.
+         */
+        fun buffer(): ByteBuffer = ByteBuffer.wrap(bytes).asReadOnlyBuffer()
+
+        override fun equals(other: Any?) = other is Ready && bytes.contentEquals(other.bytes)
+
+        override fun hashCode() = bytes.contentHashCode()
+
+        override fun toString() = "Ready(${bytes.size} bytes)"
+    }
+
+    /** Bytes came, but their SHA-256 is not the slide's: refused, never drawn. */
+    data object Mismatch : DeckResult
+
+    /** No answer came, from the API or the bucket: offline, a timeout, or no token to send. */
+    data class Unreachable(val noAnswer: NoAnswer) : DeckResult
+
+    /**
+     * Any other answer, from the API or the bucket: its status, and the reason the API's error shape names, if any: `403` once
+     * no running session of the student's class shows the deck, `404 deck_not_found` once it is removed, `503
+     * deck_storage_off`; or the bucket's own refusal of a fresh URL.
+     */
+    data class Refused(val status: Int, val reason: ApiErrorReason?) : DeckResult
+}
+
+/**
+ * One running session's live lesson, as the student's phone follows it: [run] keeps [state], [answer] sends the student's pick,
+ * and [deck] fetches the deck a slide names. Swift's actor is a lock each stretch holds ([alone]), let go at each call to the
+ * API or the bucket, so a tap goes while a read is on its way. Nothing is stored: the lesson lives in memory, its decks too, and
+ * goes with its owner, as at sign-out.
  */
 class LiveLesson(
     /** The running session whose lesson this is. */
@@ -108,6 +153,14 @@ class LiveLesson(
 
     /** The newest [run]'s number: an older run stops at its next read, saying nothing of it. */
     private var runs = 0
+
+    /**
+     * The decks this session showed, checked, by their SHA-256: in memory alone, never on disk, emptied once a read says the
+     * session is over, and gone with the lesson when its owner drops it, as at sign-out (decision 8). Every deck the session
+     * showed stays, each at most 25 MB, as the twin keeps them (Q5): keep only the slide's own if lessons ever show more than a
+     * few.
+     */
+    private val decks = mutableMapOf<String, ByteArray>()
 
     /**
      * Polls until a read says the session is not running, or its coroutine is cancelled, which it ends by throwing, as
@@ -152,7 +205,8 @@ class LiveLesson(
                 else -> problem = PollProblem.Refused(result.code, read.error?.error?.reason)
             }
             val over = presentation?.running == false
-            // Over is over: a read failing after it never says Bali can't be reached.
+            // Over is over: a read failing after it never says Bali can't be reached, and no deck outlives it.
+            if (over) decks.clear()
             published.value = LessonState(presentation, if (over) null else problem)
             if (over) null else wait
         }
@@ -198,6 +252,50 @@ class LiveLesson(
     }
 
     /**
+     * The deck [slide] names, its bytes checked against the slide's SHA-256 before anything can draw them (decisions 6, 8): kept
+     * from this session's fetch, else fetched through `GET /v1/decks/{id}/download`'s presigned GET. Its owner asks once per
+     * deck, not per page: a second ask while one is out fetches the deck again.
+     */
+    suspend fun deck(slide: Slide): DeckResult {
+        alone { decks[slide.sha256] }?.let { return DeckResult.Ready(it) }
+        val fetched = fetch(slide)
+        if (fetched is DeckResult.Ready) {
+            alone {
+                // One that ends after a read said the session is over is kept nowhere (decision 8).
+                if (published.value.presentation?.running != false) decks[slide.sha256] = fetched.bytes
+            }
+        }
+        return fetched
+    }
+
+    /**
+     * A fresh URL for the deck, then its bytes, sent with no token: the URL is its own credential, never kept, logged or said,
+     * and the client's transport follows no redirect. The bytes are asked for as stored (`Accept-Encoding: identity`), so OkHttp
+     * asks for no gzip and decodes nothing before the hash sees them, as the API asks S3 (Q6). A bucket refusing the URL, as it
+     * refuses one expired, is asked for a fresh one once.
+     */
+    private suspend fun fetch(slide: Slide, again: Boolean = true): DeckResult {
+        val download = client.download(slide.deckId)
+        val result = download.result as? SendResult.Status
+            ?: return DeckResult.Unreachable(download.noAnswer ?: NoAnswer.Unreachable)
+        val url = download.answer?.url?.let(::address)
+        if (result.code !in 200..299 || url == null) return DeckResult.Refused(result.code, download.error?.error?.reason)
+        val request = HttpRequest("GET", url, mapOf("Accept-Encoding" to "identity"), null, client.timeout)
+        val bucket =
+            try {
+                client.transport.send(request)
+            } catch (error: IOException) {
+                return DeckResult.Unreachable(NoAnswer.Unreachable)
+            }
+        return when {
+            bucket.status == 200 && sha256(bucket.body) == slide.sha256 -> DeckResult.Ready(bucket.body)
+            bucket.status == 200 -> DeckResult.Mismatch
+            bucket.status == 403 && again -> fetch(slide, again = false)
+            else -> DeckResult.Refused(bucket.status, null)
+        }
+    }
+
+    /**
      * Runs [block] with the lesson to itself, as a stretch of Swift's actor runs between two `await`s, and never cut short, so
      * a cancel lands after it. Never from inside another: the lock is no reentrant one.
      */
@@ -221,3 +319,26 @@ class LiveLesson(
  */
 private fun later(held: StudentAnswer?, other: StudentAnswer?): StudentAnswer? =
     if (held == null || other == null) held ?: other else if (other.eventId > held.eventId) other else held
+
+/** [url] as the address the bucket's request goes to, exactly as the API wrote it; none when it can't be read as one. */
+private fun address(url: String): URI? =
+    try {
+        URI(url)
+    } catch (error: URISyntaxException) {
+        null
+    }
+
+/**
+ * [bytes]' SHA-256 in lower-case hex, as the API gives a slide's, its hex written by hand, since `HexFormat` needs Android 14:
+ * worked out off its caller's thread, which may be a screen's, as a deck is up to 25 MB and Swift's actor is never the main one.
+ */
+private suspend fun sha256(bytes: ByteArray): String =
+    withContext(Dispatchers.Default) {
+        buildString {
+            for (byte in MessageDigest.getInstance("SHA-256").digest(bytes)) {
+                append(HEX_DIGITS[byte.toInt() shr 4 and 0x0F]).append(HEX_DIGITS[byte.toInt() and 0x0F])
+            }
+        }
+    }
+
+private const val HEX_DIGITS = "0123456789abcdef"
