@@ -61,7 +61,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **For AN10c:** one `Router` for the app's life in the app's scope, over `running` mapped to `Router.Run`, its
   `problems` the start's (`NotSetUp`, `StartFailed`), its looks Android's time-set broadcast and the screen coming on;
   the app's SharedPreferences `Notes`, out of the backup, handed to `Account.of` and the router alike, kept in memory and
-  written behind (`apply`), its first read made before either reads it. **For AN10d to AN10h:** Home's empty state
+  written behind (`apply`), its first read made before either reads it; and the deletion's window in santa's privacy
+  note, below. **For AN10d to AN10h:** Home's empty state
   reads `Account.State.everInClass`, Me's Sign out line its `email`, and a phone whose engine hasn't started still has
   no type (AN9f's note). **For Phase 10:** the screens send `Router.Input` and read `shown`; AS4, AS7 and the
   list-changed screen call `sawList`; AS2 and AS7 take Me's name and Leave through `naming` and `leaving`; AS2 adds the
@@ -80,20 +81,42 @@ a real decision? Add a dated entry at the top: what was decided and why.
   tap, Sign in again at its cap by the router's own wake, the enforcer's pass there held; the bell over Unlocked, by the
   time passing and by a clock set past it at Android's signal; a sign-in change dropping the last student's save and
   leave; and the riskiest part both ways: the ask's read of the router calling the account itself and returning, and the
-  router choosing while the account's lock is held in a notes write. Tried, each failing by name, then reverted: a note
+  router choosing while the account's lock is held in a notes write. From santa's review: a clock set past the bell and
+  back before it, Focus again at Android's signal with no bell waiting, the failing test first; and a tap closing what
+  was opened. Tried, each failing by name, then reverted: a note
   kept after Delete account, and after a relaunch finding the account deleted (deleteAccountWiring's, each at its own
   check); the router not choosing again at a change (8 of RouterTest's 9), at a tap's cap (Q2's) and at the bell (the
   bell's and Q2's); `everApproved` kept after `switchedOff` (everApproved's); the ask while the question shows
   (ageAgainInClass's router half, and the riskiest part's first, its read never made); the account holding its lock
   across its read of the router (that one's, no ask ever came); the router waiting on the account's lock to read it (the
   riskiest part's second, no choice while held); the last student's save or leave answer landing after a sign-in change
-  (its own); a Debug engine with no account read as Starting (Q2's); and the email kept past a sign-out (signedInAs's).
-  The riskiest part's second test first passed under its break, the notes' write held no longer than the test's own wait,
-  so the router took the lock as the hold gave up: the hold now outlasts the wait, and the test fails by name.
+  (its own); a Debug engine with no account read as Starting (Q2's); the email kept past a sign-out (signedInAs's); a
+  look heard only while a bell waits (the bell's); and the `keepsOpened` close deleted (everInClass's). The riskiest
+  part's second test first passed under its break, the notes' write held no longer than the test's own wait, so the
+  router took the lock as the hold gave up: the hold now outlasts the wait, and the test fails by name.
 
-  **The proof:** PROOF_HERE
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: the router heard Android's signal only
+  while a bell waited, so a clock set past the bell, then back before it while offline, put the lock's own rule on again
+  over Session over, which has no Emergency Unlock, until something else changed: Android's lock covers by the phone's
+  clock, so it comes back with the clock, where iOS's monitor takes the shields off at the bell for good (reviewer A;
+  taken, as the brief's rule asks, the router choosing again at each look, its failing test first); no test held the
+  `keepsOpened` close (reviewer
+  A; taken); this entry's placeholders (both; filled). **For the owner, a privacy note (reviewer B), not a defect here:**
+  the notes under the student go once the engine's deletion answers, so a process ended between Cognito's DeleteUser and
+  that answer, a window of milliseconds, relaunches signed out with nothing pending, and a store that persists (AN10c's)
+  keeps the deleted student's id until another student's replaces it. iOS has the same window (its `deleteAccount`
+  forgets them after the engine's answer too), so nothing is kept beyond the twin; the id is a server UUID, no name, out
+  of the backup. [The recommendation: AN10c closes it as its store makes it reachable, the notes forgotten as Delete
+  account starts, before anything is sent; a deletion that then stops costs only the one-time screen shown again, and
+  Home's empty-state words until a read lists the student in a class.]
 
-  **Santa's review:** SANTA_HERE
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble
+  :app:lint check` green, Android 10's API check with it, before santa's fix and after; the core and outbox suites run
+  ten times, each green, seven before the fix and three on the final code (593 tests), AN9h's AgeFallbackTest
+  `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run lint && npm test` green, the
+  portal's suite whole. No SDK package was installed: the build downloads none (`android.builder.sdkDownload=false`),
+  and nothing under the SDK's folder changed while the step ran.
 
 - **2026-11-11** — **AN10a, the router: BaliOutbox's `Screen.choose` in Kotlin, which screen shows when, the lock's switch in
   Screen Time's place; the bell by the phone's clock; and `SyncState.teacher` (the conductor's calls Q1 to Q3, and this
