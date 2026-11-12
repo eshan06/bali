@@ -12,7 +12,9 @@ import android.os.IBinder
 import android.os.Parcel
 import android.os.ParcelFileDescriptor
 import android.os.Process
+import android.system.ErrnoException
 import android.system.Os
+import android.system.OsConstants
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.ByteArrayOutputStream
@@ -103,6 +105,10 @@ class IsolatedRendererTest {
             assertNull("no pages", renderer.open(pdf(listOf(CATALOG, "<< /Type /Pages /Kids [] /Count 0 >>"))))
             assertNull("a page past the count", document.draw(4, 400, 300))
             assertNull("page 0", document.draw(0, 400, 300))
+            // Not lost by them: a wait for its loss, begun now, still waits.
+            val losing = scope.launch(start = CoroutineStart.UNDISPATCHED) { document.awaitLost() }
+            assertTrue("lost by a page outside its count", losing.isActive)
+            losing.cancel()
             // Kept, as the twin keeps it: the teacher's next page within it shows, in the same process.
             assertColor(Color.BLUE, checkNotNull(document.draw(3, 400, 300)).bitmap.at(200, 150), "page 3, after")
             assertEquals(pid, who().pid)
@@ -176,6 +182,12 @@ class IsolatedRendererTest {
                 }
                 assertDeckFolderEmpty("this Android's path, as its descriptor is handed over")
             }
+            // Android 10's file reaches the renderer read-only: no write through its descriptor, so no renderer can grow it to fill
+            // the phone's storage under Bali's own files (santa's review).
+            renderer.carrying(deck, onDisk = true).use { bytes ->
+                val refused = assertThrows(ErrnoException::class.java) { Os.write(bytes.fileDescriptor, ByteArray(1), 0, 1) }
+                assertEquals("a write through Android 10's descriptor", OsConstants.EBADF, refused.errno)
+            }
             val paths = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) listOf(false, true) else listOf(true)
             for (onDisk in paths) {
                 val case = if (onDisk) "Android 10's file" else "the memory file"
@@ -201,8 +213,8 @@ class IsolatedRendererTest {
                 kept.forEach { it.writeText("${it.name}'s own") }
                 folder.mkdirs()
                 File(folder, "left").writeText("a deck a run left")
-                // What the app's start runs (BaliApp.onCreate), in Bali's own process alone.
-                emptyDecks(context)
+                // The app's own start (BaliApp.onCreate's first step), as Bali's own process runs it.
+                assertTrue("Bali's own process read as another", app.ownStart())
                 assertDeckFolderEmpty("after a start")
                 kept.forEach {
                     assertTrue("${it.name} gone", it.exists())
@@ -338,6 +350,21 @@ class IsolatedRendererTest {
             val fresh = open(deck(1) { canvas, _ -> canvas.drawColor(Color.RED) }, bounded)
             assertColor(Color.RED, checkNotNull(fresh.draw(1, 400, 300)).bitmap.at(200, 150), "a fresh open's page")
             fresh.close()
+        }
+
+    // The bound holds whoever waits (santa's review): a draw that never ends, its screen gone meanwhile, still ends its process at
+    // the limit, never at a later call.
+    @Test
+    fun aDrawThatNeverEndsEndsItsProcessAtItsLimitEvenOnceItsScreenStoppedWaiting(): Unit =
+        runBlocking {
+            val bounded = renderer(3.seconds)
+            val document = open(deck(1) { canvas, _ -> canvas.drawColor(Color.GREEN) }, bounded)
+            val died = deathOf(service(bounded))
+            send(ThisBuild.HOLD, renderer = bounded)
+            scope.launch(start = CoroutineStart.UNDISPATCHED) { document.draw(1, 400, 300) }.cancelAndJoin()
+            assertTrue("its process never ended", died.await(PATIENCE.inWholeSeconds, TimeUnit.SECONDS))
+            lost(document, "the document whose draw never ended")
+            document.close()
         }
 
     /** A renderer of the test's own, let go after it. */
