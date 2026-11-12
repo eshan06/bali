@@ -505,7 +505,8 @@ class ReasonEngineTest : EngineFiles() {
     @Test
     fun anUnlockAnsweredLatePuttingTheLockBackWithNoReturnOfThisPhonesSinceIsSaidUntilThePhonesNextChangeWithThePhonesOrderOrWithNone(): Unit =
         runBlocking {
-            // A10, A12. What Focus says of it is AN10's.
+            // A10, A12. Focus says it (AN10e): sent with the phone's order, a return the order can't place; with none, the clock
+            // behind and how to set it, Android's Settings path (AS5-Focus-clock); in another session, nothing.
             for (ordered in listOf(true, false)) {
                 val rig = rig()
                 if (!ordered) rig.outbox.setState(Outbox.Key.Install, null)
@@ -516,6 +517,16 @@ class ReasonEngineTest : EngineFiles() {
                 assertEquals(listOf(focused, Superseded("s", ordered)), listOf(state.standing, state.superseded), "ordered $ordered")
                 // Late, it is on no chip, and its reason never changes (A20): nothing to pick for.
                 assertNull(state.recordedUnlock, "ordered $ordered")
+                assertEquals(
+                    if (ordered) {
+                        "Bali recorded your unlock, but Bali on another phone, or from before a reinstall, put you back in focus after it. Hold to unlock again if you need to."
+                    } else {
+                        "Bali recorded your unlock, but this phone's clock was behind, so it counted as before you went back to focus. Turn on automatic time in Settings → System → Date & time, then hold to unlock again."
+                    },
+                    FocusWords(state, null, t0, newYorkZone, usShortTime).superseded, "ordered $ordered",
+                )
+                val elsewhere = state.copy(standing = Standing.InSession(session("t"), ParticipationState.Focused))
+                assertNull(FocusWords(elsewhere, null, t0, newYorkZone, usShortTime).superseded, "ordered $ordered")
                 rig.engine.record(Change.Unlock("s", null))
                 assertNull(rig.engine.updates.value.superseded, "ordered $ordered")
                 rig.stop()
