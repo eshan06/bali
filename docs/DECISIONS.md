@@ -45,10 +45,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - **Tap in's answer is a type** (`TapFailure`): the scan's read said in its own words (`NoBlock(read)`,
     `BlockRead.words`), the tap the file refused (`NotKept`, iOS's `BlockRead.notKept`), or no engine. Its words are none
     only for a read `tapIn` never wraps, a block's code or a scan closed.
-  - **The start that failed names its cause by its message**, as the Storage board draws it ("disk I/O error"), else by its
-    type, so never empty, where iOS's line puts its error whole (`\(error)`): Kotlin's whole form would add a class name the
-    board doesn't draw (`java.io.IOException: disk I/O error`). Said plainly: a cause with a message is named without its
-    type, which a support request may want; the Debug readout names both.
+  - **The start that failed names its cause briefly:** a file's error (an `IOException`) by its message, as the Storage board
+    draws it ("disk I/O error"), anything else by its type alone, never empty, where iOS's line puts its error whole
+    (`\(error)`). So no other text an exception carries reaches a student's screen (santa's reviewer B: the start catches
+    whatever making or starting the engine throws, wider than iOS's catch of the outbox's open, so a later change could
+    put a decoding error quoting its input there). SQLite's own error is named by its type: on a phone its class is a
+    typealias of Android's (`androidx.sqlite`'s Android artifact has no class of that name), so an `is` in `outbox` would
+    pass the JVM's tests and could fail on a phone, as AN7g's regular expressions did. Said plainly: a support request
+    gets the type, and the message only for a file's error; the Debug readout names both.
   - **Home's empty state reads the account** (`Account.State.noClassesCard`, keyed on `everInClass`), so a screen can't pass
     another student's flag; `SyncState.noClassesCard(everInClass)` stays iOS's twin.
   - **Waiting's card with the class-started alert's check-in** ("You're tapped in. Your apps lock in a few seconds, as long
@@ -77,9 +81,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `refusedTap`, `refusalKept`, `refusedTapNewest`, `inNoClass` and TapInTests' second); an older refusal's line over the
   newest (`refusedTapNewest`, TapInTests' second and third); the empty state blind to `everInClass` (`inNoClass`,
   RouterTest's), and the account's flag left out (the account's test, RouterTest's); the sign-up page said as the
-  sign-in's (`words`); a 401 said as any other status (JoinTests' two); the cause in Kotlin's whole form (the start's); a
-  tap the file refused said as made (TapInTests' first); and the waiting card said off Waiting (`homeWaiting`, `inNoClass`,
-  `dropped`).
+  sign-in's (`words`); a 401 said as any other status (JoinTests' two); the cause in Kotlin's whole form, and any cause's
+  message shown (the start's, each); a tap the file refused said as made (TapInTests' first); and the waiting card said off
+  Waiting (`homeWaiting`, `inNoClass`, `dropped`).
 
   **For AN10e to AN10h:** add each step's words to `WordsTest`'s `everyWord`, each type's cases through `each`; a failure
   the app gives with no engine gets a `NotStarted`; C3c's card is AN10f's. **For AN12:** Waiting's card's second line,
@@ -88,9 +92,25 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `Joining.Failure.words`, the app setting `NotStarted` with no engine (iOS's AppTests); AS2's Sign in says
   `SignInError.words(page)`, and its Storage screen `Problem.words` under "Bali couldn't start".
 
-  **The proof:** PROOF_TO_COME
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble
+  :app:lint check` green, Android 10's API check with it, before santa's fix and on the final code; the core and outbox
+  suites run seven times, each green, once before santa's fix and six times on the final code (610 tests), AN9h's
+  AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run lint && npm test`
+  green, the portal's suite whole. No SDK package was installed: the build downloads none
+  (`android.builder.sdkDownload=false`), and the SDK's folders matched before and after.
 
-  **Santa's review:** SANTA_TO_COME
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: the start's cause shown word for word, with
+  no bound, from a catch wider than iOS's (reviewer B; taken, above, its break tried); DESIGN.md's scope paragraph
+  not pointing to Android's words (reviewer A; taken); and `TapFailure.NoBlock` taking any read, so its words are none for
+  the two reads `tapIn` never wraps (reviewer A; left, as said above). **For the owner (reviewer B), not a defect of this
+  step:** on Android a storage that won't open never reaches `Problem.StartFailed`. Room opens the file at its first read,
+  and every read the engine makes as it opens is inside `load()`'s `tried`, so that failure shows as the engine's own
+  (`Link.StorageFailed`), the engine running, where iOS's GRDB opens its file at the start. So the start's line, "Bali
+  couldn't open its storage on this phone (…)", the approved board's and iOS's, is reached only by another start failure,
+  none realistic today, which it would call a storage failure. [The recommendation, taken with the owner away: keep the
+  approved line; if the owner wants it exact, a later step words that path as the start's own failure, drawn on AS2's
+  row first.]
 
 - **2026-11-11** — **AN10c, the router in the app: the phone's notes in its own SharedPreferences, one `Router` for the
   app's life asked again at Android's time, zone and screen signals, a start's problem as a type with the last run's lock
