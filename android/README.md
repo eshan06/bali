@@ -290,9 +290,11 @@ words (AN10d).
 **The words** (`outbox`, AN10d to AN10h): what a student reads, each a function of the type it says, beside it, as
 BaliOutbox keeps them: iOS's lines word for word, but where the Android canvas's Words board changes or adds one.
 AN10d's are Join's, Home's (a refused tap, the waiting and empty-state cards, a read's failure), a scan's and Tap in's
-(`SyncEngine.tapIn`, its answer a type), the sign-in's and the start's. `WordsTest` reads every one for every case of
-its type: none names Screen Time, iOS, an iPhone, FaceTime or Emergency SOS, or holds an em-dash or an exclamation
-mark; each later step adds its own.
+(`SyncEngine.tapIn`, its answer a type), the sign-in's and the start's. AN10e's are Focus's (`FocusWords`: the class,
+the countdown over the lock verified on alone, the claim, offline's card, a stall and a late unlock), Emergency
+Unlock's failures, and the block screen's (`ShieldWords`: "Focused with Bali" alone, OK and Open Bali). `WordsTest`
+reads every one for every case of its type: none names Screen Time, iOS, an iPhone, FaceTime or Emergency SOS, or
+holds an em-dash or an exclamation mark; each later step adds its own.
 
 **History's rules** (`outbox`'s `History.kt`, BaliOutbox's `History.swift`, AN9g): the pages as they came, from
 the top or Show earlier's, each moment once; which read may start, Show earlier only while a page follows those read

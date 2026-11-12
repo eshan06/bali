@@ -1088,12 +1088,15 @@ words.
   "Lock off" and "Lock back on" for the ruled "Screen Time off" and "Screen Time back on"; "Calls,
   texts and emergency calls always work" for "Calls, FaceTime, Messages and Emergency SOS always
   work", on the intro's first page alone; and the new lines as drawn, Open Bali on the block screen
-  among them.
+  among them. One line the board doesn't list names the iPhone's Settings: Focus's late unlock with
+  the phone's clock behind, whose Android line names Settings → System → Date & time, drawn on
+  AS5's row as an intermediate state (AS5-Focus-clock, AN10e).
 - **Where the words live:** as on the iPhone, in the engine's module, `outbox`
   (`android/outbox/src/main/kotlin/com/bali/outbox/`), each a function of its type beside it (AN10d
   to AN10h): Join's in `Join.kt`; Home's, a scan's, the sign-in's and the start's in `Screen.kt`; Tap
-  in's in `SyncEngine.kt` (`TapFailure`). `WordsTest` reads every one, and fails a word that names
-  something Android lacks or holds an em-dash or an exclamation mark.
+  in's and Emergency Unlock's failures in `SyncEngine.kt` (`TapFailure`, `UnlockFailure`); Focus's
+  in `Focus.kt` (`FocusWords`); the block screen's in `ShieldWords.kt`. `WordsTest` reads every one,
+  and fails a word that names something Android lacks or holds an em-dash or an exclamation mark.
 - **The look:** the tokens in Material 3's roles: `primary` is action-primary-bg,
   `tertiaryContainer` the emergency pair, `error` the destructive red, `errorContainer` Lock off's
   chip, `surfaceContainerLowest` the card, `surfaceContainerHigh` the sunken well, `outline`
