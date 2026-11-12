@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.database.ContentObserver
+import android.os.Process
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.bali.core.AppConfig
@@ -123,6 +124,10 @@ class BaliApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Made in the renderer's isolated process too (RendererService), which has none of Bali's files and may register no
+        // receiver: nothing of Bali's starts there.
+        if (Process.isIsolated()) return
+        emptyDecks(this)
         notes = PreferencesNotes(this)
         router = router()
         val changes = IntentFilter(Intent.ACTION_TIME_CHANGED).apply { addAction(Intent.ACTION_TIMEZONE_CHANGED); addAction(Intent.ACTION_SCREEN_ON) }
