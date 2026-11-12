@@ -87,7 +87,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`./gradlew :core:test --rerun :outbox:test --rerun`, neither UP-TO-DATE; 693 tests, six of them new), AN9h's AgeFallbackTest
   `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run lint && npm test` green. No SDK package
   was installed and no library added: the build downloads none (`android.builder.sdkDownload=false`), and no build file changed.
-  The size, santa's count: 134 changed lines not counting tests and Markdown (the split guessed about 120), 244 in the tests.
+  The size, santa's count: 134 changed lines not counting tests and Markdown (the split guessed about 120), 249 in the tests.
 
   **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
   isolation holds and model diversity doesn't): 0 blockers. Their WARNs: the heading test never headed a lesson whose session
