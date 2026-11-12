@@ -10,6 +10,16 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN13f's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN13e2, the slide-deck case's flake on main's CI, fixed in its rig (#584; `docs/DECISIONS.md`,
+2026-11-12), test-only, Bali's code unchanged: the deck's check hashes on `Dispatchers.Default`, and SlideTest's deck rig, which
+ran the lesson half on Unconfined, went on there with the rest, the lesson half's lock held as the test answered the next read;
+the rig now keeps the lesson half on the test's own thread, the race staged in a test that failed first with CI's message.
+Before it, AN13e, the slide's deck, asked for once, one document at a time. Next: AN13f, the page drawn, then AN13g; AN11, AN12 and Phase
+10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed
+the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform is on the
+PC (the owner's OK, 2026-11-12), compileSdk 37 with today's AndroidX and OkHttp 5.5 coming in the step that needs them (Open
+owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 _Last updated: 2026-11-12 (Central) — The app's Sign in rebuilt from the approved sign-in redesign:
 Bali, the session ring as art and its line over a white sheet, Sign up and Sign in pills, its
 intermediate states drawn first (#583; DECISIONS 2026-11-12), students' in 1.0.1. Before it, the
@@ -2921,6 +2931,12 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN13f's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12), its validation naming
+`Bali_Spike_API29` as the step's brief asked.
+
+- **AN13f** The page drawn with `PdfRenderer` (twin: SlideView.swift's PDFKit page), to the owner's answers to Q2 and Q3
+  (DECISIONS 2026-11-12) — validation: the instrumented tests on `Bali_Spike_API29`, `35` and `37`
 
 AN13e's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12).
 

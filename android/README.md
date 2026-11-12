@@ -32,8 +32,8 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
 2. `./gradlew build` builds the app (its debug and release APKs), runs Android Lint, every
    module's JVM tests and the check of Android 10's API (below).
    `./gradlew :core:test :outbox:test` runs the contract tests alone; they need a JDK and no SDK.
-3. To see the debug build install, start one of the PC's test emulators, `Bali_Spike_API35`, `36` or
-   `37` (never the owner's `Pixel_7`, and never signed in to a Google account), then
+3. To see the debug build install, start one of the PC's test emulators, `Bali_Spike_API29`, `35`,
+   `36` or `37` (never the owner's `Pixel_7`, and never signed in to a Google account), then
    `./gradlew :app:installDebug`, and stop it after with `adb -s emulator-5554 emu kill`
    (`docs/GOTCHAS.md`, "Android's SDK on Windows"). The launcher lists the Debug build's readout as
    Bali readout (Debug), with Android's own icon; a Release build has no screen: Settings → Apps lists
@@ -56,8 +56,9 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
    again, handed to the app's own receiver, since no test can send a protected broadcast; and the cover,
    over Android's own apps and a blocked app of the tests' own (`StandIn.java`, in Java since it runs in
    the test app's process, which has no Kotlin), with split screen made through System UI's shell and a
-   call to the emulator's own pretend network, its call log put back; and the readout's Scan on a phone
-   with no NFC, as the emulators are, a real tag being the phone check's. A Debug
+   call to the emulator's own pretend network, its call log put back; the readout's Scan on a phone
+   with no NFC, as the emulators are, a real tag being the phone check's; and the slide's page drawn in
+   the renderer's isolated process, Android 10's own path on Android 10 itself. A Debug
    build's start opens the app's own outbox, `outbox.sqlite`, in the tests' process too, so each test
    opens a file of its own, and one that starts a run of its own waits for the app's start first
    (`BaliApp.launched`). CI builds them but has no emulator to run them, so a step that changes what
@@ -210,6 +211,22 @@ as one that can't (`Unsupported`), as on iOS. Its rules (`scan`) run on the JVM 
 the tests' own; the emulators have no NFC, so a real tag is the phone check's
 (`docs/ANDROID-PHONE-TESTS.md`, AN8). A block's link doesn't open Bali: that waits for AN1's part 2 and
 Phase 10.
+
+**The slide's page** (`app`'s `IsolatedRenderer.kt` and `RendererService.kt`, AN13f; iOS's PDFKit in `SlideView.swift`): the
+lesson half's renderer (`Renderer`, AN13e's seam) as the owner ruled (`docs/DECISIONS.md`, 2026-11-12). pdfium parses a deck
+through `PdfRenderer` in a service of Bali's own that Android isolates (`android:isolatedProcess`, its process `:renderer`): a
+user id of its own, no permission and none of Bali's files, bound at the first open and unbound once the last document closes,
+when Android ends its process. It is given one descriptor of the deck's bytes, from memory: an anonymous memory file from
+Android 11, and on Android 10 a file in `no_backup/deck/` whose name is deleted the moment it opens, before a byte is written,
+a folder each start of Bali's process empties, never `no_backup/` itself. Its calls go over a Binder of its own, each bounded
+at 10 s, one that never ends ending that process. A page (`Deck.draw`) is drawn there off Bali's main thread onto a white
+bitmap of the size asked for, as large as fits and centred, its pixels written into memory Bali made (`SharedMemory`), past
+Binder's 1 MB, then into a bitmap Bali made, with the page's text from Android 15 (`Page.said`, TalkBack's label). Every
+failure is none, never a crash: not a PDF, a password, no pages, a page outside the count, a closed document, the process
+gone. That process dying loses every document it held (`awaitLost`), and Bali's lives on; the next open binds a new one.
+`BaliApp.onCreate` returns at once there (`Process.isIsolated()`). Its tests (`IsolatedRendererTest`) run on the emulators,
+Android 10's included, over decks drawn in code; the Debug build's service says who it is, holds its calls and ends itself
+for them (`ThisBuild`), Release's never.
 
 **The outbox tables** (`core`'s `UnlockContract.kt` and `OutboxContract.kt`, BaliCore's twins) say
 what the outbox does with a record after each send; no answer ever drops an unlock the server hasn't

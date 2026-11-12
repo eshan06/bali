@@ -34,6 +34,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -105,6 +106,20 @@ class IsolatedRendererTest {
             // Kept, as the twin keeps it: the teacher's next page within it shows, in the same process.
             assertColor(Color.BLUE, checkNotNull(document.draw(3, 400, 300)).bitmap.at(200, 150), "page 3, after")
             assertEquals(pid, who().pid)
+            document.close()
+        }
+
+    // AN13e's seam: a page that fails to draw loses its document, so its slide shows failed and Try again opens it afresh.
+    @Test
+    fun aPageThatFailsToDrawIsNoneAndLosesItsDocument(): Unit =
+        runBlocking {
+            // Two pages counted, the second no page at all: pdfium opens the deck, and can't load that page.
+            val pages = "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>"
+            val document = open(pdf(listOf(CATALOG, pages, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 300] >>", "(not a page)")))
+            assertEquals(2, document.pages)
+            assertColor(Color.WHITE, checkNotNull(document.draw(1, 400, 300)).bitmap.at(200, 150), "page 1, blank")
+            assertNull("a page that won't load", document.draw(2, 400, 300))
+            lost(document, "a document whose page failed to draw")
             document.close()
         }
 
@@ -189,7 +204,10 @@ class IsolatedRendererTest {
                 // What the app's start runs (BaliApp.onCreate), in Bali's own process alone.
                 emptyDecks(context)
                 assertDeckFolderEmpty("after a start")
-                kept.forEach { assertEquals(it.name, "${it.name}'s own", it.readText()) }
+                kept.forEach {
+                    assertTrue("${it.name} gone", it.exists())
+                    assertEquals(it.name, "${it.name}'s own", it.readText())
+                }
             } finally {
                 found.forEach { (file, bytes) -> if (bytes == null) file.delete() else file.writeBytes(bytes) }
             }
@@ -234,10 +252,8 @@ class IsolatedRendererTest {
             val second = open(deck(2) { canvas, _ -> canvas.drawColor(Color.BLUE) })
             val ended = who().pid
             send(ThisBuild.END, IBinder.FLAG_ONEWAY)
-            withTimeout(PATIENCE) {
-                first.awaitLost()
-                second.awaitLost()
-            }
+            lost(first, "the first document")
+            lost(second, "the second document")
             assertNull("a page of a lost document", first.draw(1, 400, 300))
             // This process, Bali's, lives on: the tests run in it.
             assertEquals(bali, Process.myPid())
@@ -310,14 +326,14 @@ class IsolatedRendererTest {
             send(ThisBuild.HOLD, renderer = bounded)
             assertNull("an open that never ends", withTimeout(PATIENCE) { bounded.open(deck(1) { canvas, _ -> canvas.drawColor(Color.BLUE) }) })
             assertTrue("its process never ended", died.await(PATIENCE.inWholeSeconds, TimeUnit.SECONDS))
-            withTimeout(PATIENCE) { held.awaitLost() }
+            lost(held, "a document open beside the open that never ended")
             held.close()
             val drawn = open(deck(1) { canvas, _ -> canvas.drawColor(Color.BLUE) }, bounded)
             died = deathOf(service(bounded))
             send(ThisBuild.HOLD, renderer = bounded)
             assertNull("a draw that never ends", withTimeout(PATIENCE) { drawn.draw(1, 400, 300) })
             assertTrue("its process never ended", died.await(PATIENCE.inWholeSeconds, TimeUnit.SECONDS))
-            withTimeout(PATIENCE) { drawn.awaitLost() }
+            lost(drawn, "the document whose draw never ended")
             drawn.close()
             val fresh = open(deck(1) { canvas, _ -> canvas.drawColor(Color.RED) }, bounded)
             assertColor(Color.RED, checkNotNull(fresh.draw(1, 400, 300)).bitmap.at(200, 150), "a fresh open's page")
@@ -354,6 +370,10 @@ class IsolatedRendererTest {
             reply.recycle()
         }
     }
+
+    /** [document]'s loss reported through the seam ([Deck.awaitLost]); none in time fails the test, naming it. */
+    private suspend fun lost(document: Deck, case: String) =
+        assertNotNull("$case: never lost", withTimeoutOrNull(PATIENCE) { document.awaitLost() })
 
     /** Opens as [service]'s process dies: Android's own notice. */
     private fun deathOf(service: IBinder): CountDownLatch = CountDownLatch(1).also { latch -> service.linkToDeath({ latch.countDown() }, 0) }

@@ -2,7 +2,6 @@ package com.bali.bali
 
 import android.app.Service
 import android.content.Intent
-import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
@@ -11,6 +10,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.Parcel
 import android.os.SharedMemory
+import androidx.core.graphics.createBitmap
 
 /**
  * Where a deck is parsed and its pages drawn (the owner's ruling on Q2, 2026-11-12): pdfium, through `PdfRenderer`, in a process
@@ -88,7 +88,7 @@ class RendererService : Service() {
         val width = data.readInt()
         val height = data.readInt()
         SharedMemory.CREATOR.createFromParcel(data).use { memory ->
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val bitmap = createBitmap(width, height)
             val said =
                 synchronized(lock) {
                     val renderer = decks[deck] ?: return false

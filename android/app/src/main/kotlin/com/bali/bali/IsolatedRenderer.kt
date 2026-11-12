@@ -13,6 +13,7 @@ import android.os.SharedMemory
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
+import androidx.core.graphics.createBitmap
 import com.bali.outbox.Document
 import com.bali.outbox.Renderer
 import java.io.File
@@ -49,6 +50,7 @@ internal fun emptyDecks(context: Context) {
  * once the last document closes, so a new process at the next; each deck handed to it from memory as one descriptor of its bytes
  * ([carrying]); every call into it, the bind's wait with it, bounded by [limit], one that never ends ending that process. Its
  * process gone loses every document it held ([Deck.awaitLost]); Bali's own lives on. Never throws but on its caller's cancel.
+ * Android answers its bind on the main thread, so nothing waits there for an open.
  */
 class IsolatedRenderer(private val context: Context, internal val scope: CoroutineScope, private val limit: Duration = LIMIT) : Renderer {
     private val sync = Any()
@@ -58,10 +60,7 @@ class IsolatedRenderer(private val context: Context, internal val scope: Corouti
         get() = synchronized(sync) { field }
         private set
 
-    /**
-     * Opens [deck] in the isolated process, the bytes handed over by this Android's own path ([carrying]); none for every failure.
-     * A cancel of its caller closes whatever the open makes, as it comes.
-     */
+    /** [deck] opened in the isolated process, handed over by this Android's own path ([carrying]); a cancel closes what it makes. */
     override suspend fun open(deck: ByteBuffer): Document? = open { carrying(deck) }
 
     /** Opens the deck [carry] gives a descriptor of (each path called directly, Q9). */
@@ -155,12 +154,10 @@ class IsolatedRenderer(private val context: Context, internal val scope: Corouti
 
     private fun untie(binding: Binding) {
         if (bound === binding) bound = null
-        if (!binding.tied) return
-        binding.tied = false
         try {
             context.unbindService(binding)
-        } catch (gone: IllegalArgumentException) {
-            // Never bound.
+        } catch (unbound: IllegalArgumentException) {
+            // Unbound already, at its loss.
         }
     }
 
@@ -186,9 +183,8 @@ class IsolatedRenderer(private val context: Context, internal val scope: Corouti
         /** Completed once its process is gone, or it never answered: every document there lost. */
         val gone = CompletableDeferred<Unit>()
 
-        /** Its documents open, and opens on their way; whether it is bound. Under the renderer's lock. */
+        /** Its documents open, and opens on their way. Under the renderer's lock. */
         var holds = 0
-        var tied = true
 
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
             this.service.complete(service)
@@ -262,7 +258,7 @@ class Deck internal constructor(
                 val said = reply.readString()
                 val pixels = memory.mapReadOnly()
                 try {
-                    Page(Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply { copyPixelsFromBuffer(pixels) }, said)
+                    Page(createBitmap(width, height).apply { copyPixelsFromBuffer(pixels) }, said)
                 } finally {
                     SharedMemory.unmap(pixels)
                 }
