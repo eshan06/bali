@@ -258,8 +258,9 @@ class RouterTest : EngineFiles() {
     @Test
     fun whoseClassesWereListedIsKeptInTheNotesByStudentWhatTheyOpenedStaysAtAReadSayingNoneAndTheTabGoesHomeAtASignIn(): Unit =
         runBlocking {
-            // AppTests' everInClass (#143): kept in the notes, read back by a fresh account; in no class later, Home, its words
-            // AN10d's, nothing the student opened closing for it, as keepsOpened says (C3, C6a); keyed on the student.
+            // AppTests' everInClass (#143): kept in the notes, read back by a fresh account; in no class later, Home, its card
+            // saying none any more, nothing the student opened closing for it, as keepsOpened says (C3, C6a); keyed on the
+            // student, so another student in no class has none yet.
             val rig = signedRig(gated = true)
             val notes = MemoryNotes().apply { listSeenBy = "ana" }
             val phone = routed(rig.engine, rig.clock, notes = notes)
@@ -281,6 +282,7 @@ class RouterTest : EngineFiles() {
             phone.inputs.send(Router.Input.Back)
             phone.until { it == Screen.Shown(Screen.Home, true) }
             assertTrue(account.state.value.everInClass)
+            assertEquals("You're not in any classes. Join one with the class code from your teacher.", account.state.value.noClassesCard)
             // History chosen stays at a read saying none again; Me chosen, its name edited, shows no tab bar (C6b).
             phone.inputs.send(Router.Input.Tab(Screen.History))
             phone.until { it == Screen.Shown(Screen.History, true) }
@@ -309,6 +311,7 @@ class RouterTest : EngineFiles() {
             // nobody; listed in a class herself, Bea is the one kept.
             rig.through(account, accessToken("b1"), refresh = "refresh-b", me = student("bea"))
             assertFalse(account.state.value.everInClass)
+            assertEquals("You're not in a class yet. Join one with the class code from your teacher.", account.state.value.noClassesCard)
             account.synced(anas)
             assertEquals("ana", notes.inClass)
             rig.reread(student("bea", listOf(Answer.inClass("p3")))) { account.state.value.inClass == "bea" }

@@ -783,6 +783,19 @@ class SyncEngine private constructor(
     suspend fun tap(read: BlockRead): OutboxRecord? = (read as? BlockRead.Block)?.let { record(Change.Tap(it.code)) }
 
     /**
+     * Home's Tap in (C3b): the scan [read], as [tap] records it, and why it recorded no tap (rule 5): the scan found no block, or
+     * the outbox refused to keep its tap, never said as made; none once it did, nor for a scan the student closed, which changed
+     * nothing. Its caller cancelled, the tap is made all the same, as [record]'s. SyncEngine.swift's `tapIn`, its answer a type.
+     */
+    suspend fun tapIn(read: BlockRead): TapFailure? {
+        if (tried { tap(read) }.isFailure) return TapFailure.NotKept
+        return when (read) {
+            is BlockRead.Block, BlockRead.Cancelled -> null
+            BlockRead.NotBali, BlockRead.Unsupported, BlockRead.NfcOff, is BlockRead.Failed -> TapFailure.NoBlock(read)
+        }
+    }
+
+    /**
      * The student's Emergency Unlock, recorded where [SyncState.emergencyUnlock] files it; none when
      * nothing the phone knows locks. Throws when it couldn't be written, as [record].
      */
@@ -1483,6 +1496,33 @@ sealed interface ReasonFailure {
 
 /** Why Back to focus didn't go through (C5a; rule 5): the outbox refused to keep the refocus. The words are AN10's. */
 enum class RefocusFailure { NotSaved }
+
+/**
+ * Why Home's Tap in recorded no tap (C3b; rule 5), [SyncEngine.tapIn]'s answer: the scan found no block, the outbox refused to
+ * keep the tap, or the app's engine hasn't started. None is a tap, and a tap the file refused is never said as made ([words]).
+ */
+sealed interface TapFailure {
+    /** The scan found no block to tap: [read], a tag with no block's code, a phone that can't read NFC, NFC off, or the reader's error. */
+    data class NoBlock(val read: BlockRead) : TapFailure
+
+    /** A block was read, but the outbox refused to keep its tap, so nothing changed: another tap is the way on. */
+    data object NotKept : TapFailure
+
+    /** The app has no engine yet: the app's to give, never the engine's, as [UnlockFailure.NotStarted] is. */
+    data object NotStarted : TapFailure
+}
+
+/**
+ * What Home says when Tap in recorded no tap (rule 5), with the way on: the scan's own words, the tap not saved (BaliOutbox's
+ * `BlockRead.notKept`), or Bali still starting; none for a read that tapped or was closed, which [SyncEngine.tapIn] never gives.
+ */
+val TapFailure.words: String?
+    get() =
+        when (this) {
+            is TapFailure.NoBlock -> read.words
+            TapFailure.NotKept -> "Your phone couldn't save the tap. Try again."
+            TapFailure.NotStarted -> Joining.Failure.NotStarted.words
+        }
 
 /**
  * What a hook of the app's gives (a refresh or a renewal, rule 3's check, the 13+ ask), or [none] when it throws or ends in

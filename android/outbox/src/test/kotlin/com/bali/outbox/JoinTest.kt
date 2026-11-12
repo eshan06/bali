@@ -30,8 +30,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 // The Join screen's rules (C2b), over A6's fixtures and the join's, and joining through the engine (C3): BaliOutbox's
-// JoinTests and JoinEngineTests, each check of a word AN10's with the words. And new: a code's whole characters, a renewal
-// that throws or ends in a cancel of its own, and a join whose caller is cancelled.
+// JoinTests and JoinEngineTests, each failure checked as a type and in its words (AN10d), iOS's word for word. And new: a code's
+// whole characters, a renewal that throws or ends in a cancel of its own, a join whose caller is cancelled, and a phone whose
+// engine hasn't started.
 
 /** The real client, answering every request with `contracts/fixtures/[path]`'s status and body: BaliOutbox's JoinTests' `fixture`. */
 fun fixture(path: String): ApiClient {
@@ -45,8 +46,14 @@ private object NoToken : TokenProvider {
 }
 
 private val request = EnrollmentJoinRequest("6BVZA5", EventId.mint(t0), t0)
-private val notFound = Joining.Failure(SendResult.Status(404), ApiErrorReason.ClassNotFound)
-private val unreachable = Joining.Failure(SendResult.NetworkError, null)
+private val notFound = Joining.Failure.NoClass(SendResult.Status(404), ApiErrorReason.ClassNotFound)
+private val unreachable = Joining.Failure.NoClass(SendResult.NetworkError, null)
+
+/** What the screen says of each, iOS's word for word: BaliOutbox's JoinTests' `notFound`, `unreachable` and `generic`, and its 401's. */
+private const val NOT_FOUND = "No class has that code. Check it with your teacher and try again."
+private const val UNREACHABLE = "Can't reach the server. Check your connection and try again."
+private const val GENERIC = "Something went wrong at Bali. Try again in a moment."
+private const val SIGN_IN = "Bali couldn't check your sign-in. Try again."
 
 /** The screen with `6BVZA5` typed and looked up, its preview showing. */
 private suspend fun previewing(): Joining {
@@ -86,9 +93,13 @@ class JoinTest {
                 listOf<Pair<String, (Joining) -> Boolean>>(
                     "already-enrolled" to { it.preview?.alreadyEnrolled == true && it.failure == null },
                     "unnamed-teacher" to { it.preview != null && it.preview.teacher.displayName == null },
-                    "404-class-not-found" to { it.preview == null && it.failure == notFound },
-                    "400-bad-input" to { it.preview == null && it.failure == Joining.Failure(SendResult.Status(400), null) },
-                    "401-unauthorized" to { it.preview == null && it.failure == Joining.Failure(SendResult.Status(401), null) },
+                    "404-class-not-found" to { it.preview == null && it.failure == notFound && it.failure.words == NOT_FOUND },
+                    "400-bad-input" to {
+                        it.preview == null && it.failure == Joining.Failure.NoClass(SendResult.Status(400), null) && it.failure.words == GENERIC
+                    },
+                    "401-unauthorized" to {
+                        it.preview == null && it.failure == Joining.Failure.NoClass(SendResult.Status(401), null) && it.failure.words == SIGN_IN
+                    },
                 )
             for ((name, holds) in cases) {
                 val joining = Joining().type("6BVZA5")
@@ -98,12 +109,12 @@ class JoinTest {
             // No answer, no token to send, an answer that doesn't decode.
             val others =
                 listOf(
-                    client(Canned(null)) to unreachable, client(Canned(200), NoToken) to unreachable,
-                    client(Canned(200, "{}")) to Joining.Failure(SendResult.Status(200), null),
+                    Triple(client(Canned(null)), unreachable, UNREACHABLE), Triple(client(Canned(200), NoToken), unreachable, UNREACHABLE),
+                    Triple(client(Canned(200, "{}")), Joining.Failure.NoClass(SendResult.Status(200), null), GENERIC),
                 )
-            for ((other, failure) in others) {
+            for ((other, failure, words) in others) {
                 val looked = Joining().type("6BVZA5").looked(other.previewJoinCode("6BVZA5"), "6BVZA5")
-                assertEquals(listOf(null, failure), listOf(looked.preview, looked.failure))
+                assertEquals(listOf(null, failure, words), listOf(looked.preview, looked.failure, looked.failure?.words))
             }
         }
 
@@ -139,10 +150,12 @@ class JoinTest {
             val (gone, goneIn) = previewing().joined(fixture("enrollments/404-class-not-found.json").join(request))
             assertFalse(goneIn)
             assertEquals(Joining(code = "6BVZA5", failure = notFound), gone)
+            assertEquals(NOT_FOUND, gone.failure?.words)
             val (offline, offlineIn) = previewing().joined(client(Canned(null)).join(request))
             assertFalse(offlineIn)
             assertNotNull(offline.preview)
             assertEquals(unreachable, offline.failure)
+            assertEquals(UNREACHABLE, offline.failure?.words)
             assertEquals(Joining(code = "6BVZA5"), offline.back())
         }
 
@@ -170,7 +183,8 @@ class JoinTest {
             assertEquals(listOf<Any>(SendResult.Status(401), 2, 1), listOf(again.first.result, again.second, again.third))
             val none = run(listOf(refused, found)) { false }
             assertEquals(listOf<Any>(SendResult.Status(401), 1, 1), listOf(none.first.result, none.second, none.third))
-            assertEquals(Joining.Failure(SendResult.Status(401), null), Joining().type("6BVZA5").looked(none.first, "6BVZA5").failure)
+            val refusedToken = Joining().type("6BVZA5").looked(none.first, "6BVZA5").failure
+            assertEquals(listOf<Any?>(Joining.Failure.NoClass(SendResult.Status(401), null), SIGN_IN), listOf(refusedToken, refusedToken?.words))
             for (others in listOf(listOf(found), listOf(client(Canned(404))), listOf(client(Canned(null))), listOf(client(Canned(500))))) {
                 val other = run(others) { true }
                 assertEquals(listOf(1, 0), listOf(other.second, other.third), "${other.first.result}")
@@ -201,6 +215,21 @@ class JoinTest {
             caller.cancelAndJoin()
             assertEquals(listOf<Any>(1, false), listOf(sends, answered))
         }
+
+    @Test
+    fun everyRefusalInWordsKeyedOnItsStatusAndReasonNeverItsMessageATeachersAccountTooManyTriesAndAnythingElseTheWayOn() {
+        assertEquals("This is a teacher's account, and only students can join a class.", Joining.words(SendResult.Status(403), null))
+        assertEquals("Too many tries for now. Wait a minute, then try again.", Joining.words(SendResult.Status(429), null))
+        assertEquals(NOT_FOUND, Joining.words(SendResult.Status(404), ApiErrorReason.ClassNotFound))
+        for ((status, reason) in listOf(404 to null, 409 to ApiErrorReason.EventIdConflict, 500 to null, 503 to null)) {
+            assertEquals(GENERIC, Joining.words(SendResult.Status(status), reason), "$status")
+        }
+        // A failure is said by its answer's words, the same keys.
+        assertEquals(NOT_FOUND, notFound.words)
+        assertEquals(UNREACHABLE, unreachable.words)
+        // No twin in BaliOutbox's tests (iOS's AppTests check it): a press with no engine started, iOS's `Joining.notStarted`.
+        assertEquals("Bali is still starting. Try again in a moment.", Joining.Failure.NotStarted.words)
+    }
 }
 
 private val joinRoute = "POST /v1/enrollments"

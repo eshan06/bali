@@ -1,10 +1,13 @@
 package com.bali.outbox
 
 import com.bali.core.BaliJson
+import com.bali.core.BlockRead
+import com.bali.core.HostedPage
 import com.bali.core.MeResponse
 import com.bali.core.ParticipationState
 import com.bali.core.SendResult
 import com.bali.core.SessionView
+import com.bali.core.SignInError
 import java.io.IOException
 import java.time.Duration
 import java.time.Instant
@@ -16,6 +19,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CoroutineScope
@@ -31,10 +36,11 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 
-// Which screen the app shows (C1a): the router halves of BaliOutbox's ScreenTests, AppTests' `offersSignOut`, and
-// BellRedrawTests' timeSet, with a test of its own for a clock set short of the bell or back. iOS's permission is the lock's
-// switch here (approved its On, denied its Off, not determined its Starting) and its shields the lock (Q3). The words are
-// AN10d's to AN10h's; waitingWords and ridersWiring read iOS's views and have no twin; MoveTests are AS2's.
+// Which screen the app shows (C1a): BaliOutbox's ScreenTests, the router's halves and the words of Home, a scan, the sign-in
+// and the start (AN10d), iOS's word for word but where AS0's Words board changes one; AppTests' `offersSignOut`; TapInTests;
+// and BellRedrawTests' timeSet, with a test of its own for a clock set short of the bell or back. iOS's permission is the
+// lock's switch here (approved its On, denied its Off, not determined its Starting) and its shields the lock (Q3). The other
+// screens' words are AN10e's to AN10h's; waitingWords and ridersWiring read iOS's views and have no twin; MoveTests are AS2's.
 
 /**
  * The router's answer for what the phone knows at [now]: no intro Sign up shows, signed in, kept from the last run unless
@@ -121,6 +127,26 @@ private val ended = at(3000)
 
 /** Why the app couldn't start: its storage wouldn't open. */
 private val failed = Problem.StartFailed(IOException("disk I/O error"))
+
+/** A session whose bell is at 10:42 AM in New York, 1,720 s after [t0]: BaliOutbox's tests' `bell1042`. */
+private val bell1042 = session(endsAt = 1720)
+
+/** [first], then where else the phone may stand: its standing not read, and in a session in each state there is. BaliOutbox's ScreenTests' `others`. */
+private fun elsewhere(first: Standing): List<Standing> =
+    listOf(first, Standing.Unread) +
+        listOf(ParticipationState.Focused, ParticipationState.Unlocked, ParticipationState.ProtectionOff, null).map { inSession(it, bell1042) }
+
+/** The engine's truth over [outbox] as the file gives it back: its queue, and the phone's newest tap (#146). BaliOutbox's ScreenTests' `read`. */
+private suspend fun readBack(outbox: Outbox): SyncState = SyncState(queued = outbox.records(), lastTap = outbox.lastTap())
+
+/** What Home, Waiting and Protection off say of a tap of a block no teacher registered (`taps/404-unknown-block`), iOS's word for word. */
+private const val UNKNOWN_BLOCK = "Bali doesn't know a block you tapped, so that tap hasn't counted. Ask your teacher to set it up."
+
+/** What they say of a tap refused for anything else, where the screen has Tap in. */
+private const val TAP_AGAIN = "Bali couldn't record a tap. Tap in again, or ask your teacher."
+
+/** What they say of a tap still being sent at the retry bound. */
+private const val STILL_TRYING = "Bali couldn't record a tap yet. It keeps trying."
 
 /** Which screen the app shows (C1a): BaliOutbox's ScreenTests, the router's halves. */
 class ScreenTest : OutboxFiles() {
@@ -700,7 +726,11 @@ class ScreenTest : OutboxFiles() {
     @Test
     fun waitingsBackToHomeTheRegularHomeItsTabBarNeverAHomeStackedOverWaitingAndTheStartFoundIsFocusWhateverWasOpened() {
         // #151, the owner's decision, 2026-10-01: History and Me honoured there, Join over it as over any Home; Waiting itself
-        // stays the tap's answer, with no bar. Home's card saying the wait is AN10d's.
+        // stays the tap's answer, with no bar. Home's card says the wait in the hero's place, only while waiting (C3c's card
+        // never then: AN10f's checks).
+        val waiting = SyncState(standing = Standing.Waiting, me = user(classes = listOf(Answer.inClass("c"))))
+        assertEquals("You're tapped in. Your phone locks when class starts, as long as Bali is open.", waiting.waitingCard)
+        for (standing in elsewhere(Standing.Out)) assertNull(waiting.copy(standing = standing).waitingCard, "$standing")
         assertEquals(Screen.Waiting, screen(standing = Standing.Waiting))
         assertFalse(tabbed(standing = Standing.Waiting))
         assertEquals(Screen.Home, screen(standing = Standing.Waiting, opened = listOf(Screen.Home)))
@@ -715,23 +745,57 @@ class ScreenTest : OutboxFiles() {
     }
 
     @Test
-    fun inNoClassTheStudentLandsOnHomeNeverAJoinOfItsOwnItsTabBarAndJoinOpenedOverItAndNothingElseMoves() {
-        // #143; the owner's ruling, 2026-10-07: never in a class on this phone, removed from their last, or having left it. Its
-        // card in the hero's place, with Join a class, is AN10d's.
-        val (unlocked, none) = inSession(ParticipationState.Unlocked) to inNone()
-        assertEquals(Screen.Unlocked, screen(standing = unlocked, me = none))
-        assertEquals(Screen.Home, screen(me = none))
-        assertTrue(tabbed(standing = Standing.Out, me = none))
-        for (tab in listOf(Screen.History, Screen.Me)) assertEquals(tab, screen(me = none, tab = tab))
-        assertEquals(Screen.Join, screen(me = none, opened = listOf(Screen.Join)))
-        assertFalse(tabbed(standing = Standing.Out, opened = listOf(Screen.Join), me = none))
-        // Nothing else moves.
-        assertEquals(Screen.Home, screen())
-        assertEquals(Screen.Waiting, screen(standing = Standing.Waiting, me = none))
-        assertEquals(Screen.Home, screen(standing = Standing.Unread, me = none))
-        assertEquals(Screen.SessionOver, screen(standing = unlocked, me = none, now = ended))
-        assertEquals(Screen.Permission, screen(switch = LockSwitch.Off, me = none))
-        assertEquals(Screen.SignIn, screen(signedIn = false, me = none))
+    fun inNoClassTheStudentLandsOnHomeNeverAJoinOfItsOwnItsTabBarAndJoinOpenedOverItAndNothingElseMoves(): Unit =
+        runBlocking {
+            // #143; the owner's ruling, 2026-10-07: never in a class on this phone, removed from their last, or having left it.
+            val (unlocked, none) = inSession(ParticipationState.Unlocked) to inNone()
+            assertEquals(Screen.Unlocked, screen(standing = unlocked, me = none))
+            assertEquals(Screen.Home, screen(me = none))
+            assertTrue(tabbed(standing = Standing.Out, me = none))
+            for (tab in listOf(Screen.History, Screen.Me)) assertEquals(tab, screen(me = none, tab = tab))
+            assertEquals(Screen.Join, screen(me = none, opened = listOf(Screen.Join)))
+            assertFalse(tabbed(standing = Standing.Out, opened = listOf(Screen.Join), me = none))
+            // Nothing else moves.
+            assertEquals(Screen.Home, screen())
+            assertEquals(Screen.Waiting, screen(standing = Standing.Waiting, me = none))
+            assertEquals(Screen.Home, screen(standing = Standing.Unread, me = none))
+            assertEquals(Screen.SessionOver, screen(standing = unlocked, me = none, now = ended))
+            assertEquals(Screen.Permission, screen(switch = LockSwitch.Off, me = none))
+            assertEquals(Screen.SignIn, screen(signedIn = false, me = none))
+            // Its card in the hero's place, with Join a class: not in a class yet, or in none any more, as the approved Sign in &
+            // sign up design's Home boards say (AS4's Home, new and removed). Home's other cards stand as they were: the wait's
+            // (#151), and a refused tap said (#146); a class in session's (C3c) is AN10f's.
+            val out = SyncState(standing = Standing.Out, me = none)
+            assertEquals("You're not in a class yet. Join one with the class code from your teacher.", out.noClassesCard(everInClass = false))
+            assertEquals("You're not in any classes. Join one with the class code from your teacher.", out.noClassesCard(everInClass = true))
+            assertNull(out.waitingCard)
+            for (standing in elsewhere(Standing.Waiting)) {
+                for (ever in listOf(false, true)) assertNull(out.copy(standing = standing).noClassesCard(ever), "$standing")
+            }
+            // The wait's card in no class too: an armed tap needs no enrollment (#151).
+            assertNotNull(out.copy(standing = Standing.Waiting).waitingCard)
+            // The classes not read, or one of them: none.
+            assertNull(out.copy(me = null).noClassesCard(everInClass = false))
+            val running = me("""{"user":{"id":"u","role":"student","displayName":null},"classes":[{"id":"c","name":"Period 3","liveSession":{"id":"s","endsAt":"${wire(bell1042.endsAt)}"}}],"session":null}""")
+            assertNull(out.copy(me = running).noClassesCard(everInClass = true))
+            // A scan of a block no teacher set up is still said under it (#146).
+            val (outbox, _) = makeOutbox()
+            send(outbox, record(outbox, Change.Tap("NOCLASS123")), 404, Answer.unknownBlock)
+            val refused = readBack(outbox).copy(standing = Standing.Out, me = none)
+            assertNotNull(refused.noClassesCard(everInClass = false))
+            assertEquals(UNKNOWN_BLOCK, refused.refusedTapWords)
+        }
+
+    @Test
+    fun homesEmptyStateForTheAccountsStudentReadsWhetherTheyWereEverInAClassHereKeyedOnTheStudentNoneUntilTheClassesAreRead() {
+        // No iOS twin (its HomeView passes `phone.everInClass`): the notes' student is the one `GET /v1/me` names, or it's another's.
+        val none = SyncState(standing = Standing.Out, me = inNone())
+        assertEquals(none.noClassesCard(everInClass = true), Account.State(sync = none, inClass = "u").noClassesCard)
+        for (other in listOf("v", null)) {
+            assertEquals(none.noClassesCard(everInClass = false), Account.State(sync = none, inClass = other).noClassesCard, "$other")
+        }
+        assertNull(Account.State(sync = none.copy(me = null), inClass = "u").noClassesCard)
+        assertNull(Account.State(inClass = "u").noClassesCard)
     }
 
     @Test
@@ -832,6 +896,263 @@ class ScreenTest : OutboxFiles() {
             )
         }
     }
+
+    @Test
+    fun aTapRefusedForAnythingButAnUnknownBlockNamesAWayOnTheScreenHasInNoClassItsTryAgainElsewhereTapInAgainTheBoundsTooThere(): Unit =
+        runBlocking {
+            // #160's review: on Home in no class, which has no Tap in (#143), its Try again, in plain words with no dash; Tap in
+            // again everywhere else, in a class, waiting or out with the classes not read; a tap still being sent at the retry
+            // bound says so on that Home too.
+            val tryAgain = "Bali couldn't record a tap. Try again, or ask your teacher."
+            val (outbox, _) = makeOutbox()
+            send(outbox, record(outbox, Change.Tap("tag")), 409, Answer.refused("event_id_conflict"))
+            val state = readBack(outbox).copy(standing = Standing.Out, me = me(Answer.me(null)))
+            assertNotNull(state.noClassesCard(everInClass = false))
+            assertEquals(tryAgain, state.refusedTapWords)
+            assertFalse(Char(0x2014) in tryAgain || Char(0x2013) in tryAgain)
+            val inClass = state.copy(me = me(Answer.me(null, classes = listOf(Answer.inClass("c")))))
+            for (other in listOf(inClass, state.copy(standing = Standing.Waiting), state.copy(me = null))) {
+                assertNull(other.noClassesCard(everInClass = true), "${other.standing}")
+                assertEquals(TAP_AGAIN, other.refusedTapWords, "${other.standing}")
+            }
+            val (unsettled, _) = makeOutbox()
+            val lost = record(unsettled, Change.Tap("tag"))
+            repeat(Outbox.BOUND) { send(unsettled, lost, 503) }
+            assertEquals(STILL_TRYING, readBack(unsettled).copy(standing = Standing.Out, me = state.me).refusedTapWords)
+        }
+
+    @Test
+    fun whatHomeSaysOfAScanThatRecordedNoTapEachWithTheWayOnNothingForTheTapNorAScanClosedAndWhileGetMeGivesNoAnswer() {
+        // C3: not a Bali block, a phone that can't read one (the Words board's line), NFC off (Android's alone, AS4's NFC sheet), a
+        // scan that didn't finish, a tap the phone couldn't save; nothing for a block's code, the tap, nor for a scan the student
+        // closed. While `GET /v1/me` gives no answer, in the Join screen's words.
+        assertNull(BlockRead.Block("T7XK2M9QPF").words)
+        assertNull(BlockRead.Cancelled.words)
+        assertEquals("That isn't a Bali block. Hold your phone to your teacher's block.", BlockRead.NotBali.words)
+        assertEquals("This phone can't read Bali blocks, so it can't tap in. Ask your teacher.", BlockRead.Unsupported.words)
+        assertEquals("Turn on NFC in Settings to read your teacher's block.", BlockRead.NfcOff.words)
+        assertEquals("The scan didn't finish. Try again.", BlockRead.Failed("A scan is under way.").words)
+        assertEquals("Your phone couldn't save the tap. Try again.", TapFailure.NotKept.words)
+        // Tap in says a scan as the scan's own words; a press with no engine started, iOS's `Joining.notStarted`.
+        for (read in listOf(BlockRead.NotBali, BlockRead.Unsupported, BlockRead.NfcOff, BlockRead.Failed("no"))) {
+            assertEquals(read.words, TapFailure.NoBlock(read).words, "$read")
+        }
+        assertEquals("Bali is still starting. Try again in a moment.", TapFailure.NotStarted.words)
+        val state = SyncState()
+        assertNull(state.meWords)
+        assertEquals("Can't reach the server. Check your connection and try again.", state.copy(meFailed = SendResult.NetworkError).meWords)
+        assertEquals("Something went wrong at Bali. Try again in a moment.", state.copy(meFailed = SendResult.Status(503)).meWords)
+    }
+
+    @Test
+    fun aStuckTapWhoseLastAnswerTheOutboxOnlyRetriesIsStillBeingSentAtTheBoundWhereARefusalStuckItTheRefusalsWordsStand(): Unit =
+        runBlocking {
+            // 401, 408, 429: a sign-in to renew, a timeout, a limit; never "tap in again" while it is on its way (#114's review). A
+            // retry's answer over a refusal says nothing new (santa's review).
+            for (status in listOf(401, 408, 429)) {
+                val (unsettled, _) = makeOutbox()
+                val lost = record(unsettled, Change.Tap("tag"))
+                repeat(Outbox.BOUND) { send(unsettled, lost, 503) }
+                send(unsettled, lost, status)
+                val trying = readBack(unsettled)
+                assertEquals(true to status, trying.queued.first().let { it.stuck to it.lastStatus }, "$status")
+                assertEquals(StuckTap.StillSending to STILL_TRYING, trying.stuckTap to trying.refusedTapWords, "$status")
+                val (outbox, _) = makeOutbox()
+                val tap = record(outbox, Change.Tap("tag"))
+                send(outbox, tap, 409, Answer.refused("event_id_conflict"))
+                send(outbox, tap, status)
+                assertEquals(TAP_AGAIN, readBack(outbox).refusedTapWords, "$status")
+            }
+        }
+
+    @Test
+    fun aRefusedTapStaysSaidAsRefusedWhateverAnswersComeAfterItTheRetryBoundsWorthOfServerErrorsIncludedAnUnknownBlocksToo(): Unit =
+        runBlocking {
+            // The refusal is kept on the record (C4's review), each later answer overwriting its last.
+            for ((status, said) in listOf(409 to TAP_AGAIN, 404 to UNKNOWN_BLOCK)) {
+                val (outbox, _) = makeOutbox()
+                val tap = record(outbox, Change.Tap("tag"))
+                send(outbox, tap, status, Answer.refused("event_id_conflict"))
+                repeat(Outbox.BOUND) { send(outbox, tap, 503) }
+                val state = readBack(outbox)
+                val stuck = state.queued.first()
+                assertTrue(stuck.lastStatus == 503 && stuck.answers > Outbox.BOUND, "$status")
+                assertEquals(status to said, stuck.refusedStatus to state.refusedTapWords, "$status")
+            }
+        }
+
+    @Test
+    fun aTapTheServerRefusedIsSaidOnHomeAnUnknownBlockWithWhoCanSetItUpAnyOtherWithTheWayOnOneUnsettledAsStillTriedNothingElse(): Unit =
+        runBlocking {
+            // Rule 5; santa's round 1: kept and retried until one is recorded, the lock off meanwhile; the latest such tap, and
+            // nothing while none is stuck, nor for another kind of record.
+            val (outbox, _) = makeOutbox()
+            val tap = record(outbox, Change.Tap("tag"))
+            assertNull(readBack(outbox).refusedTapWords)
+            send(outbox, tap, 404, Answer.unknownBlock)
+            var state = readBack(outbox)
+            assertTrue(state.queued.first().stuck && state.pendingTap == null)
+            assertEquals(StuckTap.UnknownBlock to UNKNOWN_BLOCK, state.stuckTap to state.refusedTapWords)
+            send(outbox, record(outbox, Change.Tap("tag")), 409, Answer.refused("event_id_conflict"))
+            state = readBack(outbox)
+            assertEquals(StuckTap.Refused to TAP_AGAIN, state.stuckTap to state.refusedTapWords)
+            val (unsettled, _) = makeOutbox()
+            val lost = record(unsettled, Change.Tap("tag"))
+            repeat(Outbox.BOUND) { send(unsettled, lost, 503) }
+            state = readBack(unsettled)
+            assertTrue(state.queued.first().stuck)
+            assertEquals(STILL_TRYING, state.refusedTapWords)
+            val (other, _) = makeOutbox()
+            send(other, record(other, Change.Unlock("s", null)), 400, Answer.refused("invalid_request"))
+            state = readBack(other)
+            assertTrue(state.queued.first().stuck)
+            assertNull(state.stuckTap)
+            assertNull(state.refusedTapWords)
+        }
+
+    @Test
+    fun aRefusedTapIsSaidOnlyWhileItIsThePhonesNewestTapALaterOneLeavesItKeptAndUnsaidTheScreenAsBeforeANewRefusalItsOwnWords(): Unit =
+        runBlocking {
+            // #146: a later one on its way, or recorded and gone, leaves the refused tap kept, stuck and unsaid, and the screen
+            // chosen as before, Home, Waiting or Protection off; one refused in its turn is said in its own words; a file that
+            // names no tap leaves the latest stuck one said.
+            val (outbox, _) = makeOutbox()
+            val refused = record(outbox, Change.Tap("NOCLASS123"))
+            send(outbox, refused, 404, Answer.unknownBlock)
+            assertEquals(UNKNOWN_BLOCK, readBack(outbox).refusedTapWords)
+            val next = record(outbox, Change.Tap("tag"))
+            var state = readBack(outbox)
+            assertEquals(null to next.eventId, state.refusedTapWords to state.pendingTap?.eventId)
+            send(outbox, next, 200, Answer.joined())
+            state = readBack(outbox)
+            assertEquals(listOf(refused.eventId), state.queued.map { it.eventId })
+            assertTrue(state.queued[0].stuck)
+            assertEquals(next.eventId to null, state.lastTap to state.refusedTapWords)
+            val standings =
+                listOf(Standing.Out to Screen.Home, Standing.Waiting to Screen.Waiting, inSession(ParticipationState.ProtectionOff, later) to Screen.ProtectionOff)
+            for ((standing, shown) in standings) {
+                for (newest in listOf(refused.eventId, next.eventId)) {
+                    assertEquals(shown, screen(standing = standing, queued = state.queued, lastTap = newest), "$standing")
+                }
+            }
+            assertEquals(UNKNOWN_BLOCK, state.copy(lastTap = null).refusedTapWords)
+            send(outbox, record(outbox, Change.Tap("tag")), 409, Answer.refused("event_id_conflict"))
+            assertEquals(TAP_AGAIN, readBack(outbox).refusedTapWords)
+        }
+
+    @Test
+    fun whatTheSignInScreenSaysOfAPageThatDidntFinishItsKindAndAnotherTryNothingForOneClosedNeverAnOAuthCodeEachNotOpenedByPage() {
+        // C1b: a page that couldn't open names its page, the sign-up page's in the approved Sign in & sign up design's words, and
+        // every other failure is said alike for both. Q10: each way Android's page doesn't open (another sign-in page open, the
+        // Auth Tab's own end, no browser to open it) in iOS's two lines, keyed on the page.
+        for (why in listOf("another sign-in page is open", "the Auth Tab ended with 2", "no browser on the phone opens it")) {
+            val opened = SignInError.NotOpened(why)
+            assertEquals("The sign-in page couldn't open. Try again, or ask your teacher.", opened.words(HostedPage.SignIn), why)
+            assertEquals("The sign-up page couldn't open. Try again, or ask your teacher.", opened.words(HostedPage.SignUp), why)
+        }
+        for (page in HostedPage.entries) {
+            assertNull(SignInError.Cancelled.words(page))
+            assertEquals("Can't reach the sign-in server. Check your connection and try again.", SignInError.Unreachable.words(page))
+            assertEquals("The sign-in server didn't allow this sign-in. Ask your teacher.", SignInError.Refused("access_denied").words(page))
+            for (code in listOf("server_error", "temporarily_unavailable")) {
+                assertEquals("The sign-in server isn't working right now. Try again in a moment.", SignInError.Refused(code).words(page), code)
+            }
+            for (code in listOf("invalid_client", "invalid_grant", "invalid_request", "some_new_code", null)) {
+                assertEquals("The sign-in was refused. Try again, or ask your teacher.", SignInError.Refused(code).words(page), "$code")
+            }
+            assertEquals("Your phone couldn't keep the sign-in. Try again.", SignInError.NotKept.words(page))
+        }
+    }
+
+    @Test
+    fun theStartsProblemInItsOwnWordsNotSetUpOrTheStorageThatWouldntOpenNamedByItsCausesMessageElseItsTypeNeverTheLock() {
+        // BaliApp.swift's `problem`, under AS2's Storage board's "Bali couldn't start", with Try again: the cause in parentheses,
+        // as iOS's line names its error for a support request, by its message as the board draws it, else by its type, never
+        // empty. A start that fails has taken the last run's lock off (AN10c), so neither line speaks of the lock.
+        assertEquals("This copy of Bali isn't set up right. Ask your teacher.", Problem.NotSetUp.words)
+        assertEquals("Bali couldn't open its storage on this phone (disk I/O error). Try again, or ask your teacher.", failed.words)
+        for (cause in listOf(IllegalStateException(), IOException(" "))) {
+            assertEquals(
+                "Bali couldn't open its storage on this phone (${cause.javaClass.name}). Try again, or ask your teacher.",
+                Problem.StartFailed(cause).words,
+            )
+        }
+        for (problem in listOf(Problem.NotSetUp, failed)) assertFalse("lock" in problem.words, problem.words)
+    }
+}
+
+/** Home's Tap in (C3b), through the engine: BaliOutbox's TapInTests. */
+class TapInTest : EngineFiles() {
+    @Test
+    fun aBlocksCodeIsTheTapRecordedAndSentNothingSaidAnythingElseRecordsNothingAndIsSaidAScanClosedNothingATapNotKeptSaid(): Unit =
+        runBlocking {
+            // Santa's round 1 on iOS: untested glue. NFC off, Android's alone, among the scans that record nothing.
+            val rig = rig()
+            for (read in listOf(BlockRead.NotBali, BlockRead.Unsupported, BlockRead.NfcOff, BlockRead.Failed("A scan is under way."))) {
+                val said = rig.engine.tapIn(read)
+                assertEquals(TapFailure.NoBlock(read) to read.words, said to said?.words, "$read")
+            }
+            assertNull(rig.engine.tapIn(BlockRead.Cancelled))
+            assertEquals(emptyList(), rig.engine.updates.value.queued)
+            assertNull(rig.engine.tapIn(BlockRead.Block("T7XK2M9QPF")))
+            rig.server.next(tapRoute).reply(200, Answer.armed)
+            rig.until { it.standing == Standing.Waiting && it.queued.isEmpty() }
+            refuseRecords(rig.outbox)
+            assertEquals(TapFailure.NotKept, rig.engine.tapIn(BlockRead.Block("T7XK2M9QPF")))
+            assertEquals(emptyList(), rig.outbox.records())
+            refuseRecords(rig.outbox, false)
+        }
+
+    @Test
+    fun aRefusedTapIsSaidOnlyWhileItIsThePhonesNewestALaterTapEndsItsCardTheRefusedOneKeptRetriedRefusedAgainAndUnsaidARelaunchToo(): Unit =
+        runBlocking {
+            // #146, the owner's phone: a 3:51 PM scan of a block no teacher set up still said at 4:31 PM, in another class. A
+            // relaunch reads the phone's newest tap from the file and says nothing; a tap after it refused in its turn is said in
+            // its own words.
+            val (outbox, _) = makeOutbox()
+            val rig = rig(outbox)
+            rig.engine.record(Change.Tap("NOCLASS123"))
+            rig.server.next(tapRoute).reply(404, Answer.unknownBlock)
+            rig.until { it.refusedTapWords == UNKNOWN_BLOCK }
+            rig.engine.record(Change.Tap("T7XK2M9QPF"))
+            assertNull(rig.engine.updates.value.refusedTapWords)
+            rig.server.next(tapRoute).reply(200, Answer.joined())
+            val joined = rig.until { it.standing == Standing.InSession(session(), ParticipationState.Focused) }
+            assertNull(joined.refusedTapWords)
+            assertEquals(listOf<Change>(Change.Tap("NOCLASS123")), joined.queued.map { it.change })
+            assertTrue(joined.queued.first().stuck)
+            // Kept and retried on its backoff (2 s, no jitter), refused again: never said again.
+            rig.clock.advance(2)
+            rig.server.next(tapRoute).reply(404, Answer.unknownBlock)
+            val retried = rig.until { it.queued.firstOrNull()?.attempts == 2 }
+            assertEquals(null to 1, retried.refusedTapWords to retried.queued.size)
+            rig.stop()
+            val relaunched = rig(outbox)
+            assertEquals(listOf<Change>(Change.Tap("NOCLASS123")), relaunched.engine.updates.value.queued.map { it.change })
+            assertNull(relaunched.engine.updates.value.refusedTapWords)
+            relaunched.engine.record(Change.Tap("T7XK2M9QPF"))
+            relaunched.server.next(tapRoute).reply(409, Answer.refused("event_id_conflict"))
+            relaunched.until { it.refusedTapWords == TAP_AGAIN }
+        }
+
+    @Test
+    fun aLaunchWhoseReadOfTheFileFailedReadsThePhonesNewestTapAgainWithTheQueueOnceTheFileReadsARefusedTapPassedStillUnsaid(): Unit =
+        runBlocking {
+            // Santa's round 1 on iOS: the newest tap read again with the queue, in a step of its own before it (#155's review).
+            val (outbox, _) = makeOutbox()
+            val refused = record(outbox, Change.Tap("NOCLASS123"))
+            send(outbox, refused, 404, Answer.unknownBlock)
+            val next = record(outbox, Change.Tap("T7XK2M9QPF"))
+            send(outbox, next, 200, Answer.joined())
+            outbox.execute("ALTER TABLE outboxState RENAME TO gone")
+            val rig = rig(outbox)
+            rig.until { it.link == Link.StorageFailed }
+            outbox.execute("ALTER TABLE gone RENAME TO outboxState")
+            rig.engine.retryNow()
+            val read = rig.until { it.queued.isNotEmpty() }
+            assertEquals(listOf(refused.eventId) to next.eventId, read.queued.map { it.eventId } to read.lastTap)
+            assertNull(read.refusedTapWords)
+        }
 }
 
 /**
