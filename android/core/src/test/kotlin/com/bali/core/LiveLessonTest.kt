@@ -13,6 +13,7 @@ import kotlin.test.fail
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
@@ -163,6 +164,9 @@ class LessonPollTest {
             val read = Reply.ok(asked(answer = answer), etag = "\"a\"")
             val world = LessonWorld(listOf(read, Reply.notModified, Reply.notModified))
             val lesson = world.lesson()
+            // The owner, reading the lesson's changes from before its first read.
+            val seen = mutableListOf<LessonState>()
+            val owner = launch(start = CoroutineStart.UNDISPATCHED) { lesson.state.collect { seen += it } }
             world.poll(lesson)
 
             val sent = world.sent
@@ -175,7 +179,9 @@ class LessonPollTest {
             assertEquals(answer, state.presentation?.question?.answer)
             assertNull(state.problem)
             // The owner reads each change, the newest kept.
-            assertEquals(state, lesson.state.first())
+            eventually { seen.lastOrNull() == state }
+            owner.cancel()
+            assertEquals(LessonState(), seen.first())
         }
 
     @Test
