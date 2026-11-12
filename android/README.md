@@ -292,9 +292,12 @@ BaliOutbox keeps them: iOS's lines word for word, but where the Android canvas's
 AN10d's are Join's, Home's (a refused tap, the waiting and empty-state cards, a read's failure), a scan's and Tap in's
 (`SyncEngine.tapIn`, its answer a type), the sign-in's and the start's. AN10e's are Focus's (`FocusWords`: the class,
 the countdown over the lock verified on alone, the claim, offline's card, a stall and a late unlock), Emergency
-Unlock's failures, and the block screen's (`ShieldWords`: "Focused with Bali" alone, OK and Open Bali). `WordsTest`
-reads every one for every case of its type: none names Screen Time, iOS, an iPhone, FaceTime or Emergency SOS, or
-holds an em-dash or an exclamation mark; each later step adds its own.
+Unlock's failures, and the block screen's (`ShieldWords`: "Focused with Bali" alone, OK and Open Bali). AN10f's are
+Unlocked's (`UnlockedWords`: the class, what is open, the reason card, the re-tap, an unlock not sent yet), a reason's
+and Back to focus's failures, Protection off's (`ProtectionOffWords`: Bali's lock off, back on or being checked, and
+the way back), Session over's and Home's card for a class in session. `WordsTest` reads every one for every case of its
+type: none names Screen Time, iOS, an iPhone, FaceTime or Emergency SOS, or holds an em-dash or an exclamation mark;
+each later step adds its own.
 
 **History's rules** (`outbox`'s `History.kt`, BaliOutbox's `History.swift`, AN9g): the pages as they came, from
 the top or Show earlier's, each moment once; which read may start, Show earlier only while a page follows those read
