@@ -62,6 +62,7 @@ import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerializationException
 
 // The sync engine, BaliOutbox's SyncEngine.swift: its frame, AN5a's, its drain, AN5b's, its read loop,
 // AN5c's, its wait for the Start, AN5d's, Emergency Unlock, AN5e's: where it is filed, its reason and the
@@ -646,11 +647,18 @@ class SyncEngine private constructor(
     /**
      * Where the phone stood, read again while the file wouldn't give it back: followed, and kept as it
      * changes, from then on. The server's truth settles it too (a read, or a change's answer naming the
-     * session), so a file that never reads never strands the phone.
+     * session), so a file that never reads never strands the phone. A read that fails says whether its
+     * storage failed ([SyncState.standingFailed]).
      */
     private suspend fun readStanding() {
         if (state.standing != Standing.Unread) return
-        val standing = stored { outbox.standing() }.getOrNull() ?: return
+        val read = tried { outbox.standing() }
+        val standing = read.getOrNull()
+        if (standing == null) {
+            // Shown, and whether its storage failed it, which takes the last run's lock off (AN10c2).
+            update { it.copy(link = Link.StorageFailed, standingFailed = read.inStorage) }
+            return
+        }
         // Written back at once, filing whatever the file holds waiting to be ([keepStanding]); an out an
         // arming was carried onto waits ([armed]).
         kept = null
@@ -1270,11 +1278,11 @@ class SyncEngine private constructor(
      * its standing in the file as it changes, so a relaunch starts where the phone stood, locked still,
      * offline too, never while it is unread, which would write over the file's truth from nothing; then
      * publishes it, if it changed. A standing known carries an arming no further ([armed]), as iOS's
-     * `didSet` has it.
+     * `didSet` has it, nor a failed read of it ([SyncState.standingFailed]).
      */
     private suspend fun update(change: (SyncState) -> SyncState) {
         val last = state
-        state = change(last)
+        state = change(last).let { if (it.standingFailed && it.standing != Standing.Unread) it.copy(standingFailed = false) else it }
         if (state.standing != Standing.Unread) armed = false
         if (state.standing != kept && state.standing != Standing.Unread) keepStanding()
         if (state != last) published.value = state
@@ -1285,19 +1293,21 @@ class SyncEngine private constructor(
      * the start, so it must never begin from nothing. An unlock not filed yet acts on the standing, and
      * the first change files it ([keepStanding]), as it files whatever the file holds when its queue
      * couldn't be read. A wait's end it can't read is none, unshown as iOS's: a read of the truth then
-     * ends the wait.
+     * ends the wait. Room opens the file at its first read, so a file that won't open fails these reads,
+     * never the start ([SyncState.standingFailed]).
      */
     private suspend fun load() {
         val queued = tried { outbox.records() }.getOrNull()
         val reportedOff = tried { outbox.reportedOff() }.getOrNull()
         val lastTap = tried { outbox.lastTap() }.getOrNull()
         val waitEnds = tried { outbox.waitEnds() }.getOrNull()
-        val standing = tried { outbox.standing() }.getOrNull()
+        val read = tried { outbox.standing() }
+        val standing = read.getOrNull()
         state =
             SyncState(
                 standing = standing ?: Standing.Unread, queued = queued.orEmpty(), reportedOff = reportedOff,
                 lastTap = lastTap, link = Link.StorageFailed.takeIf { queued == null || standing == null },
-                waitEnds = waitEnds,
+                waitEnds = waitEnds, standingFailed = read.inStorage,
             )
         if (standing != null && queued != null && !state.holdsUnfiled) kept = standing
         published.value = state
@@ -1413,6 +1423,13 @@ class SyncEngine private constructor(
         } catch (error: Exception) {
             Result.failure(error)
         }
+
+    /**
+     * Whether a read of where the phone stood failed in its storage (a file that won't open or read), not on a standing this build
+     * can't read, which `keptStanding` refuses as a [SerializationException]: keyed on that, never on SQLite's own error, whose
+     * class on a phone is a typealias of Android's (AN10d).
+     */
+    private val Result<Standing>.inStorage: Boolean get() = exceptionOrNull().let { it != null && it !is SerializationException }
 
     /**
      * A storage failure, shown (rule 5), and when to try again: within a minute. Every one is shown:

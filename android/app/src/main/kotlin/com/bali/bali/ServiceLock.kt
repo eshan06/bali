@@ -27,7 +27,8 @@ const val LOCK_FILE = "lock"
  * keeps by the phone's clock, with nothing woken there; while one holds, the service listens to the
  * windows, and while none does, to nothing (the battery plan). Its file, there while one holds, is read
  * once, as the lock is made with the run, for the last run's lock (Q4): one with no end of its own, held
- * over a standing not read until the phone knows where it stands or the student unlocks. Never read again
+ * over a standing not read until the phone knows where it stands or the student unlocks, never over one
+ * its storage failed to give back (AN10c2). Never read again
  * within the run, so a lock this run put on is never taken for the last run's. What it holds is the main
  * thread's, as the service's calls are, so its calls run there. None throws.
  */
