@@ -126,7 +126,10 @@ sealed interface DeckResult {
 class LiveLesson(
     /** The running session whose lesson this is. */
     val session: String,
-    /** The app's one client: an answer never goes through the outbox (decision 5). */
+    /**
+     * The client it reads and answers through, never the outbox (decision 5): in the app the lesson's own, over a transport
+     * apart from the engine's ([OkHttpTransport.apart]), so none of its calls holds an Emergency Unlock's send (AN13d).
+     */
     private val client: ApiClient,
     /** The phone's clock, a test's own there. */
     private val now: () -> Instant = { Instant.now() },

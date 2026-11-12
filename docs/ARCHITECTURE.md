@@ -1285,6 +1285,11 @@ out, and no token reaches Bali's API before the 13+ check but the check's own re
   lock's switch has read on, who was listed in a class here and who has seen the consent list): a
   restored counter would rank a new record behind ones the server already holds (A12), and a
   restored sign-in would open a reinstall signed in.
+- **The live lesson's calls queue apart from the engine's.** OkHttp lets 5 requests a host go at
+  once and queues the rest, so the lesson's poll and answers go through a transport of their own
+  over the app's connections (`OkHttpTransport.apart`), and none ever holds an Emergency Unlock's
+  send behind it (Live lesson, decision 5). The conductor's call, awaiting the owner
+  (`docs/DECISIONS.md`, 2026-11-12).
 
 ### The battery plan (the owner, 2026-11-04)
 

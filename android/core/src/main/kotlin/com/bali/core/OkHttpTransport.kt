@@ -10,6 +10,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.CookieJar
+import okhttp3.Dispatcher
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType
 import okhttp3.OkHttpClient
@@ -25,6 +26,14 @@ import okio.BufferedSink
  */
 class OkHttpTransport internal constructor(private val client: OkHttpClient) : HttpTransport {
     constructor() : this(makeClient())
+
+    /**
+     * A transport over this one's settings and connections, its calls in a queue of their own (AN13d): OkHttp lets 5 requests
+     * a host go at once and holds the rest in its dispatcher's queue, so a call through either never waits there behind the
+     * other's. The live lesson's, so its poll and its answers never hold the engine's sends, an Emergency Unlock's among them
+     * (ARCHITECTURE, "Live lesson", decision 5).
+     */
+    fun apart(): OkHttpTransport = OkHttpTransport(client.newBuilder().dispatcher(Dispatcher()).build())
 
     override suspend fun send(request: HttpRequest): HttpAnswer {
         val call = call(request)

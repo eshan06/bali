@@ -96,7 +96,9 @@ no cache or cookies, 15 s for each wait and 30 s for a whole exchange, and no re
 request with a body goes once, whatever comes back; a read goes again on a fresh connection when
 its pooled one turns out closed, as URLSession's does. Its tests run against MockWebServer on a
 local port. Gradle picks OkHttp's Android build for the app and its JVM build for `core`'s tests.
-Its calls suspend (kotlinx.coroutines), as Swift's are async.
+Its calls suspend (kotlinx.coroutines), as Swift's are async. A transport apart (`apart()`, AN13d) keeps its settings and
+connections but queues its calls on a dispatcher of its own: OkHttp lets 5 requests a host go at once, so the live
+lesson's, through one apart, never hold the engine's behind them.
 
 **The live lesson** (`core`'s `LiveLesson.kt`, BaliCore's `LiveLesson.swift`, AN13a and AN13b): one running session's lesson as
 the phone follows it, in memory alone. Its poll (`run`) reads the presentation every 2 s with the last answer's `ETag` as
@@ -343,6 +345,18 @@ set up. It keeps the notes under the student (AN10b, `Notes.kt`; the app's in it
 AN10c): who was listed in a class here and who has seen the consent list (`sawList`), off the disk as Delete account
 starts and written back if it stops, forgotten once the account is deleted on Bali's server, at a relaunch finding it so too; says
 whose email the sign-in is; and holds Me's name and Leave, started afresh at each change of who is signed in.
+
+**The lesson half** (`outbox`'s `Lessons.kt`, BaliApp.swift's `Phone`'s lesson half, AN13d): one a run beside the account,
+over its state, following the lesson that state names (`lessonSession`), signed in, once this phone has shown the student the
+consent list as it stands. Its poll runs only while Bali's screen is in front, cancelled as it goes behind, a normal stop never
+said; a read saying the session is over drops the lesson for good, a poll refused `403` or `404` until a later read of
+`GET /v1/me` lists the session again, and the class's bell, by the phone's clock (`Screen.bell`), follows afresh, so the poll
+stops there and the card goes (Q7). A tap goes in one request through `LiveLesson.answer`, never the outbox, in the lesson
+half's own scope, the last of crossing picks alone said; Hide is this phone's alone; while Emergency Unlock is held the card
+ignores taps; and a change of who is signed in drops the lesson, its card, its picks and its heading. The screens read one
+`StateFlow`: the lesson, its card (`AnswerCard`) and its heading. Nothing is stored. Its client is the lesson's own, over a
+transport apart from the engine's (`OkHttpTransport.apart`), so no poll or answer holds an Emergency Unlock's send; the app
+makes it in AN13g. Its tests run on the engine's rig, the queue's over real sockets on the loopback, the JDK's own server.
 
 **The router** (`outbox`'s `Screen.kt` and `Router.kt`, BaliOutbox's `Screen.swift` and BaliApp.swift's `shown`, AN10a and
 AN10b): which screen shows, a type, chosen from the run's account, enforcer and engine, the start's problem, the notes
