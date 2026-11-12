@@ -102,9 +102,20 @@ a real decision? Add a dated entry at the top: what was decided and why.
   "Stop's cases, each with a sample"); and "iPhone" in SignInChanged's line (the guard: "Deleting.said names iPhone", and its own
   test) and an em-dash in Sign out's (the guard: "SignOutHold.words holds an em-dash", and MeTest's).
 
-  **The proof:** PROOF
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble :app:lint
+  check` green before santa's fixes and on the final code, Android 10's API check with it (Animal Sniffer over `core` and
+  `outbox`); the core and outbox suites green in each `check` and four more times on the final code (651 tests, nine of them new),
+  AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck && npm run lint && npm test`
+  green, the portal's suite whole (78 files). No SDK package was installed: the build downloads none
+  (`android.builder.sdkDownload=false`), and the SDK's folders matched before and after. The size, santa's count: 268 changed
+  lines not counting tests and Markdown (the split guessed about 180), 349 in the tests.
 
-  **Santa's review:** SANTA
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: no token's docs called it never a
+  connection's fault, where an expired token the phone couldn't renew offline is one of its reasons (reviewer A; reworded); the
+  deletion's cost held by its first and last sentences alone (reviewer B; pinned whole); and the count of the new sentences, three
+  in the two lines (reviewer A; fixed here and in the PR). The design check, no-ai-slop's Detect job over the new and changed
+  strings, found nothing: each line is iOS's but the three drawn, in DESIGN.md's voice.
 
   **For AN10h and Phase 10:** AS7's Me says `Naming.Failure.words` under the field, `Leaving.question(row)` and `CONSEQUENCE` over
   Leave class and `Leaving.Failure.words(row)` under it, `Leaving.inSession(row)` under a row `held` holds, `SignOutHold.words` by

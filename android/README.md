@@ -297,9 +297,9 @@ Unlocked's (`UnlockedWords`: the class, what is open, the reason card, the re-ta
 and Back to focus's failures, Protection off's (`ProtectionOffWords`: Bali's lock off, back on or being checked, and
 the way back), Session over's and Home's card for a class in session. AN10g's are Me's (a name's refusals, Leave's
 question and refusals, Sign out's holds and whose sign-in it is), Delete account's (`Deleting.said`, a deletion with no
-token said as the sign-in Bali couldn't check, never as no connection) and the 13+ stop's. `WordsTest` reads every one for every case of its
-type: none names Screen Time, iOS, an iPhone, FaceTime or Emergency SOS, or holds an em-dash or an exclamation mark;
-each later step adds its own.
+token said as the sign-in Bali couldn't check, never as no connection) and the 13+ stop's. `WordsTest` reads every one
+for every case of its type: none names Screen Time, iOS, an iPhone, FaceTime or Emergency SOS, or holds an em-dash or an
+exclamation mark; each later step adds its own.
 
 **History's rules** (`outbox`'s `History.kt`, BaliOutbox's `History.swift`, AN9g): the pages as they came, from
 the top or Show earlier's, each moment once; which read may start, Show earlier only while a page follows those read
