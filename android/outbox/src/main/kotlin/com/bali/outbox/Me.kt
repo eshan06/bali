@@ -12,14 +12,14 @@ import com.bali.core.UpdateMeResponse
 import java.time.Instant
 
 // The Me screen (C6b, C6c), BaliOutbox's Me.swift: the name as typed and saved, a class left, and Sign out's hold, every
-// failure a type. Their rules alone: every word is AN10's, the screens AS2's Your name and AS7's Me, and the calls the
-// engine's (SyncEngine.kt's `rename`, `leave` and `unlockUnsent`).
+// failure a type, and their words, each a function of its type (AN10g's; WordsTest reads every one). The screens are AS2's
+// Your name and AS7's Me, and the calls the engine's (SyncEngine.kt's `rename`, `leave` and `unlockUnsent`).
 
 /**
  * The Me screen's name (C6b; D1's Me, and AS2's Your name, which saves it as Me does) as the phone keeps it: whether the
  * student is editing it, the name as typed, and why the last save (A8's `PATCH /v1/me`) set no name ([failure], rule 5). A
- * value whose every step gives the next, as `Joining` is, where Swift's mutating calls change it; its words are AN10's.
- * BaliOutbox's `Naming`.
+ * value whose every step gives the next, as `Joining` is, where Swift's mutating calls change it; what it says is
+ * [Failure.words]. BaliOutbox's `Naming`.
  */
 data class Naming(
     val editing: Boolean = false,
@@ -34,13 +34,19 @@ data class Naming(
      */
     val eventId: String? = null,
 ) {
-    /** Why a save set no name, each with words of its own (AN10's). */
+    /** Why a save set no name, each with words of its own ([words]). */
     sealed interface Failure {
         /** Nothing to save: a name of blank space and characters that draw nothing, which the API refuses (`INVISIBLE`). */
         data object Blank : Failure
 
-        /** The save's answer set no name: its [result] and its error's [reason], which AN10's words key on, never its message. */
+        /** The save's answer set no name: its [result] and its error's [reason], which the words key on, never its message. */
         data class NotSaved(val result: SendResult, val reason: ApiErrorReason?) : Failure
+
+        /**
+         * The phone's engine hasn't started, so nothing was sent: the app's to give, never the engine's, as Join's is (AN10d's
+         * call; BaliApp.swift's `saveName`).
+         */
+        data object NotStarted : Failure
     }
 
     /** Something to save: a name with something in it a reader would see, never one of blank space and what draws nothing. */
@@ -99,10 +105,29 @@ data class Naming(
 }
 
 /**
+ * What the name's card says when a save set no name (rule 5), under the field, the name kept to try again: a blank name, how to
+ * save one; a refusal, keyed on its error's reason and its status, never its message, a teacher's account its own line, the rest
+ * in Join's words; and Bali still starting. BaliOutbox's `Naming.blank` and `Naming.words`.
+ */
+val Naming.Failure.words: String
+    get() =
+        when (this) {
+            Naming.Failure.Blank -> "Type a name to save it."
+            is Naming.Failure.NotSaved ->
+                when {
+                    reason == ApiErrorReason.DisplayNameTaken -> "A classmate already uses that name. Try another, like adding your last initial."
+                    reason == ApiErrorReason.DisplayNameInvalid -> "Bali can't use that name. Try another."
+                    result == SendResult.Status(403) -> "This is a teacher's account, and only students change their name here."
+                    else -> Joining.words(result, null)
+                }
+            Naming.Failure.NotStarted -> Joining.Failure.NotStarted.words
+        }
+
+/**
  * Leaving a class from the Me screen (C6c; D1's Leave, A19's `DELETE /v1/enrollments/{id}`) as the phone keeps it: the class
  * whose Leave was pressed, its question asked under it; the leave under way, one at a time; and why the last didn't finish,
  * said under the question, whose Leave class is the way to try again ([failure], rule 5). A value whose every step gives the
- * next; its words are AN10's. BaliOutbox's `Leaving`.
+ * next; what it says is [question], [CONSEQUENCE], [inSession] and [Failure.words]. BaliOutbox's `Leaving`.
  */
 data class Leaving(
     /** The class whose Leave was pressed: its question shows while this is set. */
@@ -117,8 +142,17 @@ data class Leaving(
      */
     val sent: Leave? = null,
 ) {
-    /** Why a leave didn't finish: its answer's [result] and its error's [reason], which AN10's words key on, never its message. */
-    data class Failure(val result: SendResult, val reason: ApiErrorReason?)
+    /** Why a leave didn't finish, each with words of its own ([words]). */
+    sealed interface Failure {
+        /** The leave's answer left the student in the class: its [result] and its error's [reason], which the words key on, never its message. */
+        data class NotLeft(val result: SendResult, val reason: ApiErrorReason?) : Failure
+
+        /**
+         * The phone's engine hasn't started, so nothing was sent: the app's to give, never the engine's, as Join's is (AN10d's
+         * call; BaliApp.swift's `leave`).
+         */
+        data object NotStarted : Failure
+    }
 
     /** A leave to send: the enrollment it ends, and its request. */
     data class Leave(val enrollmentId: String, val request: EndEnrollmentRequest)
@@ -159,33 +193,70 @@ data class Leaving(
         when {
             !busy || asking?.enrollmentId != enrollmentId -> this to false
             response.answer != null -> Leaving() to true
-            else -> copy(busy = false, failure = Failure(response.result, response.error?.error?.reason)) to false
+            else -> copy(busy = false, failure = Failure.NotLeft(response.result, response.error?.error?.reason)) to false
         }
 
     companion object {
+        /** What leaving costs, said under [question]: the way back in. */
+        const val CONSEQUENCE = "You'll need the class code to join it again."
+
         /**
-         * Whether the phone holds [row]'s Leave, said why in AN10's words: it stands in that class's lesson, whose bell hasn't rung
-         * by its own clock at [now]. Not held: the server says no to a lesson the phone isn't in (`409 class_in_session`).
+         * Whether the phone holds [row]'s Leave, said why in [inSession]'s words: it stands in that class's lesson, whose bell hasn't
+         * rung by its own clock at [now]. Not held: the server says no to a lesson the phone isn't in (`409 class_in_session`).
          */
         fun held(row: MeClass, state: SyncState, now: Instant): Boolean {
             val standing = state.standing as? Standing.InSession ?: return false
             return standing.session.classId == row.id && standing.session.endsAt > now
         }
+
+        /** The question asked under [row] before it is left, its name as the teacher wrote it. */
+        fun question(row: MeClass): String = "Leave ${row.name}?"
+
+        /** Why [row] can't be left now, under it: it is in session, as the phone knows ([held]) or the server answered. */
+        fun inSession(row: MeClass): String = "${row.name} is in session. You can leave it once class is over."
     }
 }
 
 /**
- * Why Me's Sign out waits (C6b): held, its why said in AN10's words, with Try again (rule 5). Only an Emergency Unlock holds it:
- * signed out, one the server hasn't recorded would wait for the next sign-in and go under whoever makes it (B4's rule), on a
- * shared phone another student. The server records every unlock that reaches it, so the hold ends once the phone is online.
- * BaliOutbox's `SignOutWords.held`, and BaliApp.swift's `unsent`.
+ * What the question under [row] says when a leave didn't finish (rule 5), Leave class there to try again: the class in session,
+ * when it can be left; any 403 the route gives, whatever its reason, its no to this account leaving this enrollment, never Join's
+ * words for a 403 (#134's review), as an enrollment not found or not the student's; the rest in Join's words; and Bali still
+ * starting. Keyed on the error's reason and the status, never its message. BaliOutbox's `Leaving.words`.
+ */
+fun Leaving.Failure.words(row: MeClass): String =
+    when (this) {
+        is Leaving.Failure.NotLeft ->
+            when {
+                reason == ApiErrorReason.ClassInSession -> Leaving.inSession(row)
+                reason == ApiErrorReason.EnrollmentNotFound || reason == ApiErrorReason.EnrollmentNotYours ||
+                    reason == ApiErrorReason.UnknownUser || result == SendResult.Status(403) ->
+                    "Bali couldn't find you in this class. It's checking your classes again."
+                else -> Joining.words(result, null)
+            }
+        Leaving.Failure.NotStarted -> Joining.Failure.NotStarted.words
+    }
+
+/**
+ * Why Me's Sign out waits (C6b), or didn't sign the student out: held, or a try that couldn't, its why said in its own words
+ * ([words]), with Try again (rule 5). Only an Emergency Unlock holds it: signed out, one the server hasn't recorded would wait for
+ * the next sign-in and go under whoever makes it (B4's rule), on a shared phone another student. The server records every unlock
+ * that reaches it, so the hold ends once the phone is online. BaliOutbox's `SignOutWords.held`, and BaliApp.swift's `unsent`.
  */
 enum class SignOutHold {
     /** An Emergency Unlock this phone recorded that the server hasn't. */
     UnlockUnsent,
 
     /** The outbox's file couldn't be read to say whether one waits: nothing changed. */
-    Unread;
+    Unread,
+
+    /** The phone couldn't forget the sign-in right now (`SignIn.signOut` threw): nothing changed, the app's to give. */
+    NotForgotten,
+
+    /**
+     * The phone's engine hasn't started, so nothing changed: the app's to give, never the engine's, as Join's is (AN10d's call;
+     * BaliApp.swift's `signOut`).
+     */
+    NotStarted;
 
     companion object {
         /**
@@ -206,6 +277,27 @@ enum class SignOutHold {
             }
     }
 }
+
+/**
+ * What Me says by Sign out while it waits, or once a try didn't sign the student out (rule 5), each with its why and Try again: an
+ * Emergency Unlock not with the teacher yet, which goes first, never dropped; the outbox's file unread; the sign-in not forgotten;
+ * and Bali still starting. BaliOutbox's `SignOutWords`.
+ */
+val SignOutHold.words: String
+    get() =
+        when (this) {
+            SignOutHold.UnlockUnsent -> "Your Emergency Unlock hasn't reached your teacher yet. You can sign out once it has."
+            SignOutHold.Unread -> "Bali can't read what your phone saved right now, so it can't sign you out yet. Try again in a moment."
+            SignOutHold.NotForgotten -> "Bali couldn't sign you out. Try again."
+            SignOutHold.NotStarted -> Joining.Failure.NotStarted.words
+        }
+
+/**
+ * Whose sign-in this is, said by Sign out (#147): the account's email, as the sign-in that landed names it (AN10b), so the name a
+ * student's teachers see is never taken for what they sign in with. None where no email is known: nothing said, never a guess, and
+ * never the last student's. BaliOutbox's `SignOutWords.signedIn`.
+ */
+val Account.State.signedInAs: String? get() = email?.takeIf { it.isNotEmpty() }?.let { "You're signed in as $it." }
 
 /**
  * [text] without what a name never carries, as the API refuses it (`UNPRINTABLE`, apps/api/src/display-name.ts): control and

@@ -7,9 +7,9 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 // The 13+ check (C7), BaliOutbox's Age.swift: the question's answers and its picks, counted in the Gregorian
-// calendar by java.time's ISO calendar, whatever calendar the phone's locale asks for. The question, its stop
-// screen and the intro are AS2's, every word AN10's, and the server's yes, read and recorded, the engine's
-// (SyncEngine.kt). Build 8's age notes have no twin here: no Android build ever kept one.
+// calendar by java.time's ISO calendar, whatever calendar the phone's locale asks for, and the stop screen's
+// words (AN10g's). The question, its stop screen and the intro are AS2's, and the server's yes, read and
+// recorded, the engine's (SyncEngine.kt). Build 8's age notes have no twin here: no Android build ever kept one.
 
 /**
  * The 13+ check (C7; the owner's rulings, 2026-10-04, 2026-10-05, 2026-10-07 and 2026-10-08): asked at every Sign up,
@@ -51,6 +51,15 @@ data class AgeCheck(val answer: Answer) {
         AgeCheck(if (passes(month, year, today, zone)) Answer.Passed else Answer.TooYoung)
 
     companion object {
+        /**
+         * The stop screen's title, under 13 ([Answer.TooYoung]; the owner's words, 2026-10-05), and the title over each step of
+         * the account's deletion after a sign-in answered under 13 ([Deleting.saidUnderThirteen]): nothing about an age.
+         */
+        const val NOT_YET = "Bali isn't available for you yet"
+
+        /** The stop screen's line, under its title: the way on, through the teacher, with no way back to the question this run. */
+        const val ASK_TEACHER = "Ask your teacher how to take part in class without the app."
+
         /**
          * Whether someone born in [month] of [year] is 13 or older at [today], at month precision: only once the month
          * after their birth month has begun, 13 years on, when whoever was born in that month, on its last day too, has

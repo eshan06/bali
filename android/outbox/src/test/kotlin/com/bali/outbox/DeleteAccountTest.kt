@@ -1,6 +1,7 @@
 package com.bali.outbox
 
 import androidx.sqlite.SQLiteException
+import com.bali.core.NoAnswer
 import com.bali.core.ParticipationState
 import com.bali.core.SendResult
 import com.bali.core.SignIn
@@ -259,7 +260,7 @@ class DeleteAccountTest : EngineFiles() {
             var deletion = rig.deleting()
             val lost = rig.server.next(deleteMeRoute)
             lost.reply(null)
-            assertEquals(AccountDeletion.NotDeleted(SendResult.NetworkError), deletion.answer())
+            assertEquals(AccountDeletion.NotDeleted(SendResult.NetworkError, NoAnswer.Unreachable), deletion.answer())
 
             deletion = rig.deleting()
             rig.server.next(deleteMeRoute).reply(409, Answer.refused("teacher_has_classes"))
@@ -738,7 +739,8 @@ class DeleteAccountTest : EngineFiles() {
         runBlocking {
             // AN9h (santa's review): the new answer is for another account's sign-in alone. Cognito refusing a1's refresh
             // token for good as the report's token is renewed signs a1 out: nobody's account can be deleted now, so the stop
-            // is AN9b's, whose Try again asks for a sign-in first, and the report stays.
+            // is AN9b's, whose Try again asks for a sign-in first, and the report stays. Its token ran out partway: no token,
+            // said as the sign-in Bali couldn't check, never as no connection (#553's review, Q7).
             val rig = signedRig()
             rig.signedIn()
             val off = assertNotNull(rig.engine.record(Change.ProtectionOff("s")))
@@ -748,13 +750,38 @@ class DeleteAccountTest : EngineFiles() {
             rig.clock.advance(3600) // a1 has expired: renewed for the report first
             val deletion = rig.deleting()
             rig.server.next(tokenRoute).reply(400, """{"error":"invalid_grant"}""")
-            assertEquals(AccountDeletion.NotDeleted(SendResult.NetworkError), rig.answerSendingNothing(deletion))
+            val stop = rig.answerSendingNothing(deletion)
+            assertEquals(AccountDeletion.NotDeleted(SendResult.NetworkError, NoAnswer.NoToken), stop)
+            assertEquals("Bali couldn't check your sign-in. Try again.", Deleting.Busy.answered(stop).said?.body)
             assertNull(rig.signIn.account())
             assertTrue(rig.keychain.isEmpty)
             assertEquals(listOf(off.eventId), rig.outbox.records().map { it.eventId })
             assertEquals(AccountDeletion.SignInFirst, rig.deleting().answer())
             assertTrue(rig.server.sent.none { it.route == deleteMeRoute || it.route == deleteUserRoute })
             rig.stop()
+        }
+
+    @Test
+    fun deleteMesOwnTokenRunOutAndNotRenewedIsNoTokenNothingSentSaidAsTheSignInBaliCouldntCheckNeverAsNoConnection(): Unit =
+        runBlocking {
+            // #553's review, Q7: with nothing queued, a1 expires before DELETE /v1/me goes and its renewal gives no token, Cognito
+            // refusing the refresh token for good or never answering: nothing went, so the stop says the sign-in, with Try again.
+            for (renewal in listOf<Int?>(400, null)) {
+                val rig = signedRig()
+                rig.signedIn()
+                withTimeout(patience) { rig.running.cancelAndJoin() }
+                rig.clock.advance(3600) // a1 has expired: renewed for DELETE /v1/me first
+                val deletion = rig.deleting()
+                val renewing = rig.server.next(tokenRoute)
+                if (renewal == null) renewing.reply(null) else renewing.reply(renewal, """{"error":"invalid_grant"}""")
+                val stop = rig.answerSendingNothing(deletion)
+                assertEquals(AccountDeletion.NotDeleted(SendResult.NetworkError, NoAnswer.NoToken), stop, "$renewal")
+                val stopped = Deleting.Busy.answered(stop)
+                assertEquals(Said("Bali couldn't finish deleting your account", "Bali couldn't check your sign-in. Try again."), stopped.said, "$renewal")
+                assertEquals(Deleting.Busy, stopped.start(), "$renewal")
+                assertTrue(rig.server.sent.none { it.route == deleteMeRoute || it.route == deleteUserRoute }, "$renewal")
+                rig.stop()
+            }
         }
 
     private companion object {

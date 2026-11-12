@@ -1,5 +1,6 @@
 package com.bali.outbox
 
+import com.bali.core.NoAnswer
 import com.bali.core.ParticipationState
 import com.bali.core.SendResult
 import com.bali.core.UnlockReason
@@ -124,7 +125,17 @@ class DeletionOrderTest : OutboxFiles() {
         }
 }
 
-/** Delete account on Me (C4b): BaliOutbox's DeletingTests, their ways on; their words are AN10's. */
+private const val NOT_DELETED = "Your account isn't deleted"
+private const val NOT_FINISHED = "Bali couldn't finish deleting your account"
+
+/** What the deletion's screen says once [answer] comes to it under way, [young] the gap's fallback's. */
+private fun said(answer: AccountDeletion, young: Boolean = false): Said? = Deleting.Busy.answered(answer, young).let { if (young) it.saidUnderThirteen else it.said }
+
+/**
+ * Delete account on Me (C4b): BaliOutbox's DeletingTests, their ways on and their words (AN10g). New: Bali still starting; and the
+ * three lines drawn first (Q9): another account's sign-in landed, with Back alone; a token run out partway, said as the sign-in
+ * Bali couldn't check, never as no connection (Q7); and a sign-in that can't delete, with no "older version" (Q8).
+ */
 class DeletingTest {
     @Test
     fun theQuestionIsAskedFromNothingAndCancelledBackToItDeleteAccountBeginsTheDeletionTryAgainOnlyWhereItCanHelpAndItsScreenShowsFromThePressToTheEnd() {
@@ -171,6 +182,114 @@ class DeletingTest {
         assertEquals(Deleting.None, done.close())
         // An answer to no deletion under way changes nothing.
         assertEquals(Deleting.Asking, Deleting.Asking.answered(AccountDeletion.Deleted))
+        // No iOS twin as a type: a phone whose engine hasn't started, the app's to give, said with Try again (BaliApp.swift's
+        // `deleteAccount`): nothing was sent, so nothing is deleted.
+        val unstarted = Deleting.Stopped(Deleting.Stop.NotStarted)
+        assertEquals(listOf<Any?>(true, true, Deleting.Busy), listOf(unstarted.shows, unstarted.stop.retries, unstarted.start()))
+        assertEquals(Said(NOT_DELETED, "Bali is still starting. Try again in a moment."), unstarted.said)
+    }
+
+    @Test
+    fun eachStopIsSaidWithItsWayOnTheDeletionsOwnAnswerInJoinsWordsSignInStillToGoTryAgainDoneAFreshStartUnderWayAMoment() {
+        // BaliOutbox's `words`: the teacher's account, the school; an unsent Emergency Unlock and an unread file, another try.
+        assertEquals(
+            Said(NOT_DELETED, "A teacher's account with classes or blocks is deleted through your school. Ask your school to arrange it."),
+            said(AccountDeletion.TeacherHasClasses),
+        )
+        assertEquals(Said(NOT_FINISHED, "Your Emergency Unlock hasn't reached your teacher yet. Check your connection and try again."), said(AccountDeletion.UnlockUnsent))
+        assertEquals(
+            Said(NOT_FINISHED, "Bali can't read what your phone saved right now, so it can't delete your account yet. Try again in a moment."),
+            said(AccountDeletion.Unread),
+        )
+        // A deletion sent by a try before, its answer lost, may have landed (C4a): every stop that can follow one claims neither way.
+        for (result in listOf(SendResult.NetworkError, SendResult.Status(500), SendResult.Status(429))) {
+            assertEquals(Said(NOT_FINISHED, Joining.words(result, null)), said(AccountDeletion.NotDeleted(result)), "$result")
+        }
+        assertEquals("Can't reach the server. Check your connection and try again.", said(AccountDeletion.NotDeleted(SendResult.NetworkError, NoAnswer.Unreachable))?.body)
+        val deleted = "Your account is deleted"
+        assertEquals(Said(deleted, "Bali's part is done, but your sign-in isn't deleted yet. Try again to finish."), said(AccountDeletion.SignInNotDeleted(SendResult.Status(500))))
+        assertEquals(Said(deleted, "Your sign-in is gone too. If you join Bali again, you start fresh."), said(AccountDeletion.Deleted))
+        assertEquals(Said("Deleting your account\u2026", "Bali deletes your account first, then your sign-in. This takes a moment."), Deleting.Busy.said)
+        for (quiet in listOf(Deleting.None, Deleting.Asking)) assertNull(quiet.said, "$quiet")
+        // Me's question under Delete account, before anything runs: what goes, and that it isn't an Emergency Unlock.
+        assertEquals("Delete your account?", Deleting.QUESTION)
+        assertTrue(Deleting.CONSEQUENCE.startsWith("Bali deletes your account, your name and your sign-in. This can't be undone."))
+        assertTrue(Deleting.CONSEQUENCE.endsWith("If a class is running, you leave it now and your apps unlock. It isn't an Emergency Unlock."))
+    }
+
+    @Test
+    fun anotherAccountSignedInBeforeTheDeletionWasDoneIsSaidAsThisPhoneSignedInToAnotherAccountNowWithBackAloneUnder13Too() {
+        // AN9h's stop, drawn first (AS7-Del-changed, Q9): a Try again would start a deletion of the account signed in now, so Back
+        // alone; and a DELETE /v1/me with no answer may have landed first, so the title claims neither way.
+        for (young in listOf(false, true)) {
+            val stopped = assertIs<Deleting.Stopped>(Deleting.Busy.answered(AccountDeletion.SignInChanged, young))
+            assertEquals(Deleting.Stop.SignInChanged, stopped.stop)
+            assertEquals(
+                Said(NOT_FINISHED, "This phone is signed in to another account now, so Bali stopped. Sign out and sign in to your own account, then delete it."),
+                if (young) stopped.saidUnderThirteen else stopped.said,
+            )
+            assertFalse(stopped.stop.retries, "Try again offered")
+            assertNull(stopped.start(), "Try again began a deletion")
+            assertEquals(Deleting.None, stopped.close())
+        }
+    }
+
+    @Test
+    fun aTokenRunOutPartwayIsSaidAsTheSignInBaliCouldntCheckWithTryAgainNeverAsNoConnectionUnder13TooOnlyNoAnswerFromBaliIsTheConnections() {
+        // #553's review and Q7, drawn first (AS7-Del-notoken, Q9): nothing went, so no connection was at fault. Join's 401 line,
+        // with Try again; under 13 too, never the gap's fallback's line about the connection.
+        val noToken = AccountDeletion.NotDeleted(SendResult.NetworkError, NoAnswer.NoToken)
+        for (young in listOf(false, true)) {
+            val stopped = assertIs<Deleting.Stopped>(Deleting.Busy.answered(noToken, young))
+            assertEquals(Deleting.Stop.NotDeleted(SendResult.NetworkError, NoAnswer.NoToken), stopped.stop, "under 13: $young")
+            val words = assertNotNull(said(noToken, young))
+            assertEquals(Said(NOT_FINISHED, "Bali couldn't check your sign-in. Try again."), words, "under 13: $young")
+            assertEquals(Joining.words(SendResult.Status(401), null), words.body)
+            for (connection in listOf("connection", "reach", "offline", "internet")) assertFalse(connection in words.body.lowercase(), "said as no connection: ${words.body}")
+            assertEquals(Deleting.Busy, stopped.start())
+        }
+        // No answer from Bali is the connection's: Me's line, and under 13 the gap's fallback's own.
+        val unreached = AccountDeletion.NotDeleted(SendResult.NetworkError, NoAnswer.Unreachable)
+        assertEquals("Can't reach the server. Check your connection and try again.", said(unreached)?.body)
+        assertEquals(Deleting.Stopped(Deleting.Stop.Unfinished), Deleting.Busy.answered(unreached, underThirteen = true))
+    }
+
+    @Test
+    fun aSignInThatCantDeleteItselfOrCantBeReadNowNamesNoOlderVersionOfBaliItsWayOnSigningOutAndInAgainWithBackAlone() {
+        // Q8, drawn first (AS7-Del-signinfirst, Q9): every Android build asks for the scope DeleteUser needs (the Words board), so
+        // the iPhone's "from an older version of Bali" has no twin; nothing was sent, so the account isn't deleted.
+        val stopped = assertIs<Deleting.Stopped>(Deleting.Busy.answered(AccountDeletion.SignInFirst))
+        val words = assertNotNull(stopped.said)
+        assertEquals(Said(NOT_DELETED, "Bali can't delete your account with this sign-in. Sign out and sign in again, then delete your account."), words)
+        for (older in listOf("older version", "version of bali", "update")) assertFalse(older in words.body.lowercase(), "names an older version: ${words.body}")
+        assertFalse(stopped.stop.retries)
+        assertNull(stopped.start())
+    }
+
+    @Test
+    fun theGapsFallbackSaysTheStopScreensTitleOverTheDeletionUnderWayAndDoneAndOneThatCouldntReachBaliEveryOtherStopAsMesSaysIt() {
+        // BaliOutbox's `underThirteen`, its words: the owner's (2026-10-06), final for the run once done.
+        assertEquals("Bali isn't available for you yet", AgeCheck.NOT_YET)
+        assertEquals("Ask your teacher how to take part in class without the app.", AgeCheck.ASK_TEACHER)
+        for (quiet in listOf(Deleting.None, Deleting.Asking)) assertNull(quiet.saidUnderThirteen, "$quiet")
+        assertEquals(Said(AgeCheck.NOT_YET, "Bali is deleting your account. This takes a moment."), Deleting.Busy.saidUnderThirteen)
+        assertEquals(
+            Said(AgeCheck.NOT_YET, "Bali couldn't finish deleting your account. Check your connection and try again."),
+            said(AccountDeletion.NotDeleted(SendResult.NetworkError, NoAnswer.Unreachable), young = true),
+        )
+        for (answer in listOf(
+            AccountDeletion.UnlockUnsent, AccountDeletion.Unread, AccountDeletion.SignInFirst, AccountDeletion.TeacherHasClasses,
+            AccountDeletion.SignInNotDeleted(SendResult.NetworkError), AccountDeletion.NotDeleted(SendResult.Status(500)),
+            AccountDeletion.NotDeleted(SendResult.Status(429)), AccountDeletion.SignInChanged,
+            AccountDeletion.NotDeleted(SendResult.NetworkError, NoAnswer.NoToken),
+        )) {
+            assertEquals(said(answer), said(answer, young = true), "$answer")
+        }
+        assertEquals("Your account is deleted", said(AccountDeletion.SignInNotDeleted(SendResult.NetworkError), young = true)?.title)
+        assertEquals(
+            Said(AgeCheck.NOT_YET, "Bali deleted your account. Ask your teacher how to take part in class without the app."),
+            said(AccountDeletion.Deleted, young = true),
+        )
     }
 
     @Test

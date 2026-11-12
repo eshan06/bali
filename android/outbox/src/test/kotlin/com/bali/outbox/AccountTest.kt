@@ -2,6 +2,7 @@ package com.bali.outbox
 
 import com.bali.core.HostedPage
 import com.bali.core.Landing
+import com.bali.core.NoAnswer
 import com.bali.core.ParticipationState
 import com.bali.core.SendResult
 import com.bali.core.SignIn
@@ -535,7 +536,7 @@ class AccountTest : EngineFiles() {
             assertEquals(listOf("u", "u"), account.state.value.let { listOf(it.inClass, it.listSeenBy) })
             lost.reply(null)
             withTimeout(patience) { stopping.await() }
-            assertEquals(Deleting.Stopped(Deleting.Stop.NotDeleted(SendResult.NetworkError)), account.state.value.deleting)
+            assertEquals(Deleting.Stopped(Deleting.Stop.NotDeleted(SendResult.NetworkError, NoAnswer.Unreachable)), account.state.value.deleting)
             assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy))
             // Try again, done: forgotten, and kept so.
             val deleting = scope.async { account.deleteAccount() }
@@ -576,7 +577,7 @@ class AccountTest : EngineFiles() {
             assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
             lost.reply(null)
             withTimeout(patience) { stopping.await() }
-            assertEquals(Deleting.Stopped(Deleting.Stop.NotDeleted(SendResult.NetworkError)), account.state.value.deleting)
+            assertEquals(Deleting.Stopped(Deleting.Stop.NotDeleted(SendResult.NetworkError, NoAnswer.Unreachable)), account.state.value.deleting)
             assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy))
             rig.stop()
         }
@@ -635,8 +636,9 @@ class AccountTest : EngineFiles() {
                             sent.reply(null)
                         }
                     assertEquals(Deleting.Stopped(Deleting.Stop.SignInChanged), stopped, "$followed")
-                    // No Try again: a press starts nothing for b1.
-                    account.deleteAccount()
+                    // No Try again: a press starts nothing for b1, and returns at once (one that began a deletion would wait for
+                    // the server, so the bound fails it by name rather than holding the suite).
+                    withTimeout(patience) { account.deleteAccount() }
                     assertEquals(stopped, account.state.value.deleting, "$followed")
                     assertTrue(rig.server.sent.none { it.route == deleteMeRoute || it.route == deleteUserRoute }, "$followed")
                     assertTrue(rig.server.sent.none { it.route == unlockRoute && it.token == "Bearer ${scoped("b1")}" }, "$followed")

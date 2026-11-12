@@ -1090,7 +1090,11 @@ words.
   work", on the intro's first page alone; and the new lines as drawn, Open Bali on the block screen
   among them. One line the board doesn't list names the iPhone's Settings: Focus's late unlock with
   the phone's clock behind, whose Android line names Settings → System → Date & time, drawn on
-  AS5's row as an intermediate state (AS5-Focus-clock, AN10e).
+  AS5's row as an intermediate state (AS5-Focus-clock, AN10e). Three more are Delete account's, drawn
+  on AS7's row as intermediate states (AN10g): a sign-in Bali couldn't check, Join's own line, never
+  "no connection" (AS7-Del-notoken); a sign-in that can't delete, Android's line in place of the
+  iPhone's "older version" one, which has no twin (AS7-Del-signinfirst); and this phone signed in to
+  another account meanwhile, with Back alone (AS7-Del-changed).
 - **Where the words live:** as on the iPhone, in the engine's module, `outbox`
   (`android/outbox/src/main/kotlin/com/bali/outbox/`), each a function of its type beside it (AN10d
   to AN10h): Join's in `Join.kt`; Home's, a scan's, the sign-in's, the start's and Session over's in
@@ -1098,7 +1102,10 @@ words.
   Unlock's, a reason's and Back to focus's failures in `SyncEngine.kt` (`TapFailure`,
   `UnlockFailure`, `ReasonFailure`, `RefocusFailure`); Focus's in `Focus.kt` (`FocusWords`); the
   block screen's in `ShieldWords.kt`; Unlocked's in `Unlocked.kt` (`UnlockedWords`); Protection
-  off's in `ProtectionOff.kt` (`ProtectionOffWords`). `WordsTest` reads every one, and fails a word
+  off's in `ProtectionOff.kt` (`ProtectionOffWords`); Me's name, Leave, Sign out and whose sign-in
+  it is in `Me.kt` (`Naming.Failure.words`, `Leaving`, `SignOutHold.words`,
+  `Account.State.signedInAs`); Delete account's in `Deletion.kt` (`Deleting.said`); the 13+ stop's
+  in `Age.kt` (`AgeCheck`). `WordsTest` reads every one, and fails a word
   that names something Android lacks or holds an em-dash or an exclamation mark.
 - **The look:** the tokens in Material 3's roles: `primary` is action-primary-bg,
   `tertiaryContainer` the emergency pair, `error` the destructive red, `errorContainer` Lock off's

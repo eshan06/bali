@@ -4,7 +4,9 @@ import com.bali.core.ApiErrorReason
 import com.bali.core.BaliJson
 import com.bali.core.BlockRead
 import com.bali.core.HostedPage
+import com.bali.core.MeClass
 import com.bali.core.MeResponse
+import com.bali.core.NoAnswer
 import com.bali.core.ParticipationState
 import com.bali.core.SendResult
 import com.bali.core.SignInError
@@ -39,7 +41,8 @@ private fun me(json: String): MeResponse = BaliJson.decodeFromString(MeResponse.
  * Every word the app says, by the function that says it, each read for every case of the types it keys on: AN10d's, Join's,
  * Home's, a scan's, Tap in's, the sign-in's and the start's; AN10e's, Focus's, Emergency Unlock's failures and the block
  * screen's; AN10f's, Unlocked's, a reason's and Back to focus's failures, Protection off's, Session over's and Home's card for a
- * class in session. Each later AN10 step adds its own.
+ * class in session; AN10g's, Me's name, Leave and Sign out, whose sign-in it is, Delete account and the 13+ stop. Each later AN10
+ * step adds its own.
  */
 private fun everyWord(): Map<String, List<String>> {
     // Every result an answer can have, a status from 100 to 599 or none, and every reason with none.
@@ -124,6 +127,20 @@ private fun everyWord(): Map<String, List<String>> {
     val cards = (sessions + standings.map { SyncState(standing = it, me = live) }).flatMap { state -> listOf(t0, at(3000)).mapNotNull { state.inSessionCard(it, newYorkZone, usShortTime) } }
     assertEquals(setOf(false, true), cards.map { it.unlocked }.toSet(), "InSessionCard's kinds, each reached")
     val changes = results.flatMap { result -> reasons.map { ReasonFailure.NotChanged(result, it) } }
+    // Me's: a save's and a leave's answers, every result with every reason and none; a class's question; Sign out's holds and whose
+    // sign-in it is, an email or none; and Delete account's screen at each step, every stop, every result with each reason none
+    // came and none, under 13 too.
+    val row = MeClass("c", "Period 3", null, "ec", null)
+    val names = results.flatMap { result -> reasons.map { Naming.Failure.NotSaved(result, it) } }
+    val leaves = results.flatMap { result -> reasons.map { Leaving.Failure.NotLeft(result, it) } }
+    val unanswered = results.flatMap { result -> (NoAnswer.entries + null).map { Deleting.Stop.NotDeleted(result, it) } }
+    val stops =
+        each(
+            Deleting.Stop::class, Deleting.Stop.SignInFirst, Deleting.Stop.TeacherHasClasses, Deleting.Stop.NotStarted, Deleting.Stop.UnlockUnsent,
+            Deleting.Stop.Unread, *unanswered.toTypedArray(), Deleting.Stop.Unfinished, Deleting.Stop.SignInChanged,
+        )
+    val deletings =
+        each(Deleting::class, Deleting.None, Deleting.Asking, Deleting.Busy, *stops.map { Deleting.Stopped(it) }.toTypedArray(), Deleting.Pending, Deleting.Done)
     return mapOf(
         "Joining.Failure.words" to each(Joining.Failure::class, *failures.toTypedArray()).map { it.words },
         "SyncState.meWords" to each(SendResult::class, *results.toTypedArray()).map { SyncState(meFailed = it).meWords },
@@ -147,6 +164,14 @@ private fun everyWord(): Map<String, List<String>> {
         "SyncState.inSessionCard" to cards.flatMap { listOf(it.words, it.retap) },
         "SyncState.refusedRefocusWords" to sessions.flatMap { state -> listOf(t0, at(3000)).map { state.refusedRefocusWords(it) } },
         "SyncState.sessionOverWords" to sessions.flatMap { state -> claims.map { state.sessionOverWords(it, newYorkZone, usShortTime) } },
+        "Naming.Failure.words" to each(Naming.Failure::class, Naming.Failure.Blank, *names.toTypedArray(), Naming.Failure.NotStarted).map { it.words },
+        "Leaving" to listOf(Leaving.question(row), Leaving.CONSEQUENCE, Leaving.inSession(row)),
+        "Leaving.Failure.words" to each(Leaving.Failure::class, *leaves.toTypedArray(), Leaving.Failure.NotStarted).map { it.words(row) },
+        "SignOutHold.words" to SignOutHold.entries.map { it.words },
+        "Account.State.signedInAs" to listOf(null, "", "ana@bali.test").map { Account.State(email = it).signedInAs },
+        "Deleting" to listOf(Deleting.QUESTION, Deleting.CONSEQUENCE),
+        "Deleting.said" to deletings.flatMap { listOfNotNull(it.said, it.saidUnderThirteen) }.flatMap { listOf(it.title, it.body) },
+        "AgeCheck's stop" to listOf(AgeCheck.NOT_YET, AgeCheck.ASK_TEACHER),
     ).mapValues { (_, words) -> words.filterNotNull() }
 }
 

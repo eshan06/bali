@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN10g's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN10f, Unlocked's, Protection off's and Session over's words (#571; `docs/DECISIONS.md`,
+2026-11-12), the sixth of AN10's eight steps: in `outbox`, each a function of its type, iOS's word for word but where AS0's
+Words board names Bali's lock in Screen Time's place: Unlocked's class and bell, what is open, the reason card's captions, the
+re-tap and an unlock not sent yet; a reason's and Back to focus's failures, none said as gone; Protection off's lock off, back
+on or being checked, its steps back through Accessibility settings, Settings its one way, where the iPhone also has its own
+prompt; Session over's line; and Home's card for a class in session. Every line is iOS's or a board's, so nothing was drawn.
+No screen. Before it, AN10e, Focus's words and the block screen's. Next: AN10g, the words of Me, Leave, Sign out, Delete
+account and the 13+ stop, Delete account's new lines drawn first (Q9); AN7f and AN8's 📱 check on the owner's phones, signed
+in on dev as an account that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items,
+8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open
+owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN10f's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN10e, Focus's words and the block screen's (#570; `docs/DECISIONS.md`,
 2026-11-12), the fifth of AN10's eight steps: in `outbox`, each a function of its type, iOS's word for word but where AS0's
 Words board changes one (the claim names Bali's lock) or the owner cut one (the block screen says "Focused with Bali" alone,
@@ -2768,6 +2780,11 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN10g's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12).
+
+- **AN10g** The words of Me, Leave, Sign out, Delete account and the 13+ stop (twin: Me.swift's, Deletion.swift's and
+  Age.swift's), Delete account's new lines drawn first (Q9) — validation: the JVM tests
 
 AN10f's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12).
 
