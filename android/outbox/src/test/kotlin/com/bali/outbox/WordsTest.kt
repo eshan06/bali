@@ -23,6 +23,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.awaitCancellation
 
 // The guard over every Android word (AN10d's, each later step adding its own to `everyWord`): none names what Android
 // lacks (Screen Time, iOS, an iPhone, FaceTime, Emergency SOS: DESIGN.md's Android section, the canvas's Words board) nor holds
@@ -32,9 +33,9 @@ import kotlin.test.assertTrue
 
 /**
  * [cases], at least one of each case the sealed [type] declares, checked against them: a case added later and given no sample
- * here fails by name, so its word is read too.
+ * here fails by name, so its word is read too (and, in LessonsTest, its slide's phase).
  */
-private fun <T : Any> each(type: KClass<T>, vararg cases: T): List<T> {
+internal fun <T : Any> each(type: KClass<T>, vararg cases: T): List<T> {
     val declared = type.java.declaredClasses.filter { type.java.isAssignableFrom(it) }.map { it.name }.toSortedSet()
     assertEquals(declared, cases.map { it.javaClass.name }.toSortedSet(), "${type.java.simpleName}'s cases, each with a sample")
     return cases.toList()
@@ -48,7 +49,7 @@ private fun me(json: String): MeResponse = BaliJson.decodeFromString(MeResponse.
  * Home's, a scan's, Tap in's, the sign-in's and the start's; AN10e's, Focus's, Emergency Unlock's failures and the block
  * screen's; AN10f's, Unlocked's, a reason's and Back to focus's failures, Protection off's, Session over's and Home's card for a
  * class in session; AN10g's, Me's name, Leave and Sign out, whose sign-in it is, Delete account and the 13+ stop; AN10h's,
- * History's and the consent list; AN13c's, the live lesson's heading and the answer card's line.
+ * History's and the consent list; AN13c's, the live lesson's heading and the answer card's line; AN13e's, the slide's two.
  */
 private fun everyWord(): Map<String, List<String>> {
     // Every result an answer can have, a status from 100 to 599 or none, and every reason with none.
@@ -182,6 +183,17 @@ private fun everyWord(): Map<String, List<String>> {
     val answerCards =
         questions.flatMap { question -> polls.flatMap { problem -> listOf(null, 0).flatMap { sending -> saids.map { AnswerCard(question, problem, sending, it) } } } }
     each(AnswerCard.Look::class, *answerCards.flatMap { it.looks }.distinct().toTypedArray())
+    // The slide's, in each phase of its deck.
+    val opened = object : Document {
+        override val pages = 12
+
+        override suspend fun awaitLost() {
+            awaitCancellation()
+        }
+
+        override fun close() = Unit
+    }
+    val phases = each(SlideShown.Phase::class, SlideShown.Phase.Loading, SlideShown.Phase.Failed, SlideShown.Phase.Ready(opened))
     return mapOf(
         "Joining.Failure.words" to each(Joining.Failure::class, *failures.toTypedArray()).map { it.words },
         "SyncState.meWords" to each(SendResult::class, *results.toTypedArray()).map { SyncState(meFailed = it).meWords },
@@ -222,6 +234,7 @@ private fun everyWord(): Map<String, List<String>> {
         "ConsentList" to listOf(ConsentList.WHOLE, ConsentList.ADDED).flatMap { it.sees + it.neverSees },
         "SyncState.lessonHeading" to headings.flatMap { listOf(it.first, it.second) },
         "AnswerCard.line" to answerCards.map { it.line },
+        "SlideShown.Phase.words" to phases.map { it.words },
     ).mapValues { (_, words) -> words.filterNotNull() }
 }
 
