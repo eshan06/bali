@@ -34,8 +34,8 @@
 7. **State privacy laws** (California, Colorado, Connecticut, Virginia and others) mostly
    apply above size thresholds a pilot doesn't reach, and FERPA may govern education records
    instead. Section 10 offers the rights anyway.
-8. **The operators** are two individuals. An LLC changes "Who we are" and the liability
-   picture.
+8. **The operator** is now Bali Focus Inc. (2026-11-11), named in "Who we are" in place of the two
+   individuals who ran Bali before.
 9. **These must match word for word**: the app's "What your teacher sees" lists, Apple's privacy
    label (`docs/APP-STORE.md` §3), and the policy (#130). The live page's section 2 shows the
    app's own two lists, the help page's too (`apps/web/src/components/teacher-sees.ts`, held word

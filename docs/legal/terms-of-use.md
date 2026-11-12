@@ -23,6 +23,11 @@
    costs, which seems wrong to ask of students. Confirm, or add it back for teachers only.
 4. **Apple's Licensed Application terms** (the App Store's standard EULA) may need to be
    referenced, or replaced with our own Apple-compliant terms.
-5. **The operators** are two individuals. An LLC changes the parties and the liability picture.
+5. **The operator** is now Bali Focus Inc. (2026-11-11), the party the opening paragraph and
+   section 12 name in place of the two individuals who ran Bali before. Cal. Civ. Code § 1789.3
+   asks for the provider's name, address and telephone number: section 12 gives only the name, and
+   the address and number are the owner's to give. The company changes the liability picture
+   (section 10), as this note asked before, and section 8's "We own Bali's software, name and
+   design" holds only if the founders' rights in Bali are now the company's.
 6. **The Pilot agreement** with the professor or Vanderbilt is a separate document (PLAN's
    go-live list). It isn't drafted here, since neither app shows it.

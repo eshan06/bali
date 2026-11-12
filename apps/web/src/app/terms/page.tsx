@@ -24,14 +24,13 @@ export default function TermsPage() {
   return (
     <PolicyDraft
       title="Terms of use"
-      date="Last updated November 9, 2026"
+      date="Last updated November 11, 2026"
       intro={
         <p>
-          These terms are an agreement between you and Eshan Shah and Jonathan Bani, who run Bali
-          (“Bali”, “we”, “us”), for using the Bali iPhone app and the Bali portal (together,
-          “Bali”). By creating an account or using Bali, you agree to them. If you don&apos;t agree,
-          don&apos;t use Bali. Our <TextLink href="/privacy">privacy policy</TextLink> is part of
-          these terms.
+          These terms are an agreement between you and Bali Focus Inc., which runs Bali (“Bali”,
+          “we”, “us”), for using the Bali iPhone app and the Bali portal (together, “Bali”). By
+          creating an account or using Bali, you agree to them. If you don&apos;t agree, don&apos;t
+          use Bali. Our <TextLink href="/privacy">privacy policy</TextLink> is part of these terms.
         </p>
       }
       sections={[
@@ -248,8 +247,8 @@ export default function TermsPage() {
           body: (
             <ul>
               <li>
-                <strong>California.</strong> Bali is provided by Eshan Shah and Jonathan Bani and is
-                free to students. To complain or ask about Bali, email us. You may also contact the
+                <strong>California.</strong> Bali is provided by Bali Focus Inc. and is free to
+                students. To complain or ask about Bali, email us. You may also contact the
                 Complaint Assistance Unit of the California Department of Consumer Affairs, 1625 N.
                 Market Blvd., Suite N112, Sacramento, CA 95834, (800) 952-5210 (Cal. Civ. Code
                 §&nbsp;1789.3).

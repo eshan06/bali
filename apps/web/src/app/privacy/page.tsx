@@ -26,12 +26,11 @@ export default function PrivacyPage() {
   return (
     <PolicyDraft
       title="Privacy policy"
-      date="Effective November 9, 2026"
+      date="Effective November 11, 2026"
       intro={
         <>
           <p>
-            <strong>Who we are:</strong> Bali is run by Eshan Shah and Jonathan Bani (“Bali”, “we”,
-            “us”).
+            <strong>Who we are:</strong> Bali is run by Bali Focus Inc. (“Bali”, “we”, “us”).
           </p>
           <p>
             This policy covers the Bali iPhone app and the Bali portal at https://app.getbali.app
