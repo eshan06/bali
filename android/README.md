@@ -307,7 +307,7 @@ ASCII letters and digits in upper case, each whole character a BreakIterator's g
 dropped; and why a look or a join gave no class, as its result and reason, or no engine started, each in its
 words (AN10d).
 
-**The words** (`outbox`, AN10d to AN10h and AN13c): what a student reads, each a function of the type it says, beside it, as
+**The words** (`outbox`, AN10d to AN10h, AN13c and AN13e): what a student reads, each a function of the type it says, beside it, as
 BaliOutbox keeps them: iOS's lines word for word, but where the Android canvas's Words board changes or adds one.
 AN10d's are Join's, Home's (a refused tap, the waiting and empty-state cards, a read's failure), a scan's and Tap in's
 (`SyncEngine.tapIn`, its answer a type), the sign-in's and the start's. AN10e's are Focus's (`FocusWords`: the class,
@@ -323,7 +323,8 @@ phone's own patterns) and the consent list (`ConsentList`, iOS's line for line b
 JoinView.swift's in place). AN13c's are the live lesson's (`Lesson.kt`): which lesson the phone follows, the session it stands
 in first, else the first class in session by `GET /v1/me` (`lessonSession`), its class's heading (`lessonHeading`), and the
 answer card's looks and the line under them, state by state (`AnswerCard`), what a pick's request said a type of its own
-(`Said`), every `AnswerResult` placed in it. `WordsTest` reads every one for every case of its type: none names Screen Time,
+(`Said`), every `AnswerResult` placed in it. AN13e's are the slide's two, loading and couldn't load, by its deck's phase
+(`Slide.kt`). `WordsTest` reads every one for every case of its type: none names Screen Time,
 iOS, an iPhone, FaceTime or Emergency SOS, or holds an em-dash or an exclamation mark.
 
 **History's rules** (`outbox`'s `History.kt`, BaliOutbox's `History.swift`, AN9g): the pages as they came, from
@@ -353,8 +354,11 @@ said; a read saying the session is over drops the lesson for good, a poll refuse
 `GET /v1/me` lists the session again, and the class's bell, by the phone's clock (`Screen.bell`), follows afresh, so the poll
 stops there and the card goes (Q7). A tap goes in one request through `LiveLesson.answer`, never the outbox, in the lesson
 half's own scope, the last of crossing picks alone said; Hide is this phone's alone; while Emergency Unlock is held the card
-ignores taps; and a change of who is signed in drops the lesson, its card, its picks and its heading. The screens read one
-`StateFlow`: the lesson, its card (`AnswerCard`) and its heading. Nothing is stored. Its client is the lesson's own, over a
+ignores taps; and a change of who is signed in drops the lesson, its card, its picks and its heading. The slide's deck (AN13e)
+is asked for by a screen alone (`ask`), once per `sha256`, Try again once more, and opened through a seam the app's renderer
+fills (`Renderer` in `Slide.kt`, AN13f): one document open at a time, closed once the slide's deck changes or the lesson goes,
+and a page past its pages, or a document lost after it opened, shown failed. The screens read one `StateFlow`: the lesson, its
+card (`AnswerCard`), its slide (`SlideShown`) and its heading. Nothing is stored. Its client is the lesson's own, over a
 transport apart from the engine's (`OkHttpTransport.apart`), so no poll or answer holds an Emergency Unlock's send; the app
 makes it in AN13g. Its tests run on the engine's rig, the queue's over real sockets on the loopback, the JDK's own server.
 

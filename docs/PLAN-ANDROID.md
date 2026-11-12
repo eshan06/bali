@@ -14,18 +14,18 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-12 (Central) — AN13d, the lesson followed: the poll while Bali is in front, the answer, Hide (#577;
-`docs/DECISIONS.md`, 2026-11-12), the fourth of AN13's seven steps: `outbox`'s `Lessons.kt`, BaliApp.swift's `Phone`'s lesson
-half, one a run beside the account: the lesson its state names, once the student has seen the consent list here; its poll only
-while Bali's screen is in front; dropped by a read saying over, a poll refused `403` or `404`, a change of who is signed in, and
-the class's bell by the phone's clock (Q7); each tap one request through `LiveLesson.answer`, never the outbox, the last of
-crossing picks alone said; Hide; no tap taken while Emergency Unlock is held; and the lesson's calls on a transport apart from
-the engine's (`OkHttpTransport.apart`), so none holds an Emergency Unlock's send. Nothing kept, no screen, no new word. Before
-it, AN13c, which lesson, its heading and the card's words. Next: AN13e; AN13f and AN13g once the owner has answered Q2 and Q3
-(DECISIONS 2026-11-12); AN11, AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the
-owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the
-owner's (Open owner items, 8); Android 17's SDK platform for the owner to OK before the first step with today's AndroidX, and
-OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-12 (Central) — AN13e, the slide's deck, asked for once, one document at a time (#578; `docs/DECISIONS.md`,
+2026-11-12), the fifth of AN13's seven steps: `Lessons.kt`'s deck half, BaliApp.swift's `Phone`'s, and `Slide.kt`: the slide the
+lesson shows, its deck loading, failed or ready; asked for by a screen alone, once per `sha256`, never while on its way nor on a
+page turn, Try again once more after it came; one document open at a time, closed once the slide's deck changes, at the bell, a
+change of who is signed in, a deletion and the run's end; a page past the document's pages, or a document lost after it opened,
+failed; the slide's two lines, iOS's; and the seam the app's renderer fills (`Renderer`). Two of #577's WARNs closed: a bell let
+go follows nothing, and Bali's screen in front twice runs one poll. Nothing kept, no screen. The owner answered Q2 and Q3
+(DECISIONS 2026-11-12). Before it, AN13d, the lesson followed. Next: AN13f, the page drawn, then AN13g; AN11, AN12 and Phase
+10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed
+the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform is on the
+PC (the owner's OK, 2026-11-12), compileSdk 37 with today's AndroidX and OkHttp 5.5 coming in the step that needs them (Open
+owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -204,9 +204,8 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN13b** The deck downloaded, checked against its `sha256` and kept for the session — ✅ (#575; DECISIONS 2026-11-12)
 - **AN13c** Which lesson, its heading, and the answer card's looks and words — ✅ (#576; DECISIONS 2026-11-12)
 - **AN13d** The lesson followed: the poll while Bali is in front, the answer, Hide — ✅ (#577; DECISIONS 2026-11-12)
-- **AN13e** The slide's deck, asked for once, one document at a time (twin: BaliApp.swift's deck half and SlideView.swift's
-  `SlideDeck`) — validation: the JVM tests
-- **AN13f** The page drawn with `PdfRenderer` (twin: SlideView.swift's PDFKit page), once the owner has answered Q2 and Q3
+- **AN13e** The slide's deck, asked for once, one document at a time — ✅ (#578; DECISIONS 2026-11-12)
+- **AN13f** The page drawn with `PdfRenderer` (twin: SlideView.swift's PDFKit page), to the owner's answers to Q2 and Q3
   (DECISIONS 2026-11-12) — validation: the instrumented tests on `Bali_Spike_API35` and `37`
 - **AN13g** The lesson in the app, AN13 done (twin: BaliApp.swift's `start` and `setForeground`), after AN13f —
   validation: the instrumented tests on `Bali_Spike_API35` and `37`
@@ -266,11 +265,12 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 5. ✅ **AS0's canvas:** approved as it stands, its Words board's calls as drawn, and the approved
    iPhone boards stand for the rest of Android's screens (the owner, 2026-11-04; DECISIONS
    2026-11-04).
-6. **The SDK, for what comes next:** Android 17's platform (`platforms;android-37.0`, 64 MB, from
-   Google's SDK repository) on the PC before the first step with today's AndroidX, which needs
-   compileSdk 37 (androidx.core 1.19, Compose 1.12; DECISIONS 2026-11-04), as OkHttp 5.5 does, so
-   `core` stays on 5.4.0 until then (AN3d); and Android 10 and 12 or 13 to test on, as emulator
-   images (each a download) or phones, for ISSUES #6's gap 10.
+6. **The SDK, for what comes next:** Android 17's platform (`platforms;android-37.0`, revision 2,
+   from Google's SDK repository) is on the PC (the owner's OK, 2026-11-12; DECISIONS 2026-11-12).
+   compileSdk 37, which today's AndroidX needs (androidx.core 1.19, Compose 1.12; DECISIONS
+   2026-11-04), as OkHttp 5.5 does, comes in the step that needs it, so `core` stays on 5.4.0 until
+   then (AN3d). Still the owner's: Android 10 and 12 or 13 to test on, as emulator images (each a
+   download) or phones, for ISSUES #6's gap 10.
 7. ✅ **CodeQL and Android's Kotlin:** scanned, through CodeQL's advanced setup
    (`.github/workflows/codeql.yml`), beside GitHub Actions and JavaScript/TypeScript; default setup
    switched off by the owner (the owner, 2026-11-04: "Yes, prep it"; DECISIONS 2026-11-04).

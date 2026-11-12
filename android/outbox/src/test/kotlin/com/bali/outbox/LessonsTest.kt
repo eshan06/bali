@@ -1,20 +1,28 @@
 package com.bali.outbox
 
 import com.bali.core.ApiClient
+import com.bali.core.ApiErrorReason
 import com.bali.core.BaliJson
 import com.bali.core.Cognito
+import com.bali.core.DeckResult
 import com.bali.core.LiveLesson
 import com.bali.core.MeResponse
+import com.bali.core.NoAnswer
 import com.bali.core.OkHttpTransport
 import com.bali.core.ParticipationState
 import com.bali.core.SessionView
 import com.bali.core.SignIn
+import com.bali.core.Slide
 import com.bali.outbox.AnswerCard.Look.Closed
 import com.bali.outbox.AnswerCard.Look.Open
+import com.bali.outbox.SlideShown.Phase.Failed
+import com.bali.outbox.SlideShown.Phase.Loading
+import com.bali.outbox.SlideShown.Phase.Ready
 import com.sun.net.httpserver.HttpServer
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.URI
+import java.security.MessageDigest
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
@@ -26,16 +34,22 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.test.fail
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
@@ -51,7 +65,10 @@ import kotlinx.serialization.json.jsonObject
 // run of answers never in the outbox, one going at once while an Emergency Unlock's send is held, a teacher's account following
 // nothing, a sign-in change, a sign-out and a deletion dropping all of the last student's lesson over the real account, a screen
 // leaving never cutting an answer short, the poll's cancel never said, and the queue: an Emergency Unlock's send going while more
-// of the lesson's calls than OkHttp's five a host are held, over real sockets.
+// of the lesson's calls than OkHttp's five a host are held, over real sockets. AN13e's: AppTests' slideOncePerDeck and
+// slideAsksAsItShows, their rules without their views, over a renderer that counts its opens and closes (SlideSupport.kt); a page
+// past the document's, every DeckResult, a stale ask's document, the run's end, the real account's changes; and two of Claude
+// Review's WARNs on #577, the bell let go and Bali's screen in front twice.
 
 val pollRoute = "GET /v1/sessions/s/presentation"
 val answerRoute = "POST /v1/questions/q/answers"
@@ -87,11 +104,43 @@ private fun ana(
     signIns = signIns,
 )
 
-/** Session s's presentation, [running] or over: [question] open or closed, four answers, no answer of the student's read; the [phone]. */
-private fun presentation(question: String? = "q", open: Boolean = true, running: Boolean = true, phone: String = "null"): String {
-    val asked = question?.let { """{"id":"$it","prompt":"Which?","options":["A","B","C","D"],"open":$open,"correctOption":null,"answer":null}""" }
-    return """{"running":$running,"question":${asked ?: "null"},"slide":null,"phone":$phone}"""
+/** Ana, signed in and shown the list, with Period 3 in session until [first], its session s, and Period 4 until [bell], s2. */
+private fun twoInSession(first: Instant = at(3)): Account.State {
+    val classes =
+        """[{"id":"p3","name":"Period 3","teacher":{"displayName":"Ms. Rivera"},"liveSession":{"id":"s","endsAt":"${wire(first)}"}},""" +
+            """{"id":"p4","name":"Period 4","teacher":{"displayName":"Mr. Chen"},"liveSession":{"id":"s2","endsAt":"${wire(bell)}"}}]"""
+    val me = """{"user":{"id":"ana","role":"student","displayName":"Ana"},"classes":$classes,"session":null}"""
+    return Account.State(
+        signedIn = true, sync = SyncState(me = BaliJson.decodeFromString(MeResponse.serializer(), me), meReads = 1), listSeenBy = "ana", signIns = 1,
+    )
 }
+
+/**
+ * Session s's presentation, [running] or over: [question] open or closed, four answers, no answer of the student's read; the
+ * [slide] shown ([slideOf]), none by default; the [phone].
+ */
+private fun presentation(
+    question: String? = "q", open: Boolean = true, running: Boolean = true, phone: String = "null", slide: String? = null,
+): String {
+    val asked = question?.let { """{"id":"$it","prompt":"Which?","options":["A","B","C","D"],"open":$open,"correctOption":null,"answer":null}""" }
+    return """{"running":$running,"question":${asked ?: "null"},"slide":${slide ?: "null"},"phone":$phone}"""
+}
+
+/** [text]'s SHA-256 in lower-case hex, as the API gives a slide's. */
+private fun sha256(text: String): String =
+    MessageDigest.getInstance("SHA-256").digest(text.encodeToByteArray()).joinToString("") { "%02x".format(it) }
+
+/** Page [page] of [deck], deck [id]'s bytes ([pdf]), as the presentation read names it, 12 pages by the server's count. */
+private fun slideOf(deck: String, page: Int = 1, id: String = "d1") =
+    """{"deckId":"$id","sha256":"${sha256(deck)}","page":$page,"pageCount":12}"""
+
+/** Deck [id]'s download, as the route is asked for it, and its bucket's GET, where the presigned URL sends the phone. */
+private fun downloadRoute(id: String = "d1") = "GET /v1/decks/$id/download"
+
+private fun bucketRoute(id: String = "d1") = "GET /decks/$id.pdf"
+
+/** The download route's answer for deck [id]: a presigned GET, its key's slash escaped as S3's are. */
+private fun presigned(id: String = "d1") = """{"url":"https://bucket.bali.test/decks%2F$id.pdf?signature=s"}"""
 
 /** The answer the server holds once it takes the pick [request] sent, as `POST /v1/questions/{id}/answers` answers it. */
 private fun took(request: String): String {
@@ -107,13 +156,38 @@ private fun option(pick: Server.Exchange): Int? = pick.request.body?.let { BaliJ
 /** Whether the card shows answer [index] as the one Bali holds, its line saying it is in. */
 private fun Lessons.State.answered(index: Int): Boolean = card?.let { it.looks[index] == Open(picked = true) && it.line == inLine } == true
 
-/** The lesson half under test, its own server answered by hand and its own clock, the test moving both: AppTests' `standIn`. */
-private class LessonRig(val lessons: Lessons, val server: Server, val clock: TestClock) {
+/**
+ * The lesson half under test, its own server answered by hand, its own clock and its renderer ([FakeRenderer]), the test moving
+ * them: AppTests' `standIn`.
+ */
+private class LessonRig(val lessons: Lessons, val server: Server, val clock: TestClock, val renderer: FakeRenderer = FakeRenderer()) {
     suspend fun until(condition: (Lessons.State) -> Boolean): Lessons.State =
         withTimeoutOrNull(patience) { lessons.state.first(condition) } ?: fail("the lesson half never reached the state waited for")
 
     /** The next poll, answered with [body]: the request returned. */
     suspend fun read(body: String = presentation()): Server.Exchange = server.next(pollRoute).also { it.reply(200, body) }
+
+    /** The poll's next read, 2 s on, answered with [body], then its sleep: a teacher's change of what shows. */
+    suspend fun next(body: String) {
+        asleep()
+        clock.advance(2)
+        read(body)
+    }
+
+    /** The slide shown now; none fails the test. */
+    fun slide(): Slide = lessons.state.value.slide?.slide ?: fail("no slide shown")
+
+    /** Waits for the slide's deck in and open, and returns its document. */
+    suspend fun document(): Document = (until { it.slide?.phase is Ready }.slide?.phase as Ready).document
+
+    /** Deck [id]'s fetch, answered: a fresh URL from the download route, then [deck]'s bytes from the bucket. */
+    suspend fun fetch(deck: String, id: String = "d1") {
+        server.next(downloadRoute(id)).reply(200, presigned(id))
+        server.next(bucketRoute(id)).reply(200, deck)
+    }
+
+    /** The decks' downloads asked for so far, of any deck. */
+    val downloads: Int get() = server.sent.count { it.route.startsWith("GET /v1/decks/") }
 
     /** Waits for the poll to sleep until [next] by the lesson's clock, its read in: 2 s on by default. */
     suspend fun asleep(next: Instant = clock.now() + LiveLesson.INTERVAL.toJavaDuration()) = eventually { next in clock.deadlines }
@@ -131,8 +205,19 @@ private class LessonRig(val lessons: Lessons, val server: Server, val clock: Tes
 
 /** A lesson half in the test's scope over a server and a clock of its own, followed by hand ([Lessons.followed]). */
 private fun EngineFiles.lessonRig(): LessonRig {
-    val (server, clock) = Server() to TestClock()
-    return LessonRig(Lessons(emptyFlow(), client(server), scope, clock), server, clock)
+    val (server, clock, renderer) = Triple(Server(), TestClock(), FakeRenderer())
+    return LessonRig(Lessons(emptyFlow(), client(server), renderer, scope, clock), server, clock, renderer)
+}
+
+/**
+ * [lessonRig]'s, its lesson half's own scope [Dispatchers.Unconfined]: each call it starts runs on the thread that starts or wakes
+ * it up to its first wait, a reply's, a sleep's or its lock's, so once a call returns, whatever it sent is sent and whatever it
+ * waits on it waits on, never a window of time.
+ */
+private fun EngineFiles.deckRig(accounts: Flow<Account.State> = emptyFlow()): LessonRig {
+    val (server, clock, renderer) = Triple(Server(), TestClock(), FakeRenderer())
+    val unconfined = CoroutineScope(scope.coroutineContext + Dispatchers.Unconfined)
+    return LessonRig(Lessons(accounts, client(server), renderer, unconfined, clock), server, clock, renderer)
 }
 
 /** The reads of the truth answered with [me] as they come until the next request to [route], returned: a deletion waits out the loops'. */
@@ -457,7 +542,7 @@ class LessonsTest : EngineFiles() {
             // lesson here on the engine's own server, as iOS's is on its client, so the unlock and the picks meet one server.
             val rig = rig()
             val clock = TestClock()
-            val world = LessonRig(Lessons(emptyFlow(), client(rig.server, rig.tokens), scope, clock), rig.server, clock)
+            val world = LessonRig(Lessons(emptyFlow(), client(rig.server, rig.tokens), FakeRenderer(), scope, clock), rig.server, clock)
             val lessons = world.lessons
             lessons.setInFront(true)
             lessons.followed(ana())
@@ -531,7 +616,7 @@ class LessonsTest : EngineFiles() {
             scope.launch { account.run() }
             account.until { it.signedIn != null }
             val (server, clock) = Server() to TestClock()
-            val lessons = Lessons(account.state, ApiClient(URI("https://api.bali.test"), rig.signIn, server), scope, clock)
+            val lessons = Lessons(account.state, ApiClient(URI("https://api.bali.test"), rig.signIn, server), FakeRenderer(), scope, clock)
             val world = LessonRig(lessons, server, clock)
             scope.launch { lessons.run() }
             lessons.setInFront(true)
@@ -676,7 +761,7 @@ class LessonsTest : EngineFiles() {
                     // unlock past the ten seconds below.
                     val lessonClock = TestClock()
                     val client = ApiClient(api.url, signIn, transport.apart(), OkHttpTransport.EXCHANGE_TIMEOUT)
-                    val lessons = Lessons(account.state, client, scope, lessonClock)
+                    val lessons = Lessons(account.state, client, FakeRenderer(), scope, lessonClock)
                     scope.launch { lessons.run() }
                     lessons.setInFront(true)
                     withTimeout(patience) { lessons.state.first { it.card != null } }
@@ -699,5 +784,421 @@ class LessonsTest : EngineFiles() {
                     release.countDown()
                 }
             }
+        }
+
+    @Test
+    fun setInFrontWithTheValueItAlreadyHasChangesNothingNoSecondPollAndNoExtraRead(): Unit =
+        runBlocking {
+            // Claude Review's WARN on #577: Bali's screen said in front twice cancelled the poll asleep and ran another, which read
+            // at once, as the app's `front` read again could.
+            val rig = lessonRig()
+            val lessons = rig.lessons
+            lessons.setInFront(true)
+            lessons.followed(ana())
+            rig.read()
+            rig.until { it.card != null }
+            val next = rig.clock.now() + LiveLesson.INTERVAL.toJavaDuration()
+            rig.asleep(next)
+            lessons.setInFront(true)
+            // A cancelled poll lets go of its sleep at once, so a sleep still there is the first poll's.
+            assertTrue(next in rig.clock.deadlines, "a second poll ran, the first one's sleep let go")
+            lessons.setInFront(false)
+            lessons.setInFront(false)
+            assertFalse(lessons.polling())
+            lessons.setInFront(true)
+            rig.server.next(pollRoute).reply(304)
+            rig.asleep()
+            assertEquals(2, rig.server.sent.count { it.route == pollRoute })
+        }
+
+    @Test
+    fun aBellLetGoAsTheRunEndsFollowsNothingEvenOnceItHasWokenSoNoLessonStartsAfterTheRunEnded(): Unit =
+        runBlocking {
+            // Claude Review's WARN on #577: the bell's job is the lesson half's scope's, not the run's, so a bell woken as the run
+            // ends could follow the next lesson after the run's end. Staged with no window of time: the run's end holds the lesson
+            // half's lock, closing the slide's document, as the bell wakes on this thread (the rig's scope is Unconfined) and waits
+            // there for the lock; then the run's end lets the bell go, and the lock. At Period 3's bell, Period 4's would follow.
+            val accounts = MutableStateFlow(twoInSession())
+            val rig = deckRig(accounts)
+            val lessons = rig.lessons
+            val deck = pdf("Factoring", 3)
+            val running = scope.launch { lessons.run() }
+            lessons.setInFront(true)
+            rig.read(presentation(slide = slideOf(deck)))
+            lessons.ask(rig.until { it.slide != null }.slide?.slide ?: fail("no slide shown"))
+            rig.fetch(deck)
+            rig.document()
+            lessons.setInFront(false)
+            val closing = rig.renderer.holdClose()
+            rig.clock.advance(3, holdingWakes = true)
+            running.cancel()
+            closing.taken()
+            rig.clock.releaseWakes()
+            closing.release()
+            withTimeout(patience) { running.join() }
+            assertNull(lessons.state.value.lesson, "a bell let go as the run ended followed a lesson after it")
+            assertFalse(lessons.polling())
+        }
+}
+
+/** The slide's deck in the phone's lesson half (AN13e): BaliApp.swift's `Phone`'s deck half and SlideView.swift's `SlideDeck`. */
+class SlideTest : EngineFiles() {
+    @Test
+    fun aSlidesDeckIsAskedForOncePerSha256NeverAgainOnItsWayNorOnceInNorOnAPageTurnAnotherOnceTheLastClosedOneShownAgainFromMemoryAFailedOneOnlyByTryAgain(): Unit =
+        runBlocking {
+            // AppTests' slideOncePerDeck (M8), its rules without its view (AS8's), each deck a fake renderer's, counted open and closed.
+            val rig = deckRig()
+            val lessons = rig.lessons
+            val (first, second, third) = Triple(pdf("Factoring", 3), pdf("Graphs", 2), pdf("Roots", 1))
+            lessons.setInFront(true)
+            lessons.followed(ana())
+            rig.read(presentation(slide = slideOf(first)))
+            // On its way: asked again, nothing more fetched.
+            lessons.ask(rig.slide())
+            val download = rig.server.next(downloadRoute())
+            lessons.ask(rig.slide())
+            assertEquals(1, rig.downloads, "fetched again while on its way")
+            download.reply(200, presigned())
+            rig.server.next(bucketRoute()).reply(200, first)
+            val opened = rig.document()
+            assertEquals(3, opened.pages)
+            rig.renderer.holds(lessons, "the first deck in")
+            // In: asked again, nothing fetched; another page of it, nothing fetched, the same document.
+            lessons.ask(rig.slide())
+            rig.next(presentation(slide = slideOf(first, page = 2)))
+            lessons.ask(rig.slide())
+            assertEquals(1, rig.downloads, "fetched again once in, or on a page turn")
+            assertSame(opened, rig.document())
+            assertEquals(1, rig.renderer.opens)
+            // Another deck: the last one's document closed as the read names it, the new one fetched once, as it is asked for.
+            rig.next(presentation(slide = slideOf(second, id = "d2")))
+            assertEquals(Loading, lessons.state.value.slide?.phase)
+            rig.renderer.holds(lessons, "another deck named")
+            lessons.ask(rig.slide())
+            rig.fetch(second, "d2")
+            assertEquals(2, rig.document().pages)
+            assertEquals(2, rig.downloads)
+            rig.renderer.holds(lessons, "the second deck in")
+            // The first again: from LiveLesson's memory, nothing downloaded, opened anew.
+            rig.next(presentation(slide = slideOf(first, page = 3)))
+            lessons.ask(rig.slide())
+            assertEquals(3, rig.document().pages)
+            assertEquals(2, rig.downloads, "the first deck downloaded again")
+            rig.renderer.holds(lessons, "the first deck again")
+            // One that didn't come: failed, and asked again only by Try again; a Try again on its way fetches nothing, nor a stale one.
+            val stale = rig.slide()
+            rig.next(presentation(slide = slideOf(third, id = "d3")))
+            lessons.ask(rig.slide())
+            rig.server.next(downloadRoute("d3")).reply(503)
+            rig.until { it.slide?.phase == Failed }
+            rig.renderer.holds(lessons, "the third deck refused")
+            lessons.ask(rig.slide())
+            assertEquals(3, rig.downloads, "a deck that didn't come asked again with no Try again")
+            lessons.ask(rig.slide(), again = true)
+            val again = rig.server.next(downloadRoute("d3"))
+            lessons.ask(rig.slide(), again = true)
+            lessons.ask(stale, again = true)
+            assertEquals(4, rig.downloads, "a Try again on its way, or a stale one, fetched")
+            again.reply(200, presigned("d3"))
+            rig.server.next(bucketRoute("d3")).reply(200, third)
+            assertEquals(1, rig.document().pages)
+            rig.renderer.holds(lessons, "the third deck in")
+        }
+
+    @Test
+    fun theSlideGoesAtItsClassesBellByThePhonesClockItsDocumentClosedThereAndASignOutClosesItWithTheLesson(): Unit =
+        runBlocking {
+            // AppTests' slideOncePerDeck, its end: the slide goes at its class's bell, Bali reached or not (L8c), and with Q7 the
+            // lesson goes with it, so its document is closed there; and at a sign-out, with the lesson (#331).
+            val rig = deckRig()
+            val lessons = rig.lessons
+            val deck = pdf("Factoring", 3)
+            lessons.setInFront(true)
+            lessons.followed(ana(rings = at(3)))
+            rig.read(presentation(slide = slideOf(deck)))
+            lessons.ask(rig.slide())
+            rig.fetch(deck)
+            rig.document()
+            rig.renderer.holds(lessons, "in before the bell")
+            // The bell by the phone's clock, its wake run late, as on a loaded phone: what the lesson half publishes meanwhile, at
+            // Hide, already shows no slide; the lesson goes as the bell wakes, its document closed.
+            rig.clock.advance(3, holdingWakes = true)
+            lessons.hide()
+            assertNull(lessons.state.value.slide, "the slide shown past the bell")
+            assertNotNull(lessons.state.value.lesson)
+            rig.clock.releaseWakes()
+            rig.until { it.slide == null && it.lesson == null }
+            rig.renderer.holds(lessons, "at the bell")
+            // A later read with the bell moved follows it again, its deck asked for anew; a sign-out closes it with the lesson.
+            lessons.followed(ana(rings = at(600), meReads = 2))
+            rig.read(presentation(slide = slideOf(deck)))
+            lessons.ask(rig.slide())
+            rig.fetch(deck)
+            rig.document()
+            rig.renderer.holds(lessons, "followed again")
+            lessons.followed(ana(signedIn = false, signIns = 2))
+            assertNull(lessons.state.value.slide)
+            rig.renderer.holds(lessons, "after the sign-out")
+            assertEquals(2, rig.renderer.closes)
+        }
+
+    @Test
+    fun theSlideAsksForItsDeckOnceAsItShowsADeckThatDidntComeShowsFailedAndTryAgainAsksAgainThePageReadyOnceBaliHasIt(): Unit =
+        runBlocking {
+            // AppTests' slideAsksAsItShows (M8), its rule without its view: AS8's slide asks as it shows, as SlideView's `.task(id:)`.
+            val rig = deckRig()
+            val lessons = rig.lessons
+            val deck = pdf("Factoring", 3)
+            lessons.setInFront(true)
+            lessons.followed(ana())
+            rig.read(presentation(slide = slideOf(deck, page = 2)))
+            val shown = assertNotNull(lessons.state.value.slide)
+            assertEquals(Loading, shown.phase)
+            lessons.ask(shown.slide)
+            rig.server.next(downloadRoute()).reply(403, """{"error":{"code":"forbidden","message":"not shown"}}""")
+            assertEquals(Failed, rig.until { it.slide?.phase != Loading }.slide?.phase)
+            assertEquals(1, rig.downloads)
+            lessons.ask(shown.slide, again = true)
+            rig.fetch(deck)
+            assertEquals(3, rig.document().pages)
+            assertEquals(2, rig.downloads)
+            rig.renderer.holds(lessons, "once Bali has it")
+        }
+
+    @Test
+    fun aReadNamingANewDeckShowsItLoadingAndFetchesNothingOnlyAScreensAskFetchesNeverThePoll(): Unit =
+        runBlocking {
+            // M8's call, kept (2026-10-24): no screen fetches up to 25 MB for a slide it doesn't show.
+            val rig = deckRig()
+            val lessons = rig.lessons
+            val (first, second) = pdf("Factoring", 3) to pdf("Graphs", 2)
+            lessons.setInFront(true)
+            lessons.followed(ana())
+            rig.read(presentation(slide = slideOf(first)))
+            assertEquals(Loading, lessons.state.value.slide?.phase)
+            rig.next(presentation(slide = slideOf(first, page = 2)))
+            rig.next(presentation(slide = slideOf(second, id = "d2")))
+            assertEquals(Loading, lessons.state.value.slide?.phase)
+            assertEquals(0, rig.downloads, "fetched as a read named the deck")
+            rig.renderer.holds(lessons, "no deck asked for")
+            lessons.ask(rig.slide())
+            assertEquals(1, rig.downloads)
+        }
+
+    @Test
+    fun aPagePastItsDocumentsPageCountShowsFailedNeverReadyTheDocumentKeptSoAPageWithinItShowsAtOnceWithNothingFetched(): Unit =
+        runBlocking {
+            // SlideView.swift's `page(at: slide.page - 1)`, none past the document's pages, shown as failed: here the lesson half's
+            // (decision 5). The server counts 12 pages; the renderer finds 3.
+            val rig = deckRig()
+            val lessons = rig.lessons
+            val deck = pdf("Factoring", 3)
+            lessons.setInFront(true)
+            lessons.followed(ana())
+            rig.read(presentation(slide = slideOf(deck, page = 4)))
+            lessons.ask(rig.slide())
+            rig.fetch(deck)
+            assertEquals(Failed, rig.until { it.slide?.phase != Loading }.slide?.phase, "page 4 of 3")
+            rig.renderer.holds(lessons, "a page past its document's", held = true)
+            // Try again there: the document let go, a fresh one opened from LiveLesson's memory, still without the page.
+            lessons.ask(rig.slide(), again = true)
+            assertEquals(Failed, rig.until { it.slide?.phase != Loading }.slide?.phase, "page 4 of 3, tried again")
+            assertEquals(listOf(2, 1), listOf(rig.renderer.opens, rig.renderer.closes))
+            rig.renderer.holds(lessons, "tried again", held = true)
+            // The teacher's next page within them: ready at once, the same document, nothing fetched or opened again.
+            rig.next(presentation(slide = slideOf(deck, page = 3)))
+            assertTrue(lessons.state.value.slide?.phase is Ready, "page 3 of 3")
+            assertEquals(listOf(1, 2), listOf(rig.downloads, rig.renderer.opens))
+        }
+
+    @Test
+    fun aDocumentOpenedForAnAskNoLongerTheLatestIsClosedAtOnceNeverKeptAndSoIsOneOpenedAfterASignOutLetItsDeckGo(): Unit =
+        runBlocking {
+            // Opened outside the lesson half's lock, kept or closed inside it: an open that can't be stopped still hands its
+            // document back, and nothing of it is kept.
+            val rig = deckRig()
+            val lessons = rig.lessons
+            val (first, second) = pdf("Factoring", 3) to pdf("Graphs", 2)
+            lessons.setInFront(true)
+            lessons.followed(ana())
+            rig.read(presentation(slide = slideOf(first)))
+            val opening = rig.renderer.holdOpen()
+            lessons.ask(rig.slide())
+            rig.fetch(first)
+            opening.taken()
+            // Another deck shown, and asked for, while the first opens: the first's ask no longer the latest.
+            rig.next(presentation(slide = slideOf(second, id = "d2")))
+            lessons.ask(rig.slide())
+            opening.release()
+            assertEquals(Loading, lessons.state.value.slide?.phase, "the first deck's document kept for the second")
+            rig.renderer.holds(lessons, "a document opened for a stale ask")
+            // The second's open held, and a sign-out meanwhile: its deck let go with the lesson, its document closed as it comes.
+            val held = rig.renderer.holdOpen()
+            rig.fetch(second, "d2")
+            held.taken()
+            lessons.followed(ana(signedIn = false, signIns = 2))
+            held.release()
+            rig.renderer.holds(lessons, "a document opened after its deck was let go")
+            assertEquals(listOf(2, 2), listOf(rig.renderer.opens, rig.renderer.closes))
+        }
+
+    @Test
+    fun aDocumentLostAfterItOpenedShowsItsSlideFailedClosedAndTryAgainOpensAFreshOneFromLiveLessonsMemory(): Unit =
+        runBlocking {
+            // AN13f's renderer runs in a process of its own (Q2), which can die after a document opened, or fail to draw a page:
+            // the rule is the lesson half's, and the app's renderer only says so ([Document.awaitLost]).
+            val rig = deckRig()
+            val lessons = rig.lessons
+            val deck = pdf("Factoring", 3)
+            lessons.setInFront(true)
+            lessons.followed(ana())
+            rig.read(presentation(slide = slideOf(deck)))
+            lessons.ask(rig.slide())
+            rig.fetch(deck)
+            val lost = rig.document()
+            rig.renderer.lose()
+            rig.until { it.slide?.phase == Failed }
+            rig.renderer.holds(lessons, "lost")
+            // Asked again with no Try again: nothing. Try again: a fresh document, from LiveLesson's memory.
+            lessons.ask(rig.slide())
+            assertEquals(1, rig.renderer.opens, "a lost deck opened again with no Try again")
+            lessons.ask(rig.slide(), again = true)
+            val fresh = rig.document()
+            assertNotSame(lost, fresh)
+            assertEquals(listOf(1, 2), listOf(rig.downloads, rig.renderer.opens))
+            rig.renderer.holds(lessons, "opened afresh")
+            // A renderer breaking its promises, its loss's wait and its close each throwing: failed and let go all the same.
+            val broken = deckRig()
+            broken.renderer.breaking = true
+            broken.lessons.setInFront(true)
+            broken.lessons.followed(ana())
+            broken.read(presentation(slide = slideOf(deck)))
+            broken.lessons.ask(broken.slide())
+            broken.fetch(deck)
+            broken.until { it.slide?.phase == Failed }
+            assertEquals(listOf(1, 1), listOf(broken.renderer.opens, broken.renderer.closes))
+        }
+
+    @Test
+    fun everyDeckResultButReadyShowsFailedAndSoDoesADeckTheRendererWontOpenOpensWithNoPageOrThrowsOnAgainstItsPromise(): Unit =
+        runBlocking {
+            // SlideView.swift's `SlideDeck.Phase(_:)`: the document once it opens with pages, else failed, each the canvas's one
+            // line with Try again; through each of DeckResult's cases, as WordsTest goes through AnswerResult's for `Said.of`.
+            val deck = pdf("Factoring", 3)
+            val bucket500: suspend LessonRig.() -> Unit = {
+                server.next(downloadRoute()).reply(200, presigned())
+                server.next(bucketRoute()).reply(500)
+            }
+            val results: List<Triple<DeckResult, String, suspend LessonRig.() -> Unit>> =
+                listOf(
+                    Triple(DeckResult.Ready(deck.encodeToByteArray()), "in", { fetch(deck) }),
+                    Triple(DeckResult.Mismatch, "another deck's bytes", { fetch(pdf("Something else", 3)) }),
+                    Triple(DeckResult.Unreachable(NoAnswer.Unreachable), "no answer", { server.next(downloadRoute()).reply(null) }),
+                    Triple(DeckResult.Refused(404, ApiErrorReason.DeckNotFound), "removed", { server.next(downloadRoute()).reply(404, Answer.refused("deck_not_found")) }),
+                    Triple(DeckResult.Refused(500, null), "the bucket's 500", bucket500),
+                )
+            each(DeckResult::class, *results.map { it.first }.toTypedArray())
+            for ((result, case, answered) in results) {
+                val rig = deckRig()
+                rig.lessons.setInFront(true)
+                rig.lessons.followed(ana())
+                rig.read(presentation(slide = slideOf(deck)))
+                rig.lessons.ask(rig.slide())
+                rig.answered()
+                val phase = rig.until { it.slide?.phase != Loading }.slide?.phase
+                assertEquals(result is DeckResult.Ready, phase is Ready, "$case: $phase")
+                rig.renderer.holds(rig.lessons, case)
+            }
+            // Its bytes in, but not opened: not a PDF; a password, or the renderer's process gone; no page; a throw; and a cancel
+            // of the renderer's own, its caller still on, never loading for good.
+            val opens =
+                listOf(
+                    Triple("not a PDF", "<html>Sign in</html>", FakeRenderer.Opening.AsTheBytesSay),
+                    Triple("a password, or the renderer gone", deck, FakeRenderer.Opening.Refusing),
+                    Triple("no page", pdf("Blank", 0), FakeRenderer.Opening.AsTheBytesSay),
+                    Triple("a throw", deck, FakeRenderer.Opening.Throwing),
+                    Triple("a cancel of its own", deck, FakeRenderer.Opening.CancellingItself),
+                )
+            for ((case, bytes, opening) in opens) {
+                val rig = deckRig()
+                rig.renderer.opening = opening
+                rig.lessons.setInFront(true)
+                rig.lessons.followed(ana())
+                rig.read(presentation(slide = slideOf(bytes)))
+                rig.lessons.ask(rig.slide())
+                rig.fetch(bytes)
+                assertEquals(Failed, rig.until { it.slide?.phase != Loading }.slide?.phase, case)
+                rig.renderer.holds(rig.lessons, case)
+            }
+        }
+
+    @Test
+    fun anotherStudentsSignInAndADeletionEachCloseTheDocumentTheNextStudentsSlideCarryingNothingOfTheLastsItsDeckFetchedAfresh(): Unit =
+        runBlocking {
+            // Over the real account and sign-in (AN9e), as AN13d's own test of it: nothing of one student's lesson shows to another.
+            val rig = signedRig(gated = true)
+            val account = checkNotNull(Account.of(rig.engine, scope, rig.clock, MemoryNotes()))
+            scope.launch { account.run() }
+            account.until { it.signedIn != null }
+            val (server, clock, renderer) = Triple(Server(), TestClock(), FakeRenderer())
+            val lessons = Lessons(account.state, ApiClient(URI("https://api.bali.test"), rig.signIn, server), renderer, scope, clock)
+            val world = LessonRig(lessons, server, clock, renderer)
+            val deck = pdf("Factoring", 3)
+            scope.launch { lessons.run() }
+            lessons.setInFront(true)
+            rig.through(account, scoped("a1"), me = meInSession("ana"))
+            account.sawList()
+            world.read(presentation(slide = slideOf(deck)))
+            lessons.ask(world.until { it.slide != null }.slide?.slide ?: fail("no slide shown"))
+            assertEquals("Bearer ${scoped("a1")}", server.next(downloadRoute()).also { it.reply(200, presigned()) }.token)
+            server.next(bucketRoute()).reply(200, deck)
+            world.document()
+            renderer.holds(lessons, "Ana's deck in")
+            // Bob signs in over Ana: Ana's slide goes, its document closed.
+            rig.signStudentIn(scoped("b1"), refresh = "refresh-b")
+            world.until { it.lesson == null && it.slide == null }
+            renderer.holds(lessons, "another student's sign-in")
+            rig.server.next(ageCheckRoute).reply(200, ageCheckPassed)
+            rig.readsAnswered(meInSession("bob")) { account.state.value.sync?.me?.user?.id == "bob" }
+            account.sawList()
+            // Bob's lesson, the same deck shown: loading, nothing of Ana's, fetched afresh under Bob's own token.
+            world.read(presentation(slide = slideOf(deck)))
+            val bobs = assertNotNull(world.until { it.slide != null }.slide)
+            assertEquals(Loading, bobs.phase)
+            lessons.ask(bobs.slide)
+            assertEquals("Bearer ${scoped("b1")}", server.next(downloadRoute()).also { it.reply(200, presigned()) }.token)
+            server.next(bucketRoute()).reply(200, deck)
+            world.document()
+            renderer.holds(lessons, "Bob's deck in")
+            // Delete account: Bob's slide goes with the account, its document closed.
+            account.deleting { it.ask() }
+            val deleting = scope.async { account.deleteAccount() }
+            rig.past(deleteMeRoute, meInSession("bob")).reply(200, deletedAnswer)
+            rig.server.next(deleteUserRoute).reply(200, "{}")
+            withTimeout(patience) { deleting.await() }
+            world.until { it.lesson == null && it.slide == null }
+            renderer.holds(lessons, "the deletion")
+            assertEquals(listOf(2, 2), listOf(renderer.opens, renderer.closes))
+            rig.stop()
+        }
+
+    @Test
+    fun noDocumentIsLeftOpenOnceTheRunEndsTheSlideGoneWithTheLesson(): Unit =
+        runBlocking {
+            // The run's end drops the lesson (AN13d), its deck with it: a run the app's scope ends leaves nothing open.
+            val accounts = MutableStateFlow(ana())
+            val rig = deckRig(accounts)
+            val lessons = rig.lessons
+            val deck = pdf("Factoring", 3)
+            val running = scope.launch { lessons.run() }
+            lessons.setInFront(true)
+            rig.read(presentation(slide = slideOf(deck)))
+            lessons.ask(rig.until { it.slide != null }.slide?.slide ?: fail("no slide shown"))
+            rig.fetch(deck)
+            rig.document()
+            rig.renderer.holds(lessons, "in")
+            running.cancelAndJoin()
+            assertNull(lessons.state.value.slide)
+            rig.renderer.holds(lessons, "once the run ended")
         }
 }
