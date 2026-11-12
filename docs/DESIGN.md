@@ -1097,7 +1097,7 @@ words.
   another account meanwhile, with Back alone (AS7-Del-changed).
 - **Where the words live:** as on the iPhone, in the engine's module, `outbox`
   (`android/outbox/src/main/kotlin/com/bali/outbox/`), each a function of its type beside it (AN10d
-  to AN10h): Join's in `Join.kt`; Home's, a scan's, the sign-in's, the start's and Session over's in
+  to AN10h, AN13c): Join's in `Join.kt`; Home's, a scan's, the sign-in's, the start's and Session over's in
   `Screen.kt`, Home's card for a class in session among them (`inSessionCard`); Tap in's, Emergency
   Unlock's, a reason's and Back to focus's failures in `SyncEngine.kt` (`TapFailure`,
   `UnlockFailure`, `ReasonFailure`, `RefocusFailure`); Focus's in `Focus.kt` (`FocusWords`); the
@@ -1108,7 +1108,9 @@ words.
   in `Age.kt` (`AgeCheck`); History's in `History.kt` (a read's failures, each moment and its note,
   a day's title and a moment's time, from the phone's own patterns); the consent list in
   `Consent.kt` (`ConsentList`), iOS's line for line but its focus status, "Bali's lock off", which
-  ConsentTest holds to JoinView.swift's. `WordsTest` reads every one, and fails a word
+  ConsentTest holds to JoinView.swift's; and the live lesson's in `Lesson.kt`, the answer card's line
+  under its answers, state by state (`AnswerCard`), and the permission step's class over its lesson
+  (`lessonHeading`), the Screen Time ask's twin. `WordsTest` reads every one, and fails a word
   that names something Android lacks or holds an em-dash or an exclamation mark.
 - **The look:** the tokens in Material 3's roles: `primary` is action-primary-bg,
   `tertiaryContainer` the emergency pair, `error` the destructive red, `errorContainer` Lock off's
