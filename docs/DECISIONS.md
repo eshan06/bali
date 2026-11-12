@@ -14,8 +14,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   stays Bali. The privacy policy's "Who we are", and the terms' opening paragraph and California
   notice (section 12), name Bali Focus Inc. as the party that runs Bali, in place of Eshan Shah and
   Jonathan Bani, the operators since the drafts of 2026-10-24; both pages' dates move to November
-  11, 2026, as the privacy policy's section 11 and the terms' section 6 promise of any change. The
-  website's copyright line reads "© 2026 Bali Focus Inc." in place of "© 2026 Bali", built on
+  11, 2026, as the privacy policy's section 11 and the terms' section 6 promise of any change. No
+  notice goes out in the app or on the portal: every prod account is still the team's (PLAN.md), so
+  the notice those sections promise of a change that matters is owed to no one (the owner's ruling,
+  2026-11-07), and anyone who signs up from now on agrees to the company's terms. The website's
+  copyright line reads "© 2026 Bali Focus Inc." in place of "© 2026 Bali", built on
   `demo3` the same day, apart from this change. App Store Connect's seller and copyright fields
   (its copyright reads `2026 Eshan Shah`, `docs/APP-STORE.md`) are the owner's to change there.
   Nothing in `ios/`, `android/` or `packages/` names an operator or carries a copyright line of
