@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-09 (Central) — Bali 1.0, build 13, is submitted to the App Store, "Waiting
+for Review" (Before the pilot, items 5 and 6; #548; DECISIONS 2026-11-09): the listing branded
+around focus, the privacy label published, rated 13+, the United States only, released by hand.
+Before it, every session's bell on a whole minute (#546). Next: App Review's verdict, the
+§3.3.3(P) answer (Open owner items); a session builds the retire-a-block command; the owner the
+sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11–AN13; AN1's
+part 2 on the owner's phones; the audit's polish waits._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN13e's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN13d, the lesson followed: the poll while Bali is in front, the answer, Hide (#577;
 `docs/DECISIONS.md`, 2026-11-12), the fourth of AN13's seven steps: `outbox`'s `Lessons.kt`, BaliApp.swift's `Phone`'s lesson
 half, one a run beside the account: the lesson its state names, once the student has seen the consent list here; its poll only

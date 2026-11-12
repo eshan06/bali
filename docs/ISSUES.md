@@ -174,9 +174,16 @@ App-Store-signed copy, and all three bundles carry `com.apple.developer.family-c
 
 **Resubmitted** 2026-11-10 (the owner): build 14, signed after the account-level grant, the same app
 as 13, with a reply to App Review naming the entitlement on all three bundle IDs. "Waiting for
-Review". Record App Review's verdict here, with its date, when it comes.
+Review".
 
-**Done when:** Apple's answer is on record, and the design matches it.
+**Approved** 2026-11-12 (the owner; App Store Connect reads "Pending Developer Release"): App Review
+approved Bali 1.0, build 14, as the review notes describe it (`docs/APP-STORE.md` section 2): the
+student taps in on their teacher's block, and the recording shows the teacher's side. That is
+Apple's answer on §3.3.3(P), so the design stands and no fallback is needed. An approval covers
+this version only: a later one, or a complaint, can be judged again, so the fallbacks above stay
+on file. Released by hand, the owner's call.
+
+**Done when:** Apple's answer is on record, and the design matches it. ✅ 2026-11-12.
 
 ## 4. Phone bans at school
 
