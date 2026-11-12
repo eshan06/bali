@@ -207,16 +207,61 @@ test('narrower screens get a Menu: it opens, its links go where they say, and it
   await panel.getByRole('link', { name: 'Questions' }).click();
   await expect(panel).toBeHidden();
   await expect(page.locator('#faq')).toBeInViewport();
-  // Escape closes it and puts the focus back on Menu; so does a tap outside it.
+  // Escape from a link in the menu closes it and puts the focus back on Menu; a tap outside it closes it too.
   await summary.click();
   await expect(panel).toBeVisible();
+  await panel.getByRole('link', { name: 'Guides' }).focus();
   await page.keyboard.press('Escape');
   await expect(panel).toBeHidden();
   await expect(summary).toBeFocused();
   await summary.click();
   await expect(panel).toBeVisible();
-  await page.locator('#faq h2').click();
+  await page.locator('.bs-foot-bar').click();
   await expect(panel).toBeHidden();
+});
+
+test('a Menu opened while the page is still loading stays open when loading ends', async ({ page }) => {
+  test.skip(page.viewportSize().width >= 1080, 'the Menu shows below 1080 px');
+  // The Android picture arrives two seconds late, as on slow school Wi-Fi.
+  await page.route('**/android-focus-question.png', async (route) => { await new Promise((r) => setTimeout(r, 2000)); await route.continue(); });
+  await page.goto('/', { waitUntil: 'commit' });
+  await expect(page.locator('html')).toHaveClass(/is-drawn/);
+  expect(await page.evaluate(() => document.readyState)).not.toBe('complete');
+  await page.locator('.bs-menu > summary').click();
+  await page.waitForLoadState('load');
+  await page.waitForTimeout(200);
+  await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
+});
+
+test('every page’s Menu closes on Escape and on a tap outside it, and Escape leaves focus alone when it is elsewhere', async ({ page }) => {
+  test.skip(page.viewportSize().width >= 1080, 'the Menu shows below 1080 px');
+  for (const path of PATHS) {
+    await open(page, path);
+    const summary = page.locator('.bs-menu > summary');
+    const panel = page.getByRole('navigation', { name: 'Sections' });
+    await summary.click();
+    await expect(panel, path).toBeVisible();
+    await panel.getByRole('link', { name: 'Guides' }).focus();
+    await page.keyboard.press('Escape');
+    await expect(panel, path).toBeHidden();
+    await expect(summary, path).toBeFocused();
+    await summary.click();
+    await expect(panel, path).toBeVisible();
+    await page.locator('.bs-foot-bar').click();
+    await expect(panel, path).toBeHidden();
+    // An iPhone sends no click for a tap on plain text, only the tap's pointer events. They close it too.
+    await summary.click();
+    await expect(panel, path).toBeVisible();
+    await page.locator('.bs-foot-bar').dispatchEvent('pointerdown');
+    await page.locator('.bs-foot-bar').dispatchEvent('pointerup');
+    await expect(panel, path).toBeHidden();
+    // Focus on the logo, outside the menu: Escape closes the menu and the focus stays on the logo.
+    await summary.click();
+    await page.locator('.bs-brand').first().focus();
+    await page.keyboard.press('Escape');
+    await expect(panel, path).toBeHidden();
+    await expect(page.locator('.bs-brand').first(), path).toBeFocused();
+  }
 });
 
 test('on phones the hero shows the teacher’s screen on its own, large enough to read', async ({ page }) => {

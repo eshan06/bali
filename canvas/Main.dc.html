@@ -530,12 +530,21 @@ class Component extends DCLogic {
     if (menu) {
       if (this.props.menu === 'open') menu.open = true;
       this.onMenu = (e) => { if (e.target && e.target.closest && e.target.closest('.bs-menu-panel a')) menu.open = false; };
-      this.onKey = (e) => { if (e.key === 'Escape' && menu.open) { menu.open = false; const s = menu.querySelector('summary'); if (s) s.focus(); } };
+      this.onKey = (e) => {
+        if (e.key !== 'Escape' || !menu.open) return;
+        const inside = menu.contains(document.activeElement);
+        menu.open = false;
+        // Focus goes back to Menu only if it was in the menu; elsewhere on the page it stays put.
+        const s = menu.querySelector('summary');
+        if (inside && s) s.focus();
+      };
+      // pointerup, not click: an iPhone sends no click for a tap on plain text, and a scroll sends no pointerup.
       this.onDoc = (e) => { if (menu.open && !menu.contains(e.target)) menu.open = false; };
-      this.onShow = () => { menu.open = false; };
+      // Only a page brought back from the cache closes it; every first load fires pageshow too.
+      this.onShow = (e) => { if (e.persisted) menu.open = false; };
       menu.addEventListener('click', this.onMenu);
       document.addEventListener('keydown', this.onKey);
-      document.addEventListener('click', this.onDoc);
+      document.addEventListener('pointerup', this.onDoc);
       window.addEventListener('pageshow', this.onShow);
       this.menu = menu;
     }
@@ -607,7 +616,7 @@ class Component extends DCLogic {
     if (this.menu) {
       this.menu.removeEventListener('click', this.onMenu);
       document.removeEventListener('keydown', this.onKey);
-      document.removeEventListener('click', this.onDoc);
+      document.removeEventListener('pointerup', this.onDoc);
       window.removeEventListener('pageshow', this.onShow);
     }
     if (this.raf) cancelAnimationFrame(this.raf);
