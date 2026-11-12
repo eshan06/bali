@@ -21,7 +21,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **The style** (`infra/cognito/managed-login/`: the settings, the two logos, the request that applies them, and a test):
   Bali's tokens, the stone-50 page, a white card at radius 20, green-700 pill buttons and links, stone-100 fields with
   `border-input` edges, the green-600 focus ring, the logo above the card, light mode only. Of two looks shown side by side the
-  owner took the softer: labels in `text-secondary` where the first had `text-primary`, and headings at the regular weight,
+  owner took the softer, the one the sign-in redesign canvas (below) draws on its boards of AWS's page, on the phone and on a
+  computer: labels in `text-secondary` where the first had `text-primary`, and headings at the regular weight,
   "Sign in" at 28 px, through `categories.global.typography`, keys AWS doesn't document but Cognito took and keeps; should AWS
   drop them, the headings turn bold again and nothing else changes. The words stay AWS's; no setting reaches them. Cognito
   takes a form logo between 1:1 and 4:1, so D2d's 140 × 32 lockup (4.375:1) sits on a 4:1 canvas, its pixels unchanged.

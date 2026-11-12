@@ -67,7 +67,8 @@ states of sign-in (its Teacher row, 2026-11-07), and for
 the portal and the student web the canvas below. The
 [Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB) (the owner, 2026-11-12)
 wins over those two for the app's Sign in screen and the portal's sign-in page, each opening
-Cognito's managed login, which PLAN's next steps rebuild from it. Changing any of
+Cognito's managed login, which PLAN's next steps rebuild from it; its boards of AWS's page draw
+the managed-login style itself (`infra/cognito/managed-login/`). Changing any of
 it is the owner's call, never a side effect of a PR: every user-facing screen
 is designed in Claude Design and approved by the owner before it is built
 (CLAUDE.md, Working rules).

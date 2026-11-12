@@ -176,8 +176,7 @@ console → Cognito → that user pool:
 
 1. **Hosted-UI domain**, if the pool has none: **Branding → Domain → Create
    Cognito domain**, with a prefix such as `bali`, and choose **Managed login**,
-   on the pool's Essentials plan or above; each app client then takes Bali's style
-   (`infra/cognito/managed-login/README.md`). The domain is
+   on the pool's Essentials plan or above. The domain is
    `https://<prefix>.auth.<region>.amazoncognito.com`, the pool's one — the
    portal's `NEXT_PUBLIC_COGNITO_DOMAIN` too.
 2. **The phone's app client.** **Applications → App clients → Create app
@@ -192,6 +191,9 @@ console → Cognito → that user pool:
      client allows only `openid`, `email` and `phone`. The app asks for all four
      (C4a: Cognito's `DeleteUser` needs the last), so a client without one
      refuses every sign-in from the phone.
+   - **Its style,** on a managed-login domain: Bali's, by
+     `infra/cognito/managed-login/README.md` ("A new client"). Without it the
+     client shows Cognito's default look, or no page at all if the CLI made it.
 3. **Refresh-token expiration.** On the client's **App client information →
    Edit**, raise **Refresh token expiration** above Cognito's 30-day default —
    365 days, say. Cognito refusing the refresh token is the app's one

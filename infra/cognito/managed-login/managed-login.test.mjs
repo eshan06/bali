@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { crc32, inflateSync } from 'node:zlib';
 
 const here = dirname(fileURLToPath(import.meta.url));
 // What `request.mjs` prints for each pool, as the owner's aws command sends it.
@@ -106,12 +107,24 @@ test('the typography keys, which AWS does not document, hold only what Cognito t
   }
 });
 
-test('each logo is a PNG between 1:1 and 4:1, the shapes Cognito takes for a form logo', () => {
+test('each logo is a whole PNG between 1:1 and 4:1, the shapes Cognito takes for a form logo', () => {
   for (const { env, Assets } of requests) {
     const logo = Buffer.from(Assets.find((a) => a.Category === 'FORM_LOGO').Bytes, 'base64');
     const png = Buffer.from('89504e470d0a1a0a', 'hex'); // the signature every PNG starts with
     assert.ok(logo.subarray(0, 8).equals(png), `${env}'s logo is not a PNG`);
-    const ratio = logo.readUInt32BE(16) / logo.readUInt32BE(20); // IHDR's width over its height
+    // make-logo.mjs writes the file itself, so each chunk's CRC and every row are checked here.
+    const idat = [];
+    for (let at = 8; at < logo.length; at += 12 + logo.readUInt32BE(at)) {
+      const end = at + 8 + logo.readUInt32BE(at);
+      const crc = crc32(logo.subarray(at + 4, end));
+      assert.equal(crc, logo.readUInt32BE(end), `${env}'s logo: a chunk's CRC is wrong`);
+      if (logo.toString('latin1', at + 4, at + 8) === 'IDAT') idat.push(logo.subarray(at + 8, end));
+    }
+    const [width, height] = [logo.readUInt32BE(16), logo.readUInt32BE(20)]; // IHDR's
+    assert.deepEqual([logo[24], logo[25]], [8, 6], `${env}'s logo is not 8-bit RGBA`);
+    const rows = inflateSync(Buffer.concat(idat)).length;
+    assert.equal(rows, height * (1 + width * 4), `${env}'s logo is missing rows`);
+    const ratio = width / height;
     assert.ok(ratio >= 1 && ratio <= 4, `${env}'s logo is ${ratio.toFixed(3)}:1`);
   }
 });
