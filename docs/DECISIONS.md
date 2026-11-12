@@ -43,7 +43,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
     each of the router's looks) and follows afresh there, so the lesson is dropped, its poll stopped and its card gone (L8c). A
     later read of `GET /v1/me` with the bell moved, a teacher's extend, follows it again, since nothing marks it over. It differs
     from iOS on purpose: iOS's poll runs past the bell until Bali answers, the app goes behind or the engine's state changes, the
-    card hidden meanwhile, L8c's named ceiling; a change for the Mac, if wanted.
+    card hidden meanwhile, L8c's named ceiling; a change for the Mac, if wanted. Its cost (santa's reviewer B), for the owner: a
+    teacher's extend that the phone reads only after the old bell rang follows the lesson afresh, so a closed question the
+    student hid shows again, Hide once more taking it away, and a pick on its way at the bell says nothing of itself, the card
+    showing the answer Bali holds; iOS, which keeps its lesson past the bell, keeps both.
   - **Q8, the Debug readout:** no lesson line; the readout is unchanged.
   - **The queue (santa's reviewer B on #574):** the app's one `OkHttpTransport` lets 5 requests a host go at once and queues
     the rest, so on a slow network the lesson's poll and crossing answers, beside the engine's own reads, could have held an
@@ -67,13 +70,22 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - **The lesson followed shows at once** (`State.lesson`, empty until its first read), so a screen and a test know it is
     followed; `polling()`, internal, is the tests' mark that nothing polls, never a window of time.
   - **The poll waits on the phone's clock** (`SyncClock`), as the engine's waits do, so the tests move it.
+  - **An answer's end takes the lesson's state first** (santa's reviewer B, the regression test first): the lesson's read is
+    watched on a thread of its own, so the tap's end could make the card from the read before it, the answer just taken missing
+    for a moment; iOS's main actor runs the lesson's read ahead of the tap's end.
+
+  **For the owner, a privacy note (both of santa's reviewers; dropped as a finding, since it needs two accounts on one phone,
+  ruled out for the pilot):** the poll and each answer go under the token the sign-in gives as they are sent, as the outbox's
+  records and iOS's lesson do, so a pick of one student's sent as another's sign-in lands and passes the 13+ check, her token
+  being renewed meanwhile, could be recorded on the other's account. For the owner's re-check before K-12, with the queued
+  records' rule (AN9h); `ApiClient.forAccount` is the tool that would hold each to its own account.
 
   **The tests** (`LessonsTest.kt`, the JVM, fourteen; `OkHttpTransportTest.kt`, two): AppTests' seven, their rules without
   their views (AS8's), each named as the iOS description in one camelCase sentence, a loop in place of the parameterized ones:
-  `lessonFollowed`, `lessonAnswers` (with the crossing picks the other way too, the earlier's answer landing while the later is
-  on its way, which iOS's test never stages), `lessonRefused`, `cardIgnoresTapsMidHold`, `lessonHide`, `offFocusCardWaits` and
-  `cardGoesAtTheBell` (with Q7: the poll stopped there, a tap at the bell before its late wake sending nothing, and a later read
-  with the bell moved followed again). New: a run of answers leaving no record in the engine's queue or the outbox's file, each
+  `lessonFollowed`, `lessonAnswers` (with each answer taken on the card the moment its tap ends, and the crossing picks the other
+  way too, the earlier's answer landing while the later is on its way, which iOS's test never stages), `lessonRefused`,
+  `cardIgnoresTapsMidHold`, `lessonHide`, `offFocusCardWaits` and `cardGoesAtTheBell` (with Q7: the poll stopped there, a tap at
+  the bell before its late wake sending nothing, and a later read with the bell moved followed again). New: a run of answers leaving no record in the engine's queue or the outbox's file, each
   going at once while an Emergency Unlock's send is held at the server; a teacher's account following nothing; each sign-in that
   lands, the same student's again too, dropping the lesson and its pick; over the real account and sign-in, another student's
   sign-in, a sign-out and a deletion each dropping the lesson, its card, its pick and its heading, the next student's card
@@ -99,11 +111,29 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (`cardGoesAtTheBell`, the card kept; `lessonFollowed`); the card past the bell before its wake (`cardGoesAtTheBell`,
   "answered past the bell"); the lesson's calls back on the engine's queue, `apart()` sharing the dispatcher (core's queue test,
   timed out at its minute, and outbox's, "the unlock's send waited behind the lesson's calls"); an answer in its caller's scope
-  (the screen-leaving test); and no drop at a sign-in landing (the sign-in-lands test, "kept over the sign-in").
+  (the screen-leaving test); no drop at a sign-in landing (the sign-in-lands test, "kept over the sign-in"); and the lesson's
+  state not taken at an answer's end (`lessonAnswers`: the first answer missing from the card as its tap ended, in two runs of
+  three before the fix, and none of five after).
 
-  **The proof:** PROOF
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble :app:lint
+  check` green on the final code, Android 10's API check with it (Animal Sniffer over `core` and `outbox`), Android Lint finding
+  nothing, and no compiler warning from this step's code; the core and outbox suites green in that `check` and four more times
+  on the final code, each task run again (`./gradlew :core:test --rerun :outbox:test --rerun`, neither UP-TO-DATE; 709 tests,
+  sixteen of them new), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck &&
+  npm run lint && npm test` green, the portal's suite whole (78 files). No SDK package was installed and no library added: the
+  build downloads none (`android.builder.sdkDownload=false`), no build file changed, and the outbox's real-socket test runs on
+  the JDK's own HTTP server. The size, santa's count: 330 changed lines not counting tests and Markdown (the split guessed about
+  260 before the queue), 767 in the tests.
 
-  **Santa's review:** SANTA
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): 0 blockers. Their WARNs: this entry's placeholders (reviewer A; filled); an
+  assertion's message naming the bell on a step whose read said over (reviewer A; renamed); Q7 named only here, in the README
+  and in PLAN-ANDROID, not in ARCHITECTURE's list of where Android differs (reviewer A; left, since Q7 bends none of iOS's rules,
+  its poll past the bell L8c's ceiling, not a rule); the card made at an answer's end from the read before it (reviewer B; fixed,
+  above, its test failing first); Q7's cost to Hide after a late extend (reviewer B; named above); the token at send time
+  (both; the owner's note above); and ARCHITECTURE's new line a design line beside iOS's decision 4, one engine owning the
+  server's calls, for the owner's look, with `LiveLesson`'s KDoc still calling its client the app's one (reviewer B; the line
+  is marked the conductor's call awaiting the owner, and the KDoc now says the lesson's own).
 
   **For AN13e to AN13g and AS8:** AN13e adds the deck half to `Lessons`: the slide from `lesson.presentation.slide`, shown while
   the lesson is the one to follow (`current`), as the card is; its deck asked once per `sha256` through the followed
