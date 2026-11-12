@@ -23,6 +23,7 @@ import com.bali.core.SessionView
 import com.bali.core.TokenProvider
 import com.bali.outbox.Change
 import com.bali.outbox.Enforcer
+import com.bali.outbox.Link
 import com.bali.outbox.LockSwitch
 import com.bali.outbox.Outbox
 import com.bali.outbox.OutboxDatabase
@@ -30,6 +31,7 @@ import com.bali.outbox.Problem
 import com.bali.outbox.Standing
 import com.bali.outbox.SyncClock
 import com.bali.outbox.SyncEngine
+import com.bali.outbox.UnlockFailure
 import java.io.File
 import java.io.IOException
 import java.net.URI
@@ -318,6 +320,46 @@ class LockServiceTest {
                 // That run is the app's, in its scope: ended with this one's calls before the outbox closes (AN5c).
                 app.running.value?.job?.cancelAndJoin()
             }
+        }
+
+    @Test
+    fun anOutboxThatWontOpenTakesOffTheLockTheLastRunLeftOnAndOnceItOpensTryAgainPutsItBackFromItsStanding(): Unit =
+        runBlocking {
+            // AN10c2: Room opens the outbox at its first read, so a file that won't open, here not a database, as an update that
+            // failed might leave one, never fails the start. The engine runs over a standing unread, its storage failed, and the
+            // lock the last run left on comes off, as at a start that runs nothing: no Emergency Unlock could be recorded over it.
+            switchOn()
+            tapIn()
+            until { enforcer.updates.value.takeIf { it.locked && it.until == view.endsAt } }
+            // The run ends as Bali stops, its lock left on to the bell, its outbox closed whole into its one file.
+            end()
+            val file = File(context.noBackupFilesDir, LOCK_FILE)
+            assertTrue(file.exists())
+            val database = context.getDatabasePath(FILE)
+            assertFalse(File(database.path + "-wal").exists())
+            val whole = database.readBytes()
+            database.writeText("not a database. ".repeat(512))
+            // The next start works, over that file.
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            outbox = Outbox.open(Room.databaseBuilder(context, OutboxDatabase::class.java, FILE))
+            app.begin { SyncEngine.open(outbox, ApiClient(URI("https://api.bali.test"), token, server), scope, clock).also { engine = it } }
+            assertNull(app.problem.value)
+            val loaded = engine.updates.value
+            assertEquals(listOf(Standing.Unread, Link.StorageFailed, true), listOf(loaded.standing, loaded.link, loaded.standingFailed))
+            until { enforcer.updates.value.takeIf { it.checked && !it.locked } }
+            assertFalse(file.exists())
+            assertNull(app.lock.until)
+            assertEquals("", until { listening()?.takeIf { it.isEmpty() } })
+            assertEquals(UnlockFailure.NotSaved, engine.pressUnlock())
+            // The file whole again: Try again reads it, focused in the session, the lock back on to its bell.
+            database.writeBytes(whole)
+            engine.retryNow()
+            val claim = until { enforcer.updates.value.takeIf { it.locked } }
+            assertEquals(view.endsAt, claim.until)
+            assertTrue(file.exists())
+            assertEquals(WIDE, until { listening()?.takeIf { it == WIDE } })
+            // That run is the app's, in its scope: ended with this one's calls before the outbox closes (AN5c).
+            app.running.value?.job?.cancelAndJoin()
         }
 
     @Test

@@ -248,8 +248,12 @@ class BaliAppTest {
                 val (signIn, account) = run(outbox, server, scope)
                 server.signStudentIn(signIn, scope, "u1", mayDelete = true)
                 server.next(AGE_CHECK).reply(200, PASSED)
-                server.next("GET /v1/me").reply(200, ME)
-                until { account.state.value.takeIf { it.inClass == "u1" && it.sync?.me != null } }
+                // Each read of the truth answered until one lands: a read made before the check let the sign-in through can
+                // reach the server after it, older than the forget that followed, so it counts as no read (AN9d's `meChanges`).
+                until {
+                    if ("GET /v1/me" in server.waiting) server.next("GET /v1/me").reply(200, ME)
+                    account.state.value.takeIf { it.inClass == "u1" && it.sync?.me != null }
+                }
                 account.sawList()
                 assertEquals(listOf("u1", "u1"), app.notes.run { listOf(inClass, listSeenBy) })
                 // Written behind: on the disk once the write lands.

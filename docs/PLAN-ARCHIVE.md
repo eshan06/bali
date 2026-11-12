@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN10c2's on 2026-11-12: _Last updated: 2026-11-11 (Central) — AN10d, Home's words, Tap in, and the sign-in's and the start's words (#566;
+`docs/DECISIONS.md`, 2026-11-11), the fourth of AN10's eight steps and the first a student reads: in `outbox`, each a
+function of its type, iOS's word for word but where AS0's Words board changes one (a phone with no NFC) or adds one (NFC
+off): Join's failures and a phone whose engine hasn't started; Home's refused tap, its waiting and empty-state cards and
+its read's failure; a scan's words, and `tapIn`, its answer a type; the sign-in's failures, each way a page doesn't open
+keyed on the page (Q10); the start's problem, which never says the apps are locked; and the guard over every Android
+word, which each later step joins. No screen. Before it, AN10c, the router in the app. Next: AN10e, Focus's words and the
+block screen's; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check
+on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to
+OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner
+has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN10d's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN10c, the router in the app (#565; `docs/DECISIONS.md`, 2026-11-11), the third
 of AN10's eight steps: the phone's notes in the app's own SharedPreferences, out of the backup, handed to each run's
 account and to one `Router` for the app's life over the run, the start's problem and Android's looks (the time set, the

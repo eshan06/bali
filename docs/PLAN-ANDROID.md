@@ -14,14 +14,13 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-11 (Central) — AN10d, Home's words, Tap in, and the sign-in's and the start's words (#566;
-`docs/DECISIONS.md`, 2026-11-11), the fourth of AN10's eight steps and the first a student reads: in `outbox`, each a
-function of its type, iOS's word for word but where AS0's Words board changes one (a phone with no NFC) or adds one (NFC
-off): Join's failures and a phone whose engine hasn't started; Home's refused tap, its waiting and empty-state cards and
-its read's failure; a scan's words, and `tapIn`, its answer a type; the sign-in's failures, each way a page doesn't open
-keyed on the page (Q10); the start's problem, which never says the apps are locked; and the guard over every Android
-word, which each later step joins. No screen. Before it, AN10c, the router in the app. Next: AN10e, Focus's words and the
-block screen's; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check
+_Last updated: 2026-11-12 (Central) — AN10c2, the last run's lock over a storage that won't read (#569;
+`docs/DECISIONS.md`, 2026-11-12), a fix to AN10c's call, from AN10d's review: on Android a storage that won't open fails
+the engine's reads, never its start, so where the phone's storage fails to give back where it stood, the last run's lock
+comes off as the engine loads, as at a start that runs nothing, and a later read that works puts it back from the
+standing; a lock this run put on still ends at its own end, and the last run's still holds over a standing merely unread
+(Q4). No word and no screen. Before it, AN10d, Home's words, Tap in, and the sign-in's and the start's words. Next: AN10e,
+Focus's words and the block screen's; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check
 on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform for the owner to
 OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6); AN1's part 2 once the owner
 has the phones. Not on the pilot's critical path._
@@ -175,6 +174,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN10a** The router — ✅ (#563; DECISIONS 2026-11-11)
 - **AN10b** The router's inputs, and its run — ✅ (#564; DECISIONS 2026-11-11)
 - **AN10c** The router in the app — ✅ (#565; DECISIONS 2026-11-11)
+- **AN10c2** The last run's lock over a storage that won't read — ✅ (#569; DECISIONS 2026-11-12)
 - **AN10d** Home's words, Tap in, and the sign-in's and the start's words — ✅ (#566; DECISIONS 2026-11-11)
 - **AN10e** Focus's words and the block screen's (twin: `FocusWords` and `ShieldWords`) — validation: the JVM tests
 - **AN10f** Unlocked's, Protection off's and Session over's words (twin: `UnlockedWords`, `ProtectionOffWords`, and

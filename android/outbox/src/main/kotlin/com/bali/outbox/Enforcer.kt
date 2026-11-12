@@ -95,7 +95,8 @@ class Enforcer(
     /**
      * The end of the lock this enforcer put on and the lock still holds, not the last run's, which has
      * none of its own: over a standing not read, this one, a pending tap's, still comes off at the cap,
-     * the last run's never, since a session it may be for may still be running (#91's review). None: none.
+     * the last run's never, since a session it may be for may still be running (#91's review), but where
+     * the standing's storage failed (AN10c2). None: none.
      */
     private var putOn: Instant? = null
 
@@ -289,13 +290,15 @@ class Enforcer(
 
     /**
      * Whether the lock changes to [until]: put on till then where it holds none, again as its end moves, and
-     * the last run's given that end once where the phone stood is known, never before, which would take it
-     * off there; or, none, taken off, but while where the phone stood is unread only one this enforcer put
-     * on, or any once the student has unlocked over it ([SyncState.unlockedLast]): enforcement never
-     * begins from nothing. Never put on over the switch off: Android has unbound the service.
+     * the last run's given that end once where the phone stood is known, or its storage failed to give it
+     * back ([SyncState.standingFailed]), never before, which would take it off there; or, none, taken off,
+     * but while where the phone stood is merely unread only one this enforcer put on, or any once the student
+     * has unlocked over it ([SyncState.unlockedLast]): enforcement never begins from nothing, nor holds the
+     * last run's lock over a storage that may refuse the unlock's record (AN10c2). Never put on over the
+     * switch off: Android has unbound the service.
      */
     private fun changes(state: SyncState, until: Instant?, switch: LockSwitch, locking: Boolean): Boolean {
-        val known = state.standing != Standing.Unread
+        val known = state.standing != Standing.Unread || state.standingFailed
         return if (until != null) {
             switch != LockSwitch.Off && (!locking || until != putOn && (putOn != null || known))
         } else {

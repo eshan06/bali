@@ -8,6 +8,119 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **AN10c2, the last run's lock over a storage that won't read: where the phone's storage fails to give
+  back where it stood, the last run's lock comes off as the engine loads, as at a start that runs nothing, and a later read
+  that works puts it back from the standing (the conductor's call from #566's review, and this step's own, marked, each
+  awaiting the owner's look; AN10c2, #569).** The owner is asleep and said to take the recommended option on every regular
+  call, so each call here is the conductor's or this step's, for the owner to look at.
+
+  **The gap, shown first** (AN10d's santa, reviewer B; a test failing on main by name before any fix): on Android a storage
+  that won't open never fails the start. Room opens its file at the first read, and every read the engine makes as it opens
+  is inside `load()`'s `tried`, so the engine ran over a standing unread (`Standing.Unread`, `Link.StorageFailed`), and the
+  enforcer kept the last run's lock, which has no end (`ServiceLock.until` is `Instant.MAX` while `kept`). A lock with no end
+  comes off only where the standing is known, where this enforcer put it on, or where the student has unlocked over it, and
+  that unlock, filed `UnlockUnfiled`, must be recorded first, in the storage that refused everything: `pressUnlock` answered
+  `NotSaved` at every press. So the phone held a lock with no end and an Emergency Unlock that never went through, until the
+  storage read again or the student switched Bali's service off in Settings, the teacher seeing nothing meanwhile.
+  StorageFailedTest's first test, on main: three presses, each `NotSaved`, then "the last run's lock still on, over a storage
+  that won't read". iOS is bounded: its file opens at the start, and its monitor ends the shields at the bell. Nothing in
+  `ios/` changes.
+
+  **The conductor's call, built:** where the phone's standing can't be read because its storage failed, at the engine's load
+  or any read of it again, the last run's lock comes off, as at a start that runs nothing (AN10c); a later read that works
+  puts it back from the standing, focused in a session on to its bell, anything else off. Kept as they were: a lock this run
+  put on, with its own end, which a storage failure never takes off (it ends there, as iOS's shields end at the bell); the
+  last run's lock over a standing merely unread (AN7a's Q4); and the unlock contract, nothing here writing, sending or
+  discarding a record.
+
+  **Where it lives:** `outbox`. `SyncState.standingFailed`, set by `load()` and `readStanding()` from the read of the
+  standing that failed, cleared once the standing is known (`update`); `Enforcer.changes` counts it as the standing known,
+  so the last run's lock comes off where nothing locks, or takes the end of what does. `android/app` changes by
+  `ServiceLock`'s doc and its tests, and ARCHITECTURE's Android rules name the difference from iOS. No word and no screen:
+  a standing unread with the lock off is a state the router already chooses (Home signed in, Sign in signed out), and iOS's
+  Home offers Emergency Unlock there only over the lock verified on.
+
+  **This step's calls, each awaiting the owner's look:**
+  - **What a storage failure is:** a read of the standing that fails with anything but a `SerializationException`, which
+    `keptStanding` throws for a standing this build can't read. Never keyed on SQLite's own error, whose class on a phone is a
+    typealias of Android's (AN10d). So every failure of Room's or SQLite's, whatever its class (a file that isn't a database,
+    a failed migration's `IllegalStateException`, a disk's I/O error), takes the lock off, the side that never strands a
+    student, and a standing this build can't read keeps Q4's rule.
+  - **Pending, on Android:** the engine's `open` loads before it returns, so no pass runs while its first read is pending,
+    and the app keeps the last run's lock until its start ends (AN10c). The pending read an enforcer meets is a read again of
+    a standing merely unread, within a minute; its test holds that read at a point the rig marks.
+  - **The partial case** (the standing unread for its storage, the queue read): the same rule, so a pending tap gives the lock
+    its cap in the last run's place, and it comes off there, where the last run's would have stayed for a session running past
+    it (#91's review). The tap's Emergency Unlock reads the standing inside its own write, so the storage that refused the
+    standing refuses it too: `NotSaved` there, over a lock that ends at the cap, at most 50 minutes after the tap, as over a
+    lock this run put on.
+  - **The test's storage refuses the outbox's own statements alone,** never SQLite's transaction control or Room's own
+    refresh after a write: refusing that refresh's rollback held Room's writer for good on this rig, so a later write never
+    returned, where a real disk's failure rolls back. Seen while probing, then kept out of the tests (StorageFailedTest's
+    helper says why).
+
+  **The alternatives, for the owner:** (1) keep the lock and rely on Settings' switch, today's behavior; (2) let an Emergency
+  Unlock over the last run's lock go through when its record can't be kept. The conductor rejected (2): an unlock with no
+  record breaks "always recorded".
+
+  **The weak spots, plainly:**
+  - A storage failure that passes takes the last run's lock off until the next read works: within a minute
+    (`Outbox.BACKOFF_CAP`), 30 s with the screen on, or at Try again. Nothing is sent meanwhile, no read able to take its
+    stamp, so the grid shows the phone gone quiet.
+  - Whether a student can cause one: Bali's storage is private, and my reading finds one way that might, filling the phone's
+    storage so the file can't open at the next launch, not shown either way here. It would be quieter than a force-stop,
+    which switches the lock off too: a force-stop takes Bali's service off Android's list, so Bali opened again in the session
+    reports protection off, where a storage that fails records nothing (no write lands, and the switch stays on, so the check
+    has nothing to report), the grid showing the phone gone quiet until a read works and the lock comes back by itself.
+    Settings' Clear storage deletes the outbox and the lock's file alike and ends Bali's process, so no last run's lock is left
+    to hold.
+  - Not this call's: a standing this build can't read beside writes the storage refuses keeps today's behavior, the lock held
+    and the unlock `NotSaved`, Settings' switch the way out. It needs a corrupt kept value and a failing disk at once.
+
+  **The tests,** on the JVM (StorageFailedTest, new): the gap, first, failing on main; a file Room can't open, as a failed
+  update might leave one, the lock off at the first pass and the file untouched; a later read that works, focused putting the
+  lock on to its bell and out leaving it off; a lock this run put on staying on through a storage failure to its end, in a
+  session and at a tap's cap; the last run's lock staying on while the standing's read is held pending, off once that read
+  fails in the storage; and the partial case. On `Bali_Spike_API35`, `36` and `37` (instrumented), LockServiceTest's new
+  test: a real file the outbox can't open, in the test's own data, the lock the last run left on off, its file gone and the
+  service listening to nothing, the unlock `NotSaved`; then the file whole again, and Try again putting the lock back on to
+  the bell. Tried, each failing by name, then reverted: today's rule, the last run's lock kept (5 of the 6 new, all but this
+  run's lock's); a storage failure taking this run's lock off, by the failed standing (this run's lock's at its cap, and the
+  partial case) and by the link (this run's lock's in its session, the later read, the partial case); the last run's lock
+  taken off while a read is only pending, by the failure marked as the read begins ("the last run's lock taken off while a
+  read is only pending") and over any standing unread (the pending test's first line, StandingKeptTest's three and
+  UnreadUnlockTest's two of Q4's); and a later good read leaving the lock off where the standing says focused, by no lock put
+  on while the link says the storage failed (the later read, this run's lock's at its cap, the partial case).
+
+  **For Phase 10 (AS4):** Home over a standing unread offers Emergency Unlock only while the lock is verified on
+  (`Protection.locked`), as iOS's does, so a storage that failed shows Home's line with Try again (`retryNow`, which reads the
+  standing again) and no unlock. AN10e to AN10h: no word changes here.
+
+  **AN10c's BaliAppTest race, found on API 36's first run** (61 of 62): `theNotesARunKeeps…` timed out waiting for the account
+  to show the student in a class, its one read of `GET /v1/me` answered, my new test passing in the same run. The cause, read
+  from the code (it doesn't fail on demand): once the 13+ check lets a sign-in through, two reads of the truth can reach the
+  server, one the read loop began before `letThrough`'s `forgetMe` and sent once `passed()` let its token through, and the one
+  after that forget. The engine counts the first as no read (AN9d's `meChanges`), and the test answered only the first
+  `GET /v1/me` it saw. Nothing of this step's runs there (a fresh outbox, its standing read). Fixed in the test, which now
+  answers each read until one lands; no product change, the phone reading again after the forget. Then the whole suite again
+  on all three emulators.
+
+  **The proof:** the whole instrumented suite, 62 of 62, on each of `Bali_Spike_API35`, `36` and `37` (61 before this step), on
+  the final code; `./gradlew assemble :app:assembleDebugAndroidTest :app:lint check` green, Android 10's API check with it; the
+  core and outbox suites run six times, each green (616 tests), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among
+  them every time; `npm run typecheck && npm run lint && npm test` green, the portal's suite whole. No SDK package was
+  installed: the build downloads none (`android.builder.sdkDownload=false`), and the SDK's folders matched before and after.
+  Each emulator after its runs: Bali and its test app uninstalled, AN1's spike apps kept, every setting as found (the
+  accessibility list and switch, the font scale, Airplane mode, the screen's timeout, automatic time and zone, the zone, the
+  call log), stopped.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: the difference from iOS named only here,
+  where ARCHITECTURE's parity rule names each in "Rules that keep the phone honest, where Android's differ", AN10c's start
+  that runs nothing the same (both reviewers; a rule there now, marked as the conductor's calls awaiting the owner); and the
+  weak spot's comparison with a force-stop, which left out that a force-stop is reported as protection off once Bali is opened
+  again, where a storage failure records nothing (reviewer B; said above).
+
 - **2026-11-11** — **Bali Focus Inc. runs Bali, and the privacy policy and terms name it (the
   owner).** Bali is incorporated as Bali Focus Inc. (the owner, 2026-11-11: "we're also
   incorporated now as bali focus inc so make the appropriate changes for that too"); the brand

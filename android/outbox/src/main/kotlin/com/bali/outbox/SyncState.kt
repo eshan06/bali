@@ -99,6 +99,13 @@ data class SyncState(
      * none when not known (the file keeps none it can read), a wait only a read ends.
      */
     val waitEnds: Instant? = null,
+    /**
+     * Whether where the phone stood is unread because its storage failed: the last read of it, at launch or again, failed in the
+     * file itself (one that won't open or read), not on a standing this build can't read. That storage may refuse an Emergency
+     * Unlock's record too, so the last run's lock comes off over it, as at a start that runs nothing (AN10c2). Only while
+     * [standing] is [Standing.Unread].
+     */
+    val standingFailed: Boolean = false,
 ) {
     /** Whether the student is in any class, as [me] says: none until a read answers (C3). */
     val hasClasses: Boolean? get() = me?.let { it.classes.isNotEmpty() }

@@ -32,7 +32,8 @@ sealed interface Standing {
     /**
      * Not known: the outbox's file wouldn't give back where the phone stood at launch, a storage
      * failure, shown. Nothing is kept over the file's standing until it is read again or the server's
-     * truth says where the phone stands.
+     * truth says where the phone stands. Whether the file itself failed, or gave back a standing this
+     * build can't read, is [SyncState.standingFailed]'s.
      */
     data object Unread : Standing
 }
