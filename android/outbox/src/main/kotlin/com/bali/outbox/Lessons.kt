@@ -17,6 +17,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,7 +52,7 @@ class Lessons(
      * answer of the lesson ever waits in a queue ahead of an Emergency Unlock's send (decision 5).
      */
     private val client: ApiClient,
-    /** The app's deck renderer (AN13f): opens the slide's deck into its document, one open at a time. */
+    /** The app's deck renderer (AN13f): opens the slide's deck into its document, one kept at a time. */
     private val renderer: Renderer,
     scope: CoroutineScope,
     private val clock: SyncClock = SystemClock,
@@ -315,7 +317,7 @@ class Lessons(
             alone {
                 val held = deck?.takeIf { ask == asks }
                 val kept = document?.takeIf { held != null && it.pages > 0 }
-                if (kept == null) document?.close()
+                if (kept == null) document?.let(::shut)
                 if (held != null) {
                     held.phase = kept?.let { SlideShown.Phase.Ready(it) } ?: SlideShown.Phase.Failed
                     publish()
@@ -327,27 +329,41 @@ class Lessons(
         alone {
             val held = deck?.takeIf { ask == asks } ?: return@alone
             held.phase = SlideShown.Phase.Failed
-            kept.close()
+            shut(kept)
             publish()
         }
     }
 
-    /** A call into the renderer: its cancel thrown on, and anything else it throws against its promise none, so no deck ends Bali's process. */
+    /**
+     * A call into the renderer: the deck's own cancel, as it is let go, thrown on, a normal stop; anything else it throws against its
+     * promise none, a cancel of its own too (a time limit of its own, say), so the slide says it failed, Try again with it, never
+     * loading for good, and no deck ends Bali's process.
+     */
     private suspend fun <T> guarded(call: suspend () -> T): T? =
         try {
             call()
         } catch (cancelled: CancellationException) {
-            throw cancelled
+            currentCoroutineContext().ensureActive()
+            null
         } catch (broken: Exception) {
             null
         }
+
+    /** Closes [document], a throw against its promise kept from ending Bali's process. */
+    private fun shut(document: Document) {
+        try {
+            document.close()
+        } catch (broken: Exception) {
+            // Closed or not, the lesson holds it no more.
+        }
+    }
 
     /** The deck let go: its fetch on its way cancelled, a cancel there a normal stop, and its document closed. BaliApp.swift's `letDeckGo`. */
     private fun letDeckGo() {
         val held = deck ?: return
         deck = null
         held.fetch.cancel()
-        (held.phase as? SlideShown.Phase.Ready)?.document?.close()
+        (held.phase as? SlideShown.Phase.Ready)?.document?.let(::shut)
     }
 
     /** The card's own let go: the pick on its way, what the last one said and Hide, and a pick's answer still to come said nowhere. */

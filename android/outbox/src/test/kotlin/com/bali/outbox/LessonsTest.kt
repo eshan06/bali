@@ -920,8 +920,13 @@ class SlideTest : EngineFiles() {
             rig.fetch(deck)
             rig.document()
             rig.renderer.holds(lessons, "in before the bell")
-            // The bell by the phone's clock: the slide goes, its document closed.
-            rig.clock.advance(3)
+            // The bell by the phone's clock, its wake run late, as on a loaded phone: what the lesson half publishes meanwhile, at
+            // Hide, already shows no slide; the lesson goes as the bell wakes, its document closed.
+            rig.clock.advance(3, holdingWakes = true)
+            lessons.hide()
+            assertNull(lessons.state.value.slide, "the slide shown past the bell")
+            assertNotNull(lessons.state.value.lesson)
+            rig.clock.releaseWakes()
             rig.until { it.slide == null && it.lesson == null }
             rig.renderer.holds(lessons, "at the bell")
             // A later read with the bell moved follows it again, its deck asked for anew; a sign-out closes it with the lesson.
@@ -995,10 +1000,15 @@ class SlideTest : EngineFiles() {
             rig.fetch(deck)
             assertEquals(Failed, rig.until { it.slide?.phase != Loading }.slide?.phase, "page 4 of 3")
             rig.renderer.holds(lessons, "a page past its document's", held = true)
+            // Try again there: the document let go, a fresh one opened from LiveLesson's memory, still without the page.
+            lessons.ask(rig.slide(), again = true)
+            assertEquals(Failed, rig.until { it.slide?.phase != Loading }.slide?.phase, "page 4 of 3, tried again")
+            assertEquals(listOf(2, 1), listOf(rig.renderer.opens, rig.renderer.closes))
+            rig.renderer.holds(lessons, "tried again", held = true)
             // The teacher's next page within them: ready at once, the same document, nothing fetched or opened again.
             rig.next(presentation(slide = slideOf(deck, page = 3)))
             assertTrue(lessons.state.value.slide?.phase is Ready, "page 3 of 3")
-            assertEquals(listOf(1, 1), listOf(rig.downloads, rig.renderer.opens))
+            assertEquals(listOf(1, 2), listOf(rig.downloads, rig.renderer.opens))
         }
 
     @Test
@@ -1057,6 +1067,16 @@ class SlideTest : EngineFiles() {
             assertNotSame(lost, fresh)
             assertEquals(listOf(1, 2), listOf(rig.downloads, rig.renderer.opens))
             rig.renderer.holds(lessons, "opened afresh")
+            // A renderer breaking its promises, its loss's wait and its close each throwing: failed and let go all the same.
+            val broken = deckRig()
+            broken.renderer.breaking = true
+            broken.lessons.setInFront(true)
+            broken.lessons.followed(ana())
+            broken.read(presentation(slide = slideOf(deck)))
+            broken.lessons.ask(broken.slide())
+            broken.fetch(deck)
+            broken.until { it.slide?.phase == Failed }
+            assertEquals(listOf(1, 1), listOf(broken.renderer.opens, broken.renderer.closes))
         }
 
     @Test
@@ -1089,13 +1109,15 @@ class SlideTest : EngineFiles() {
                 assertEquals(result is DeckResult.Ready, phase is Ready, "$case: $phase")
                 rig.renderer.holds(rig.lessons, case)
             }
-            // Its bytes in, but not opened: not a PDF; a password, or the renderer's process gone; no page; a throw.
+            // Its bytes in, but not opened: not a PDF; a password, or the renderer's process gone; no page; a throw; and a cancel
+            // of the renderer's own, its caller still on, never loading for good.
             val opens =
                 listOf(
                     Triple("not a PDF", "<html>Sign in</html>", FakeRenderer.Opening.AsTheBytesSay),
                     Triple("a password, or the renderer gone", deck, FakeRenderer.Opening.Refusing),
                     Triple("no page", pdf("Blank", 0), FakeRenderer.Opening.AsTheBytesSay),
                     Triple("a throw", deck, FakeRenderer.Opening.Throwing),
+                    Triple("a cancel of its own", deck, FakeRenderer.Opening.CancellingItself),
                 )
             for ((case, bytes, opening) in opens) {
                 val rig = deckRig()

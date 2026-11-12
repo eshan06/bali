@@ -49,17 +49,19 @@ interface Renderer {
     /**
      * Opens [deck], the bytes a deck's check let through (`DeckResult.Ready.buffer()`, read-only and in memory, never the array the
      * lesson keeps), into its document, its pages counted; none where it won't open: not a PDF, a password, the renderer's process
-     * gone. Never throws but on a cancel, which closes whatever it opened before it throws.
+     * gone, or an open that can't finish, which is the renderer's to end (AN13f bounds it), so a slide never stays loading. Never
+     * throws but on a cancel, which closes whatever it opened before it throws. An open let go may still finish beside the next
+     * one's, so the renderer holds no single slot: the lesson half closes the document it no longer wants as it comes.
      */
     suspend fun open(deck: ByteBuffer): Document?
 }
 
 /**
- * A deck opened ([Renderer.open]): one at a time, closed once the lesson lets it go. A screen may still hold it from an earlier
- * state once it is closed, so drawing a closed one counts as failed, never a crash (AN13f's to build).
+ * A deck opened ([Renderer.open]): one kept at a time, closed once the lesson lets it go. A screen may still hold it from an
+ * earlier state once it is closed, so drawing a closed one counts as failed, never a crash (AN13f's to build).
  */
 interface Document {
-    /** How many pages it has. */
+    /** How many pages it has: fixed as it opened, read with no call to the renderer, so it never throws. */
     val pages: Int
 
     /**

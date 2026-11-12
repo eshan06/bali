@@ -3,6 +3,7 @@ package com.bali.outbox
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -47,17 +48,18 @@ class Held {
 /**
  * The renderer as a test holds it: each open and close counted; a deck's pages read from its bytes ([pdf]), any other bytes none,
  * as a file that isn't a PDF; an open, or a close, held while the test does what it must ([holdOpen], [holdClose]); its opens
- * refused, or thrown against its promise, where the test says ([opening]); and its documents lost ([lose]). Each deck it is given
- * must be read-only.
+ * refused, thrown or cancelled against its promise where the test says ([opening]), and its documents breaking theirs
+ * ([breaking]); and its documents lost ([lose]). Each deck it is given must be read-only.
  */
 class FakeRenderer : Renderer {
-    /** How its opens go: as the bytes say, refused, or throwing, as the seam promises never to. */
-    enum class Opening { AsTheBytesSay, Refusing, Throwing }
+    /** How its opens go: as the bytes say, refused, throwing, or in a cancel of its own (a time limit's), as the seam promises never to. */
+    enum class Opening { AsTheBytesSay, Refusing, Throwing, CancellingItself }
 
     private val sync = Any()
     private var opened = 0
     private var closed = 0
     private var how = Opening.AsTheBytesSay
+    private var broken = false
     private var openHeld: Held? = null
     private var closeHeld: Held? = null
     private val documents = mutableListOf<Opened>()
@@ -65,6 +67,11 @@ class FakeRenderer : Renderer {
     var opening: Opening
         get() = synchronized(sync) { how }
         set(value) = synchronized(sync) { how = value }
+
+    /** Whether its documents break their promises: each one's loss's wait throws at once, and its close, once counted. */
+    var breaking: Boolean
+        get() = synchronized(sync) { broken }
+        set(value) = synchronized(sync) { broken = value }
 
     /** Documents open now: each open less each close, so one closed twice shows too. */
     val open: Int get() = synchronized(sync) { opened - closed }
@@ -86,6 +93,7 @@ class FakeRenderer : Renderer {
         when (opening) {
             Opening.Refusing -> return null
             Opening.Throwing -> throw IllegalStateException("the renderer broke its promise")
+            Opening.CancellingItself -> throw CancellationException("the renderer's own time limit")
             Opening.AsTheBytesSay -> Unit
         }
         val pages = text.takeIf { it.startsWith("%PDF") }?.substringAfterLast(", ")?.removeSuffix(" pages")?.toIntOrNull() ?: return null
@@ -106,7 +114,10 @@ class FakeRenderer : Renderer {
     private inner class Opened(override val pages: Int) : Document {
         val gone = CompletableDeferred<Unit>()
 
-        override suspend fun awaitLost() = gone.await()
+        override suspend fun awaitLost() {
+            if (breaking) throw IllegalStateException("the renderer broke its promise")
+            gone.await()
+        }
 
         override fun close() {
             val held = synchronized(sync) {
@@ -114,6 +125,7 @@ class FakeRenderer : Renderer {
                 closeHeld.also { closeHeld = null }
             }
             held?.block()
+            if (breaking) throw IllegalStateException("the renderer broke its promise")
         }
     }
 }
