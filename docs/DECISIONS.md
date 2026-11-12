@@ -62,11 +62,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
     at once, with nothing fetched or opened again: the one case with a document open and no slide shown ready. Closing it there
     would leave every later page of that deck failed until Try again, since a page turn fetches nothing.
   - **The seam's shape:** `open` gives a document or none, Swift's failable `PDFDocument(data:)`, every failure the one phase;
-    `close` returns at once and never throws, the renderer closing after any draw under way, so the lesson half closes under its
-    lock, never suspending in it; and `awaitLost` suspends until the loss. The KDoc says a cancel mid-open closes what it opened,
-    and that a screen may still hold a document once it is closed, a draw of it failed, never a crash: AN13f's to keep.
-  - **Every call into the renderer is guarded:** one that throws against its promise is failed, never a crash, since a throw in
-    the fetch's coroutine would end Bali's process, the lock's service with it; the enforcer outlives a lock's throw the same way.
+    `pages` is fixed as the document opened, read with no call to the renderer; `close` returns at once and never throws, the
+    renderer closing after any draw under way, so the lesson half closes under its lock, never suspending in it; and `awaitLost`
+    suspends until the loss. The KDoc says a cancel mid-open closes what it opened, that an open that can't finish is the
+    renderer's to end, that one document is kept at a time (an open let go may still finish beside the next, so the renderer holds
+    no single slot), and that a screen may still hold a document once it is closed, a draw of it failed, never a crash: AN13f's.
+  - **The renderer's calls are guarded,** `open`, `awaitLost` and `close`: one that throws against its promise is failed, never a
+    crash, since a throw in the fetch's coroutine would end Bali's process, the lock's service with it, as the enforcer outlives a
+    lock's throw; and a cancel of the renderer's own while the deck is still asked for (a time limit of its own, say) is failed
+    too, with Try again, never loading for good. Only the deck's own cancel, as it is let go, ends its fetch quietly.
   - **A document with no page is closed at once,** failed, in the lesson half (the twin's `pageCount > 0`), where the JVM tests
     reach it.
   - **`SlideShown` is equal by its slide and its phase,** `Ready` by its document, so AS8's slide can ask as what shows changes,
@@ -80,51 +84,67 @@ a real decision? Add a dated entry at the top: what was decided and why.
   after the run's end); and `setInFront` with the value it already has changes nothing, no second poll and no read of it (before,
   a second `true` cancelled the poll asleep and ran another, which read at once). Both are staged with no window of time.
 
-  **The tests** (`LessonsTest.kt`, the JVM: `SlideTest`'s ten beside AN13d's sixteen, two of them the WARNs'; the fake,
+  **The tests** (`LessonsTest.kt`, the JVM: `SlideTest`'s ten, and the WARNs' two beside AN13d's fourteen; the fake,
   `SlideSupport.kt`'s `FakeRenderer`, counts each open and close, reads a deck's pages from its bytes, holds an open or a close
-  where a test says, refuses, throws against its promise, and loses its documents). AppTests' `slideOncePerDeck` and
+  where a test says, refuses, throws or cancels itself against its promise, has its documents break theirs, and loses them).
+  AppTests' `slideOncePerDeck` and
   `slideAsksAsItShows`, their rules without their views, each named as the iOS description in one camelCase sentence; and new: a
   read naming a new deck fetching nothing until asked; a page past the document's; a document opened for an ask no longer the
   latest, and one opened after a sign-out let its deck go, each closed at once; every `DeckResult` but `Ready` failed, through each
-  of its cases (`each`, now shared from WordsTest), and a deck not a PDF, refused, with no page or a throw; a document lost after it
-  opened; over the real account, another student's sign-in and a deletion each closing the document, the next student's slide
-  loading, fetched afresh under that student's own token; no document open once `run()` ends; and the two WARNs. At each check the fake's
-  documents open are one with a deck held open and none otherwise. WordsTest guards both lines. The deck tests run the lesson half
-  on `Dispatchers.Unconfined`, so each call it starts runs on the thread that starts or wakes it, up to its first wait: what an
-  ask or a read fetched is fetched as the call returns, and "nothing fetched" is checked there, never over a window of time.
+  of its cases (`each`, now shared from WordsTest), and a deck not a PDF, refused, with no page, a throw or a cancel of the
+  renderer's own; Try again on a page past the document's, its document let go; the slide gone past the bell before its late wake;
+  a document lost after it opened, and a renderer whose loss's wait and close both throw; over the real account, another student's
+  sign-in and a deletion each closing the document, the next student's slide loading, fetched afresh under that student's own
+  token; no document open once `run()` ends; and the two WARNs. At each check the fake's documents open are one with a deck held
+  open and none otherwise. WordsTest guards both lines. The deck tests run the lesson half on `Dispatchers.Unconfined`, so each
+  call it starts runs on the thread that starts or wakes it, up to its first wait: what an ask or a read fetched is fetched as the
+  call returns, and "nothing fetched" is checked there, never over a window of time.
 
   **Tried, each failing by name, then reverted:** fetch as a read names the deck (the read-names-a-deck test, "fetched as a read
   named the deck", 2 for 0); the on-its-way guard dropped (the once-per-deck test, "fetched again while on its way"); the last
   document left open (the once-per-deck test, "another deck named: documents open", and the bell's, the run's end's, another
   student's sign-in, and the WARN's stage); ready shown for a page past the count (the page test, "page 4 of 3"); a document opened
   for a stale ask kept (the stale-ask test, "documents open", and the no-page case); a document's loss ignored (the loss test, its
-  wait for the failed phase timing out); and each WARN's fix undone (the bell's test, "a bell let go as the run ended followed a
-  lesson after it", and the in-front test, "a second poll ran, the first one's sleep let go").
+  wait for the failed phase timing out); each WARN's fix undone (the bell's test, "a bell let go as the run ended followed a
+  lesson after it", and the in-front test, "a second poll ran, the first one's sleep let go"); and, after santa's review, no let-go
+  at a new ask (the page test, `[2, 0]` for `[2, 1]`), the slide past the bell (the bell's test, "the slide shown past the bell"),
+  a renderer's own cancel thrown on (the every-result test, its wait timing out) and a close unguarded (the loss test's broken
+  renderer, its wait timing out).
 
   **The proof:** `./gradlew assemble :app:lint check` green on the final code, Android 10's API check with it (Animal Sniffer over
   `core` and `outbox`), Android Lint finding nothing in `outbox` and no compiler warning from this step's code; the core and outbox
-  suites green PROOF_RUNS; `npm run typecheck && npm run lint && npm test` NPM_PROOF. No SDK package was installed by this step and
-  no library added: the build downloads none (`android.builder.sdkDownload=false`), no build file changed, and the build used
-  platforms 35 and 36.1 alone. The size, santa's count: SIZE_CODE changed lines not counting tests and Markdown (the split guessed
-  about 120 before the seam's rules, the two fixes and the loss), SIZE_TESTS in the tests.
+  suites green in each `check` and four more times on the final code, each task run again (`./gradlew :core:test --rerun
+  :outbox:test --rerun`, neither UP-TO-DATE; 721 tests, twelve of them new), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…`
+  among them every time; `npm run typecheck && npm run lint && npm test` green, the portal's suite whole (78 files), and the
+  README through `prettier --check`. No SDK package was installed by this step and no library added: the build downloads none
+  (`android.builder.sdkDownload=false`), no build file changed, and the build used platforms 35 and 36.1 alone. The size, santa's
+  count: 234 changed lines not counting tests and Markdown (the split guessed about 120 before the seam's rules, the two fixes and
+  the loss), 673 in the tests.
 
   **Also:** AN13d's entry's privacy note says "the token being renewed meanwhile" where it said "her token", with no gendered
   pronoun. Android 17's SDK platform (`platforms;android-37.0`, revision 2, from Google's SDK repository) is on the PC: the
   owner's "Yes, download it" (about 18:05 UTC), the conductor installing it with no new license accepted; compileSdk stays 36.1
   until the step that needs 37 (PLAN-ANDROID, Open owner items, 6).
 
-  **Santa's review:** SANTA_REVIEW
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each fixed: a renderer's own cancel left the slide
+  loading for good, Try again refused while it loads (both; now failed); `pages` and `close` were called unguarded though this
+  entry said every call was (both; `close` guarded, `pages` fixed at open in its KDoc); the KDoc's "one open at a time" overstated
+  it (reviewer B; one kept at a time, an open let go finishing beside the next); and three paths no test reached, Try again past a
+  page count letting its document go, the slide past the bell before its late wake, and a loss's wait that throws (reviewer A and
+  B; each now tested, each break failing by name). The design check, no-ai-slop's Detect job over the two lines, found nothing.
 
   **For AN13f, AN13g and AS8:** AN13f fills `Renderer` with `PdfRenderer` to the owner's answers (above): `open` takes the
-  read-only buffer, never asks for the array, and gives a document with its pages or none, closing what it opened on a cancel;
-  `close` returns at once, the renderer closing after a draw under way, as `PdfRenderer` allows one page open at a time and is
-  not thread-safe; `awaitLost` returns once the isolated process dies or a page fails to draw; and a draw of a closed document is
-  failed, never a crash. The screens draw through AN13f's own document type, the one its renderer made. AN13g makes the lesson
-  half with the app's renderer, `Lessons(account.state, ApiClient(config.api, signIn, transport.apart()), renderer, within, looks
-  = looks)`, beside the account in `BaliApp.start`. AS8 draws `state`'s `slide`: the page `slide.page - 1` once ready, else its
-  phase's line (`words`) in the sunken frame, Try again on failed calling `ask(slide, again = true)`; it calls `ask(slide)` as
-  the slide shows and at each change of `SlideShown`, as SlideView.swift's `.task(id:)`; "Slide N of M", Pinch to zoom, Try
-  again's button and TalkBack's text are AS8's and AN13f's.
+  read-only buffer, never asks for the array, and gives a document with its pages or none, closing what it opened on a cancel,
+  and bounds itself, a hung pdfium ended as none (its process unbound); `pages` is a field, fixed at open; `close` returns at once,
+  the renderer closing after a draw under way, as `PdfRenderer` allows one page open at a time and is not thread-safe; an open
+  let go may finish beside the next, so no single slot; `awaitLost` returns once the isolated process dies or a page fails to draw;
+  and a draw of a closed document is failed, never a crash. The screens draw through AN13f's own document type, the one its
+  renderer made. AN13g makes the lesson half with the app's renderer, `Lessons(account.state, ApiClient(config.api, signIn,
+  transport.apart()), renderer, within, looks = looks)`, beside the account in `BaliApp.start`. AS8 draws `state`'s `slide`: the
+  page `slide.page - 1` once ready, else its phase's line (`words`) in the sunken frame, Try again on failed calling `ask(slide,
+  again = true)`; it calls `ask(slide)` as the slide shows and at each change of `SlideShown`, as SlideView.swift's `.task(id:)`;
+  "Slide N of M", Pinch to zoom, Try again's button and TalkBack's text are AS8's and AN13f's.
 
 - **2026-11-12** — **AN13d, the lesson followed: BaliApp.swift's `Phone`'s lesson half in Kotlin, in `outbox`, its poll only
   while Bali's screen is in front, the answer and Hide, and the lesson's calls on a queue apart from the engine's, the fourth of
