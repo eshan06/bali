@@ -87,7 +87,8 @@ data class History(
     /**
      * The read [reading] would start, with no engine started to send it (the app's to give, asked before [reading]; BaliApp.swift's
      * `readHistory`): nothing sent, and why said where that read's own failure would be, as [answered] says one, nothing busy.
-     * None where [reading] would start none.
+     * None where [reading] would start none. The app counts it as the latest read all the same (`reads`, AS7's), as iOS's does, so
+     * the answer to a Show earlier still on its way is dropped, never taken as this read's page from the top.
      */
     fun notStarted(more: Boolean): History? = reading(more)?.failed(Failure.NotStarted)
 

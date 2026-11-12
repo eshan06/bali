@@ -45,17 +45,20 @@ a real decision? Add a dated entry at the top: what was decided and why.
     note) and, with none, takes `notStarted`, which says "Bali is still starting. Try again in a moment." where that read's
     failure would be, above the moments read for one from the top ("Bali couldn't update your history. Bali is still
     starting. Try again in a moment.", iOS's line), with nothing busy. iOS's `readHistory` does it by `reading`, then
-    `failed`; here the rule of where is History's, never a screen's. Android's router shows History only with an engine's
-    account (Q1, Q2), so none is reached today; the type keeps the twin's.
+    `failed`; here the rule of where is History's, never a screen's. AS7 counts it as the latest read all the same
+    (`reads`), as iOS does, so a Show earlier's answer still on its way is dropped, never taken as this read's page from the
+    top (santa's reviewer B; its doc says so). Android's router shows History only with an engine's account (Q1, Q2), so
+    none is reached today; the type keeps the twin's.
   - **A date's year is judged as written, in the calendar its pattern writes in** (the formatter's chronology, the ISO
     calendar where it names none), as iOS judges it in the phone's. Whether the app's formatters carry the phone's
     calendar is AS7's call; with none, the ISO calendar writes and judges, as Age.kt counts.
   - **The one-time screen lists everything the list gained** (`ConsentList.ADDED`, iOS's `added(sawAnswers: false)`): a
     clock set ahead, the answers line and how many answered, and "Which answer is yours". No Android build ever showed L8a's
     list (`Notes`, AN10b), so the phone can't tell a student who saw it, and neither change goes untold. The canvas's
-    AS7-ListChanged draws the other case, two Sees lines (the Consent's `added` variant, iOS's `sawAnswers: true`).
-    [Recommendation: AS7 draws the three-line case on its row as an intermediate state before building the screen.
-    Consent.dc.html is untouched.]
+    AS7-ListChanged draws the other case, two Sees lines (the Consent's `added` variant, iOS's `sawAnswers: true`), so on
+    Android its board draws a case the phone never shows, and the three-line case is the only one. [Recommendation: the
+    owner's look before AS7 builds the screen, since a state that is a screen's only case may be more than an intermediate
+    one (santa's reviewer A); the three lines are the whole list's own, and Consent.dc.html is untouched.]
   - **The consent list is held to iOS's in place:** ConsentTest reads `ConsentCard.sees` and `neverSees` from JoinView.swift,
     as the portal's help page does, so an iPhone list changed without Android's fails ci.yml's "Android contract tests
     (JVM)", which runs `outbox`'s tests on every PR but a docs-only one. Said plainly: an iPhone PR that changes the list
@@ -92,14 +95,26 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (the guard: "History.Moment.words holds an em-dash", "History.Note.words holds an exclamation mark", and `everyKind` and
   the lock's test); and no engine said in the failure's place above moments read (the no-engine test).
 
-  **The proof:** PROOF.
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble :app:lint
+  check` green, Android 10's API check with it (Animal Sniffer over `core` and `outbox`) and no compiler warning from this
+  step's code; the core and outbox suites green in each `check` and four more times on the final code (`--rerun`; 658 tests,
+  seven of them new), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck &&
+  npm run lint && npm test` green, the portal's suite whole (78 files). No SDK package was installed: the build downloads
+  none (`android.builder.sdkDownload=false`), and the SDK's folders matched before and after. The size, santa's count: 197
+  changed lines not counting tests and Markdown (the split guessed about 110), 297 in the tests.
 
-  **Santa's review:** SANTA.
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, each taken: `notStarted` over a Show
+  earlier still on its way, whose answer AS7 must drop by counting this read as the latest, as iOS's `reads` does (reviewer
+  B; its doc says so now, and AS7's note above); the one-time screen's three lines are Android's only case where its board
+  draws two (reviewer A; the recommendation above is the owner's look now, not a drawing); and this entry's placeholders
+  (both; filled). Reviewer B's third, the help page's "or Screen Time off", is the owner's item above. The design check,
+  no-ai-slop's Detect job over the new strings, found nothing: each is iOS's or the board's, in DESIGN.md's voice.
 
   **For Phase 10 (AS2, AS4, AS7):** AS7's History says `failure.words` in the moments' place or Show earlier's, with Try
   again, and `notUpdated.notUpdatedWords` above the moments read; each day's `title.words(now, zone, thisYear,
   anotherYear)`, and each moment's `time`, `words` and its note's `words`; it asks for the engine before `reading` and, with
-  none, takes `notStarted(more)`. Its formatters are the phone's own patterns, made with `DateTimeFormatter.ofPattern(pattern,
+  none, takes `notStarted(more)`, counted as the latest read. Its formatters are the phone's own patterns, made with `DateTimeFormatter.ofPattern(pattern,
   locale)`: a pattern letter Android 10's java.time lacks (the day period `B` some locales use) throws there, and java.time
   writes ASCII digits unless handed the locale's `DecimalStyle`, both AS5's and AS7's to settle as they build. The intro's
   second page, Join's preview and Me's What your teacher sees show `ConsentList.WHOLE` under their own headings ("Sees",
