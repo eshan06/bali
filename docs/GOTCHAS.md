@@ -98,6 +98,8 @@ the clone is `C:\Users\Eshan Shah\Downloads\github\bali`. Its path has a space: 
 - **`cd` in the Bash tool can fail if fnm's `--use-on-cd` is on.** It turns `cd` into its own
   function, which can stop with "We can't find the necessary environment variables to replace the
   Node version". Keep it out of `~/.bashrc`; otherwise use `git -C <path>`, absolute paths or `builtin cd`.
+- **`npm --prefix <dir> exec -- vitest` runs in the current folder.** From `C:\dev\bali` it picks up
+  every worktree's copy of a test under it. Use `npm --prefix <dir> run test -- <file>` instead.
 - **Line endings.** Git for Windows checks files out with CRLF by default and the repo is LF, so
   the clone sets `core.autocrlf=input` (its worktrees share it). A clone made before the setting
   keeps CRLF files on disk though `git status` is clean: check `git ls-files --eol`, and re-checkout

@@ -349,6 +349,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 
 **The rest of the owner's queue:**
 
+- **Bali Focus Inc. (2026-11-11):** App Store Connect's seller and copyright fields, and the provider's address and phone for the terms' California notice (§ 1789.3).
 - **The prod sitting's findings (2026-11-08):**
   - 👀 A student with no name shows as their account id's first 8 characters ("01a11334" on the
     grid, the recap's Didn't join and a session's report): `displayName ?? id.slice(0, 8)`, `nameOf`
