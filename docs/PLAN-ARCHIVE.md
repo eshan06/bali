@@ -10,6 +10,18 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN10d's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN10c, the router in the app (#565; `docs/DECISIONS.md`, 2026-11-11), the third
+of AN10's eight steps: the phone's notes in the app's own SharedPreferences, out of the backup, handed to each run's
+account and to one `Router` for the app's life over the run, the start's problem and Android's looks (the time set, the
+zone changed, the screen coming on), each asking it again; a start that runs nothing says why as a type and takes off
+the lock the last run left on, a later start that works putting it back from the outbox's standing; Delete account
+taking the notes under the student off the disk before it sends anything; and the Debug readout's Screen line (Q11). No
+word and no screen. Before it, AN10b, the router's inputs and its run. Next: AN10d, Home's words, Tap in, and the
+sign-in's and the start's words; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that
+passed the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK
+platform for the owner to OK before the first step with today's AndroidX, and OkHttp 5.5 with it (Open owner items, 6);
+AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN10c's on 2026-11-11: _Last updated: 2026-11-11 (Central) — AN10b, the router's inputs and its run (#564; `docs/DECISIONS.md`, 2026-11-11), the
 second of AN10's eight steps: `outbox`'s `Router.kt`, one a process (Q1), choosing again at each change of the run's
 account, enforcer and engine, the start's problem and the screens' inputs, and at each bell and tap's cap by the phone's
@@ -2721,6 +2733,11 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN10d's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11).
+
+- **AN10d** Home's words, Tap in, and the sign-in's and the start's words (twin: Join.swift's and Screen.swift's words, and
+  SyncEngine.swift's `tapIn`), and the guard over every Android word — validation: the JVM tests
 
 AN10c's line, as it read when it was done (2026-11-11; `docs/DECISIONS.md`, 2026-11-11).
 

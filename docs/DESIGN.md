@@ -1088,6 +1088,11 @@ words.
   texts and emergency calls always work" for "Calls, FaceTime, Messages and Emergency SOS always
   work", on the intro's first page alone; and the new lines as drawn, Open Bali on the block screen
   among them.
+- **Where the words live:** as on the iPhone, in the engine's module, `outbox`
+  (`android/outbox/src/main/kotlin/com/bali/outbox/`), each a function of its type beside it (AN10d
+  to AN10h): Join's in `Join.kt`; Home's, a scan's, the sign-in's and the start's in `Screen.kt`; Tap
+  in's in `SyncEngine.kt` (`TapFailure`). `WordsTest` reads every one, and fails a word that names
+  something Android lacks or holds an em-dash or an exclamation mark.
 - **The look:** the tokens in Material 3's roles: `primary` is action-primary-bg,
   `tertiaryContainer` the emergency pair, `error` the destructive red, `errorContainer` Lock off's
   chip, `surfaceContainerLowest` the card, `surfaceContainerHigh` the sunken well, `outline`

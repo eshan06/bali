@@ -66,9 +66,9 @@ import kotlinx.coroutines.withContext
 // The sync engine, BaliOutbox's SyncEngine.swift: its frame, AN5a's, its drain, AN5b's, its read loop,
 // AN5c's, its wait for the Start, AN5d's, Emergency Unlock, AN5e's: where it is filed, its reason and the
 // late unlock, the phone check's cap, AN7a's, Delete account, AN9b's, and the 13+ check's read, ask and yes,
-// AN9c's, the deletion's sends and the check's each under one account's token alone, AN9h's, and the account's
-// calls, Join, Leave, Your name and forget me, AN9d's. Swift's actor is a lock each stretch holds
-// (docs/PLAN-ANDROID.md).
+// AN9c's, the deletion's sends and the check's each under one account's token alone, AN9h's, the account's
+// calls, Join, Leave, Your name and forget me, AN9d's, and Home's Tap in, AN10d's (`tapIn`). Swift's actor is
+// a lock each stretch holds (docs/PLAN-ANDROID.md).
 
 /** The engine's clock: the time records are stamped with, the zone its days end in, and waiting on it: a test's own there. */
 interface SyncClock {
