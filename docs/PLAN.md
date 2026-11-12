@@ -8,13 +8,14 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-12 (Central) — App Review approved Bali 1.0, build 14 (Before the pilot,
-item 5; ISSUES #3, so Apple's §3.3.3(P) answer is in): "Pending Developer Release", not released,
-the owner's hold. Before it, the resubmission on build 14 after an automated scan refused build 13
-for the Family Controls entitlement (#550, #551). Next: the owner's release call and disabling the
-review account (Open owner items); a session builds the retire-a-block command; the owner the
-sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11–AN13;
-AN1's part 2 on the owner's phones; the audit's polish waits._
+_Last updated: 2026-11-12 (Central) — Cognito's sign-in pages move to its managed login, in Bali's
+style, the username and password on one page (#PRNUM; DECISIONS 2026-11-12): dev's domain switched,
+both pools' four clients styled (`infra/cognito/managed-login/`). Before it, App Review approved
+Bali 1.0, build 14, held unreleased (#579). Next: the owner's switch of prod's domain, the release
+call and disabling the review account (Open owner items); the portal's sign-in page, then the app's
+Sign in, from the approved sign-in redesign; a session builds the retire-a-block command; the owner
+the sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02);
+AN11–AN13; AN1's part 2 on the owner's phones; the audit's polish waits._
 
 ## Now
 
@@ -58,14 +59,12 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
 - **A teacher's account on the iPhone (the owner, 2026-11-07)** ✅ (#541; DECISIONS 2026-11-07):
   once `GET /v1/me` names a teacher's account, one screen, the app is for students, with Open the
   portal and Sign out, and no device token registered; the server unchanged. Left: Android's twin.
-- **A TestFlight run leaves no certificate behind** ✅ (#542; DECISIONS 2026-11-07): it revokes the
-  Apple Development certificate its signing made, never one from before the run; build 13's run
-  passed its live check (2026-11-07): 3 certificates before signing, 4 after the run, 3 after the
-  revoke.
-- **A session's bell on a whole minute (the owner, 2026-11-08: "Yes, snap them")** ✅ (#546;
-  DECISIONS 2026-11-08): a Start's end and an extend's go up to the next whole minute, where iOS
-  frees a closed app's phone; the 16 hours and PostHog's `planned_minutes` count the minutes picked.
-  No new app build.
+- **The sign-in pages on Cognito's managed login (the owner, 2026-11-12)** ✅ (#PRNUM; DECISIONS
+  2026-11-12): Bali's style on both pools' four clients, the username and password on one page
+  (`infra/cognito/managed-login/`); dev's domain switched, prod's the owner's (Open owner items).
+  Next, each rebuilt from the approved
+  [Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB): the portal's sign-in
+  page, then the app's Sign in screen (the Mac's).
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04); part 2 on
@@ -340,7 +339,6 @@ Researched 2026-10-05; findings in [`docs/ROADMAP-RESEARCH.md`](ROADMAP-RESEARCH
 - 🔧 Cognito for prod: self sign-up gated (S11's Lambda) ✅, a password policy ✅, MFA Optional (TOTP) ✅, MFA on the AWS root ✅; to check: no password-auth clients, unused clients deleted, user-existence errors off; skipped for the pilot: threat protection, CloudTrail — runbook: `docs/RUNBOOKS.md`, 2 (its status list). In dev's pool, the candidate to delete: the old `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`, made with a secret); the clients in use are `bali-ios-dev-public`, `bali-web-dev`, and `bali-ios` (`6qcvcp0ubqmb8gunkt1d6dpkeo`), the demo's password sign-ins, on dev's `AUTH_AUDIENCE` (found 2026-10-14; `docs/DEPLOY.md`)
 - 🔧 Railway for prod: the database on the private network only ✅, `CORS_ORIGINS` set exactly ✅, a long `INTERNAL_API_KEY` ✅; 2FA deferred by the owner; **no backups yet, so no restore drill**: backups before the Vanderbilt pilot's first class (L0b; the owner, 2026-10-12, withdrawing the ruling of 2026-10-05), the drill once a backup exists — runbooks: `docs/RUNBOOKS.md`, 1 and 4
 - 🔧 GitHub: a ruleset and CODEOWNERS so no PR changes `.github/**`, the `Dockerfile` or `.railway/` without the owner; secret scanning with push protection; private vulnerability reporting; CodeQL ✅ (advanced setup, 2026-11-04: JavaScript/TypeScript, GitHub Actions, Kotlin; Swift not yet; blocks merges on high-or-worse security alerts and errors via `protect-main`'s code-scanning rule since 2026-10-14); 2FA — runbook: `docs/RUNBOOKS.md`, 5
-- ✅ The reviewers' rules (#359; `docs/DECISIONS.md`, 2026-10-13): security holes, personal data the privacy paths miss and loosened tests block; reviews judge by `main`'s rules and clear the last failed review first; santa's Reviewer B reviews as an attacker; both Claude workflows on Opus 5.5; merged by the owner's ruleset toggle (GOTCHAS)
 - The school: its phone policy allows Bali, its FERPA notice names vendors as school officials, the agreement is signed, parents are told, students with 504 or IEP plans are accommodated
 
 **Phase 5's owner list:**
@@ -348,6 +346,11 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 
 **The rest of the owner's queue:**
 
+- 🔧 **Prod's sign-in pages to managed login (2026-11-12):** its two clients wear the style; switch
+  its domain, outside class hours, by the one command in `infra/cognito/managed-login/README.md`
+  ("The domain's switch, and back", its rollback beside it), then sign in once on prod to confirm.
+- 🔧 **Prod's MFA, a mismatch (2026-11-12):** AWS reports prod's pool's `MfaConfiguration` as `OFF`,
+  where this file and runbook 2 say MFA Optional (TOTP) ✅. Nothing changed: the owner's to check.
 - **Bali Focus Inc. (2026-11-11):** App Store Connect's seller and copyright fields, and the provider's address and phone for the terms' California notice (§ 1789.3).
 - **The prod sitting's findings (2026-11-08):**
   - 👀 A student with no name shows as their account id's first 8 characters ("01a11334" on the
@@ -383,7 +386,6 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 ✅ (#437, saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it at 25 minutes, and a stuck one once nothing is sent for 30 s, #436), #334 ✅ (#403, a timeout on the portal's polls; #432, on every other read and save but a deck's check and a class's create, which has one since 2026-10-23), #336 measured (#438; DECISIONS 2026-10-22), its fix, a random wait of up to 10 s before the phone's first read after a push, approved by the owner (2026-10-23) and built in the push's app half (#456); and a bell past the gate's 600 phones is over the Starts' 1 s with no push (1,200: 0.9–1.2 s), a later step's before a school that size; L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
 - #380: Present after the bell has no Start, so starting the next class from a projected tab shows the last recap's unlock reasons (the owner, 2026-10-14: tracked, not now); PresentEnded's line, "the session ended at 9:55 AM", waits with it (PV12b kept Present's "no session running")
 - Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade (due now, for 15.5.28, #435); ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
-- ✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left.
 - 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's three class-page controls are built (P10, P11).
 - **Before the pilot's first class, four steps for sessions** (the owner's workflow review, 2026-10-13; one PR each; after the redesign's PV17c, the owner, 2026-10-14); the event-id check done (the owner's go, 2026-10-23), the other three wait for the owner's word:
   - a column-level privacy test: every column classified personal or not, each personal one placed by the privacy paths that handle it (the account deletion, the disposal, the retention run, the export), so a new column fails until it is placed; FERPA covers university students too;

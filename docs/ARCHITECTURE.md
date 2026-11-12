@@ -327,6 +327,15 @@ minors — password security should be a giant company's liability, not a solo
 developer's — and because it's free until 50,000 monthly users and already proven in v2
 (v2's auth bugs were in our code around Cognito, not in Cognito). If its clunkiness
 becomes real pain during the iOS build, the named fallback is Clerk.
+*Amended 2026-11-12 (the owner's ask):* Cognito's own pages, where everyone signs in, signs up and
+resets a password, are its **managed login**, the pages' second version, in both pools, where they
+were the classic hosted UI: in Bali's tokens (`infra/cognito/managed-login/`), their words still
+AWS's. Cognito stays rather than Clerk: passwords can't be moved out of Cognito, so a move would
+have every account set a new one, and the app App Review approved has Cognito built in. Username
+and password sit on one page: an app client allowing choice-based sign-in (`ALLOW_USER_AUTH`) gets
+managed login's identifier-first form, the username alone and then the password on a page of its
+own, so Bali's clients leave it off. `/signup` still opens the sign-up page, as the app's Sign up
+needs (C7, below). Dev's domain switched on 2026-11-12; prod's is the owner's to switch (PLAN).
 
 **2. Every request carries a JWT — a signed identity note.** The server doesn't remember
 anyone between requests, so each request must say who it's from without re-sending a
@@ -382,8 +391,9 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   student sees a stop screen, and the server never learns the question was asked. Under-13
   consent itself stays a later decision, for the K-12 pilot.
   *Amended 2026-10-07 (the owner's decision of 2026-10-06, the gap's fallback):* Cognito's own
-  sign-in page links to its sign-up, and the classic hosted UI cannot hide that link for the app
-  alone, so an account can be made around the question. A sign-in that comes back to a phone that
+  sign-in page links to its sign-up, and Cognito cannot hide that link for the app alone, on the
+  classic hosted UI or on managed login (Auth decision 1's amendment), so an account can be made
+  around the question. A sign-in that comes back to a phone that
   has not passed the check gets the question first, and the sign-in gives Bali's API no token
   until it is answered. 13 or older carries on as after any sign-in. Under 13 deletes the account
   by Delete account's own steps (C4): what the phone queued goes first, every Emergency Unlock
@@ -1104,7 +1114,7 @@ never covers or delays Emergency Unlock, and its answers never enter the outbox.
   it is asked), before Screen Time and Home. The shields' Focus and the home a standing not read
   keeps, which hold the exit, come before both, and so do a session's own screens: Unlocked,
   Protection off and Session over.
-  Every way to the hosted UI starts at one call (`Phone.signIn`), which, for the sign-up page,
+  Every way to Cognito's managed login starts at one call (`Phone.signIn`), which, for the sign-up page,
   asks the check first, every time; only that question's Continue and then the intro, shown where
   this run has not shown it since its last sign-out (once per account, not per phone: the owner's
   rulings, 2026-10-07), go on to the page, after an answer of 13 or older that same time
@@ -1243,7 +1253,7 @@ without it is APNs's, so every shipped iPhone calls it as today. FCM's tokens ar
 APNs's, in the same privacy paths, and Google becomes a processor the privacy policy names before
 the first Android build reaches a student.
 
-**7. Sign-in through Cognito's hosted UI**, as on iOS: in an Auth Tab where the phone's browser has
+**7. Sign-in through Cognito's managed login**, as on iOS: in an Auth Tab where the phone's browser has
 one, which answers Bali alone, else a Custom Tab, whose answer, a link any app can send, is taken
 only for the waiting sign-in with its state; each ephemeral where the browser offers that, and where
 it doesn't, sharing the browser's cookies (the conductor's call, awaiting the owner; `docs/DECISIONS.md`,
@@ -1975,8 +1985,8 @@ Each exists because v2 broke it and shipped a real bug
   students (2026-10-06, a visible doorbell, never the truth), its backend and its app half built
   (#456), the app asking to send it right after onboarding's Screen Time step (the owner, 2026-10-24);
   the Android app (2026-11-02, decided 2026-11-04, "Android app structure"): native Kotlin and
-  Compose, iOS's rules ported with their tests, push through FCM, sign-in through Cognito's hosted
-  UI, its lock an Accessibility service, with its battery plan, which AN1's part 2 confirms on a
+  Compose, iOS's rules ported with their tests, push through FCM, sign-in through Cognito's managed
+  login, its lock an Accessibility service, with its battery plan, which AN1's part 2 confirms on a
   Pixel and a Samsung before launch (`docs/PLAN-ANDROID.md`, Phases 8–11); analytics (2026-11-04,
   "Analytics (PostHog)"): PostHog fed by the server alone, its class totals, always sent, and the
   teacher actions the portal posts it, never a phone and no PostHog code in the browser, nothing

@@ -8,6 +8,46 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **Cognito's sign-in pages move from the classic hosted UI to its managed login, in a softer Bali style,
+  with the username and password on one page (the owner's ask and approval).** The owner asked for a sign-in page that looks
+  like Bali, not like AWS's default.
+
+  **Managed login, not Clerk** (Auth decision 1's named fallback): Cognito never lets passwords out, so a move would have every
+  account set a new one, and the app App Review approved on 2026-11-12 has Cognito built in. Managed login is Cognito's own
+  second version of its pages, dressed per app client by a style, a settings object and images; it needs the Essentials plan,
+  which both pools are on. The apps and the portal change nothing: they open the same addresses, and `/signup` still opens the
+  sign-up page under managed login (seen on dev), so the app's Sign up works as it did.
+
+  **The style** (`infra/cognito/managed-login/`: the settings, the two logos, the request that applies them, and a test):
+  Bali's tokens, the stone-50 page, a white card at radius 20, green-700 pill buttons and links, stone-100 fields with
+  `border-input` edges, the green-600 focus ring, the logo above the card, light mode only. Of two looks shown side by side the
+  owner took the softer: labels in `text-secondary` where the first had `text-primary`, and headings at the regular weight,
+  "Sign in" at 28 px, through `categories.global.typography`, keys AWS doesn't document but Cognito took and keeps; should AWS
+  drop them, the headings turn bold again and nothing else changes. The words stay AWS's; no setting reaches them. Cognito
+  takes a form logo between 1:1 and 4:1, so D2d's 140 × 32 lockup (4.375:1) sits on a 4:1 canvas, its pixels unchanged.
+  This step's calls, each awaiting the owner's look: the request sends two images, the logo and the favicon, since an update
+  changes only what it names and a style's other images are Cognito's own (dev's styles, read back merged, show them filled);
+  and the repo's logos are the bytes live on the four styles, which `make-logo.mjs` redraws to the pixel.
+
+  **One page:** the owner asked for the username and password on one page. Managed login gives a client allowing choice-based
+  sign-in (`ALLOW_USER_AUTH`) the identifier-first form, the username alone and then the password on a page of its own, so it
+  came off dev's two clients, nothing else on them changed; prod's never had it. Runbook 2, step 8, now says to keep it off.
+
+  **Where it stands:** dev's domain is on managed login and both its clients wear the style; prod's two clients wear it with
+  prod's logo, and prod's domain stays classic until the owner switches it (PLAN's Open owner items; the README's one
+  command). Its rollback is the same command with version 1: a pool keeps its classic CSS and logo through a switch (dev's read
+  back after its own), so classic comes back as it was. The classic files (`infra/cognito/hosted-ui/`: D2d's CSS, its test, the
+  140 × 32 logos and its README) are retired; DESIGN's scope line, ARCHITECTURE's Auth decision 1 (amended) and its hosted-UI
+  mentions, RUNBOOKS, DEPLOY and WEB now say managed login.
+
+  **The sign-in redesign canvas:** the owner approved the
+  [Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB) the same day: the app's Sign in screen and the
+  portal's sign-in page, each opening managed login, rebuilt from it in PLAN's next two steps. The portal keeps no Sign up
+  button, by design: a student signs up in the app, where the 13+ question is. The managed-login page keeps its own sign-up
+  link, which no setting hides for one client; an account made through it meets the 13+ question in the app before the app
+  gives Bali's API its token, and the portal shows it no student page until then (ARCHITECTURE, Auth, the gap's fallback;
+  Live lesson, decision 13).
+
 - **2026-11-12** — **The company's name is written Bali Focus Inc., with no comma, and the website's hero loses its line on
   the states' phone laws (the owner).** The owner sent a screenshot of the name as the company writes it, "Bali Focus Inc.",
   which is how the privacy policy, the terms and the website's copyright line already give it (the 2026-11-11 entry below),

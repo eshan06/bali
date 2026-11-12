@@ -31,7 +31,8 @@ uses values the one before it produced:
   Vanderbilt address) (4); the password policy, minimum 12 (5); MFA optional,
   TOTP (6); both app clients, SRP and refresh only, the phone's with the 365-day refresh
   token and the `aws.cognito.signin.user.admin` scope C4 needs (8); the hosted-UI domain,
-  its branding set to Hosted UI (classic) (9); the values handed to Railway, Vercel and
+  its branding still Hosted UI (classic) until the owner switches it to managed login, both
+  clients' styles in place since 2026-11-12 (9); the values handed to Railway, Vercel and
   the iOS build (12). Not needed: Sign in with Apple (11; no Google sign-in).
 - **Runbook 2 — skipped for the pilot, still to do:** threat protection (7; it needs
   the Plus plan, billed per user) and CloudTrail (2). Not recorded, so check them:
@@ -462,7 +463,10 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
        `ALLOW_ADMIN_USER_PASSWORD_AUTH` (those send a password straight to the API).
        Keep `ALLOW_REFRESH_TOKEN_AUTH`. `ALLOW_USER_SRP_AUTH`: try it off; if the
        hosted page then fails to sign anyone in, turn it back on (SRP never sends
-       the password).
+       the password). Keep `ALLOW_USER_AUTH` (choice-based sign-in) **off**: with it,
+       managed login asks for the username alone and the password on a page of its
+       own; without it, both on one page (the owner's ask, 2026-11-12;
+       `infra/cognito/managed-login/README.md`).
      - **Prevent user existence errors:** **Enabled**, so a sign-in never says
        whether an email has an account.
    **Check**, with the AWS CLI signed in to the account:
@@ -472,12 +476,14 @@ and the portal on its free Vercel address, `https://<project>.vercel.app` (e.g.
    aws cognito-idp initiate-auth --client-id <client id> --auth-flow USER_PASSWORD_AUTH \
      --auth-parameters USERNAME=nobody@example.com,PASSWORD=x
    ```
-   The first shows no `*_PASSWORD_AUTH`, `ENABLED`, `["code"]`, and only the URLs
-   above. The second must fail with *"USER_PASSWORD_AUTH flow not enabled for this
+   The first shows no `*_PASSWORD_AUTH` and no `ALLOW_USER_AUTH`, `ENABLED`, `["code"]`,
+   and only the URLs above. The second must fail with *"USER_PASSWORD_AUTH flow not enabled for this
    client"*. Then the phone client's public-client check in `docs/DEPLOY.md`
    (`invalid_grant`, never `invalid_client`).
 9. **The hosted-UI domain.** Pool → **Branding** → **Domain** → **Create Cognito
-   domain**, prefix e.g. `bali`, **Hosted UI (classic)** (as dev). This is
+   domain**, prefix e.g. `bali`, **Managed login** (as dev since 2026-11-12), which
+   needs the pool's **Essentials** plan or above; then give each app client Bali's
+   style (`infra/cognito/managed-login/README.md`). This is
    `https://<prefix>.auth.<region>.amazoncognito.com`: the portal's
    `NEXT_PUBLIC_COGNITO_DOMAIN` and the phone's `BALI_COGNITO_DOMAIN`.
    **Check:** open

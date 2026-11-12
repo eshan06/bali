@@ -178,8 +178,8 @@ The PC whose clone is `C:\dev\bali` holds Android's SDK and its test emulators
 ## Cloud sessions / dev environment
 
 - **A sign-up on dev's hosted page fails.** Dev's Cognito pool (`us-east-1_YTloqilwT`) verifies
-  no attribute, so its Sign up makes the account unconfirmed and lands on Cognito's "An error was
-  encountered with the requested page." Use the existing demo accounts (`$DEMO_USER_TEACHER` and
+  no attribute, so its Sign up makes the account unconfirmed and ends on an error message from
+  Cognito. Use the existing demo accounts (`$DEMO_USER_TEACHER` and
   the students the owner's shell exports) until the owner turns on email verification in the
   console; then delete this entry.
 

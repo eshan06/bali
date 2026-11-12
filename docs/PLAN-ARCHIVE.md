@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-12 (Central) — App Review approved Bali 1.0, build 14 (Before the pilot,
+item 5; ISSUES #3, so Apple's §3.3.3(P) answer is in): "Pending Developer Release", not released,
+the owner's hold. Before it, the resubmission on build 14 after an automated scan refused build 13
+for the Family Controls entitlement (#550, #551). Next: the owner's release call and disabling the
+review account (Open owner items); a session builds the retire-a-block command; the owner the
+sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11–AN13;
+AN1's part 2 on the owner's phones; the audit's polish waits._
+
 _Last updated: 2026-11-09 (Central) — Bali 1.0, build 13, is submitted to the App Store, "Waiting
 for Review" (Before the pilot, items 5 and 6; #548; DECISIONS 2026-11-09): the listing branded
 around focus, the privacy label published, rated 13+, the United States only, released by hand.
@@ -2322,6 +2330,16 @@ Production backups (L0b) moved to before the first actual pilot, the Vanderbilt 
 2026-10-12), and hold back no screen. Left for the owner, under Open owner items: L0b, before the
 Vanderbilt pilot's first class.
 
+**In flight, two finished lines as PLAN.md said them until 2026-11-12 (moved for its word cap):**
+- **A TestFlight run leaves no certificate behind** ✅ (#542; DECISIONS 2026-11-07): it revokes the
+  Apple Development certificate its signing made, never one from before the run; build 13's run
+  passed its live check (2026-11-07): 3 certificates before signing, 4 after the run, 3 after the
+  revoke.
+- **A session's bell on a whole minute (the owner, 2026-11-08: "Yes, snap them")** ✅ (#546;
+  DECISIONS 2026-11-08): a Start's end and an extend's go up to the next whole minute, where iOS
+  frees a closed app's phone; the 16 hours and PostHog's `planned_minutes` count the minutes picked.
+  No new app build.
+
 ## Phases: the full table and the finished step lists (as of 2026-10-13)
 
 | Phase | What | Status |
@@ -2776,6 +2794,7 @@ Done items, and the lines `docs/PLAN.md` keeps short or once (as of 2026-10-13).
 - The portal redesign in v2's look ("Portal redesign (v2's look) steps"; the owner, 2026-10-12): ✅ **PV1**, the states no board drew: drawn on the canvas and approved by the owner on 2026-10-12 (canvas version 21; PV1's line and `docs/DECISIONS.md`). **Both calls made, as proposed** (the owner, 2026-10-12; `docs/DECISIONS.md`): (1) **built exactly as drawn** (PV4, ✅ 2026-10-13): the canvas's radii (8, 12, 16), type sizes and spacing added as portal tokens, portal-only, `tokens.test.ts` naming and pinning each beside the owner's ruled sizes so no other value gets in, the spacing as Tailwind's multiples of `space-1`, and Reports' italic line on Instrument Sans's italic file, added (DESIGN.md §1, Its call). (2) **Recent activity's events** (PV3): the three kinds Home's `Main` board draws, an Emergency Unlock with its reason, protection off, and a session started, each with its student (none for a start) and its class, from today's sessions of the teacher's own classes, newest first, four at most (the board's count), shown while a class is live as the board draws it (HomeIdle draws none); nothing else (no tap-in, return to focus, silence, leaving, extension, end, question or slide).
 - ✅ Before C4: the phone's Cognito app client allows the `aws.cognito.signin.user.admin` scope (Cognito's `DeleteUser` needs it) — prod (2026-10-04) and dev's `bali-ios-dev-public` (2026-10-05).
 - ✅ The pre-pilot event-id step, done 2026-10-23 with part 3 (#449); its line as PLAN.md held it, under "Before the pilot's first class, four steps for sessions": a repeated-`event_id` check on every data-changing route, driven from the authorization matrix's route list, in three parts: part 1, the check ✅ (#442; DECISIONS 2026-10-23), its list the five routes that failed then; part 2, Create class's event id ✅ (#447; DECISIONS 2026-10-23), off the list; next part 3, the three places #319's survey found comparing an id as text, so a retry in upper case misses (a deck's removal, a tap with the unlock sent under it, and an unlock's replay after its reason changed; DECISIONS 2026-10-22), each taking its entries off the list;
+- Two done lines as PLAN.md held them until 2026-11-12 (moved for its word cap): "✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left." and, from Phase 6's owner list, "✅ The reviewers' rules (#359; `docs/DECISIONS.md`, 2026-10-13): security holes, personal data the privacy paths miss and loosened tests block; reviews judge by `main`'s rules and clear the last failed review first; santa's Reviewer B reviews as an attacker; both Claude workflows on Opus 5.5; merged by the owner's ruleset toggle (GOTCHAS)"
 
 ## Go-live features
 
