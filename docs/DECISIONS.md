@@ -70,15 +70,32 @@ a real decision? Add a dated entry at the top: what was decided and why.
   test, "offline"); and a refusal keyed on its message (the by-reason test: `event_id_conflict` said "the question is
   closed").
 
-  **The proof:** PROOF
+  **The proof:** `android/app` is unchanged, so the JVM tests are the proof and no emulator ran: `./gradlew assemble :app:lint
+  check` green, Android 10's API check with it (Animal Sniffer over `core` and `outbox`) and no compiler warning from this
+  step's code; the core and outbox suites green in each `check` and four more times on the final code (`--rerun`; 676 tests,
+  eighteen of them new), AN9h's AgeFallbackTest `aYesForOneAccountTakenAtAWake…` among them every time; `npm run typecheck &&
+  npm run lint && npm test` green, the portal's suite whole (78 files), and `npm run format:check`. No SDK package was
+  installed and no library added: the build downloads none (`android.builder.sdkDownload=false`), and no build file changed.
+  The size, santa's count: 223 changed lines not counting tests and Markdown (the split guessed about 190), 533 in the tests.
 
-  **Santa's review:** SANTA
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs: this entry's placeholders (both; filled);
+  the cadence test's owner check, which read the `StateFlow`'s own value and so could never fail (reviewer A; it now collects
+  from before the first read and waits for the newest, as iOS's `updates` iterator did); and one for AN13d (reviewer B),
+  below.
 
   **For AN13b to AN13g and AS8:** AN13b adds the deck beside the poll: `DeckResult`, the decks kept by `sha256` and emptied
   where over is over, `deck(slide)` and its fetch, with `ApiClient`'s `transport` and `timeout` made `internal` for it. AN13d
   runs `run()` in its own scope while Bali's screen is in front and cancels it as the screen goes behind, calls `answer` in
   its own scope too, so a screen leaving never cuts an answer short, and reads `state`. AN13c words `PollProblem` and
-  `AnswerResult`. Nothing here polls or answers by itself.
+  `AnswerResult`. Nothing here polls or answers by itself. **For AN13d to weigh (santa's reviewer B):** the app's one
+  `OkHttpTransport`, the engine's and the sign-in's, runs each call through OkHttp's dispatcher, which lets 5 requests a host
+  go at once and queues the rest; the lesson, given the engine's client, adds its poll and its answers, so on a slow network
+  the poll and a few crossing answers, beside the engine's own reads, could hold an Emergency Unlock's send in that queue
+  until a call ahead ends (each bounded at 30 s). The unlock itself is the phone's at once and its record is kept, so only
+  its send waits; decision 5's "no answer ahead of an unlock" speaks of the outbox, not that queue. Unreachable here, since
+  nothing calls `LiveLesson` yet: AN13d's to settle with a test, a limit on answers in flight, or a dispatcher of the
+  lesson's own.
 
 - **2026-11-12** — **AN10h, History's words and the consent list: BaliOutbox's `History.words`, `notUpdated`, the moments'
   and notes' words and the day titles, and JoinView.swift's `ConsentCard` lists in Kotlin, each a function of its type, the
