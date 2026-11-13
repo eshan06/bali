@@ -35,11 +35,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **The fix (the conductor's call, awaiting the owner's look), in the rig alone:** `deckRig` runs the lesson half on the test's
   own thread (`TestsThread`, a dispatcher in `LessonsTest.kt`): what the test starts or wakes still runs at once there, as
   Unconfined ran it, so "nothing fetched" is still checked as a call returns; what another thread wakes, the deck's hash above
-  all, goes to the test's own `runBlocking` loop and runs there as the test next waits. So no stretch of the lesson half runs at
-  once with a step of the test, whatever hop a later step adds, as iOS's AppTests run their `Phone` with the test, both on the
-  main actor. Not chosen: a seam for the hash's dispatcher in core's `LiveLesson` and in `Lessons` (product code changed for a
-  test, and only that one hop closed), or a wait in the rig after each read (the read's watch can wait on `LiveLesson`'s own lock
-  too, which no test sees).
+  all, goes to the test's own `runBlocking` loop and runs there as the test next waits. So nothing the lesson half's own scope
+  runs can run at once with a step of the test, whatever hop a later step adds, as iOS's AppTests run their `Phone` with the test,
+  both on the main actor; a test reads what such work did only after a wait, a mark or a call that takes the lesson half's lock.
+  A run a test starts in a scope of its own, as two deck tests start `lessons.run()` on the engines' Default scope, runs its own
+  stretches there, as the app's does. Not chosen: a seam for the hash's dispatcher in core's `LiveLesson` and in `Lessons`
+  (product code changed for a test, and only that one hop closed), or a wait in the rig after each read (the read's watch can wait
+  on `LiveLesson`'s own lock too, which no test sees).
 
   **The regression test, failing first** (its own commit): SlideTest's
   `aReadAnsweredWhileTheLastDecksOpenStillHoldsTheLessonHalfsLockOnAThreadOfItsOwnIsShownAsTheRigsNextReturnsSoTheSlideAskedForIsTheOneShown`,

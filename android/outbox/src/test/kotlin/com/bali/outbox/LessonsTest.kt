@@ -220,9 +220,10 @@ private fun EngineFiles.lessonRig(): LessonRig {
  * test ends (a reply, the clock moved, a hold let go), runs at once there up to its first wait, a reply's, a sleep's or its lock's,
  * as [Dispatchers.Unconfined] runs it, so once a call returns, whatever it sent is sent and whatever it waits on it waits on, never
  * a window of time. What another thread wakes, the deck's check above all (core's `sha256`, on [Dispatchers.Default]), runs there
- * as the test next waits, never at once with a step of the test: on Unconfined it ran on, and held the lesson half's lock on, a
- * thread of its own (the flake of 2026-11-12, staged in [SlideTest]), as iOS's AppTests never do, their `Phone` and the test both
- * on the main actor.
+ * as the test next waits, never at once with a step of the test, so a test reads what it did only after a wait: a mark, or a call
+ * that takes the lesson half's lock. On Unconfined it ran on, and held the lesson half's lock on, a thread of its own (the flake
+ * of 2026-11-12, staged in [SlideTest]), as iOS's AppTests never do, their `Phone` and the test both on the main actor. A run a
+ * test starts in a scope of its own (`lessons.run()` in [EngineFiles.scope]) runs its own stretches there, as the app's does.
  */
 private suspend fun EngineFiles.deckRig(accounts: Flow<Account.State> = emptyFlow()): LessonRig {
     val (server, clock, renderer) = Triple(Server(), TestClock(), FakeRenderer())
@@ -843,6 +844,8 @@ class LessonsTest : EngineFiles() {
             // ends could follow the next lesson after the run's end. Staged with no window of time: the run's end holds the lesson
             // half's lock, closing the slide's document, as the bell wakes on this thread (the rig's lesson half runs here) and waits
             // there for the lock; then the run's end lets the bell go, and the lock. At Period 3's bell, Period 4's would follow.
+            // The lock goes to the bell's stretch next, which the rig runs as this test next waits, so the lesson is read once
+            // `polling()` has had the lock after it: even when the run has ended before the test's join, which then never waits.
             val accounts = MutableStateFlow(twoInSession())
             val rig = deckRig(accounts)
             val lessons = rig.lessons
@@ -861,8 +864,8 @@ class LessonsTest : EngineFiles() {
             rig.clock.releaseWakes()
             closing.release()
             withTimeout(patience) { running.join() }
-            assertNull(lessons.state.value.lesson, "a bell let go as the run ended followed a lesson after it")
             assertFalse(lessons.polling())
+            assertNull(lessons.state.value.lesson, "a bell let go as the run ended followed a lesson after it")
         }
 }
 
