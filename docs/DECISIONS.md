@@ -21,7 +21,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   52 pt tall with a 16/20 label (`PillButtonStyle`), round at 26, a label the text size wraps growing them. The
   ring is `SessionRingArt`, the portal's own geometry and tokens (`components/mark.tsx`, #582) drawn in a Canvas:
   `BaliMark`'s open arc and Focus's `Ring`, with its digits, don't fit. Measured against the board's render at
-  390 × 844, every part sits within 1.5 pt of it.
+  390 × 844, every part sits within 1.5 pt of it down the screen; across, words keep iOS's font's widths.
 
   **The policy links underlined, a dot between them**, as the board draws them (`PolicyLinks`' `underlined` and
   `dotted`, Sign in's alone): DESIGN.md §4 named the app's colour-only links a known gap until the owner approved
