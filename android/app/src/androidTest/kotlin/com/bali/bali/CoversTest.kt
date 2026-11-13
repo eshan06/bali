@@ -157,8 +157,13 @@ class CoversTest {
             return window.id
         }
         never(holder(Intent(Settings.ACTION_SETTINGS)), { shell("am start -a android.settings.SETTINGS") })
-        // Where the student switches Bali off, and removes it, the removal asked and never confirmed: Back.
-        never(holder(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)), { shell("am start -a android.settings.ACCESSIBILITY_SETTINGS") })
+        // Where the student switches Bali off, and removes it, the removal asked and never confirmed: Back. Android 13's Settings
+        // can open its Accessibility page through a deep link of its own, a first page finishing for it and the page started
+        // last, once over the next step's removal (AN6d's run on API 33): left once the page's own window has the focus.
+        never(holder(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)), { shell("am start -a android.settings.ACCESSIBILITY_SETTINGS") }) {
+            until { Unit.takeIf { "$ACCESSIBILITY_PAGE}" in focused() } }
+            home()
+        }
         val removing = Intent(Intent.ACTION_DELETE, "package:${context.packageName}".toUri())
         never(holder(removing), { shell("am start -a android.intent.action.DELETE -d package:${context.packageName}") }) {
             // Back to the home screen, no Home after it: one pressed as Back lands can come after the next step's start.
@@ -578,6 +583,9 @@ class CoversTest {
         const val SPLIT_SCREEN_PRIMARY = 3
         const val SPLIT_SCREEN_SECONDARY = 4
         const val EMERGENCY_DIALER = "com.android.phone.EmergencyDialer.DIAL"
+
+        /** Settings' Accessibility page's window, as `dumpsys window` names it. */
+        const val ACCESSIBILITY_PAGE = "com.android.settings/com.android.settings.Settings\$AccessibilitySettingsActivity"
         const val EMERGENCY_ASSISTANCE = "android.telephony.action.EMERGENCY_ASSISTANCE"
         val EMERGENCY_ALERTS = listOf("android.provider.action.SMS_EMERGENCY_CB_RECEIVED", "android.provider.Telephony.SMS_EMERGENCY_CB_RECEIVED")
         const val TAG = "BaliCovers"
