@@ -14,17 +14,15 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-13 (Central) — AN6f, the sign-out page made sure, where the phone's browser offers no ephemeral tab (#591;
-`docs/DECISIONS.md`, 2026-11-13): the sign-in page's answer reaches the sign-in at once and its code is traded first, the
-sign-out page opening once the token endpoint has answered, so the tokens are given before `/logout`, as AWS documents; they're
-kept only once that page comes back, and dropped when it closed or couldn't open. A sign-in page closed with no answer opens the
-sign-out page too, still ending as the close; a host made again before the browser covers it waits on; SignInBrowserTest's
-font-scale change is undone to Bali's window size too (the conductor's calls and this step's, awaiting the owner's look). No
-screen, no word. Before it, AN13g, the lesson in the app, and with it AN13. Next: AN9j and AN9k, AN11, AN12 and Phase 10's
-screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, on any Chrome now, signed in on dev as an
-account that passed the 13+ check on an iPhone (Q7), and AN6f's checks on a Chrome before 136; prod's Android client, the
-owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that needs them (Open owner items,
-6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-13 (Central) — AN9j, `409 account_deleted` read as signed out (#592; `docs/DECISIONS.md`, 2026-11-13):
+Bali's server's answer to any call, heard where every answer comes, ends that account's sign-in as Sign out does, with no
+DeleteUser; its queue let go, every Emergency Unlock kept apart and never sent; a phone in a lesson off its lock at once. Only for
+the account signed in, and this phone's own deletion finishes its own way, DeleteUser included (the conductor's calls and this
+step's, awaiting the owner's look). No screen, no word. Before it, AN6f, the sign-out page made sure. Next: AN9k, then AN11, AN12
+and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, on any Chrome now, signed in on
+dev as an account that passed the 13+ check on an iPhone (Q7), and AN6f's checks on a Chrome before 136; prod's Android client,
+the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that needs them (Open owner
+items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -180,9 +178,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   2026-11-11)
 - **AN9f** Me's rules: Your name, Leave and Sign out's hold — ✅ (#560; DECISIONS 2026-11-11)
 - **AN9g** History's rules and its call — ✅ (#561; DECISIONS 2026-11-11)
-- **AN9j** `409 account_deleted` read as signed out (the owner, 2026-11-12): today a deleted account's other phone says
-  "Something went wrong at Bali", and one locked in a lesson stays locked until the bell (twin: the iPhone's half, PLAN's C4d,
-  the Mac's) — validation: the JVM tests, the engine's and the router's
+- **AN9j** `409 account_deleted` read as signed out — ✅ (#592; DECISIONS 2026-11-13)
 - **AN9k** A student's notes kept off the phone's storage once a deletion's request went out, even where its answer was lost,
   so that student sees the one-time consent screen again (the owner, 2026-11-12; twin: the iPhone's half, PLAN's C4e, the
   Mac's) — validation: the JVM tests, and BaliAppTest's notes test on `Bali_Spike_API29`, `35` and `37`

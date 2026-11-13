@@ -364,6 +364,10 @@ an archived class never reserves its code forever; a teacher can regenerate it (
   retry." Only a definitive `401 Unauthorized` (Cognito rejecting the token) ends a
   session. v2 got this wrong: one network blip signed the teacher out into a login page
   that then rejected their correct password.
+  *Amended 2026-11-13 (the owner, 2026-11-12, "in both apps"):* Bali's server saying the
+  account is deleted, `409 account_deleted` to a call under its token (C3d), is a real no
+  too: that sign-in ends as Sign out ends it, on Android since AN9j, on the iPhone with C4d
+  ("Android app structure", the rules where Android's differ).
 - **A reinstall starts signed out** (the owner's ruling, 2026-10-08, found on TestFlight
   build 8). iOS keeps the Keychain, where the phone keeps its sign-in, after an app is
   deleted, while it deletes the app's own files and its app group's: a reinstall opened
@@ -1265,7 +1269,8 @@ sign-in still ending as that close (AN6e's and AN6f's calls, awaiting the owner;
 2026-11-05 and 2026-11-13). Sign out needs no `/logout`: a sign-in that finishes there has ended its session. The code grant with PKCE, through app clients of
 Android's own on each pool, with no secret, the answer at the app id's own scheme
 (`com.bali.bali://auth/callback`, two slashes, the form Cognito's console takes). Auth's rules hold:
-only a real `401` signs anyone out, and no token reaches Bali's API before the 13+ check but the check's own read and a deletion's.
+only a real `401`, or Bali's server's `409 account_deleted` (AN9j, below), signs anyone out, and no token reaches Bali's API before
+the 13+ check but the check's own read and a deletion's.
 
 ### Rules that keep the phone honest, where Android's differ
 
@@ -1294,6 +1299,14 @@ only a real `401` signs anyone out, and no token reaches Bali's API before the 1
   its file at the first read, so that is the engine's load, never the start); a later read that works
   puts it back from the standing, and a lock this run put on still ends at its own end. The conductor's
   calls, the owner's by the go-ahead of 2026-11-12 (`docs/DECISIONS.md`, 2026-11-11, 2026-11-12 and 2026-11-13).
+- **A deleted account reads as signed out** (the owner, 2026-11-12; AN9j; the iPhone's twin is C4d, not built yet). Bali's
+  server answering any call `409 account_deleted` (C3d) is that call's account gone, wherever the answer comes: the API client
+  tells the sign-in whose token it sent. Only for the account signed in then, the sign-in is forgotten as Sign out forgets it,
+  with no Cognito DeleteUser (the API's deleter removes it); what the account still had queued is let go; an Emergency Unlock
+  still queued is kept apart in the outbox's file, never sent, so it never goes under another account nor holds that account's
+  queue or lock; and the phone leaves its session, the lock off at once. This phone's own deletion finishes as Delete account
+  does, DeleteUser included: under way, it goes on; its `DELETE /v1/me` answer lost, the `409` is that answer. The conductor's
+  calls, awaiting the owner (`docs/DECISIONS.md`, 2026-11-13).
 - **A reinstall starts signed out, with an outbox of its own.** Android deletes an app's files and
   its Keystore keys with the app, but its backup can bring the files back on a reinstall or a new
   phone. Bali leaves its own out of the backup and of a transfer to a new phone (the outbox, its
