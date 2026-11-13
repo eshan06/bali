@@ -70,8 +70,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
      the browser covered it, a real sign-in ended for nothing (AN13g's finding).
   6. **The host gone for good ends the sign-in at once** (its task swiped away, or Back on the host itself): no sign-out page
      can open with no host, so the sign-in page's close is `Cancelled` with none, the sign-out page's is the browser not signed
-     out (or the close it followed), and while the code is traded the sign-out page never opens: the browser not signed out,
-     the tokens dropped.
+     out (or the close it followed), and once the sign-in page is gone by, the code being traded or the sign-out page shown but
+     never opened, the sign-out page never opens: the browser not signed out, the tokens dropped. A host on its way out opens
+     nothing (santa's round 1, below).
   7. **Call 4 by the font scale, put back to Bali's window size too.** `recreate()` can't stand in for a rotation while the tab
      is open: on a stopped host it passes through `onResume` on Android's local relaunch (AN6c's finding), which, the browser
      having covered the host, is the close. So `changed {}` keeps the font scale and now waits, once it's put back, for Bali's
@@ -123,9 +124,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   open; call 3's rule (`resumed` before and after the browser covered the host); the host in front told; the host gone for
   good; the app's browser letting go as its caller does; and a whole sign-in through it, traded before the sign-out page opens.
   SignInBrowserTest: every test on the new browser; Back on the sign-in page opening the sign-out page where the browser offers
-  no ephemeral tab, none on Android 17; a host made again on screen before the browser covers it waiting on (new); the whole
-  sign-in's trade reaching the tests' server before the sign-out page opens, and so before its return is sent, nothing sealed or
-  signed in before it.
+  no ephemeral tab, none on Android 17; a host made again on screen before the browser covers it waiting on (new); a host
+  finishing as the code's trade answers, in one step of the main thread, opening no sign-out page and, gone, ending the sign-in
+  (new, santa's round 1); the whole sign-in's trade reaching the tests' server before the sign-out page opens, and so before its
+  return is sent, nothing sealed or signed in before it.
 
   **Broken on purpose, each failing by name, then reverted:**
   - the trade waiting for the sign-out page, as AN6e's did (signed out first, traded after): SignInTest's
@@ -149,16 +151,49 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - a remade host's resume before the cover ending the sign-in: in `HostedUi.resumed` (`covered` ignored), HostedUiTest's
     `aHostBackInFront…`, `opened again before the browser covered the host`, and `aHostInFront…`; on API 35,
     SignInBrowserTest's `aHostMadeAgainOnScreen…`, `the host made again took the sign-in page as the student's close`; and in
-    the host (`covered` set by Android's stop to make it again), the same test, the same line.
+    the host (`covered` set by Android's stop to make it again), the same test, the same line;
+  - santa's round 1, the host gone once its sign-in page was ending nothing (`left`'s old branches): HostedUiTest's
+    `theHostGoneForGood…`, `the host gone before it opened the sign-out page ended nothing`; on API 35, SignInBrowserTest's
+    `aHostFinishingAsTheTradeAnswers…`, the sign-out's wait `Timed out waiting for 30000 ms`, the hang itself; and a host on its
+    way out opening the sign-out page (`next()` with no `isFinishing`), the same test, `a sign-out page opened by a host on its
+    way out expected:<1> but was:<2>`.
 
-  **The runs,** on the final code: on the JVM, every task run again, none UP-TO-DATE: core 158 (154 at #590, four new),
-  outbox 571, the app's 28 and 31, Debug's and Release's (HostedUiTest's 15 now 20); Gradle's `assemble
+  **The runs,** on the final code (`2f45b54f`): on the JVM, every task run again, none UP-TO-DATE: core 158 (154 at #590, four
+  new), outbox 571, the app's 28 and 31, Debug's and Release's (HostedUiTest's 15 now 20); Gradle's `assemble
   :app:assembleDebugAndroidTest :app:lint check` green, Android 10's API check with it. SignInBrowserTest, BaliAppTest and
-  ReadoutTest, 32 tests (31 at #590: the remake test is new): on `Bali_Spike_API29` (Chrome 74) and `_API35` (Chrome 124), 31
-  passed and 1 skipped on each, the ephemeral-tab test; on `_API37` (Chrome 145), 30 passed and 2 skipped, the two that need a
-  browser with no ephemeral tab. WHOLE_SUITES After each run, `dumpsys netstats` listed no traffic for Bali's uid or its test
-  app's. Each emulator after: Bali and its test app uninstalled, AN1's spike apps kept, its font scale, Accessibility services
-  and Airplane mode as found, stopped. Nothing was added to the PC's SDK, and no library.
+  ReadoutTest, 33 tests (31 at #590: two new), each emulator cold-booted: on `Bali_Spike_API29` (Chrome 74) and `_API35` (Chrome
+  124), 32 passed and 1 skipped on each, the ephemeral-tab test; on `_API37` (Chrome 145), 30 passed and 3 skipped, the three
+  that need a browser with no ephemeral tab. The whole suite, 94 tests (92 at #590), each from a cold boot: on
+  `Bali_Spike_API33` (Chrome 109), 93 passed and 1 skipped, the ephemeral-tab test, AN13g's failed test passing; on `_API36`
+  (Android 16, Chrome 133, no ephemeral tab), 93 passed and 1 skipped, the same. `npm run typecheck && npm run lint && npm test`
+  green but for the portal's `tokens.test.ts` case "never set on one icon…", 5,096 ms against its 5 s limit in the full run
+  (AN6a's known one): the portal's suite alone passed whole (78 files, 1,663 tests), and `npm run test:infra` 24 of 24. After
+  each run, `dumpsys netstats` listed no traffic for Bali's uid or its test app's. Each emulator after: Bali and its test app
+  uninstalled, AN1's spike apps kept, its font scale, Accessibility services and Airplane mode as found, stopped. Nothing was
+  added to the PC's SDK, and no library.
+
+  **Two failures on the way, each traced before anything ran again:**
+  - API 33's first whole run (on `8c4e3b62`, before santa's fix): 88 passed, 1 skipped and 4 failed of 93, every failure
+    CoversTest's teardown (`home()`: the launcher never had the window focus within 30 s), just after Google Messages stopped
+    answering under CoversTest's `callingForHelp…` (`am_anr`: input dispatching timed out at its LaunchConversationActivity).
+    The emulator, cold-booted, was starved by this step's own `npm test` on the PC at the same time; the dialer and the Google
+    app had stopped answering during its boot too. Nothing of AN6f's runs in CoversTest. The final run had nothing else
+    running on the PC.
+  - API 35's first run on the final code: 31 of 33. Twice Chrome 124's first-run activity never got the input focus (`Waiting
+    because no window has focus`, then `Dropping KEY event`, then Chrome's own ANR), so a test's Back was dropped: the second
+    Back of `aHostMadeAgainForAChange…TakesTheStudentsBack…`, on the sign-out page, and the first of `theHostOpensTheTab…`,
+    AN6c's own step. Bali's side had done its part, the close opening the sign-out page. A first-run page opened by hand on
+    that emulator, up for over an hour of runs, did the same at its Back; after a cold boot it opened and closed with Back as
+    it should, and the run passed whole.
+
+  **Santa's review:** NICE in two rounds, two Claude Opus reviewers at max effort each round (no Codex or Gemini CLI on this
+  PC, so context isolation holds and model diversity doesn't). Round 1: one blocker, from both: a host gone for good as the
+  code's trade answered (Back on it, or its task swiped away while the process lives) ended nothing, since its pause had
+  cleared `front` and `left` matched neither branch with the sign-out page shown but never opened, so the sign-in waited
+  forever and every later Sign in was refused as another sign-in page open. Fixed, `left` ending it there too (call 6), its
+  tests failing first by name (above). Reviewer B's WARN, a host on its way out still opening that sign-out page: fixed,
+  `next()` opening nothing while it finishes. Round 2, on the fixes: no blocker from either; B's WARN, this paragraph written
+  before the fix's test, taken.
 
 - **2026-11-13** — **AN13g, the lesson in the app, and with it AN13: `BaliApp.start` makes the lesson half once a run beside
   the account, in the run's own scope; its client is handed to `start`, the app's own run alone getting one unasked, so no
