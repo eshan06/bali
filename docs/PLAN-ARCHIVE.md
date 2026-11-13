@@ -10,6 +10,23 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN9k's on 2026-11-13: _Last updated: 2026-11-13 (Central) — AN9j, `409 account_deleted` read as signed out (#592; `docs/DECISIONS.md`, 2026-11-13):
+Bali's server's answer to any call, heard where every answer comes, ends that account's sign-in as Sign out does, with no
+DeleteUser; its Emergency Unlocks sent first under its own token, the rest of its queue let go; a phone in a lesson off its lock at once. Only for
+the account signed in, and this phone's own deletion finishes its own way, DeleteUser included (the conductor's calls and this
+step's, awaiting the owner's look). No screen, no word. Before it, AN6f, the sign-out page made sure. Next: AN9k, then AN11, AN12
+and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, on any Chrome now, signed in on
+dev as an account that passed the 13+ check on an iPhone (Q7), and AN6f's checks on a Chrome before 136; prod's Android client,
+the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that needs them (Open owner
+items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
+`docs/PLAN.md`'s, replaced by AN9k's on 2026-11-13: _Last updated: 2026-11-13 (Central) — Android reads `409 account_deleted` as signed out (AN9j, #592;
+DECISIONS 2026-11-13). Before it, Android's sign-out page made sure where the browser offers no
+ephemeral tab (AN6f, #591). Next: the owner's switch of prod's domain, the release call and
+disabling the review account (Open owner items); a session builds the retire-a-block command and S12;
+the owner the sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02);
+AN9k, AN11, AN12; AN1's part 2 on the owner's phones; the audit's polish waits._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN9j's on 2026-11-13: _Last updated: 2026-11-13 (Central) — AN6f, the sign-out page made sure, where the phone's browser offers no ephemeral tab (#591;
 `docs/DECISIONS.md`, 2026-11-13): the sign-in page's answer reaches the sign-in at once and its code is traded first, the
 sign-out page opening once the token endpoint has answered, so the tokens are given before `/logout`, as AWS documents; they're
@@ -3058,6 +3075,12 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN9k's line, as it read when it was done (2026-11-13; `docs/DECISIONS.md`, 2026-11-13).
+
+- **AN9k** A student's notes kept off the phone's storage once a deletion's request went out, even where its answer was lost,
+  so that student sees the one-time consent screen again (the owner, 2026-11-12; twin: the iPhone's half, PLAN's C4e, the
+  Mac's) — validation: the JVM tests, and BaliAppTest's notes test on `Bali_Spike_API29`, `35` and `37`
 
 AN9j's line, as it read when it was done (2026-11-13; `docs/DECISIONS.md`, 2026-11-13).
 

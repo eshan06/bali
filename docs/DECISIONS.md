@@ -8,6 +8,170 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-13** — **AN9j's kept Emergency Unlock copies stay on the phone for the adult pilot, as built (the owner, 2026-11-13;
+  recorded by AN9k, #593).** The conductor asked: "Keep a deleted student's unsent unlock copy on their phone for the pilot?" The
+  owner answered: "Yes, keep it." It settles, for the pilot, AN9j's item on where a kept Emergency Unlock stays and what it holds
+  (AN9j's entry below, "Where a kept Emergency Unlock stays (call 1)", and its "Said plainly, for the owner"): the `kept:<id>`
+  rows in the outbox's `outboxState` stay on the phone until Bali's data goes. It holds for C4d's mirror on the iPhone too. The
+  owner decides again before the first K-12 school (`docs/PLAN-ANDROID.md`, Open owner items, 9).
+
+- **2026-11-13** — **AN9k, a student's notes kept off the phone's storage once a deletion's request went out, even where its
+  answer was lost: Delete account's stop writes `inClass` and `listSeenBy` back only where its `DELETE /v1/me` never went out, or
+  the server's answer proves the account stands (`409 teacher_has_classes`); after any other, nothing writes them to the storage
+  for the rest of the run, the screens reading them from memory, so a relaunch finds none; and AN9j's forget is written through
+  (the owner's call of 2026-11-12; the conductor's four calls and this step's, marked, each awaiting the owner's look; AN9k,
+  #593).**
+
+  **The owner's call** (the go-ahead of 2026-11-12, call 1, recorded on 2026-11-13): "A student's notes come off the phone's
+  storage once a deletion's request went out, even where its answer was lost: that student sees the one-time consent screen
+  again. iOS has the same gap. AN9k, and C4e on the iPhone." This is Android's half; the iPhone's is C4e, the Mac's, below. It
+  closes the first privacy note AN10c's review left for the owner ("A stop after `DELETE /v1/me` went out writes the notes
+  back", AN10c's entry) and the hooks AN9j left ("For AN9k").
+
+  **Where it lives:** `outbox`'s `SyncEngine.kt`: `deletionSent`, whether the last deletion's `DELETE /v1/me` went out, cleared as
+  a deletion starts and set by `deleteMe` as each send comes back with anything but `NoToken`. `Account.kt`: `offTheStore`, held
+  for the run; `mayStore`, which `synced` and `sawList` ask before they write; `delete`, whose stop reads `deletionSent` with the
+  answer; and `signed`, which hands the forget to `run`, made through `Notes.forgetStudent` with the account let go. `Notes.kt`'s
+  KDoc. In `android/app`, BaliAppTest alone: `PreferencesNotes` is unchanged. No screen, no word, no library and no SDK package.
+
+  **The conductor's calls (2026-11-13), awaiting the owner's look:**
+  1. **"Went out" means the phone started sending `DELETE /v1/me`,** which may have reached the server. A stop before it is sent
+     writes the notes back, as before.
+  2. **Storage only:** in the run the screens read the notes from memory, so nothing on screen changes. The consent screen shows
+     again at a later launch, where the deletion didn't land: the owner's call taken literally ("off the phone's storage").
+  3. **`deletionId` stays in memory,** as AN9j left it: a lost answer, then a relaunch, still ends with no DeleteUser of the
+     phone's own (below).
+  4. **No screen and no new word.**
+
+  **This step's calls, each awaiting the owner's look:**
+  1. **One answer proves the account stands: `409 teacher_has_classes`,** which the server gives once it has read the account
+     standing, a teacher's with a class or a block, deleting nothing. It writes the notes back where no request of the run went
+     out unproved before it (call 2). (`409 event_id_conflict` is answered the same way, but the engine sends again under a fresh
+     id, so it never ends a deletion.) A 401, a 400 or a 429 is answered before the server reads the account (its token check,
+     the body's shape, the rate limit): it proves that one request deleted nothing, never that one before it didn't, so it keeps
+     the notes off. Where none had gone before, as with a first try's 401 refused again after its renewal, that costs the student
+     the one-time screen at the next launch, the cost the owner's call accepts.
+  2. **Not again in the run** (the brief's second rule, strictly): once such a stop came, nothing writes the notes under the
+     student to the storage until the app's process ends: neither `synced` (a read listing the student in a class), nor
+     `sawList`, nor a later deletion's stop, one before its own request goes or one refused `409 teacher_has_classes` alike. The
+     phone can't tell a read the server answered before the deletion landed from one after it (the server may still be deleting
+     as it answers), and the cost is what the brief allows: where the deletion didn't land, the one-time screen and Home's
+     empty-state words until the next launch's first read lists the student in a class. Round 1 let a later
+     `teacher_has_classes` end the hold; santa's reviewers both found that such a refusal for another account's sign-in (two
+     accounts on one phone, ruled impossible for the pilot, but a privacy finding) would write the first student's ids back, so
+     nothing ends it now, at the cost of a teacher's own notes, which no screen of a teacher's reads. The hold is the account's,
+     one a run, which in the app is the process's life (`BaliApp.begin` starts one, and again only after a start that ran
+     nothing), and it holds for anyone signed in later in that run too: a person coming back after a deletion is a new account
+     (C3d), whose notes then wait for the next launch the same way.
+  3. **AN9j's forget, written through after the account's stretch:** `signed` takes the notes from the account's memory, then
+     `run` calls `forgetStudent` with the account let go, as `Notes.kt`'s rule asks. After that stretch nothing writes them back
+     (no `me` shows until the engine forgets it, and the sign-in gives Bali's API no token); a read of the store in the instant
+     between still finds them, and the screens read the account. Two of AN10c's relaunch checks in AccountTest now wait for the
+     store's forget instead of reading the store at once.
+  4. **The engine says it; the account reads it with the answer** (`deletionSent`): set from each send's answer, so a send cut
+     short by the run's end sets nothing, and its deletion answers nothing either: the notes stay off, as AN10c left them. A
+     request that couldn't be built (`Unreachable`, never in practice) counts as sent, the safe side.
+
+  **Which stops write the notes back, and which don't:**
+  - **Back, as before** (nothing went out, or the account proved standing): `SignInFirst`; `UnlockUnsent`; `Unread`; `NotDeleted`
+    from the sends before `DELETE /v1/me` (a record no answer settled); `NotDeleted` with `NoToken`, the sign-in giving
+    `DELETE /v1/me` no token, so it never went; `SignInChanged` before it went out (another account's sign-in landing while the
+    outbox went, AN9h); and `TeacherHasClasses`; each only where no request of the run went out unproved before it.
+  - **Kept off for the run:** once `DELETE /v1/me` went out, no answer, a timeout, a 5xx, a 401 refused again after its renewal,
+    a 400, a 429, a 2xx with no outcome the phone knows, and `SignInChanged`; then every later stop in the run,
+    `TeacherHasClasses` too. The app closed mid-deletion writes nothing back either, as AN10c built it.
+  - **Gone, as before:** `Deleted` and `SignInNotDeleted`; and AN9j's sign-in forgotten or marked for its deletion, now written
+    through.
+
+  **What a relaunch finds:** no `inClass` and no `listSeenBy` on the disk: the press took them off written through, and nothing
+  in the run put them back. Where the account was deleted, its sign-in, kept, hears `409 account_deleted` at its first call and
+  reads as signed out (AN9j), with no DeleteUser of the phone's own (`deletionId` went with the process): the API's deleter
+  removes that Cognito user (C3-cognito). Where it wasn't, the student is still signed in: the first read lists them in a class,
+  Home's words are right again, and the consent list's one-time screen shows once more, its Continue keeping it as before.
+
+  **What C4e should mirror on the iPhone:** iOS keeps the notes in its defaults through the whole deletion and forgets them only on
+  `.deleted` or `.signInNotDeleted` (`Phone.deleteAccount`), so a lost answer leaves them there, and AN10c's forget before
+  anything is sent isn't on iOS either (AN10c's "For the Mac"). Mirror: take `inClass`, `listSeenBy` and `answersListSeenBy` out
+  of the defaults as the press starts, `Phone` keeping its own copies for the screens; have `SyncEngine.deleteAccount` say whether
+  its `DELETE /v1/me` went out (cleared as a deletion starts, set as `deleteMe` gets any answer but no token); at a stop, write
+  them back only where none went out unproved this run, this one's own `teacherHasClasses` included as proof, else hold them off
+  for the rest of the run, nothing ending the hold, `keepInClass` and `sawList` keeping theirs in memory alone meanwhile; and
+  forget them on the deletion's own answer and on C4d's sign-out, as here. The lists above are the rule, and the tests below its
+  cases.
+
+  **What it doesn't close, plainly:**
+  - **A lost answer, the account still standing:** that student sees the one-time consent screen again at the next launch, and
+    Home's empty-state words are the never-in-a-class ones until a read lists them: the cost the owner's call accepts.
+  - **A relaunch loses `deletionId`** (call 3): this phone's own deletion, its answer lost, then a relaunch, ends with no
+    DeleteUser of the phone's own; the API's deleter removes that Cognito user (dev has its key since 2026-11-12; prod's is
+    runbook 9's step 4, the owner's).
+  - **A forget the disk refuses** (`forgetStudent`'s commit, a storage failure no student causes) leaves the notes there, as
+    before; only a deletion answered deleted writes them off again, behind.
+  - **AN9j's forget's instant:** a process ended between the sign-in's forget and the notes' commit, milliseconds, leaves them on
+    the disk where the sign-in was forgotten for a deletion elsewhere; a sign-in marked for this phone's own deletion finds them at
+    the relaunch, Pending, and forgets them.
+  - **The iPhone** keeps the gap until C4e.
+
+  **The tests,** failing first in their own commit (`2e02709d`). Against main's code, seven failed by name:
+  - `eachStopOnceDeleteMeWentOut…` (no answer, a 503, a 401 renewed and refused again, another account's sign-in landed
+    meanwhile): `no answer ==> expected: <[the student's forgotten, written through]> but was: <[…, inClass=u, listSeenBy=u]>`;
+  - AN10c's two, which pinned the write-back after a lost answer and now pin none, `deleteAccountTakesTheNotesOffTheStore…` and
+    `aReadLandingWhileTheDeletionRuns…`: the same, `inClass=u, listSeenBy=u`;
+  - `anAnswerThatProvesTheAccountStands…`, after a lost answer: `the lost answer ==> expected: <[null, null]> but was: <[u, u]>`;
+  - `afterALostAnswerAReadAnsweredLater…` (a read naming the student in a class after the stop, the consent list seen then, and a
+    relaunch's account over the same store finding none): `but was: <[…, inClass=null, listSeenBy=null, inClass=u, listSeenBy=u]>`;
+  - DeletedOnServerTest's `theDeletedStudentsNotesAndMe…` (AN9j's sign-in forgotten): `expected: <[the student's forgotten,
+    written through]> but was: <[inClass=null, listSeenBy=null]>`; and `aDeletionsLostAnswerKeepsTheNotesOffTheStore…` (its
+    sign-in marked): `but was: <[…, inClass=u, listSeenBy=u]>`.
+
+  The eighth, `eachStopBeforeDeleteMeWentOut…` (a sign-in from before the scope, an unlock unsent, the file unread, a record no
+  answer settled, no token), passed there, today's behavior, and fails under its break. BaliAppTest's notes test, instrumented, on
+  `Bali_Spike_API35` against main's code, failed at its disk check after the lost answer, the file holding `u1` for both notes
+  (`BaliAppTest.kt:305`). Its restore now commits, as LessonAppTest's has since AN13g, so a run's last restore isn't lost as its
+  process ends. Santa's round 1 (`0cab5396`) made `anAnswerThatProvesTheAccountStands…` a first try's alone, then a later press
+  stopped before its request, written back (`…AndALaterPressStoppedBeforeItsRequestToo`), and added two:
+  `afterALostAnswerEveryLaterStopInTheRun…` (a Try again stopped before its request, by no token or an unlock unsent, then one
+  refused `409 teacher_has_classes`, each keeping the notes off), which failed against the code before its fix at its
+  `teacher_has_classes` step; and DeletedOnServerTest's `whileAN9jsForgetIsOnItsWayToTheDisk…` (AN9j's forget held on its way to
+  the disk while a state sent before the `409` and the consent list land, neither writing anything), a race test of what was built.
+
+  **Broken on purpose, each failing by name, then reverted,** on the final code:
+  - the stop writing them back after `DELETE /v1/me` went out (main's): six, `eachStopOnce…`, `deleteAccountTakes…`,
+    `aReadLanding…`, `afterALostAnswerAReadAnsweredLater…`, `afterALostAnswerEveryLaterStop…` and `aDeletionsLostAnswer…`;
+  - a stop before it went out not writing them back: `eachStopBefore…`, at `a sign-in from before the scope`, and
+    `anAnswerThatProves…AndALaterPress…`; the engine counting a send with no token as sent: `eachStopBefore…`, at `no token`;
+  - the proof not writing them back: `anAnswerThatProves…`, `but was: <[the student's forgotten, written through]>`;
+  - a later `synced` or `sawList` putting them back: `afterALostAnswerAReadAnsweredLater…`, each alone too, `<[…, inClass=u]>` and
+    `<[…, listSeenBy=u]>`;
+  - AN9j's forget written behind, not through: `theDeletedStudentsNotesAndMe…`, `<[inClass=null, listSeenBy=null]>`,
+    `aDeletionsLostAnswer…`, and `whileAN9jsForget…`, `no forget began`;
+  - santa's round 1: the hold dropped at a later stop, `afterALostAnswerEveryLaterStop…`, at `no token`; a later
+    `teacher_has_classes` ending the hold (round 1's first rule), the same test, at that step; the engine's word of the last
+    request kept into the next deletion, `anAnswerThatProves…AndALaterPress…`; and `signed` no longer hiding `me` on AN9j's path,
+    `whileAN9jsForget…`, `expected: <[]> but was: <[inClass=u, listSeenBy=u]>`.
+
+  **The proof:** `./gradlew assemble :app:assembleDebugAndroidTest :app:lint check` green from scratch (`--rerun-tasks`, all 167
+  of its tasks run), Android 10's API check with it: `core` 162, `outbox` 595 (588 at #592, seven new: five in AccountTest, two in
+  DeletedOnServerTest), the app's 28 and 31, Debug's and Release's, as they were. BaliAppTest whole and PreferencesNotesTest on
+  `Bali_Spike_API29`, `_API35` and `_API37`, one at a time, each from a cold boot, before santa's round 1 and again on the final
+  code: 10 of 10 on each every time, none skipped; `dumpsys netstats`, polled after each run, listed nothing for Bali's uid or
+  its test app's. `npm run typecheck && npm run lint && npm test` green, no emulator running, the portal's suite whole. Nothing
+  was added to the PC's SDK, and no library. Each emulator after: Bali and its test app uninstalled, AN1's spike apps kept, every
+  setting as found, stopped.
+
+  **Santa's review:** two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context isolation holds and
+  model diversity doesn't). Round 1: Reviewer A, no blocker and three WARNs; Reviewer B, one blocker and two WARNs. The blocker
+  (B), A's first WARN too: nothing tested the hold across a later stop, so dropping `|| offTheStore` left the suite green; tested
+  now, failing under that break. Both reviewers' privacy WARN: a later `teacher_has_classes` ended the hold whichever account it
+  answered, so on a phone with two accounts (ruled impossible for the pilot) a teacher's refusal could write a deleted student's
+  ids back; the rule is now strictly not again in the run (call 2), and its test fails under round 1's rule. Reviewer A's other
+  two: the engine's reset of its word untested (tested now), and AN9j's forget moved out of the stretch with no race test (added).
+  Reviewer B's other: `theDeletedStudentsNotesAndMe…`'s store check now waits for the forget, a change the PR's description names
+  now beside AccountTest's two. Round 2, fresh reviewers on the fixes alone: no blocker; each found the fixes working, each new
+  test failing under its break by their reading, and the strict rule able only to take writes away; and each one WARN, the
+  same, `deleteAccount`'s and `Notes`' KDoc still reading as round 1's rule, fixed in place. No round 3: the GitHub Claude
+  Review checks the final code.
+
 - **2026-11-13** — **AN9j, `409 account_deleted` read as signed out: Bali's server's answer to any call under an account's
   token, heard where every answer comes, ends that account's sign-in as Sign out ends it, with no Cognito DeleteUser; every
   Emergency Unlock it still has goes first, under its own token, the rest of its queue let go, an unlock that still didn't

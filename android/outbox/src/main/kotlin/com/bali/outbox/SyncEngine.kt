@@ -215,6 +215,9 @@ class SyncEngine private constructor(
     /** The account [deletionId]'s deletion is for: a `409 account_deleted` heard for it is that deletion's lost answer (AN9j). */
     private var deletionOf: String? = null
 
+    /** Whether the last account deletion's `DELETE /v1/me` went out ([deletionSent]). */
+    private var deleteMeSent = false
+
     /**
      * A `409 account_deleted` being read ([deletedOnServer]): the drain holds while that account's unlocks go, and another heard
      * meanwhile, theirs included, is this one's.
@@ -1040,7 +1043,20 @@ class SyncEngine private constructor(
      * each call into the sign-in with the engine let go: its caller cancelled stops waiting, and it goes on.
      */
     suspend fun deleteAccount(signIn: SignIn): AccountDeletion =
-        alone { deletion?.takeIf { it.isActive } ?: scope.async { delete(signIn) }.also { deletion = it } }.await()
+        alone {
+            deletion?.takeIf { it.isActive }
+                ?: scope.async { delete(signIn) }.also {
+                    deletion = it
+                    deleteMeSent = false
+                }
+        }.await()
+
+    /**
+     * Whether the last account deletion's `DELETE /v1/me` went out ([deleteAccount]): the phone started sending it, so the server
+     * may have deleted the account whatever came back, no answer, a 5xx, or a stop after it (AN9k). Nothing went where the sign-in
+     * gave no token. The account reads it with the deletion's answer.
+     */
+    internal suspend fun deletionSent(): Boolean = alone { deleteMeSent }
 
     private suspend fun delete(signIn: SignIn): AccountDeletion {
         // The account it is for, which its mark and DeleteUser hold to; none to be read now is as `mayDelete`'s
@@ -1159,7 +1175,7 @@ class SyncEngine private constructor(
 
     /**
      * One `DELETE /v1/me` under [account]'s token, renewed for that account alone, and under the last one's event id
-     * while no answer settled it (rule 4), the engine let go.
+     * while no answer settled it (rule 4), the engine let go; each send that went out marked so ([deletionSent]).
      */
     private suspend fun deleteMe(signIn: SignIn, account: String): ApiResponse<DeleteMeResponse> {
         val eventId =
@@ -1167,7 +1183,12 @@ class SyncEngine private constructor(
                 deletionOf = account
                 deletionId ?: EventId.mint(clock.now()).also { deletionId = it }
             }
-        return Joining.send({ signIn.refresh(account) }) { client.forDeletion(account).deleteMe(DeleteMeRequest(eventId)) }
+        return Joining.send({ signIn.refresh(account) }) {
+            client.forDeletion(account).deleteMe(DeleteMeRequest(eventId)).also { answer ->
+                // On the wire unless the sign-in gave no token: it may have reached the server, whatever comes back (AN9k).
+                if (answer.noAnswer != NoAnswer.NoToken) alone { deleteMeSent = true }
+            }
+        }
     }
 
     /** What the deleted account still had queued let go, every Emergency Unlock kept apart ([Outbox.accountDeleted]), and the queue read again. */

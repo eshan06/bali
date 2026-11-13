@@ -14,6 +14,9 @@ import com.bali.core.SendResult
 import com.bali.core.UnlockReason
 import com.bali.core.UpdateMeRequest
 import java.net.URI
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -21,6 +24,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
@@ -38,8 +42,8 @@ import kotlinx.serialization.json.longOrNull
 // AN9j, `409 account_deleted` read as signed out (the owner, 2026-11-12; DECISIONS 2026-11-13): over the engine as the app makes
 // it, its sign-in gated as the app's is, the account, an enforcer over its fake lock and the router running as the app runs them,
 // and the API and Cognito answered by hand. Each place the answer can arrive; the lock off as it's read; another account's 409 and
-// every other 409 changing nothing; an Emergency Unlock kept apart; this phone's own deletion finished its own way; and two loops
-// hearing it at once. No iOS twin yet: C4d, the Mac's.
+// every other 409 changing nothing; an Emergency Unlock kept apart; this phone's own deletion finished its own way; two loops
+// hearing it at once; and the student's notes off the disk, written through (AN9k). No iOS twin yet: C4d and C4e, the Mac's.
 
 /** Bali's server's answer to a call under a deleted account's old token (C3d). */
 val deletedOnServer = Answer.refused("account_deleted")
@@ -60,6 +64,31 @@ suspend fun keptApart(outbox: Outbox): Map<String, JsonObject> =
 
 /** [kept]'s field [name], as text; none for none. */
 fun JsonObject.text(name: String): String? = get(name)?.jsonPrimitive?.contentOrNull
+
+/** The notes in [kept], the student's forget held once [arm]ed until [release], as a slow disk holds a commit. */
+private class HeldForget(val kept: RecordedNotes = RecordedNotes()) : Notes by kept {
+    private val armed = AtomicBoolean(false)
+    private val begun = CompletableDeferred<Unit>()
+    private val released = CountDownLatch(1)
+
+    override fun forgetStudent() {
+        if (armed.get()) {
+            begun.complete(Unit)
+            released.await(patience.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        }
+        kept.forgetStudent()
+    }
+
+    fun arm() = armed.set(true)
+
+    /** Waits for the forget to begin; none in time fails the test. */
+    suspend fun began() = withTimeoutOrNull(patience) { begun.await() } ?: fail("no forget began")
+
+    fun release() {
+        armed.set(false)
+        released.countDown()
+    }
+}
 
 /** The access token Cognito's DeleteUser was sent, in its body. */
 private fun Server.Exchange.deleteUserToken(): String? =
@@ -501,10 +530,12 @@ class DeletedOnServerTest : EngineFiles() {
         }
 
     @Test
-    fun theDeletedStudentsNotesAndMeGoWithTheirSignInAsAFinishedDeleteAccountTakesThemHereAndInTheStore(): Unit =
+    fun theDeletedStudentsNotesAndMeGoWithTheirSignInAsAFinishedDeleteAccountTakesThemHereAndOffTheDiskWrittenThrough(): Unit =
         runBlocking {
-            // The conductor's call 3, santa's round 1 (both reviewers): listed in a class here, the consent list seen.
-            val notes = MemoryNotes()
+            // The conductor's call 3, santa's round 1 (both reviewers): listed in a class here, the consent list seen. Off the disk
+            // as a deletion's press takes them, written through with the account let go, so a process ended right after leaves none
+            // there (AN9k).
+            val notes = RecordedNotes()
             val rig = signedRig(gated = true)
             val routed = routed(rig.engine, rig.clock, notes = notes)
             val account = checkNotNull(routed.account)
@@ -512,12 +543,77 @@ class DeletedOnServerTest : EngineFiles() {
             account.until { it.inClass == "u" }
             account.sawList()
             assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy))
+            notes.writes.clear()
             rig.engine.retryNow()
             past(rig, meRoute).reply(409, deletedOnServer)
             signedOut(rig, routed, "the read of the truth, the notes kept")
             account.until { it.inClass == null && it.listSeenBy == null && it.sync?.me == null }
+            eventually { notes.student.isNotEmpty() }
+            assertEquals(listOf(RecordedNotes.FORGOT), notes.student)
             assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
             rig.until { it.me == null }
+            rig.stop()
+        }
+
+    @Test
+    fun whileAN9jsForgetIsOnItsWayToTheDiskAStateSentBeforeThe409AndTheConsentListSeenThenWriteNothingBack(): Unit =
+        runBlocking {
+            // Santa's round 1, reviewer A: AN9j's forget is made after the account's stretch now (AN9k, this step's call 3), so a
+            // state the engine sent before the 409, still listing the student in a class, and the consent list seen, each landing
+            // while the forget is on its way to the disk, find no `me` to keep: the stretch hid it until the engine forgets it.
+            val notes = HeldForget()
+            val rig = signedRig(gated = true)
+            val routed = routed(rig.engine, rig.clock, notes = notes)
+            val account = checkNotNull(routed.account)
+            rig.through(account, scoped("a1"), me = Answer.me(classes = listOf(Answer.inClass("p3"))))
+            account.until { it.inClass == "u" }
+            account.sawList()
+            val listed = rig.engine.updates.value
+            notes.kept.writes.clear()
+            notes.arm()
+            try {
+                rig.engine.retryNow()
+                past(rig, meRoute).reply(409, deletedOnServer)
+                notes.began()
+                account.synced(listed)
+                account.sawList()
+                assertEquals(emptyList(), notes.kept.student)
+            } finally {
+                notes.release()
+            }
+            eventually { notes.kept.student.isNotEmpty() }
+            assertEquals(listOf(RecordedNotes.FORGOT), notes.kept.student)
+            signedOut(rig, routed, "the read of the truth, the forget held")
+            rig.stop()
+        }
+
+    @Test
+    fun aDeletionsLostAnswerKeepsTheNotesOffTheStoreAndThe409ThatMarksItsSignInForgetsTheScreensOnesWrittenThroughNeverBehind(): Unit =
+        runBlocking {
+            // AN9k at AN9j's hook: the sign-in marked for its DeleteUser, the notes off the store since the lost answer, the
+            // screens' own then gone too, through to the disk.
+            val notes = RecordedNotes()
+            val rig = signedRig(gated = true)
+            val routed = routed(rig.engine, rig.clock, notes = notes)
+            val account = checkNotNull(routed.account)
+            val listed = Answer.me(null, classes = listOf(Answer.inClass("p3")))
+            rig.through(account, scoped("a1"), me = listed)
+            account.until { it.inClass == "u" }
+            account.sawList()
+            account.deleting { it.ask() }
+            notes.writes.clear()
+            val stopping = async { account.deleteAccount() }
+            past(rig, deleteMeRoute, me = listed).reply(null)
+            withTimeout(patience) { stopping.await() }
+            assertEquals(listOf(RecordedNotes.FORGOT), notes.student)
+            assertEquals(listOf("u", "u"), account.state.value.let { listOf(it.inClass, it.listSeenBy) })
+            rig.engine.retryNow()
+            past(rig, meRoute, me = listed).reply(409, deletedOnServer)
+            account.until { it.deleting == Deleting.Pending && it.inClass == null && it.listSeenBy == null }
+            assertTrue(rig.signIn.deletionPending())
+            eventually { notes.student.size > 1 }
+            assertEquals(listOf(RecordedNotes.FORGOT, RecordedNotes.FORGOT), notes.student)
+            assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
             rig.stop()
         }
 

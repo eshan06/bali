@@ -112,6 +112,13 @@ class Account internal constructor(
     /** The notes under the student, as the store held them as the account was made, then as the account keeps them. */
     private var inClass: String? = notes.inClass
     private var listSeenBy: String? = notes.listSeenBy
+
+    /**
+     * A deletion's `DELETE /v1/me` went out and its answer didn't prove the account stands: the notes under the student stay off
+     * the store for the rest of the run, whatever comes after, the screens reading them from here, so a relaunch finds none of a
+     * student whose account may be gone (the owner, 2026-11-12; AN9k).
+     */
+    private var offTheStore = false
     private var email: String? = null
     private var naming = Naming()
     private var leaving = Leaving()
@@ -134,7 +141,8 @@ class Account internal constructor(
                 val pending = landing.signedIn && signIn.deletionPending()
                 val checked = landing.signedIn && signIn.checked()
                 val email = if (landing.signedIn) signIn.email() else null
-                val (forget, ask) = alone { signed(landing, pending, checked, email) }
+                val (forget, ask, notesGone) = alone { signed(landing, pending, checked, email) }
+                if (notesGone) notes.forgetStudent()
                 if (forget) engine.forgetMe()
                 if (ask) scope.launch { askAge() }
             }
@@ -143,15 +151,15 @@ class Account internal constructor(
 
     /**
      * The engine's state as it comes, BaliApp.swift's `synced`: one sent before the engine forgot the last `me` comes without it,
-     * and a student it lists in a class is kept as one in the notes (#143), replacing the last, the store's once no deletion runs
-     * ([delete]).
+     * and a student it lists in a class is kept as one in the notes (#143), replacing the last, the store's where it may be
+     * ([mayStore]).
      */
     internal suspend fun synced(state: SyncState) =
         alone {
             engineState = state
             shown()?.me?.takeIf { it.classes.isNotEmpty() && it.user.id != inClass }?.let {
                 inClass = it.user.id
-                if (deleting != Deleting.Busy) notes.inClass = it.user.id
+                if (mayStore) notes.inClass = it.user.id
             }
             publish()
         }
@@ -166,9 +174,16 @@ class Account internal constructor(
             val id = shown()?.me?.user?.id
             if (id == null || id == listSeenBy) return@alone
             listSeenBy = id
-            if (deleting != Deleting.Busy) notes.listSeenBy = id
+            if (mayStore) notes.listSeenBy = id
             publish()
         }
+
+    /**
+     * Whether a note under the student may go to the store now: never while a deletion runs, from its press to its answer
+     * (AN10c), nor for the rest of the run once its `DELETE /v1/me` went out unproved ([offTheStore]): a read or the consent list
+     * seen then may come from before the server deleted the account (AN9k).
+     */
+    private val mayStore: Boolean get() = deleting != Deleting.Busy && !offTheStore
 
     /**
      * A step of Me's name (C6b; AS2's Your name and AS7's Me): [step] one of [Naming]'s own, and what it gives besides, which
@@ -230,9 +245,12 @@ class Account internal constructor(
      * stop is [AccountDeletion.SignInChanged], and the account deleted on the server but not its sign-in is deleted, that
      * sign-in gone from the phone and its Cognito user the server's deleter's (C3-cognito; AN9b's call). The notes under the
      * student leave the store before anything is sent, written through, so a process ended mid-deletion keeps nothing of the
-     * student's (AN10c), the screens reading them from here meanwhile; a stop writes them back, so the same student isn't
-     * asked again. The account deleted on the server, they go here too, and its `me` with them, as iOS's `forgetNotes`
-     * forgets them (the owner's rulings, 2026-10-23).
+     * student's (AN10c), the screens reading them from here meanwhile. A stop writes them back, so the same student isn't asked
+     * again, only where no `DELETE /v1/me` of the run went out unproved: once one did, they stay off the store for the rest of
+     * the run, whatever came back or comes after, the account perhaps gone. A request's own answer proves the account stands
+     * where the server refused it having read the account, a teacher's with classes (the owner, 2026-11-12; AN9k). The account
+     * deleted on the server, they go here too, and its `me` with them, as iOS's `forgetNotes` forgets them (the owner's
+     * rulings, 2026-10-23).
      */
     suspend fun deleteAccount(): Unit = call { delete() }
 
@@ -248,6 +266,7 @@ class Account internal constructor(
         // meanwhile ([synced], [sawList]).
         notes.forgetStudent()
         val answer = engine.deleteAccount(signIn)
+        val sent = engine.deletionSent()
         val now = signIn.landings().first()
         val forget =
             alone {
@@ -266,8 +285,13 @@ class Account internal constructor(
                     forgetNotes()
                     forgot()
                 } else {
-                    notes.inClass = inClass
-                    notes.listSeenBy = listSeenBy
+                    // Off the store for the run once its request went out, unless this answer is the server's refusal of an account
+                    // it read standing; and once off, never back in the run, whatever a later deletion answers (AN9k).
+                    offTheStore = offTheStore || sent && kept != AccountDeletion.TeacherHasClasses
+                    if (!offTheStore) {
+                        notes.inClass = inClass
+                        notes.listSeenBy = listSeenBy
+                    }
                 }
                 publish()
                 gone
@@ -286,10 +310,11 @@ class Account internal constructor(
      * student's `me` is forgotten, and so is one this run's sign-in has none of: a read that failed before it, with no token to
      * send, isn't its read ([forgot]); and, once the account is deleted on Bali's server, a relaunch finding it so or a sign-in
      * forgotten for it (AN9j, [Landing.deleted]), the notes under the student and its `me`. A sign-in
-     * not through the check is asked about it ([askAge]). Returns whether the engine is to forget `me`, and whether to ask,
-     * each the caller's to do with the account let go.
+     * not through the check is asked about it ([askAge]). Returns whether the engine is to forget `me`, whether to ask, and
+     * whether the notes under the student are to leave the store, written through ([Notes.forgetStudent]; AN9k), each the
+     * caller's to do with the account let go.
      */
-    private fun signed(landing: Landing, pending: Boolean, checked: Boolean, email: String?): Pair<Boolean, Boolean> {
+    private fun signed(landing: Landing, pending: Boolean, checked: Boolean, email: String?): Triple<Boolean, Boolean, Boolean> {
         val another = landing.account?.let { account != null && it != account } ?: (landing.signedIn && signedIn == false)
         val changed = landing.signedIn != signedIn || another || landing.count != landed
         if (changed) {
@@ -306,7 +331,10 @@ class Account internal constructor(
         // as a finished Delete account takes them (the owner's ruling, 2026-10-23).
         val gone = landing.deleted && !landing.signedIn
         val notesGone = (pending || gone) && (inClass != null || listSeenBy != null)
-        if (notesGone) forgetNotes()
+        if (notesGone) {
+            inClass = null
+            listSeenBy = null
+        }
         // Made here, not the store read at launch (none before it).
         val forget = notesGone || gone || another || changed && landing.signedIn && signedIn != null && shown()?.me == null
         landing.account?.let { account = it }
@@ -320,7 +348,7 @@ class Account internal constructor(
         }
         if (forget) forgot()
         publish()
-        return forget to ask
+        return Triple(forget, ask, notesGone)
     }
 
     /**
@@ -393,7 +421,10 @@ class Account internal constructor(
         forgets += 1
     }
 
-    /** The account deleted on Bali's server: the notes under the student go, here and in the store (BaliApp.swift's `forgetNotes`). */
+    /**
+     * Delete account answered, the account deleted on Bali's server: the notes under the student go, here and in the store, whose
+     * disk the press's forget emptied unless it couldn't commit (BaliApp.swift's `forgetNotes`).
+     */
     private fun forgetNotes() {
         inClass = null
         listSeenBy = null
