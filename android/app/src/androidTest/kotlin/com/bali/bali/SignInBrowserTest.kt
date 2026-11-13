@@ -92,6 +92,7 @@ class SignInBrowserTest {
         send(sent)
         assertEquals(sent, await(waiting.answer))
         // Taken, it brings the host back over the tab, which closes the tab: the one thing it starts.
+        hostCameAndWent()
         assertEquals(listOf(HostedUiActivity::class.java.name), started.map { it.component?.className })
     }
 
@@ -111,6 +112,16 @@ class SignInBrowserTest {
         assertEquals(emptyList<Intent>(), started)
         send(answer("s1"))
         assertEquals(answer("s1"), await(waiting.answer))
+        hostCameAndWent()
+    }
+
+    /**
+     * The host a taken answer brought back, come and gone again with nothing waiting, before the test ends: made after it, as
+     * once on Android 10's emulator (AN7h's whole run), it opened a tab for the next test's sign-in.
+     */
+    private fun hostCameAndWent() {
+        until { Unit.takeIf { started.any { it.component?.className == HostedUiActivity::class.java.name } } }
+        until { Unit.takeIf { "${context.packageName}/.HostedUiActivity" !in shell("dumpsys activity activities") } }
     }
 
     @Test

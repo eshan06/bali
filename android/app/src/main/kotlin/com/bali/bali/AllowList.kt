@@ -10,6 +10,7 @@ import android.telecom.InCallService
 import android.telecom.TelecomManager
 import android.view.inputmethod.InputMethodManager
 import androidx.core.net.toUri
+import com.bali.outbox.SYSTEM_UI
 
 /**
  * What the lock never covers (ARCHITECTURE, "Android app structure", decision 2), asked of Android as a lock comes on.
@@ -46,8 +47,6 @@ internal object AllowList {
     @Suppress("DEPRECATION") private fun PackageManager.receivers(intent: Intent) = queryBroadcastReceivers(intent, 0)
     @Suppress("DEPRECATION") private fun PackageManager.services(intent: Intent) = queryIntentServices(intent, PackageManager.GET_META_DATA)
     @Suppress("DEPRECATION") private fun PackageManager.default(intent: Intent) = resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
-
-    private const val SYSTEM_UI = "com.android.systemui"
 
     /** The system itself: its own dialogs, and the chooser it answers with where no app holds a part. */
     private const val SYSTEM = "android"

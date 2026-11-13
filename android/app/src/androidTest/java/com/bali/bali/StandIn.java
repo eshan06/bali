@@ -3,10 +3,13 @@ package com.bali.bali;
 import android.app.Activity;
 import android.app.PictureInPictureParams;
 import android.content.BroadcastReceiver;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.provider.CallLog;
 import android.util.Rational;
 import android.view.View;
 
@@ -56,5 +59,26 @@ public class StandIn extends Activity {
     public static class Alert extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {}
+    }
+
+    /**
+     * The cover test's own call taken out of the call log on Android 10, whose shell has no call-log permission there
+     * (CoversTest.kt): the calls since {@link #SINCE} counted, after deleting them with {@link #DELETE}; the count, the
+     * broadcast's result. Only the tests' own app holds that permission, granted by the test and gone with the app.
+     */
+    public static class Calls extends BroadcastReceiver {
+        static final String SINCE = "since";
+        static final String DELETE = "delete";
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            ContentResolver calls = context.getContentResolver();
+            String where = CallLog.Calls.DATE + ">=?";
+            String[] since = {Long.toString(intent.getLongExtra(SINCE, Long.MAX_VALUE))};
+            if (intent.getBooleanExtra(DELETE, false)) calls.delete(CallLog.Calls.CONTENT_URI, where, since);
+            try (Cursor found = calls.query(CallLog.Calls.CONTENT_URI, new String[] {CallLog.Calls._ID}, where, since, null)) {
+                setResultCode(found == null ? -1 : found.getCount());
+            }
+        }
     }
 }

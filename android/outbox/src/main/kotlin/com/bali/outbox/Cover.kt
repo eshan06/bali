@@ -45,6 +45,9 @@ enum class WindowKind {
 /** A window on the screen, as Android lists it to the lock's service: never its contents. */
 data class OnScreen(val id: Int, val kind: WindowKind, val bounds: Area, val pictureInPicture: Boolean = false)
 
+/** System UI's package: the shade's and the notifications', and on Android 10 the picture-in-picture menu's, an activity there. */
+const val SYSTEM_UI = "com.android.systemui"
+
 /**
  * A cover over [window], at [area]. [home]: its app fills the screen, so goes home once the cover lands (Q5). [held]: it
  * takes the window's touches; a picture-in-picture window's go to System UI, which moves, closes or opens it, never stuck.
@@ -58,9 +61,14 @@ data class Covering(val window: Int, val area: Area, val home: Boolean, val held
  * since no window's contents is read (the battery plan). A cover keeps clear of each window above it not covered itself
  * (the shade, a notification, the keyboard), but a picture-in-picture window's own menu. A full-screen app goes home once
  * its cover lands (Q5); a split half or a picture-in-picture window stays covered. Names last only while a lock holds.
+ * Android 10's menu is System UI's activity in the small window's own task, which Android lists in the small window's
+ * place while it's up: covered as the blocked app's small window it stands for (AN7h).
  */
 class Cover(private val mine: String) {
     private val names = HashMap<Int, String>()
+
+    /** The blocked app's picture-in-picture window last listed, while anything is in picture-in-picture. */
+    private var pinned: Int? = null
 
     /** [window]'s app, as the window's own state event names it. */
     fun named(window: Int, app: String) = names.set(window, app)
@@ -68,18 +76,32 @@ class Cover(private val mine: String) {
     /** The app [window] was named for; none: no event has, while the lock holds. */
     fun app(window: Int): String? = names[window]
 
-    fun forget() = names.clear()
+    fun forget() {
+        names.clear()
+        pinned = null
+    }
 
     /** The covers now over [windows], listed top first as Android lists them, while [until] is ahead of [now]; else none, every name forgotten. */
     fun covering(windows: List<OnScreen>, allowed: Set<String>, safe: Area, until: Instant?, now: Instant): List<Covering> {
         if (until == null || until <= now) return emptyList<Covering>().also { forget() }
+        // The small window, an app's in picture-in-picture, and Android 10's menu, System UI's, listed in its place.
+        val small = windows.firstOrNull { it.pictureInPicture && names[it.id].let { app -> app != null && app != SYSTEM_UI } }
+        val menu = windows.firstOrNull { it.pictureInPicture && names[it.id] == SYSTEM_UI }
+        pinned =
+            when {
+                small != null -> small.id.takeIf { names[small.id].let { app -> app != mine && app !in allowed } }
+                // The menu's window may be listed before its own event names it.
+                windows.any { it.pictureInPicture } -> pinned
+                else -> null
+            }
+        val standing = menu?.id?.takeIf { small == null && pinned != null }
         // The places of the windows above the one at hand that no cover hides.
         val above = mutableListOf<Area>()
         val covers = mutableListOf<Covering>()
         for (window in windows.filter { it.kind != WindowKind.Passed }) {
             val app = names[window.id]
             val area = window.bounds meets safe
-            if (window.kind == WindowKind.Kept || app == null || app == mine || app in allowed || area == null) {
+            if (window.kind == WindowKind.Kept || area == null || window.id != standing && (app == null || app == mine || app in allowed)) {
                 above += window.bounds
                 continue
             }

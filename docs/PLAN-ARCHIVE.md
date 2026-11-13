@@ -10,6 +10,27 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN7h's on 2026-11-13: _Last updated: 2026-11-12 (Central) — AN13f, the slide's page drawn with `PdfRenderer` in an isolated process (#585;
+`docs/DECISIONS.md`, 2026-11-12), the sixth of AN13's seven steps: `app`'s `IsolatedRenderer.kt` and `RendererService.kt`,
+AN13e's seam filled to the owner's answers to Q2 and Q3: pdfium in a service process Android isolates, bound while a deck is
+open; the deck handed over from memory, an anonymous memory file from Android 11, on Android 10 a file in `no_backup/deck/`
+whose name goes as it opens, that folder emptied at each start; a page drawn there onto a white bitmap, as large as fits and
+centred, its pixels back through memory Bali made, its text with it from Android 15; every failure none; that process's death
+each document's loss, Bali's process living on; `BaliApp.onCreate` returning at once there. Its tests on `Bali_Spike_API29`
+(Android 10, set up 2026-11-12), `35` and `37`. No screen, no word. Before it, AN13e2, the slide-deck case's CI flake fixed in
+its rig, and AN13e, the slide's deck. Next: AN13g, the lesson in the app; AN11, AN12 and Phase 10's screens, in the conductor's
+order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone
+(Q7); Android's Cognito clients, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the
+step that needs them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
+`docs/PLAN.md`'s, replaced by AN7h's on 2026-11-13: _Last updated: 2026-11-12 (Central) — The sign-in deletion case's flake on main's CI, the test's: a
+retry while the first try is at Cognito leaves the row a try of its own, as C3d designed; each order
+is now a case, the race staged in a test that failed first (#586; DECISIONS 2026-11-12). Before it,
+the slide-deck case's flake (#584). Next: the owner's switch of prod's domain, the release call and
+disabling the review account (Open owner items); a session builds the retire-a-block command; the
+owner the sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02);
+AN11–AN13; AN1's part 2 on the owner's phones; the audit's polish waits._
+
 _Last updated: 2026-11-12 (Central) — The slide-deck case's flake on main's CI, fixed in its rig:
 SlideTest's deck rig runs the lesson half's own scope on the test's own thread, the race staged in a
 test that failed first (AN13e2, #584; DECISIONS 2026-11-12). Before it, the app's Sign in from the
@@ -2939,6 +2960,18 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+`docs/PLAN.md`'s Now line for Android, as it read until AN7h (2026-11-13), word for word: AN7h shortened it for room,
+AN1's parts 1 and 1c, AN1b and AS0 being done and on the Phases table's rows.
+
+- **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
+  AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
+  2026-11-03); AN1b ✅ (DECISIONS 2026-11-04); part 2 on
+  a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱), before
+  launch; AN2–AN10's and AN13a–AN13f's code ✅ (#488–#585), AN13e2's CI flake fix ✅ (#584);
+  AN11–AN13 next. AS0, the
+  screens' canvas, ✅ approved as it stands
+  (#484, #486; DECISIONS 2026-11-04). Not on the pilot's critical path.
 
 AN13f's line, as it read when it was done (2026-11-12; `docs/DECISIONS.md`, 2026-11-12), its validation naming
 `Bali_Spike_API29` as the step's brief asked.

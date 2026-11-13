@@ -3,6 +3,11 @@
      allow-list never holds, started by the shell in a task of its own, in split screen and picture-in-picture. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- The cover test's own call taken out of the call log on Android 10, whose shell can't (StandIn.Calls): this app's
+         alone, never Bali's, granted by the test. -->
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.WRITE_CALL_LOG" />
+
     <application>
         <activity
             android:name="com.bali.bali.StandIn"
@@ -23,6 +28,11 @@
                 <action android:name="android.provider.action.SMS_EMERGENCY_CB_RECEIVED" />
             </intent-filter>
         </receiver>
+        <!-- Called by the shell alone, which holds DUMP. -->
+        <receiver
+            android:name="com.bali.bali.StandIn$Calls"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
     </application>
 
 </manifest>

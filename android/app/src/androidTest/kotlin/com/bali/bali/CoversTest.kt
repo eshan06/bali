@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.graphics.Rect
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.provider.Settings
 import android.provider.Telephony
@@ -25,6 +26,7 @@ import com.bali.outbox.Enforcer
 import com.bali.outbox.LockSwitch
 import com.bali.outbox.Outbox
 import com.bali.outbox.OutboxDatabase
+import com.bali.outbox.SYSTEM_UI
 import com.bali.outbox.SyncEngine
 import java.time.Duration
 import java.time.Instant
@@ -71,6 +73,12 @@ class CoversTest {
     private val enforcer: Enforcer get() = checkNotNull(app.running.value).enforcer
     private val service: LockService get() = checkNotNull(app.lock.service)
 
+    /**
+     * A system app the allow-list never holds, which opens on these emulators with no prompt of its own in front: Google's
+     * Contacts, or AOSP's on Android 10's image.
+     */
+    private val blocked by lazy { listOf("com.google.android.contacts", "com.android.contacts").first { shell("pm path $it").isNotBlank() } + "/com.android.contacts.activities.PeopleActivity" }
+
     @Before
     fun start(): Unit =
         runBlocking {
@@ -100,6 +108,8 @@ class CoversTest {
                 app.lock.unlock()
                 shell("am start -n $STAND_IN --ez ${StandIn.FINISH} true")
                 until { Unit.takeIf { STAND_IN !in shell("am stack list") } }
+                // On Android 10 a readout docked in split screen stays there once its other half has gone.
+                closeReadouts()
                 home()
             } finally {
                 put(found.first)
@@ -116,12 +126,12 @@ class CoversTest {
         // As AN1 timed it: from Home, where the test starts and each launch ends, three times, the first cold.
         val times =
             (1..3).map { launch ->
-                if (launch == 1) shell("am force-stop ${BLOCKED.substringBefore('/')}")
+                if (launch == 1) shell("am force-stop ${blocked.substringBefore('/')}")
                 val homes = covers { it.homes }
                 val from = System.nanoTime()
-                shell("am start -n $BLOCKED")
+                shell("am start -n $blocked")
                 // Covered over its own window, named by that window's own state event.
-                val (window, landed) = until { covers { it.landed }?.takeIf { (window, at) -> at > from && named(window) == BLOCKED.substringBefore('/') } }
+                val (window, landed) = until { covers { it.landed }?.takeIf { (window, at) -> at > from && named(window) == blocked.substringBefore('/') } }
                 // Then sent home, once, and the cover gone with its window: the launcher in front.
                 until { Unit.takeIf { covers { it.homes } == homes + 1 } }
                 until { seen().takeIf { windows -> windows.none { it.id == window } && windows.any { it.app == launcher } && covers { it.shown }.isEmpty() } }
@@ -151,8 +161,9 @@ class CoversTest {
         never(holder(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)), { shell("am start -a android.settings.ACCESSIBILITY_SETTINGS") })
         val removing = Intent(Intent.ACTION_DELETE, "package:${context.packageName}".toUri())
         never(holder(removing), { shell("am start -a android.intent.action.DELETE -d package:${context.packageName}") }) {
+            // Back to the home screen, no Home after it: one pressed as Back lands can come after the next step's start.
             shell("input keyevent KEYCODE_BACK")
-            home()
+            until { Unit.takeIf { "${launcher()}/" in focused() } }
         }
         val dialing = never(dialer, { shell("am start -a android.intent.action.DIAL") })
         never(holder(Intent(EMERGENCY_DIALER)), { shell("am start -a $EMERGENCY_DIALER") })
@@ -162,9 +173,9 @@ class CoversTest {
         // conversation by itself, each of its activities starting the next (on Android 16's and 17's, one after asking the
         // network whether the number is a business's), and the last, a main screen made anew, would come up over the in-call
         // screen. So the call waits until Android has resumed that one, not one left from before: nothing of the link is left.
-        val before = records(MESSAGES_CONVERSATION)
+        val before = MESSAGES_CONVERSATIONS.flatMap(::records).toSet()
         never(checkNotNull(Telephony.Sms.getDefaultSmsPackage(context)), { shell("am start -a android.intent.action.SENDTO -d smsto:5551234") }) {
-            until { Unit.takeIf { resumed()?.let { (record, activity) -> activity == MESSAGES_CONVERSATION && record !in before } == true } }
+            until { Unit.takeIf { resumed()?.let { (record, activity) -> activity in MESSAGES_CONVERSATIONS && record !in before } == true } }
         }
         // A call, to the emulator's own pretend network: the in-call screen, a window of the dialer's own.
         val calling = System.currentTimeMillis()
@@ -172,12 +183,19 @@ class CoversTest {
             never(dialer, { shell("am start -a android.intent.action.CALL -d tel:5551234") }, besides = setOf(dialing))
         } finally {
             // Hung up, ringing or in a call on no line; then the call log as found, the test's own call taken out once the
-            // dialer has written it there, which it does a moment after.
+            // dialer has written it there, which it does a moment after. Android 10's shell has no call-log permission, so
+            // there the tests' own app does it (StandIn.Calls).
             shell("input keyevent KEYCODE_ENDCALL")
             until { Unit.takeIf { Regex("""mCallState=[12]""") !in shell("dumpsys telephony.registry") } }
-            until { Unit.takeIf { "Row:" in shell("content query --uri content://call_log/calls --where date>=$calling") } }
-            shell("content delete --uri content://call_log/calls --where date>=$calling")
-            assertEquals("No result found.", shell("content query --uri content://call_log/calls --where date>=$calling").trim())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                until { Unit.takeIf { "Row:" in shell("content query --uri content://call_log/calls --where date>=$calling") } }
+                shell("content delete --uri content://call_log/calls --where date>=$calling")
+                assertEquals("No result found.", shell("content query --uri content://call_log/calls --where date>=$calling").trim())
+            } else {
+                for (permission in listOf("READ_CALL_LOG", "WRITE_CALL_LOG")) shell("pm grant $STAND_IN_APP android.permission.$permission")
+                until { Unit.takeIf { calls(calling) > 0 } }
+                assertEquals(0, calls(calling, delete = true))
+            }
         }
         never(launcher(), { home() })
         never(context.packageName, { shell("am start -n $READOUT") })
@@ -195,9 +213,9 @@ class CoversTest {
         val asked =
             listOf(EMERGENCY_DIALER, "android.intent.action.DIAL_EMERGENCY", EMERGENCY_ASSISTANCE, Settings.ACTION_SETTINGS, Settings.ACTION_ACCESSIBILITY_SETTINGS, "android.content.pm.action.REQUEST_PERMISSIONS", Intent.ACTION_CHOOSER)
         for (action in asked) found("query-activities --brief -a $action").filter { it in system }.let { assertTrue("$action: $it", it.all { app -> app in allowed }) }
-        // Emergency alerts: the system's receiver allowed; the tests' own app declares one too (StandIn.Alert), as any app
-        // may, and is no system app.
-        val alerts = found("query-receivers --brief -a $EMERGENCY_ALERT")
+        // Emergency alerts, by Android 11's broadcast and Android 10's, as the allow-list asks: the system's receiver allowed;
+        // the tests' own app declares Android 11's too (StandIn.Alert), as any app may, and is no system app.
+        val alerts = EMERGENCY_ALERTS.flatMap { found("query-receivers --brief -a $it") }
         assertTrue("$alerts", STAND_IN_APP in alerts && alerts.any { it in system && it in allowed })
         assertTrue(STAND_IN_APP !in allowed)
     }
@@ -211,10 +229,20 @@ class CoversTest {
         until { Unit.takeIf { covers { it.homes } == homes + 1 } }
         until { Unit.takeIf { "${launcher()}/" in focused() } }
         // Then beside the readout in split screen, below it: covered where it is, within the safe area, the gesture bar
-        // below it bare, and never sent home. The readout in front first, the split's other half.
-        shell("am start -n $READOUT")
-        until { Unit.takeIf { READOUT in focused() } }
-        shell("dumpsys activity service SystemUIService WMShell splitscreen moveToSideStage ${task(STAND_IN).first} 1")
+        // below it bare, and never sent home. The readout in front first, the split's other half; on Android 10, whose split
+        // screen isn't System UI's, the readout docked above in a task of its own, then the stand-in brought beside it.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            shell("am start -n $READOUT")
+            until { Unit.takeIf { READOUT in focused() } }
+            shell("dumpsys activity service SystemUIService WMShell splitscreen moveToSideStage ${task(STAND_IN).first} 1")
+        } else {
+            // Each started afresh, so in its half: an open task keeps its own.
+            closeReadouts()
+            shell("am stack remove ${checkNotNull(stackOf(STAND_IN))}")
+            until { Unit.takeIf { STAND_IN !in shell("am stack list") } }
+            shell("am start -W --windowingMode $SPLIT_SCREEN_PRIMARY -n $READOUT")
+            shell("am start -W --windowingMode $SPLIT_SCREEN_SECONDARY -n $STAND_IN")
+        }
         val half = until { task(STAND_IN).second.takeIf { it.top > 0 && task(READOUT).second.bottom <= it.top } }
         val standIn = until { seen().firstOrNull { it.app == STAND_IN_APP && it.bounds == half && it.cover != null } }
         val cover = checkNotNull(standIn.cover)
@@ -262,8 +290,9 @@ class CoversTest {
         // As a video app goes: full screen, covered and sent home, it goes into picture-in-picture.
         shell("am start -n $STAND_IN --ez ${StandIn.PIP_ON_LEAVE} true")
         // Covered where it is, its cover drawn there on the screen, the small window read afresh each time as it moves in,
-        // and read once at rest, where System UI takes its touches.
-        val small = until { seen().firstOrNull { it.app == STAND_IN_APP && it.pictureInPicture && it.cover == it.bounds && it.bounds == pipTouches() }?.takeIf { pixel(it.bounds.centerX, it.bounds.centerY) == Covers.PLAIN } }
+        // and read once at rest, where System UI takes its touches, Android 10's menu come and gone first.
+        menuCameAndWent()
+        val small = until { seen().firstOrNull { it.app in pinned && it.pictureInPicture && it.cover == it.bounds && it.bounds at pipTouches() }?.takeIf { pixel(it.bounds.centerX, it.bounds.centerY) == Covers.PLAIN } }
         assertEquals(homes + 1, covers { it.homes })
         // Dragged up or down, as a student drags it off whatever is under it, and let go there, still, so it stays: the touch
         // goes through its cover to System UI, which moves it, and the cover follows it. Android puts it back where it was
@@ -274,20 +303,33 @@ class CoversTest {
         shell("input motionevent MOVE $x ${y + by}")
         shell("input motionevent MOVE $x ${y + 2 * by}")
         shell("input motionevent UP $x ${y + 2 * by}")
-        val moved = until { seen().firstOrNull { it.id == small.id && it.bounds != small.bounds && it.cover == it.bounds && it.bounds == pipTouches() }?.takeIf { pixel(it.bounds.centerX, it.bounds.centerY) == Covers.PLAIN } }
+        val moved = until { seen().firstOrNull { it.app in pinned && it.pictureInPicture && it.bounds != small.bounds && it.cover == it.bounds && it.bounds at pipTouches() }?.takeIf { pixel(it.bounds.centerX, it.bounds.centerY) == Covers.PLAIN } }
         // Its menu opened, as a student opens it to bring it back full screen: System UI's own window at its place, over it,
         // the touches the menu's, through the cover, which stays, so the app is never seen under the menu's dimmed glass.
+        // Android 10's menu is System UI's activity in the small window's own task, listed in the small window's place as the
+        // two grow: covered in its stead, its full-screen button in its middle once at rest.
         val (x2, y2) = moved.bounds.centerX to moved.bounds.centerY
         shell("input tap $x2 $y2")
-        until {
-            seen().takeIf { windows ->
-                windows.any { it.type == AccessibilityWindowInfo.TYPE_SYSTEM && (it.bounds meets moved.bounds) != null } && windows.firstOrNull { it.id == small.id }?.cover == moved.bounds
-            }?.takeIf { pixel(x2, y2) == Covers.PLAIN }
-        }
+        val open =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                until {
+                    seen().takeIf { windows ->
+                        windows.any { it.type == AccessibilityWindowInfo.TYPE_SYSTEM && (it.bounds meets moved.bounds) != null } && windows.firstOrNull { it.id == small.id }?.cover == moved.bounds
+                    }?.takeIf { pixel(x2, y2) == Covers.PLAIN }
+                }
+                moved.bounds
+            } else {
+                until { atRest { seen().firstOrNull { it.app == SYSTEM_UI && it.pictureInPicture && it.cover == it.bounds }?.bounds }?.takeIf { pixel(it.centerX, it.centerY) == Covers.PLAIN } }
+            }
         // Opened full screen from the menu: sent home again, under the cover it kept, which on Android 16 is the one that
-        // sent it home first.
-        shell("input tap $x2 $y2")
-        until { Unit.takeIf { covers { it.homes } == homes + 2 } }
+        // sent it home first. Android 10 may list it where its animation left it, short of the screen, and say no more, so
+        // there it can stay in front under its cover instead, until the screen next changes (AN7h).
+        shell("input tap ${open.centerX} ${open.centerY}")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            until { Unit.takeIf { covers { it.homes } == homes + 2 } }
+        } else {
+            until { Unit.takeIf { covers { it.homes } == homes + 2 || seen().any { it.app == STAND_IN_APP && !it.pictureInPicture && it.cover != null } } }
+        }
     }
 
     @Test
@@ -299,14 +341,16 @@ class CoversTest {
             val end = Instant.now().plusSeconds(15)
             app.lock.lock(end)
             shell("am start -n $STAND_IN --ez ${StandIn.PIP_ON_LEAVE} true")
-            val small = until { seen().firstOrNull { it.app == STAND_IN_APP && it.pictureInPicture && it.cover != null } }
+            // At rest, where System UI takes its touches, Android 10's menu come and gone first.
+            menuCameAndWent()
+            until { seen().firstOrNull { it.app in pinned && it.pictureInPicture && it.cover != null && it.bounds at pipTouches() } }
             // Covered before the end, by the phone's clock; the screen still from here on, so no window event comes.
             assertTrue(Instant.now() < end)
             val gone = until { Instant.now().takeIf { covers { it.shown }.isEmpty() } }
             assertTrue("$gone from $end", !gone.isBefore(end) && gone.isBefore(end.plusSeconds(2)))
-            // The small window still there, bare.
-            val bare = until { seen().firstOrNull { it.id == small.id } }
-            until { Unit.takeIf { pixel(bare.bounds.centerX, bare.bounds.centerY) == StandIn.COLOUR } }
+            // The small window still there, bare: its own colour where it is now (Android 17 may have moved it), read as the window
+            // in picture-in-picture, whichever Android 10 lists there.
+            until { Unit.takeIf { seen().firstOrNull { it.pictureInPicture }?.let { pixel(it.bounds.centerX, it.bounds.centerY) == StandIn.COLOUR } == true } }
         }
 
     /** [value]'s first answer, asked until it gives one; none within 30 s fails the test, saying what the service saw last. */
@@ -382,16 +426,43 @@ class CoversTest {
         return field
     }
 
+    /** How many calls the call log holds since [since], after deleting them where asked: through the tests' own app (StandIn.Calls). */
+    private fun calls(since: Long, delete: Boolean = false): Int {
+        val answer = shell("am broadcast -n $STAND_IN_APP/com.bali.bali.StandIn\$Calls --el ${StandIn.Calls.SINCE} $since --ez ${StandIn.Calls.DELETE} $delete")
+        return checkNotNull(Regex("""result=(-?\d+)""").find(answer)) { answer }.groupValues[1].toInt()
+    }
+
+    /** Android 10's stack holding [component]'s task, as `am stack list` names it. */
+    private fun stackOf(component: String): Int? {
+        var stack: Int? = null
+        for (line in shell("am stack list").lines()) {
+            Regex("""^Stack id=(\d+)""").find(line.trim())?.let { stack = it.groupValues[1].toInt() }
+            if (Regex("""taskId=\d+: ${Regex.escape(component)} """).containsMatchIn(line)) return stack
+        }
+        return null
+    }
+
+    /** Every readout a test opened closed with its task, gone from Android's list of tasks. */
+    private fun closeReadouts() {
+        instrumentation.runOnMainSync {
+            Stage.entries.flatMap { ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(it) }.filterIsInstance<ReadoutActivity>().forEach { it.finishAndRemoveTask() }
+        }
+        until { Unit.takeIf { READOUT !in shell("am stack list") } }
+    }
+
     /** The window with the focus, as `dumpsys window` names it. */
     private fun focused(): String = shell("dumpsys window").lineSequence().firstOrNull { "mCurrentFocus" in it }.orEmpty()
 
-    /** The activity Android has resumed on top, its record and its name, as `dumpsys activity activities` names them. */
+    /**
+     * The activity Android has resumed on top, its record and its name, as `dumpsys activity activities` names them: Android 10
+     * with no space after the colon, Android 13 closing a brace after the name.
+     */
     private fun resumed(): Pair<String, String>? =
-        Regex("""^\s*ResumedActivity: ActivityRecord\{(\w+) u0 (\S+) t-?\d+\}""", RegexOption.MULTILINE).find(shell("dumpsys activity activities"))?.groupValues?.let { it[1] to it[2] }
+        Regex("""^\s*ResumedActivity: ?ActivityRecord\{(\w+) u0 ([^\s\}]+)\}? t-?\d+\}""", RegexOption.MULTILINE).find(shell("dumpsys activity activities"))?.groupValues?.let { it[1] to it[2] }
 
     /** The records Android holds now of [activity], as `dumpsys activity activities` names them. */
     private fun records(activity: String): Set<String> =
-        Regex("""ActivityRecord\{(\w+) u0 ${Regex.escape(activity)} """).findAll(shell("dumpsys activity activities")).map { it.groupValues[1] }.toSet()
+        Regex("""ActivityRecord\{(\w+) u0 ${Regex.escape(activity)}\}? """).findAll(shell("dumpsys activity activities")).map { it.groupValues[1] }.toSet()
 
     /** How many covers the window manager holds: each window's own line in `dumpsys window windows`. */
     private fun coversOnScreen(): Int = Regex("""Window #\d+ Window\{\w+ u0 ${Covers.TITLE}\}""").findAll(shell("dumpsys window windows")).count()
@@ -410,9 +481,48 @@ class CoversTest {
             }
         }
 
-    /** Where System UI takes the picture-in-picture window's touches, as `dumpsys input` places its input consumer. */
-    private fun pipTouches(): Area? =
-        Regex("""name=pip_input_consumer, .*?frame=\[(-?\d+),(-?\d+)]\[(-?\d+),(-?\d+)]""").find(shell("dumpsys input"))?.groupValues?.let { Area(it[1].toInt(), it[2].toInt(), it[3].toInt(), it[4].toInt()) }
+    // Android 11 takes Android 10's paths here, untested: by AOSP's reading it has 10's menu activity and 10's shell with no
+    // call-log permission, both gone in 12 (AN7h).
+
+    /**
+     * The apps a small window's cover is listed for: the stand-in's. Android 10 can leave the service's list of windows as its
+     * picture-in-picture animations had it, saying no more changed (AN7h): there System UI's menu may stay listed at the small
+     * window's place after it has gone, its cover standing in for the small window's.
+     */
+    private val pinned get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) setOf(STAND_IN_APP) else setOf(STAND_IN_APP, SYSTEM_UI)
+
+    /**
+     * Where System UI takes the picture-in-picture window's touches, as `dumpsys input` places its input consumer (Android 10
+     * quoting its name). None on Android 10 while its menu is up, an activity that takes them, the consumer still listed then.
+     */
+    private fun pipTouches(): Area? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && menuUp()) return null
+        return Regex("""name='?pip_input_consumer'?, .*?frame=\[(-?\d+),(-?\d+)]\[(-?\d+),(-?\d+)]""").find(shell("dumpsys input"))?.groupValues?.let { Area(it[1].toInt(), it[2].toInt(), it[3].toInt(), it[4].toInt()) }
+    }
+
+    /** Android 10's menu up over the small window: the top of its task, as `am stack list` names it. */
+    private fun menuUp(): Boolean = "topActivity=ComponentInfo{$SYSTEM_UI/" in shell("am stack list")
+
+    /**
+     * On Android 10, System UI's menu come over the small window and gone again, as it comes each time a window is pinned, for
+     * 3.5 s (AOSP's PipTouchHandler and PipMenuActivity): a window event each way, so the screen is still only after it.
+     */
+    private fun menuCameAndWent() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return
+        until { Unit.takeIf { menuUp() } }
+        until { Unit.takeIf { !menuUp() } }
+    }
+
+    /** Whether a small window is where System UI takes its [touches]: on Android 10, which lists a scaled window's place a pixel short, within that pixel. */
+    private infix fun Area.at(touches: Area?): Boolean =
+        touches != null && if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) this == touches else listOf(left - touches.left, top - touches.top, right - touches.right, bottom - touches.bottom).all { it in -1..0 }
+
+    /** [place]'s answer once it has stopped moving: the same at two reads a moment apart. */
+    private fun atRest(place: () -> Area?): Area? {
+        val first = place() ?: return null
+        Thread.sleep(250)
+        return first.takeIf { place() == it }
+    }
 
     /** The app Android answers [intent] with. */
     private fun holder(intent: Intent): String = checkNotNull(context.packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)).activityInfo.packageName
@@ -420,8 +530,13 @@ class CoversTest {
     /** The student's home screen's app. */
     private fun launcher(): String = holder(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
 
-    /** The student presses Home: back once the home screen has the focus, so nothing opened next is put behind it. */
+    /**
+     * The student presses Home: back once the home screen has the focus, so nothing opened next is put behind it. Not pressed
+     * where the home screen has it already, since nothing would mark that Home's landing, which could come after the next step's
+     * start and put it behind (once on Android 17, AN7h).
+     */
     private fun home() {
+        if ("${launcher()}/" in focused()) return
         shell("input keyevent KEYCODE_HOME")
         until { Unit.takeIf { "${launcher()}/" in focused() } }
     }
@@ -458,16 +573,20 @@ class CoversTest {
         const val READOUT = "com.bali.bali/com.bali.bali.ReadoutActivity"
         const val STAND_IN = "com.bali.bali.test/com.bali.bali.StandIn"
         const val STAND_IN_APP = "com.bali.bali.test"
+
+        // Android 10's split screen's two halves, as `am start --windowingMode` names them.
+        const val SPLIT_SCREEN_PRIMARY = 3
+        const val SPLIT_SCREEN_SECONDARY = 4
         const val EMERGENCY_DIALER = "com.android.phone.EmergencyDialer.DIAL"
         const val EMERGENCY_ASSISTANCE = "android.telephony.action.EMERGENCY_ASSISTANCE"
-        const val EMERGENCY_ALERT = "android.provider.action.SMS_EMERGENCY_CB_RECEIVED"
+        val EMERGENCY_ALERTS = listOf("android.provider.action.SMS_EMERGENCY_CB_RECEIVED", "android.provider.Telephony.SMS_EMERGENCY_CB_RECEIVED")
         const val TAG = "BaliCovers"
 
-        /** A system app the allow-list never holds, which opens on these emulators with no prompt of its own in front. */
-        const val BLOCKED = "com.google.android.contacts/com.android.contacts.activities.PeopleActivity"
-
-        /** Where Google Messages, these emulators' SMS app, ends a number's link: the conversation, on a main screen made anew. */
-        const val MESSAGES_CONVERSATION = "com.google.android.apps.messaging/.main.MainActivity"
+        /**
+         * Where Google Messages, these emulators' SMS app, ends a number's link: the conversation, on a main screen made anew;
+         * on Android 10's image, its Messages of 2019, on a conversation's own screen.
+         */
+        val MESSAGES_CONVERSATIONS = listOf("com.google.android.apps.messaging/.main.MainActivity", "com.google.android.apps.messaging/.ui.conversation.ConversationActivity")
         val PATIENCE = 30.seconds
     }
 }

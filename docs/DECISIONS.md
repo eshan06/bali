@@ -8,6 +8,135 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-13** — **AN7h, the lock on Android 10: a lesson's cover reaches every app. Android 10 and 11 never take back a
+  package an accessibility service has named, so Bali names none there; and Android 10's picture-in-picture menu, an activity of
+  System UI's, is covered as the small window it stands in for (this step's calls and the conductor's, marked, each awaiting the
+  owner's look; AN7h, #587).** The owner said to take the recommended option on every regular call, so each call here is this
+  step's or the conductor's, for the owner to look at. Android's lock has no iOS twin (ARCHITECTURE, "Android app structure",
+  decision 2).
+
+  **Where it lives:** `app`'s `ServiceLock.kt` (`NARROWS`, from Android 12); the service's XML in two copies, `res/xml` for
+  Android 10 and 11 naming no package and `res/xml-v31` from Android 12 naming Bali's (Debug's until Phase 10 moves the service to
+  main: both copies move with it); `outbox`'s `Cover.kt` (`pinned`, the small window Android 10's menu stands in for, and
+  `SYSTEM_UI`, now shared with `AllowList`). No library, no SDK package, no user-facing word.
+
+  **The root cause, run and read.** Android 10 keeps two package lists for a service: its info, which `setServiceInfo` replaces
+  and which AccessibilityManager and `dumpsys accessibility` read back, and its binding's own filter, which every event must pass
+  and which `setServiceInfo` only adds to: `AbstractAccessibilityServiceConnection.setDynamicallyConfigurableProperties` does
+  `mPackageNames.addAll`, with no `clear()` (AOSP android10-release). A binding's filter starts from the info as Android holds it:
+  the XML's at the phone's start, and after that whatever `setServiceInfo` last left there, since each binding is made from the
+  same info object (`updateServicesLocked`). Bali named its own package from its XML and at every connect (the battery plan), so
+  every binding's filter held it, and a lesson's `packageNames = null` cleared the info but not the filter: Android delivered the
+  service no other app's window event, and nothing was named or covered. Seen on `Bali_Spike_API29` with a probe, a test and a log
+  line in the service, neither committed: in a lesson the service was told the window events from every app, AccessibilityManager
+  read that back and `dumpsys` listed the two event types, yet opening the tests' stand-in and Settings delivered nothing; naming
+  the stand-in's package too, in the same lesson, delivered its window's event at once and covered it, Settings still none; and
+  null again widened nothing. AN13f's reading was right, short of one part: the shared info, which also explains why the five
+  failed every time.
+
+  **Why LockServiceTest's check passed:** it read the info through AccessibilityManager (`getEnabledAccessibilityServiceList`
+  returns the info object, whose packages `setServiceInfo` replaces) and the event types from `dumpsys`, which on Android 10
+  prints no packages. Neither is the filter events pass.
+
+  **The versions it reaches, by reading:** Android 10 and 11 add without clearing (android10-release; android11-release, its QPR
+  branches through android11-qpr3-s1-release, and the last tags, android-11.0.0_r48 and android-security-11.0.0_r76); Android 12
+  clears the list first (android12-release, as android12L-release, android13-release and android14-release do). Run: Android 10
+  (`Bali_Spike_API29`), and Android 13 (`Bali_Spike_API33`, its first boot, `ro.build.version.sdk` 33): a lesson's `null` widened there,
+  the probe's stand-in named, covered and sent home and Settings named, and the regression test and CoversTest passed. 15 and 17 ran
+  clean before (AN7e) and after. 11 and 12 have no emulator here (ISSUES #6, gap 10).
+
+  **The fix (the conductor's call, awaiting the owner's look):** from Android 12 nothing changes: outside a lesson, event types 0,
+  flags 0 and Bali's package, in its XML (`xml-v31`) and in `ServiceLock`. On Android 10 and 11 the service names no package,
+  ever: its XML names none and `ServiceLock` sets none. **Its cost there:** outside a lesson Bali still hears nothing (event types
+  0), but every app keeps sending its window-state events to Android, which drops them: where a service names no package,
+  Android 10 asks every app for `TYPE_WINDOW_STATE_CHANGED` whatever its event types (`getRelevantEventTypes`), the very cost the
+  battery plan's narrowing avoids (AN1b). One binder call each time a window opens or changes; not measured, with no phone on 10
+  or 11 (AN1's part 2's phones run newer Android). ARCHITECTURE's battery plan says so. Set aside: naming every installed package
+  in a lesson (Android 11 hides other apps' packages without `QUERY_ALL_PACKAGES`, which Play restricts, and an app installed
+  mid-lesson would escape the lock) and switching the service off and on to clear the filter (never, by the brief).
+
+  **Android 10's picture-in-picture menu (this step's call, found once windows came through):** System UI shows its menu, an
+  activity of its own in the small window's task, each time a window is pinned, for 3.5 s, and again while the student opens it
+  (AOSP android10-release, `PipTouchHandler.onActivityPinned` and `PipMenuActivity`'s `INITIAL_DISMISS_DELAY`). While it's up,
+  Android 10 lists the menu's window in the small window's place and the small window not at all, so the blocked app showed bare
+  there. `Cover` now covers System UI's window in picture-in-picture as the small window it stands in for, its touches still the
+  menu's, never sent home, while the small window last listed in picture-in-picture was a blocked app's and something is in
+  picture-in-picture (a menu listed before its own event names it keeps that). From Android 12 the menu is a window of WMShell's and
+  both are listed, the menu above (run on 13, 15 and 17), so nothing changes there; Android 11 still has 10's menu activity (read).
+  **One edge, for the owner's look (santa's reviewer A; this step's call, leave it):** a blocked app's small window, then in the
+  same breath an allowed app's that no event has named in the lock, then System UI's menu over it, would have that menu covered for
+  its 3.5 s, its touches still the menu's. It needs an allowed app in picture-in-picture that was on screen since before the lock,
+  and no frame with nothing in picture-in-picture between the two, so its reach is doubtful; narrowing it would mean keeping each
+  small window's place too. **Left, Android 10's own** (ARCHITECTURE's "What's weaker", ISSUES #6's gap 10): about 20 to 30 ms bare as
+  the menu's window is listed before its event names it, and about 100 ms as it goes before Android lists the small window again;
+  and Android 10 doesn't always say the windows changed after its picture-in-picture animations, so the service's list can lag: the
+  menu's cover stays at the small window's place after the menu has gone (it stays covered), and an app opened full screen from the
+  menu stays listed where its animation was, 27 px short of the screen on the emulator, so it isn't sent home but stays in front
+  under its cover, that strip bare, until the screen next changes. Bali can't read the list afresh without reading a window, which
+  the battery plan forbids.
+
+  **The sixth failure, the test's own:** it asked for Android 11's alert action alone, and Android 10's cell broadcast app answers
+  only `android.provider.Telephony.SMS_EMERGENCY_CB_RECEIVED` (`cmd package query-receivers` on the emulator), which `AllowList`
+  already asks for. The test now asks both.
+
+  **The regression test** (its own commit first): LockServiceTest's
+  `anotherAppsWindowEventsReachTheServiceInALessonAndInTheNextOneAfterEmergencyUnlock`, what Android delivers: Settings opened in
+  a lesson, and in the next after Emergency Unlock, its window named by its own state event. On API 29 it failed by name, the other
+  13 passing: "lesson 1: no window event from com.android.settings reached the service, told [4194336, 64, []], listening
+  [TYPE_WINDOW_STATE_CHANGED, TYPE_WINDOWS_CHANGED]". And `theServiceListensToNothing...` now reads the XML as Android parses it on
+  the phone (`bindsWith`), since Android 10's installed info is the object `setServiceInfo` writes over, and the narrowing each
+  version holds.
+
+  **CoversTest on Android 10's and 13's images** (test only): AOSP Contacts in place of Google's; Messages of 2019, whose link ends
+  on `.ui.conversation.ConversationActivity`, and `dumpsys`'s `ResumedActivity:` with no space (Android 13's closes a brace after the
+  activity's name); Android 10's own split screen (`am start --windowingMode 3`, then 4, each in a task started afresh);
+  `pip_input_consumer` quoted, a pixel off a scaled window's place, and still listed while the menu is up, so the picture-in-picture
+  tests wait for the menu to come and go first; the menu's shapes above; and the call's call log, which Android 10's shell can't read
+  (nor 11's: the call-log permissions reach the Shell's manifest in android12-release; so 11, untested, takes 10's paths, gated at
+  12), taken out by
+  the tests' own app (`StandIn.Calls`, `READ_CALL_LOG` and `WRITE_CALL_LOG` in the test app alone, granted by the test, its
+  receiver open to the shell's `DUMP` alone; never Bali's). The two rows this step's own calls had left on API 29's log, before
+  it, were deleted through it: the log as found, empty.
+
+  **Tried, each failing by name, then reverted** (on API 29): the XML naming Bali's package on Android 10, `theServiceListensTo...`
+  "expected:<[]> but was:<[com.bali.bali]>" (the delivery test passed there: an earlier test's binding had taken the stuck start,
+  and later bindings start from the info `setServiceInfo` overwrote, so the XML is checked as parsed); `ServiceLock` naming it on
+  Android 10, three: the regression test, "lesson 1: no window event from com.android.settings...", `theServiceListensTo...`
+  "expected:<[0, 0, []]> but was:<[0, 0, [com.bali.bali]]>" and CoversTest's blocked app; Android 10's alert action dropped from
+  the test, `eachSystemApp...` "[com.bali.bali.test]"; and no window standing in for the small one, CoverTest's two new cases
+  and both picture-in-picture tests on API 29.
+
+  **SignInBrowserTest's race (its own commit, test only):** API 29's whole run once failed
+  `aCustomTabsAnswerComesBack...` with a tab started before the host: the host the previous case's answer brought back was made
+  after that case had ended, found the next case's waiting sign-in and opened a tab for it. Both cases that end on a taken answer
+  now wait for its host to come and go.
+
+  **CoversTest's Home race (found on `Bali_Spike_API37`, test only):** after the uninstall screen's Back, `home()` found the home
+  screen focused at once, and its Home key landed 0.4 s later, after the dialer's start, sending the dialer away before its window
+  was named (once in three runs). The uninstall step now ends on Back alone, and `home()` presses nothing where the home screen has
+  the focus already.
+
+  **The runs:** on `Bali_Spike_API29` (Android 10), the regression test failing first (above); on the final code, CoversTest 6,
+  LockServiceTest 14 and SignInBrowserTest 8 of each; the whole instrumented suite, 80 of 80 (`f3440d3b`, before CoversTest's last
+  test-only changes, which then ran on all four). Three earlier whole runs there failed one case each, each cause found and closed in
+  the tests: SignInBrowserTest's race, and twice the lock-end test reading Android 10's menu period as rest. On `_API33` (Android 13),
+  CoversTest and LockServiceTest 20 of 20 and the whole suite 80 of 80 (`35dc1f13`); on `_API35` and `_API37`, the same three
+  classes whole, CoversTest on the final code (twice on 37, where one run first met the Home race). Gradle's `assemble
+  :app:assembleDebugAndroidTest :app:lint check` green, Android 10's API check with it, each JVM suite run again: core 153, outbox
+  571, the app's 17 and 20. `npm run typecheck && npm run lint && npm test` green, the portal's suite whole. Nothing installed in
+  the PC's SDK. Each emulator after: Bali and its test app uninstalled, AN1's spike apps kept, every setting and the call log as
+  found (Android 13's font scale, unset at its first boot, unset again), stopped.
+
+  **For AN6d and AN13g:** the whole suite on API 29 is 80 tests and passes; CoversTest now runs there, its picture-in-picture tests
+  waiting out Android 10's menu (about 4 s each). SignInBrowserTest's two answer-taken cases wait for their host. A test that opens
+  another app under a lock on Android 10 meets the GOTCHAS entry's shell. **For Phase 10:** the service's XML is two files.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): no blocker. Their WARNs: Android 11 shares Android 10's two test causes, its Shell
+  without call-log permissions and its menu an activity (A, checked in AOSP), so CoversTest's Android 10 paths are gated at 12,
+  taken; the PR's count of the menu's stand-in waits (A), taken; the rebase over #586's status line (B), taken; the battery plan's
+  change on 10 and 11 and the full-screen-from-the-menu gap, each to be named for the owner (B, A), named; and the `pinned` edge
+  above (A), left for the owner's look. Both confirmed the root cause and the version gate against AOSP.
 - **2026-11-12** — **The sign-in deletion case's flake on main's CI, found, staged and fixed in the test: a deletion sent again
   while its first try is at Cognito leaves its row for a try of its own, as C3d designed, so each order is now a case of its own
   that says what the design leaves (the owner's standing order on findings; the conductor's call, awaiting the owner's look;

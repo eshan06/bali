@@ -336,15 +336,23 @@ both phones, on the build students will install, before Android launches
    sentence of the service's description in Settings; if Play's review asks for it, it goes back.
    *Checked:* by Play's review of the build students install (AP4); on both phones, the disclosure
    shown in Bali's normal use, and No thanks leaving the service off.
-10. **Android 10 to 14 are untested.** Bali runs on Android 10 and later (minSdk 29, AN2), but the
-    PC has only Android 15, 16 and 17 emulators, so nothing older has run it. A Java API an older
-    phone lacks would fail only there, since Android Lint doesn't check `core`'s and `outbox`'s
-    calls against Android 10 (`docs/DECISIONS.md`, 2026-11-04, AN2). Android 10 also measures no
+10. **Android 10 to 14: two emulators, no phone.** Bali runs on Android 10 and later (minSdk 29, AN2).
+    The PC's Android 10 and 13 emulators run the instrumented tests whole (AN13f, AN7h); 11, 12 and 14
+    have run nothing. Android 10's first run found the lock covering nothing: Android 10 and 11 never
+    take back a package an accessibility service has named, and Bali named its own outside a lesson,
+    so no other app's window reached it. Fixed by naming none there, run on 10 and read for 11
+    (`docs/DECISIONS.md`, 2026-11-13, AN7h); its cost, every app sending its window-state events
+    outside a lesson too, is unmeasured. Around picture-in-picture, Android 10's list of windows can
+    lag: a small window bare for a tenth of a second as System UI's menu comes and goes, and one opened
+    full screen from that menu left in front under its cover, a strip bare, until the screen next
+    changes (AN7h). A Java API an older phone lacks would fail only there, since Android Lint doesn't
+    check `core`'s and `outbox`'s calls against Android 10 (2026-11-04, AN2). Android 10 also measures no
     insets outside a window, so there the cover's safe area is worked out from the display's own sizes
     (2026-11-05, AN7e). *Checked:* the build students install, through a whole lesson, on Android 10
-    and on Android 12 or 13, as emulator images the owner adds (each a download the owner OKs) or as
-    phones; on Android 10, a screen with a cutout, upright and turned both ways: a full-screen app sent
-    home, a split half covered to its edges.
+    and on 11 or 12, as emulator images the owner adds (each a download the owner OKs) or as phones;
+    on Android 10, a screen with a cutout, upright and turned both ways: a full-screen app sent home, a
+    split half covered to its edges; and on a phone on 10 or 11, a picture-in-picture app and its menu,
+    and the battery outside a lesson.
 11. **What the allow-list lets through.** The parts the student chooses are allowed whoever holds
     them, each app whole: the phone and messaging apps chosen, the home screen chosen and every keyboard
     switched on, so an app that is one of these and more besides (a home screen with a feed, a keyboard

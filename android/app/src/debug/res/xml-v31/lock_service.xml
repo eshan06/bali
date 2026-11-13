@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The lock's service as it binds from Android 12: listening to nothing, from Bali's own package alone (the battery
+     plan), until ServiceLock widens it to the window events in a lesson, a widening Android takes from 12 (on 10 and
+     11 it never clears a name, so xml/'s names none: AN7h). It never reads a window's contents; the list of windows
+     and their changes, which the cover follows window by window (AN7e), need canRetrieveWindowContent. Not an
+     accessibility tool (ISSUES #7). -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/lock_service_description"
+    android:packageNames="com.bali.bali" />
