@@ -1639,7 +1639,7 @@ describe('DELETE /v1/me (C3)', () => {
     const { student } = await seedClassroom(db, 'del-after');
     const token = await ctx.tokenFor(student.cognitoId);
     await deleteAs(token);
-    const before = await db.select().from(users);
+    const before = await db.select().from(users).orderBy(users.id);
 
     const res = await ctx.app.inject({
       method: 'PATCH',
@@ -1651,7 +1651,7 @@ describe('DELETE /v1/me (C3)', () => {
     // Its token still valid, its sign-in maybe not yet gone from Cognito: refused all the same.
     expect(res.statusCode).toBe(409);
     expect(res.json<ApiErrorBody>().error).toMatchObject({ reason: 'account_deleted' });
-    expect(await db.select().from(users)).toEqual(before);
+    expect(await db.select().from(users).orderBy(users.id)).toEqual(before);
     expect((await rowOf(student.id)).displayName).toBeNull();
   });
 });

@@ -294,19 +294,32 @@ async function armBen(s: Awaited<ReturnType<typeof seed>>) {
   });
 }
 
-/** Every row of the tables a disposal could touch, for the school's people and classes. */
+/**
+ * Every row of the tables a disposal could touch, for the school's people and classes, each table
+ * in a fixed order (its key, or its creation and then its key): without an ORDER BY, two reads of
+ * the same rows may return them in different orders.
+ */
 async function rowsOf(s: { school: { id: string }; teacher: { id: string } }, on: Database = db) {
-  const classRows = await on.select().from(classes).where(eq(classes.schoolId, s.school.id));
+  const classRows = await on
+    .select()
+    .from(classes)
+    .where(eq(classes.schoolId, s.school.id))
+    .orderBy(classes.id);
   const classIds = classRows.map((c) => c.id);
   const enrolled = await on
     .select()
     .from(enrollments)
-    .where(inArray(enrollments.classId, classIds));
+    .where(inArray(enrollments.classId, classIds))
+    .orderBy(enrollments.id);
   const peopleIds = [s.teacher.id, ...enrolled.map((e) => e.studentId)];
-  const lessons = await on.select().from(sessions).where(inArray(sessions.classId, classIds));
+  const lessons = await on
+    .select()
+    .from(sessions)
+    .where(inArray(sessions.classId, classIds))
+    .orderBy(sessions.id);
   return {
     school: await on.select().from(schools).where(eq(schools.id, s.school.id)),
-    users: await on.select().from(users).where(inArray(users.id, peopleIds)),
+    users: await on.select().from(users).where(inArray(users.id, peopleIds)).orderBy(users.id),
     classes: classRows,
     enrollments: enrolled,
     sessions: lessons,
@@ -318,18 +331,48 @@ async function rowsOf(s: { school: { id: string }; teacher: { id: string } }, on
           questions.sessionId,
           lessons.map((l) => l.id),
         ),
-      ),
-    responses: await on.select().from(responses).where(inArray(responses.studentId, peopleIds)),
+      )
+      .orderBy(questions.id),
+    responses: await on
+      .select()
+      .from(responses)
+      .where(inArray(responses.studentId, peopleIds))
+      .orderBy(responses.id),
     participations: await on
       .select()
       .from(participations)
-      .where(inArray(participations.studentId, peopleIds)),
-    events: await on.select().from(events).where(inArray(events.userId, peopleIds)),
-    blocks: await on.select().from(blocks).where(eq(blocks.teacherId, s.teacher.id)),
-    invites: await on.select().from(teacherInvites).where(eq(teacherInvites.schoolId, s.school.id)),
-    armed: await on.select().from(armedTaps).where(eq(armedTaps.teacherId, s.teacher.id)),
-    tokens: await on.select().from(deviceTokens).where(inArray(deviceTokens.userId, peopleIds)),
-    ageChecks: await on.select().from(ageChecks).where(inArray(ageChecks.userId, peopleIds)),
+      .where(inArray(participations.studentId, peopleIds))
+      .orderBy(participations.id),
+    events: await on
+      .select()
+      .from(events)
+      .where(inArray(events.userId, peopleIds))
+      .orderBy(events.id),
+    blocks: await on
+      .select()
+      .from(blocks)
+      .where(eq(blocks.teacherId, s.teacher.id))
+      .orderBy(blocks.id),
+    invites: await on
+      .select()
+      .from(teacherInvites)
+      .where(eq(teacherInvites.schoolId, s.school.id))
+      .orderBy(teacherInvites.id),
+    armed: await on
+      .select()
+      .from(armedTaps)
+      .where(eq(armedTaps.teacherId, s.teacher.id))
+      .orderBy(armedTaps.id),
+    tokens: await on
+      .select()
+      .from(deviceTokens)
+      .where(inArray(deviceTokens.userId, peopleIds))
+      .orderBy(deviceTokens.token),
+    ageChecks: await on
+      .select()
+      .from(ageChecks)
+      .where(inArray(ageChecks.userId, peopleIds))
+      .orderBy(ageChecks.userId),
     drafts: await on
       .select()
       .from(savedQuestions)
@@ -348,7 +391,8 @@ async function rowsOf(s: { school: { id: string }; teacher: { id: string } }, on
           sessionPresentations.sessionId,
           lessons.map((l) => l.id),
         ),
-      ),
+      )
+      .orderBy(sessionPresentations.sessionId),
   };
 }
 
