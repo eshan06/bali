@@ -8,7 +8,8 @@ package com.bali.outbox
  * The phone's notes, BaliApp.swift's `everApproved`, `inClass` and `listSeenBy` in its own defaults, and nothing beside them (L8a's
  * `answersListSeenBy` has no twin: no Android build ever showed L8a's list). Kept as the outbox is, out of the backup and of a
  * transfer to a new phone (ARCHITECTURE, "Android app structure"). A sign-out keeps them, so the same student is never asked
- * again; the account deleted on Bali's server, the two under the student go ([Account]). Read and written in the account's and
+ * again; the account deleted on Bali's server, the two under the student go ([Account]), and once a deletion's request went out
+ * they stay off the disk for the run, unless an answer proves the account stands (AN9k). Read and written in the account's and
  * the router's own stretches, so a store never waits on its disk there: the app's keeps them in memory and writes behind
  * (AN10c). The one write that waits on the disk is [forgetStudent]'s, which the account makes with itself let go.
  */
@@ -24,7 +25,8 @@ interface Notes {
 
     /**
      * [inClass] and [listSeenBy] gone, off the disk before this returns: Delete account's, before it sends anything, so a process
-     * ended while the deletion runs leaves nothing of the student's on the phone (AN10c). Written through, so it waits on the disk.
+     * ended while the deletion runs leaves nothing of the student's on the phone (AN10c), and the account's once Bali's server has
+     * deleted the account, its sign-in forgotten or marked for it (AN9j; AN9k). Written through, so it waits on the disk.
      */
     fun forgetStudent()
 }
