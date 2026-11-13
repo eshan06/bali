@@ -11,7 +11,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 - **2026-11-13** — **AN7h, the lock on Android 10: a lesson's cover reaches every app. Android 10 and 11 never take back a
   package an accessibility service has named, so Bali names none there; and Android 10's picture-in-picture menu, an activity of
   System UI's, is covered as the small window it stands in for (this step's calls and the conductor's, marked, each awaiting the
-  owner's look; AN7h, #NNN).** The owner said to take the recommended option on every regular call, so each call here is this
+  owner's look; AN7h, #587).** The owner said to take the recommended option on every regular call, so each call here is this
   step's or the conductor's, for the owner to look at. Android's lock has no iOS twin (ARCHITECTURE, "Android app structure",
   decision 2).
 

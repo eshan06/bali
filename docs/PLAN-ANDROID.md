@@ -14,7 +14,7 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-13 (Central) — AN7h, the lock on Android 10: a lesson's cover reaches every app (#NNN;
+_Last updated: 2026-11-13 (Central) — AN7h, the lock on Android 10: a lesson's cover reaches every app (#587;
 `docs/DECISIONS.md`, 2026-11-13). Android 10 and 11 only add the packages an accessibility service names to the filter its
 events pass, never clearing it, so with Bali's own named outside a lesson no other app's window reached the service there and
 the lock covered nothing. From Android 12 the service names Bali's package outside a lesson as before; on 10 and 11 it names
@@ -161,7 +161,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   2026-11-05, Q8) — validation: every line answered on both phones
 - **AN7g** The cover test's SMS step waiting out Google Messages — ✅ (#562; DECISIONS 2026-11-11)
 - **AN7h** The lock on Android 10: a lesson's cover reaches every app (no iOS twin: Android's lock is its own) — ✅
-  (#NNN; DECISIONS 2026-11-13)
+  (#587; DECISIONS 2026-11-13)
 - **AN8** 📱 The tap over NFC — ✅ its code (#532; DECISIONS 2026-11-05); left, its 📱 check, a real
   block on both phones, offline (`docs/ANDROID-PHONE-TESTS.md`, AN8); and the block's link opening Bali
   when it's closed, not built: it waits for AN1's part 2 to find whether it works, and for Phase 10, since

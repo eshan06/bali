@@ -10,7 +10,7 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 
 _Last updated: 2026-11-13 (Central) — The lock on Android 10 fixed: Android 10 and 11 never take back a
 package an accessibility service names, so Bali names none there, and Android 10's picture-in-picture
-menu is covered (AN7h, #NNN; DECISIONS 2026-11-13). Before it, the sign-in deletion case's CI flake
+menu is covered (AN7h, #587; DECISIONS 2026-11-13). Before it, the sign-in deletion case's CI flake
 (#586). Next: the owner's switch of prod's domain, the release call and disabling
 the review account (Open owner items); a session builds the retire-a-block command; the owner the
 sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11–AN13;
@@ -69,7 +69,7 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1's part 2 on a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱),
   before launch; AN2–AN10's and AN13a–AN13f's code ✅ (#488–#585), AN13e2's CI flake fix ✅ (#584),
-  AN7h, the lock on Android 10, ✅ (#NNN); AN11–AN13 next. Not on the pilot's critical path.
+  AN7h, the lock on Android 10, ✅ (#587); AN11–AN13 next. Not on the pilot's critical path.
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
   (#434; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file
   (`docs/WEB.md`, Testing the portal), `try-again.test.tsx` the pattern. Each UI step from now on
