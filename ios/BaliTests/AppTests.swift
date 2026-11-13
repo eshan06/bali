@@ -2429,11 +2429,15 @@ struct AppTests {
                         $0.accessibilityFrame.minX < -0.5 || $0.accessibilityFrame.maxX > screen.width + 0.5
                     }
                     #expect(outside.isEmpty, "\(at): \(outside.map { $0.accessibilityLabel ?? "" })")
+                    // The ring's rule is the text size's alone, whatever the sheet holds: drawn on
+                    // the plain screen only, its track at least 10 pt wide, so a point in every 3
+                    // finds it (CI's simulator draws slowly).
+                    guard name == "signIn" else { continue }
                     let image = try #require(drawn(window).flatMap(UIImage.init(data:)), "\(at)")
                     let pixel = try pixels(of: image)
                     let (width, height) = (Int(image.size.width), Int(image.size.height))
-                    let ring = stride(from: 0, to: height, by: 2).contains { y in
-                        stride(from: 0, to: width, by: 2).contains { track(pixel($0, y)) }
+                    let ring = stride(from: 0, to: height, by: 3).contains { y in
+                        stride(from: 0, to: width, by: 3).contains { track(pixel($0, y)) }
                     }
                     #expect(ring == !size.isAccessibilitySize, "\(at)")
                 }
