@@ -295,22 +295,22 @@ async function armBen(s: Awaited<ReturnType<typeof seed>>) {
 }
 
 /** Every row of the tables a disposal could touch, for the school's people and classes. */
-async function rowsOf(s: { school: { id: string }; teacher: { id: string } }) {
-  const classRows = await db.select().from(classes).where(eq(classes.schoolId, s.school.id));
+async function rowsOf(s: { school: { id: string }; teacher: { id: string } }, on: Database = db) {
+  const classRows = await on.select().from(classes).where(eq(classes.schoolId, s.school.id));
   const classIds = classRows.map((c) => c.id);
-  const enrolled = await db
+  const enrolled = await on
     .select()
     .from(enrollments)
     .where(inArray(enrollments.classId, classIds));
   const peopleIds = [s.teacher.id, ...enrolled.map((e) => e.studentId)];
-  const lessons = await db.select().from(sessions).where(inArray(sessions.classId, classIds));
+  const lessons = await on.select().from(sessions).where(inArray(sessions.classId, classIds));
   return {
-    school: await db.select().from(schools).where(eq(schools.id, s.school.id)),
-    users: await db.select().from(users).where(inArray(users.id, peopleIds)),
+    school: await on.select().from(schools).where(eq(schools.id, s.school.id)),
+    users: await on.select().from(users).where(inArray(users.id, peopleIds)),
     classes: classRows,
     enrollments: enrolled,
     sessions: lessons,
-    questions: await db
+    questions: await on
       .select()
       .from(questions)
       .where(
@@ -319,28 +319,28 @@ async function rowsOf(s: { school: { id: string }; teacher: { id: string } }) {
           lessons.map((l) => l.id),
         ),
       ),
-    responses: await db.select().from(responses).where(inArray(responses.studentId, peopleIds)),
-    participations: await db
+    responses: await on.select().from(responses).where(inArray(responses.studentId, peopleIds)),
+    participations: await on
       .select()
       .from(participations)
       .where(inArray(participations.studentId, peopleIds)),
-    events: await db.select().from(events).where(inArray(events.userId, peopleIds)),
-    blocks: await db.select().from(blocks).where(eq(blocks.teacherId, s.teacher.id)),
-    invites: await db.select().from(teacherInvites).where(eq(teacherInvites.schoolId, s.school.id)),
-    armed: await db.select().from(armedTaps).where(eq(armedTaps.teacherId, s.teacher.id)),
-    tokens: await db.select().from(deviceTokens).where(inArray(deviceTokens.userId, peopleIds)),
-    ageChecks: await db.select().from(ageChecks).where(inArray(ageChecks.userId, peopleIds)),
-    drafts: await db
+    events: await on.select().from(events).where(inArray(events.userId, peopleIds)),
+    blocks: await on.select().from(blocks).where(eq(blocks.teacherId, s.teacher.id)),
+    invites: await on.select().from(teacherInvites).where(eq(teacherInvites.schoolId, s.school.id)),
+    armed: await on.select().from(armedTaps).where(eq(armedTaps.teacherId, s.teacher.id)),
+    tokens: await on.select().from(deviceTokens).where(inArray(deviceTokens.userId, peopleIds)),
+    ageChecks: await on.select().from(ageChecks).where(inArray(ageChecks.userId, peopleIds)),
+    drafts: await on
       .select()
       .from(savedQuestions)
       .where(eq(savedQuestions.teacherId, s.teacher.id))
       .orderBy(savedQuestions.createdAt, savedQuestions.id),
-    decks: await db
+    decks: await on
       .select()
       .from(decks)
       .where(eq(decks.schoolId, s.school.id))
       .orderBy(decks.createdAt, decks.id),
-    presentations: await db
+    presentations: await on
       .select()
       .from(sessionPresentations)
       .where(
@@ -351,6 +351,30 @@ async function rowsOf(s: { school: { id: string }; teacher: { id: string } }) {
       ),
   };
 }
+
+describe('rowsOf, the read these tests compare', () => {
+  it('reads the same rows in the same order whichever plan the database picks for each read', async () => {
+    const s = await seed('rows-order');
+    // The lesson past its bell, ended as the sweep ends it, is written again: on disk it now lies
+    // after the running one, against their classes' order, as the two in CI's failure lay.
+    await endSession(db, { sessionId: s.past.id, at: new Date(), reason: 'expired' });
+    // Postgres promises no order without an ORDER BY: an index scan returns rows in its index's
+    // order, a scan of the table in the order they lie on disk. Autovacuum's ANALYZE can switch a
+    // read from one plan to the other between two reads, as it did in CI on 2026-11-13; here
+    // each read is made to take one of them.
+    const byIndex = await db.transaction(async (tx) => {
+      await tx.execute(sql`set local enable_seqscan = off`);
+      await tx.execute(sql`set local enable_bitmapscan = off`);
+      return rowsOf(s, tx);
+    });
+    const byScan = await db.transaction(async (tx) => {
+      await tx.execute(sql`set local enable_indexscan = off`);
+      await tx.execute(sql`set local enable_bitmapscan = off`);
+      return rowsOf(s, tx);
+    });
+    expect(byScan).toEqual(byIndex);
+  });
+});
 
 describe('the disposal’s coverage of the schema', () => {
   it('handles every foreign key to users or schools', () => {
