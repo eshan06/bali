@@ -90,11 +90,38 @@ a real decision? Add a dated entry at the top: what was decided and why.
   half to send (nobody signs in there) and `ApiClient`'s transport is `core`'s alone; AN13d's queue tests in `core` and
   `outbox` cover the queue.
 
-  **Nothing reached dev:** after each run, `dumpsys netstats`, polled, listed no traffic for Bali's uid or its test app's.
+  **Nothing reached dev:** after each run, `dumpsys netstats`, polled, listed no traffic for Bali's uid or its test app's, on all
+  four emulators and after the config break.
 
-  **The runs:** RUNS
+  **The runs,** one emulator at a time, on the final code (`9c25f2b0`: round 1's fix added one assertion to BaliAppTest after
+  `ce38c91c`): `LessonAppTest` 6 of 6 and BaliAppTest 9 of 9 on `Bali_Spike_API29`, `_API33`, `_API35` and `_API37`, Android
+  10's deck path (its nameless file) among them through the app's renderer; then the whole suite, 92 tests. API 37: 90 passed,
+  SignInBrowserTest's two that need a browser with no ephemeral tab skipped (Chrome 145 offers one). API 35, on `ce38c91c`: 91
+  passed, its ephemeral-tab test skipped (Chrome 124 has none), and BaliAppTest and LessonAppTest run again on the fix. API 33:
+  90 passed, the ephemeral-tab test skipped, and one failure, found and not this step's (below). API 29: 91 passed, the
+  ephemeral-tab test skipped. Gradle's `assemble :app:assembleDebugAndroidTest :app:lint check :core:test --rerun :outbox:test
+  --rerun` green, Android 10's API check with it, core's 154 and outbox's 571 JVM tests run again, neither UP-TO-DATE, the app's
+  49; `npm run typecheck && npm run lint && npm test` green, the portal's suite whole (78 files). No SDK package was installed
+  and no library added. Each emulator after: Bali and its test app uninstalled, AN1's spike apps kept, its settings as found,
+  stopped.
 
-  **Santa's review:** SANTA
+  **The one failure, on `Bali_Spike_API33`, for AN6f's worker and the owner:** SignInBrowserTest's
+  `aHostMadeAgainForAChange…TakesTheStudentsBackForAClose…` never saw the browser cover its sign-in host. Its logcat: the test
+  before it put the font scale back, and System UI then laid its navigation bar out again, a screen-size change
+  (`configDiffForRecreate={CONFIG_SCREEN_SIZE, CONFIG_WINDOW_CONFIGURATION}`) that reached this test's new host 0.02 s after it
+  launched the tab, while Chrome 109, force-stopped and its first run never accepted, was still on its first-run trampoline. The
+  host made again came back to the front with its page already opened and finished, as a student's close
+  (`HostedUiActivity.onResume`), so the test's wait for the cover never came. Nothing of the lesson half runs there; the test's
+  restore waits for the font scale alone, not for what System UI does after it. Not re-run for a different answer. On a phone the
+  same edge needs a rotation in the moment between Sign in's tab launching and the browser covering Bali, with a browser that
+  opens a page of its own first: that sign-in ends as closed, saying nothing, and Sign in works again.
+
+  **Santa's review:** NICE in two rounds, two Claude Opus reviewers at max effort each round (no Codex or Gemini CLI on this PC,
+  so context isolation holds and model diversity doesn't). Round 1: one blocker (reviewer A), the plan docs citing this entry
+  before it was written, fixed by this entry; WARNs: no test pinning `ownLessonClient`'s `overSignIn` guard (both; BaliAppTest's
+  account test now does, shown failing by name with the guard dropped), none pinning its `transport.apart()` (B; left, as
+  above), and the archive's API 33 line and the netstats line written before their runs ended (both, then B in round 2; true
+  once the runs above ended). Round 2, on the fixes: both found them working, no blocker.
 
   **For AS8 and Phase 10:** AS8 reads `running.value?.lessons?.state` (its card, its slide and its heading), calls `answer` and
   `hide` from the card, and `ask(slide)` as the slide shows and at each change of `SlideShown` (Try again: `ask(slide, again =
