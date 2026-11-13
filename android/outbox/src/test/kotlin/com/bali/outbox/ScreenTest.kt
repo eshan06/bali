@@ -1097,6 +1097,9 @@ class ScreenTest : OutboxFiles() {
                 assertEquals("The sign-in was refused. Try again, or ask your teacher.", SignInError.Refused(code).words(page), "$code")
             }
             assertEquals("Your phone couldn't keep the sign-in. Try again.", SignInError.NotKept.words(page))
+            // AN6e: the page that ends Cognito's session in a browser with no ephemeral tab closed before Cognito sent it back.
+            // Nothing changed, as with a closed sign-in page, so nothing yet: its words, if any, come with AS2 (PLAN-ANDROID).
+            assertNull(SignInError.BrowserNotSignedOut.words(page))
         }
     }
 

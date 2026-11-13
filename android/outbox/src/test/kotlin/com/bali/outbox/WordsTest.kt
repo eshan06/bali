@@ -71,7 +71,7 @@ private fun everyWord(): Map<String, List<String>> {
     val signIns =
         each(
             SignInError::class, SignInError.Cancelled, SignInError.NotOpened("another sign-in page is open"), SignInError.Unreachable,
-            *refusals.toTypedArray(), SignInError.NotKept,
+            *refusals.toTypedArray(), SignInError.NotKept, SignInError.BrowserNotSignedOut,
         )
     // Focus where the phone may stand, with a tap held or none, a late unlock of its session or none, every link and sign-in, and
     // each claim the check can make, the switch off with its report kept or not; each claim reached, so each one's words are read.
