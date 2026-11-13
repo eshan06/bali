@@ -107,13 +107,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   page again 0.8 s later; the test had taken a Settings window before the page itself, pressed Home and asked for the removal, and
   the page's late start came over the uninstaller, which finished as `noHistory` does (`wm_finish_activity … UninstallerActivity,
   stop-no-history`). The step now leaves once the page's own window has the focus: the first page never has a window, though the
-  system marks it resumed for a moment, so `ResumedActivity` isn't enough. Nothing of this step's runs there, and Settings takes
-  that deep link only some of the time (not in the later runs whose logs were read), so the fix is read from the log, not shown
-  failing.
+  system marks it resumed for a moment, so `ResumedActivity` isn't enough. Nothing of this step's runs there. Settings takes that
+  deep link only some of the time; it took it again in the final whole run, where the step waited out the page's late start,
+  pressing Home 0.9 s after it, and passed.
 
   **The runs:** on `Bali_Spike_API29`, `_API35` and `_API37`, on the final code, BaliAppTest 9 and ReadoutTest 10, 19 of 19 on
   each; before santa's WARN fix, which changed only the readout's two buttons and `BaliApp`'s note of its engine, SignInBrowserTest
-  8 and CoversTest 6, with its fix, on each. On `Bali_Spike_API33`, the whole instrumented suite on the final code, SUITE_33 (80 at
+  8 and CoversTest 6, with its fix, on each. On `Bali_Spike_API33`, the whole instrumented suite on the final code, 82 of 82 (80 at
   #587: BaliAppTest's start test is two now, and ReadoutTest has one more), after one earlier run failed at CoversTest's race
   (above) and one, the fix's, passed 81 of 81. After each run `dumpsys netstats`, polled, listed no traffic for Bali's or its
   test app's uid. On the JVM, run again: core 153, outbox 571, the app's 18 and 21. Gradle's `assemble
