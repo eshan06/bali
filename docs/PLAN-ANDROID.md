@@ -14,7 +14,7 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-12 (Central) — AN13f, the slide's page drawn with `PdfRenderer` in an isolated process (#PRNUM;
+_Last updated: 2026-11-12 (Central) — AN13f, the slide's page drawn with `PdfRenderer` in an isolated process (#585;
 `docs/DECISIONS.md`, 2026-11-12), the sixth of AN13's seven steps: `app`'s `IsolatedRenderer.kt` and `RendererService.kt`,
 AN13e's seam filled to the owner's answers to Q2 and Q3: pdfium in a service process Android isolates, bound while a deck is
 open; the deck handed over from memory, an anonymous memory file from Android 11, on Android 10 a file in `no_backup/deck/`
@@ -207,7 +207,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN13d** The lesson followed: the poll while Bali is in front, the answer, Hide — ✅ (#577; DECISIONS 2026-11-12)
 - **AN13e** The slide's deck, asked for once, one document at a time — ✅ (#578; DECISIONS 2026-11-12)
 - **AN13e2** The slide-deck case's flake on main's CI: the deck rig's lesson half on the test's own thread — ✅ (#584; DECISIONS 2026-11-12)
-- **AN13f** The page drawn with `PdfRenderer`, in an isolated process — ✅ (#PRNUM; DECISIONS 2026-11-12)
+- **AN13f** The page drawn with `PdfRenderer`, in an isolated process — ✅ (#585; DECISIONS 2026-11-12)
 - **AN13g** The lesson in the app, AN13 done (twin: BaliApp.swift's `start` and `setForeground`), after AN13f —
   validation: the instrumented tests on `Bali_Spike_API29`, `35` and `37`
 

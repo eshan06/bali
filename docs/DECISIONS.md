@@ -10,7 +10,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-12** — **AN13f, the slide's page drawn with `PdfRenderer` in an isolated process: AN13e's seam filled in `android/app`
   to the owner's answers to Q2 and Q3, the sixth of AN13's seven steps (this step's own calls and the conductor's, marked, each
-  awaiting the owner's look; AN13f, #PRNUM).** The owner said to take the recommended option on every regular call, so each call
+  awaiting the owner's look; AN13f, #585).** The owner said to take the recommended option on every regular call, so each call
   here is this step's or the conductor's, for the owner to look at.
 
   **Where it lives:** `app`'s new `RendererService.kt`, the service where pdfium parses, declared in main's manifest with
