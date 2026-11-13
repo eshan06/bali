@@ -13,8 +13,10 @@ import {
   events,
   participations,
   schools,
+  teacherInvites,
   users,
 } from '../src/schema.js';
+import { hashInviteCode } from '../src/schools.js';
 import {
   exportStudentRecord,
   STUDENT_RECORD_COVERAGE,
@@ -295,6 +297,41 @@ describe('exportStudentRecord (C5)', () => {
     // She never tapped into Chemistry's lesson, and answered in it: it is named all the same.
     expect(record.sessions.map((s) => s.id)).toContain(chemistry.id);
     expect(JSON.stringify(record)).not.toContain('Done?');
+  });
+
+  it('lists the invites an account redeemed by when, then by id, never as the table holds them', async () => {
+    const school = one(await db.insert(schools).values({ name: 'School c5-invites' }).returning());
+    const teacher = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'teacher-c5-invites', role: 'teacher', schoolId: school.id })
+        .returning(),
+    );
+    // The last redeem has the smallest id, and two share one instant: the record's order is by
+    // when, then by id, and neither the table's order on disk nor its key's is that order.
+    const [last, first, second] = [newUuidV7(), newUuidV7(), newUuidV7()].sort();
+    if (!last || !first || !second) throw new Error('seed');
+    const redeemed = (id: string, at: string) => ({
+      id,
+      schoolId: school.id,
+      codeHash: hashInviteCode(newUuidV7()),
+      createdAt: new Date('2026-10-01T09:00:00Z'),
+      expiresAt: new Date('2026-10-15T09:00:00Z'),
+      redeemedAt: new Date(at),
+      redeemedBy: teacher.id,
+      redeemEventId: newUuidV7(),
+    });
+    // Written last to first, so a scan of the table reads them backwards.
+    await db
+      .insert(teacherInvites)
+      .values([
+        redeemed(last, '2026-10-06T09:00:00Z'),
+        redeemed(second, '2026-10-05T09:00:00Z'),
+        redeemed(first, '2026-10-05T09:00:00Z'),
+      ]);
+
+    const record = await exported(teacher.id);
+    expect(record.invitesRedeemed.map((i) => i.id)).toEqual([first, second, last]);
   });
 
   it('finds the account by its Cognito subject too, and none for a stranger', async () => {
