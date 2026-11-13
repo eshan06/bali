@@ -86,7 +86,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the page's late start came over the uninstaller, which finished as `noHistory` does (`wm_finish_activity … UninstallerActivity,
   stop-no-history`). The step now leaves once the page's own window has the focus: the first page never has a window, though the
   system marks it resumed for a moment, so `ResumedActivity` isn't enough. Nothing of this step's runs there, and Settings takes
-  that deep link only some of the time (none in the runs after), so the fix is read from the log, not shown failing.
+  that deep link only some of the time (not in the later runs whose logs were read), so the fix is read from the log, not shown
+  failing.
 
   **The runs:** on `Bali_Spike_API29`, `_API35` and `_API37`, BaliAppTest 9, ReadoutTest 9 and SignInBrowserTest 8, 26 of 26 on
   each, and CoversTest 6 of 6 with its fix; on `Bali_Spike_API33`, the whole instrumented suite, 81 of 81 (80 at #587:
