@@ -8,6 +8,80 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **The sign-in deletion case's flake on main's CI, found, staged and fixed in the test: a deletion sent again
+  while its first try is at Cognito leaves its row for a try of its own, as C3d designed, so each order is now a case of its own
+  that says what the design leaves (the owner's standing order on findings; the conductor's call, awaiting the owner's look;
+  #585).** Test-only: Bali's code is unchanged but one comment, and no phone met it.
+
+  **What failed:** CI's push run 43367247980 on `1f864f56` (#584, Android tests and docs only), attempt 1, "Integration + race
+  tests (real Postgres)": `sign-in-deletion.test.ts`'s "is deleted once, however often the deletion is sent" (C3-cognito, #303)
+  at its last line, `expect(await queue()).toEqual([])`, its row still queued: `attempts` 1, `deleted_at` 04:46:02.919,
+  `finished_at` null, `next_attempt_at` 04:47:02.908, its username kept. Its first two lines passed (AdminDeleteUser once, the
+  pool empty), and so did the same test in that run's PGlite lane and on #584's PR run. Since #558 merged it is the one failure
+  in 54 finished CI runs.
+
+  **The root cause, plainly:** the case sends `DELETE /v1/me` twice, back to back, and each request starts a pass of the deleter
+  in the background once it commits. Since C3d (#558, 2026-11-11) a try's finish leaves its row queued when a deletion was queued
+  since its claim (`finishCognitoDeletion`'s guard on `deleted_at`), so that deletion keeps a try of its own; and a deletion of a
+  queued row keeps its tries and their backoff (`queueCognitoDeletion`). In CI's run the retry's queue write landed 11 ms after
+  the first pass claimed the row (at 04:46:02.908, `next_attempt_at` less the claim's minute), while its try was at Cognito. The
+  try deleted the sign-in, its finish left the row queued, and the retry's own pass found nothing due, the claim having put the
+  next try off a minute; `settle()` returned with the row queued, as the design leaves it, where the case's last line wanted
+  none. On PGlite one connection, in the test's own process and on its own thread, runs every statement, so the first pass's
+  three (the claim, the account's lookup, the finish) nearly always finish while the retry's token is still being signed on
+  Node's crypto threads: the retry then finds the row finished, queues it anew, and its own pass finds the sign-in gone and
+  finishes it. On real Postgres each statement is a round trip on a pool of connections, on a runner busy with every other
+  file's tests, so the retry's two statements can overtake the first pass's last. Before C3d the finish deleted the row whatever
+  came since, so the case passed in every order: #558 made its last line hang on the order, and CI met the other one a day later.
+
+  **Test or product: the test's.** The product did what C3d designed. A deletion sent twice in that order (a lost answer's retry,
+  landing while the first try waits on Cognito) deletes the sign-in once, at once. Its row stays queued for the retry's own try,
+  its username kept and the mark refusing the sign-in's old tokens all along, until the claim's backoff is past and a sweep takes
+  it: one to two minutes after a row's first try, and at most an hour and a minute after a row that had failed before (the
+  backoff's cap, then the sweep's minute). That try finds the sign-in gone and finishes the row. No phone sees anything; the
+  owner's log shows two "Cognito sign-in deletion done" lines for the row, `deleted`, then `gone`.
+
+  **The fix, in the test** (the conductor's call, awaiting the owner's look: the product stays as C3d designed it). The case lets
+  the first try finish (`settle()`) before its retry, so its order is certain, keeps its three assertions where they were, and
+  checks the retry's own try found the sign-in gone. The other order is a case of its own, the regression test below, whose last
+  lines say what C3d leaves there: the row queued for the retry's own try, due a minute after the claim and not tried a
+  millisecond before, then finished by that try (`gone`), AdminDeleteUser called once in all. The C3d rule is unchanged, and no
+  assertion was loosened: the original's three hold in both cases, and the regression test's queue is empty once the try the
+  design gives the retry has run. `finishCognitoDeletion`'s comment now says when that try is due, which the case was written
+  without. Not chosen: the retry's try at once. While the first try is at Cognito it would find the user still there and delete
+  it a second time, two tries on one row at once, which the kept backoff stops (tried: the regression test then fails,
+  AdminDeleteUser called twice); after that try, it would take a pass trying again after a finish it skipped, product code for a
+  row only the deleter reads, the mark holding either way.
+
+  **The regression test, failing first** (its own commit): "is deleted once when the deletion is sent again while its first try
+  is at Cognito", the case's steps with the retry staged by the fake pool's new `hold`: Cognito's next AdminDeleteUser held
+  unanswered until the test lets it go, with a promise for when the try makes it, so the retry lands between the first try's
+  claim and its finish every time, on either database, with no sleep and no window of time. Before the fix, with the original's
+  three assertions, it failed as CI did in each of 5 runs of the file, its other 18 cases passing: `expected [ { …(9) } ] to
+  deeply equal []`, the row CI printed (`attempts` 1, `deleted_at` the retry's, `finished_at` null, the next try a minute after the
+  claim, the username kept). Tried on the fixed tests, each failing by name, then reverted: the finish's guard dropped (the
+  regression test: no row left for the retry's try); a queued row's backoff dropped at a deletion (the regression test:
+  AdminDeleteUser twice); a finished row's deletion queuing nothing (the original case, its retry's own try now checked, and
+  "queues the sign-in anew…").
+
+  **The same cause elsewhere: none.** Each other case of the file has at most one pass in flight at a time: one deletion and
+  then `settle()`, a sweep the test awaits, or the deleter off; only this case sent a second deletion with the first one's pass
+  still running, and no other API test turns the deleter on. In `packages/db`, `cognito-deletions.test.ts` calls the queue, the
+  claim and the finish one after another (its C3d test stages this very order, and expects the row left queued), and
+  `races.test.ts`'s two claims at once checks nothing a finish or a queue write moves.
+
+  **The loops** (the scratchpad's `apiflake-loop.sh`, each run a fresh vitest process of the file from `apps/api`, and
+  `apiflake-hammer.sh`, one case in several processes at once). Before the fix, on main's code, on PGlite: the file 100 times, 0
+  failed; the case alone, 8 processes at once of 250 runs each, 2000 runs, 0 failed. Said plainly, it never failed here, as the
+  PGlite lane never showed it: the staged test is the proof that counts. After the fix, on the final code: the file 100 times
+  on PGlite, AFTER_FAILED failed. Real Postgres: not run on this PC. Docker Desktop is installed, but its engine wasn't running, so
+  its images couldn't be listed, and nothing was started or pulled; this PR's real-Postgres job is that proof.
+
+  **The proof:** `npm run typecheck && npm run lint` green. `npm test`: the API's 66 files and the database's 25 passed (one
+  skipped in each, the real-Postgres lane's), `@bali/shared`'s 6 and the infra tests' 24; the portal's suite passed whole run
+  alone (78 files), its `tokens.test.ts` case "never set on one icon…" having run past its 5 s in the whole run on this PC, as
+  AN6a's entry records. `npm run demo` not run: no API behavior changed. Santa: SANTA_LINE
+
 - **2026-11-12** — **AN13f, the slide's page drawn with `PdfRenderer` in an isolated process: AN13e's seam filled in `android/app`
   to the owner's answers to Q2 and Q3, the sixth of AN13's seven steps (this step's own calls and the conductor's, marked, each
   awaiting the owner's look; AN13f, #585).** The owner said to take the recommended option on every regular call, so each call
