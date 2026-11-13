@@ -52,10 +52,12 @@ struct PolicyLinks: View {
 
     /// Each page's link: caption text in the brand's ink (DESIGN.md's links), in a 44-pt target,
     /// read by VoiceOver as the link it is, as the portal's own are; `dotted`, the dot before the
-    /// second in the tertiary ink, which VoiceOver skips.
+    /// second in the tertiary ink, which VoiceOver skips, and the second's words at its target's
+    /// start, so a word under 44 pt wide sits as near the dot as the first's.
     private func links(dotted: Bool) -> some View {
         ForEach(Page.allCases) { page in
-            if dotted, page != Page.allCases.first {
+            let after = dotted && page != Page.allCases.first
+            if after {
                 Text("·").textStyle(.caption).foregroundStyle(Theme.textTertiary)
                     .accessibilityHidden(true)
             }
@@ -63,7 +65,8 @@ struct PolicyLinks: View {
                 opened = page
             } label: {
                 Text(page.title).underline(underlined).textStyle(.caption)
-                    .foregroundStyle(Theme.brand).frame(minWidth: 44, minHeight: 44)
+                    .foregroundStyle(Theme.brand)
+                    .frame(minWidth: 44, minHeight: 44, alignment: after ? .leading : .center)
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
