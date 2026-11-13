@@ -535,11 +535,16 @@ class HostedUiTest {
      */
     @Test
     fun throughTheSignInTheCodeIsTradedFirstTheSignOutPageShownOnceItIsAndTheTokensKeptOnlyAsItComesBack() {
-        val trades = CopyOnWriteArrayList<String>() // the page shown as each trade went out
+        val trades = CopyOnWriteArrayList<String>() // where the sign-in stood as each trade went out
         val token =
             object : HttpTransport {
                 override suspend fun send(request: HttpRequest): HttpAnswer {
-                    trades += pages.page()?.url?.path ?: "none"
+                    trades +=
+                        when {
+                            pages.waiting() == null -> "after the sign-out page"
+                            pages.page() == null -> "before the sign-out page"
+                            else -> "while ${pages.page()?.url?.path} was shown"
+                        }
                     return HttpAnswer(200, emptyMap(), """{"access_token":"a.b.c","refresh_token":"r"}""".encodeToByteArray())
                 }
             }
@@ -571,7 +576,7 @@ class HostedUiTest {
         assertNull(signedIn)
         assertNotNull(kept.load())
         // Each traded with no page shown: before its sign-out page opened, while the browser's session still stood.
-        assertEquals(listOf("none", "none"), trades)
+        assertEquals(listOf("before the sign-out page", "before the sign-out page"), trades)
     }
 
     /** [value]'s first answer, asked until it gives one: a point the test waits for, failing rather than hanging. */

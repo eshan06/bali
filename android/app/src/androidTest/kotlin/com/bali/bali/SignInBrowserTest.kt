@@ -268,11 +268,14 @@ class SignInBrowserTest {
             val call = signInPage()
             tab()
             val host = host() as HostedUiActivity
-            onMain { (host as Activity).startActivityForResult(Intent().setClassName(instrumentation.context.packageName, Veil::class.java.name), VEIL) }
+            // Android's own call, as the host is an Activity: androidx marks its override deprecated for the result API's sake.
+            val plain: Activity = host
+            onMain { plain.startActivityForResult(Intent().setClassName(instrumentation.context.packageName, Veil::class.java.name), VEIL) }
             until { onMain { host.lifecycle(Lifecycle.State.STARTED) } }
             onMain { host.recreate() }
             val again = until { onMain { (hosts.lastActivity as? HostedUiActivity)?.takeIf { it !== host && settled(it) } } }
             assertNotNull("the host made again ended the sign-in as the student's close", pages.waiting())
+            assertEquals("the host made again took the sign-in page as the student's close", page("s1"), pages.page()?.url)
             assertFalse(call.isCompleted)
             // It kept the tab it opened: the browser was asked once.
             assertEquals(1, views().size)
@@ -285,7 +288,7 @@ class SignInBrowserTest {
             hostCameAndWent()
         } finally {
             instrumentation.removeMonitor(held)
-            onMain { (hosts.lastActivity as? Activity)?.finishActivity(VEIL) }
+            onMain { hosts.lastActivity?.finishActivity(VEIL) }
         }
     }
 

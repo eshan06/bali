@@ -160,6 +160,20 @@ private fun decoded(raw: String): String? {
 enum class HostedPage { SignIn, SignUp }
 
 /**
+ * The phone's browser as [SignIn.signIn] uses it (AN6c, AN6f). [open] shows the hosted UI's page and returns where it sent the
+ * student back, as text, as soon as it does, or throws why not: the student's close [SignInError.Cancelled], anything else
+ * [SignInError.NotOpened]. Where that page's tab left Cognito's session in the browser, [signedOut], asked once the answer's code
+ * has been traded, ends it on one more page and returns once that page came back, or throws why not:
+ * [SignInError.BrowserNotSignedOut] closed first, [SignInError.NotOpened] one that couldn't open. Where no session was left, it
+ * returns at once. iOS's browser is [open] alone: its sign-in is ephemeral, so nothing follows the answer there.
+ */
+interface Browser {
+    suspend fun open(page: URI): String
+
+    suspend fun signedOut() {}
+}
+
+/**
  * Who is signed in, as [SignIn.landings] says it (Q2): whether someone [signedIn] is, and their [account], the tokens'
  * `sub`; and [count], how many sign-ins have landed in the sign-in's life, a renewal never one, so each sign-in is told
  * from the last, the same account's again included.
@@ -219,7 +233,8 @@ sealed class SignInError : Exception(null, null, false, false) {
     /**
      * The sign-in page answered, but the browser it opened in, one that offers no ephemeral tab, wasn't signed out of the hosted
      * UI after it (AN6e): the page that ends that session closed before Cognito sent it back, the student's close or a page that
-     * couldn't load. Nothing changed: the code is never traded, and the next sign-in ends the session again.
+     * couldn't load. Nothing changed: the tokens its code was traded for are dropped (AN6f), and the next sign-in ends the
+     * session again.
      */
     data object BrowserNotSignedOut : SignInError()
 }
@@ -459,42 +474,64 @@ class SignIn(
     }
 
     /**
-     * Signs the student in through Cognito's hosted UI, replacing any tokens the phone had. [browser] opens
-     * [page] and returns where the hosted UI sent the student back, as text (AN6c), or throws why not: the
-     * student's close [SignInError.Cancelled], the browser not signed out of the hosted UI after it
-     * [SignInError.BrowserNotSignedOut] (AN6e), anything else [SignInError.NotOpened]. Its code is exchanged
-     * in the sign-in's scope: a caller cancelled after the browser answered stops waiting, and it goes on.
-     * [yes], a Sign up's 13 or older (C7-server), keeps the tokens through the check with that yes's event
-     * id before anything hears of them, so the account it made is never asked.
+     * Signs the student in through Cognito's hosted UI, replacing any tokens the phone had. [browser] opens [page] and returns
+     * where the hosted UI sent the student back, as text (AN6c), or throws why not ([Browser.open]). Its code is traded at once,
+     * then the browser is signed out of the hosted UI where its tab left Cognito's session there ([Browser.signedOut], AN6f), and
+     * only then are the tokens kept and the engine told: until that page came back they're kept nowhere, given to nobody, and a
+     * browser not signed out drops them. That runs in the sign-in's scope: a caller cancelled after the browser answered stops
+     * waiting, and it goes on. [yes], a Sign up's 13 or older (C7-server), keeps the tokens through the check with that yes's
+     * event id before anything hears of them, so the account it made is never asked.
      *
      * @throws SignInError why it didn't finish; then nothing changed.
      */
-    suspend fun signIn(page: HostedPage = HostedPage.SignIn, yes: String? = null, browser: suspend (URI) -> String) {
+    suspend fun signIn(page: HostedPage = HostedPage.SignIn, yes: String? = null, browser: Browser) {
         val attempt = Attempt()
         // It can't fail, the domain a URL and the rest escaped; were it to, nothing is sent.
         val url = cognito.authorizeUrl(attempt, page) ?: throw SignInError.Unreachable
-        val code = cognito.code(browser(url), attempt)
-        scope.async { keepGrant(code, attempt, yes) }.await()
+        val answer = browser.open(url)
+        scope.async { keepGrant(answer, attempt, yes, browser) }.await()
     }
 
-    /** The tokens [code] and [attempt]'s verifier are exchanged for, kept with [yes]; then the engine told. */
-    private suspend fun keepGrant(code: String, attempt: Attempt, yes: String?) {
-        val fields =
-            listOf(
-                "grant_type" to "authorization_code", "client_id" to cognito.clientId, "code" to code,
-                "redirect_uri" to cognito.redirectUri.toString(), "code_verifier" to attempt.verifier,
-            )
-        val grant = exchange(fields).getOrThrow()
-        val refresh = grant.refresh ?: throw SignInError.Refused(null)
+    /** [signIn] through a browser that leaves no session behind, SignIn.swift's `signIn(_:yes:through:)`: an ephemeral tab's. */
+    suspend fun signIn(page: HostedPage = HostedPage.SignIn, yes: String? = null, browser: suspend (URI) -> String) =
+        signIn(page, yes, object : Browser { override suspend fun open(page: URI): String = browser(page) })
+
+    /**
+     * [answer]'s code and [attempt]'s verifier traded at once, then [browser] signed out of the hosted UI, so the tokens are
+     * already given when Cognito's `/logout` ends that session (AN6f); only then kept with [yes], and the engine told. The session
+     * is ended whether the trade worked or not, and where both fail the trade's failure is said, the one the student's next try
+     * needs fixed. Tokens traded for a browser not signed out are dropped: kept nowhere, given to nobody, so nothing to revoke.
+     */
+    private suspend fun keepGrant(answer: String, attempt: Attempt, yes: String?, browser: Browser) {
+        val traded = try { Result.success(traded(answer, attempt)) } catch (error: SignInError) { Result.failure(error) }
+        val notSignedOut =
+            try {
+                browser.signedOut()
+                null
+            } catch (error: SignInError) {
+                error
+            }
+        val given = traded.getOrThrow()
+        notSignedOut?.let { throw it }
         val told =
             alone {
-                val given = Tokens(grant.access, refresh, grant.email, now())
                 val fresh = if (yes == null) given else given.copy(checked = true, yes = yes)
                 if (!keep(fresh)) throw SignInError.NotKept
                 adopt(fresh, lands = true)
                 tokenArrived
             }
         told?.let { hook -> orElse(Unit) { hook() } }
+    }
+
+    /** The tokens [answer]'s code and [attempt]'s verifier are traded for at the token endpoint, as they came, or why not. */
+    private suspend fun traded(answer: String, attempt: Attempt): Tokens {
+        val fields =
+            listOf(
+                "grant_type" to "authorization_code", "client_id" to cognito.clientId, "code" to cognito.code(answer, attempt),
+                "redirect_uri" to cognito.redirectUri.toString(), "code_verifier" to attempt.verifier,
+            )
+        val grant = exchange(fields).getOrThrow()
+        return Tokens(grant.access, grant.refresh ?: throw SignInError.Refused(null), grant.email, now())
     }
 
     /**

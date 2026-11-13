@@ -14,6 +14,7 @@ import kotlin.test.fail
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.selects.select
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import okhttp3.Headers.Companion.headersOf
@@ -296,7 +297,13 @@ class SignInTest : SignIns() {
             val phone = signIn(store, endpoint, told = told)
             val browser = SignOutPage()
             val signing = async { phone.signIn(HostedPage.SignUp, yes = "y1", browser = browser) }
-            endpoint.received(1)
+            val traded = async { endpoint.received(1) }
+            val first =
+                select {
+                    traded.onAwait { "the trade" }
+                    browser.asked.onAwait { "the sign-out page" }
+                }
+            assertEquals("the trade", first, "the sign-out page asked for before the code was traded")
             assertFalse(browser.asked.isCompleted, "the sign-out page asked for before the trade answered")
             endpoint.answer(200, granted(jwt("a1"), refresh = "refresh-1"))
             browser.asked.await()
