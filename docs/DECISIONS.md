@@ -153,10 +153,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **The proof:** `./gradlew assemble :app:assembleDebugAndroidTest :app:lint check` green from scratch (`--rerun-tasks`, all 167
   of its tasks run), Android 10's API check with it: `core` 162, `outbox` 595 (588 at #592, seven new: five in AccountTest, two in
   DeletedOnServerTest), the app's 28 and 31, Debug's and Release's, as they were. BaliAppTest whole and PreferencesNotesTest on
-  `Bali_Spike_API29`, `_API35` and `_API37`, one at a time, each from a cold boot: 10 of 10 on each, none skipped; `dumpsys
-  netstats`, polled after each run, listed nothing for Bali's uid or its test app's. `npm run typecheck && npm run lint && npm
-  test` green, no emulator running. Nothing was added to the PC's SDK, and no library. Each emulator after: Bali and its test app
-  uninstalled, AN1's spike apps kept, every setting as found, stopped.
+  `Bali_Spike_API29`, `_API35` and `_API37`, one at a time, each from a cold boot, before santa's round 1 and again on the final
+  code: 10 of 10 on each every time, none skipped; `dumpsys netstats`, polled after each run, listed nothing for Bali's uid or
+  its test app's. `npm run typecheck && npm run lint && npm test` green, no emulator running, the portal's suite whole. Nothing
+  was added to the PC's SDK, and no library. Each emulator after: Bali and its test app uninstalled, AN1's spike apps kept, every
+  setting as found, stopped.
 
   **Santa's review:** two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context isolation holds and
   model diversity doesn't). Round 1: Reviewer A, no blocker and three WARNs; Reviewer B, one blocker and two WARNs. The blocker
@@ -166,7 +167,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   ids back; the rule is now strictly not again in the run (call 2), and its test fails under round 1's rule. Reviewer A's other
   two: the engine's reset of its word untested (tested now), and AN9j's forget moved out of the stretch with no race test (added).
   Reviewer B's other: `theDeletedStudentsNotesAndMe…`'s store check now waits for the forget, a change the PR's description names
-  now beside AccountTest's two.
+  now beside AccountTest's two. Round 2, fresh reviewers on the fixes alone: no blocker; each found the fixes working, each new
+  test failing under its break by their reading, and the strict rule able only to take writes away; and each one WARN, the
+  same, `deleteAccount`'s and `Notes`' KDoc still reading as round 1's rule, fixed in place. No round 3: the GitHub Claude
+  Review checks the final code.
 
 - **2026-11-13** — **AN9j, `409 account_deleted` read as signed out: Bali's server's answer to any call under an account's
   token, heard where every answer comes, ends that account's sign-in as Sign out ends it, with no Cognito DeleteUser; every
