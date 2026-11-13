@@ -393,12 +393,24 @@ class Outbox private constructor(internal val file: OutboxDatabase, private val 
         }
 
     /**
-     * The API has deleted the account (C4): every record queued but an Emergency Unlock is let go, the deleted
-     * account's, which any later send would put under a fresh account, or under whoever signs in next. An
-     * unlock never is: the deletion waits for every one first ([nextBeforeDeletion]).
+     * The API has deleted the account (C4), by this phone's deletion or another's (AN9j): every record queued is let go, the
+     * deleted account's, which any later send would put under a fresh account, or under whoever signs in next. An Emergency
+     * Unlock never is: it is kept apart, out of the queue, whole (its row's event id, session or tap, reason, time and place in
+     * what the phone did, under `kept:` and its id in the rules' state), never sent again and read by nothing, so it never goes
+     * under another account, holds the next one's queue or reads back, or guards its lock (the conductor's call, AN9j). It goes
+     * only with Bali's data. This phone's own deletion sends every one first ([nextBeforeDeletion]), so it keeps one apart only
+     * if one was made after its `DELETE /v1/me`.
      */
     suspend fun accountDeleted() {
-        write { it.step("DELETE FROM outbox WHERE kind != 'unlock'") }
+        write {
+            it.step(
+                "INSERT OR REPLACE INTO outboxState (key, value) SELECT ? || eventId, json_object('eventId', eventId, 'sessionId', " +
+                    "sessionId, 'tapId', tapId, 'reason', reason, 'recordedAt', recordedAt, 'seq', COALESCE(orderSeq, seq)) " +
+                    "FROM outbox WHERE kind = 'unlock'",
+                KEPT,
+            )
+            it.step("DELETE FROM outbox")
+        }
     }
 
     /**
@@ -478,6 +490,9 @@ class Outbox private constructor(internal val file: OutboxDatabase, private val 
 
 /** The install's key, which the selection's SQL names too. */
 internal const val INSTALL = "install"
+
+/** The start of each key an Emergency Unlock is kept apart under, its event id after it ([Outbox.accountDeleted]). */
+private const val KEPT = "kept:"
 
 /** An unlock not filed yet (B6b): made where the phone stood unread, under no session or tap. */
 private const val UNFILED = "kind = 'unlock' AND sessionId IS NULL AND tapId IS NULL"

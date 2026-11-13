@@ -90,15 +90,17 @@ private suspend fun EngineFiles.inLesson(): Pair<SignedRig, Routed> {
 
 /**
  * Read as signed out, [what] naming the arrival: the router on Sign in, so no screen of the student's says the generic words; the
- * sign-in forgotten as Sign out forgets it; out of the session, the lock off.
+ * sign-in forgotten as Sign out forgets it; out of the session, the lock off. The sign-in goes first, in the engine's one stretch,
+ * so a phone unlocked or protection off goes straight to Sign in, never Home on the way, the stretch then ending in no session.
  */
 private suspend fun signedOut(rig: SignedRig, routed: Routed, what: String) {
     withTimeoutOrNull(patience) { routed.router.shown.first { it == Screen.Shown(Screen.SignIn, false) } }
         ?: fail("$what: the router stayed on ${routed.router.shown.value}")
     assertTrue(rig.keychain.isEmpty, what)
     assertNull(rig.signIn.account(), what)
-    assertEquals(Standing.Out, rig.engine.updates.value.standing, what)
-    assertFalse(routed.lock.holds, what)
+    withTimeoutOrNull(patience) { rig.engine.updates.first { it.standing == Standing.Out } }
+        ?: fail("$what: the phone stayed ${rig.engine.updates.value.standing}")
+    eventually { !routed.lock.holds }
 }
 
 /** Each call a `409 account_deleted` can answer, made from where [inLesson] leaves the phone: its request, on its way. */
@@ -305,17 +307,23 @@ class DeletedOnServerTest : EngineFiles() {
     @Test
     fun aDeletionUnderWayFinishesItsOwnWayA409HeardMidwayOnTheLessonsOwnCallDeleteUserRunUnderTheSignInsToken(): Unit =
         runBlocking {
-            // The lesson's calls still go while the deletion holds the loops (AN13g).
+            // A tap the server never answered, which the deletion sends before its `DELETE /v1/me` (AN9b's `sendAll`), held on its
+            // way while the lesson's own call, which still goes while the deletion holds the loops (AN13g), hears the 409 first.
             val (rig, _) = inLesson()
+            rig.engine.record(Change.Tap("tag"))
+            rig.server.next(tapRoute).reply(null)
+            rig.until { it.retryAt == at(2) }
             val deletion = rig.deleting()
-            val delete = past(rig, deleteMeRoute)
+            val queued = past(rig, tapRoute)
             val lesson = lessonOver(rig)
             val answer = async { lesson.answer("q", 1) }
             rig.server.next(answerRoute).reply(409, deletedOnServer)
             assertEquals(AnswerResult.AccountDeleted, answer.await())
             assertFalse(rig.keychain.isEmpty)
             assertEquals("a1", rig.signIn.account())
-            delete.reply(200, deletedAnswer)
+            // The deletion's own send hears it too, and goes on: the tap refused, which holds no deletion back.
+            queued.reply(409, deletedOnServer)
+            past(rig, deleteMeRoute).reply(200, deletedAnswer)
             val cognito = rig.server.next(deleteUserRoute)
             assertEquals(scoped("a1"), cognito.deleteUserToken())
             cognito.reply(200, "{}")
@@ -356,6 +364,27 @@ class DeletedOnServerTest : EngineFiles() {
             account.until { it.deleting == Deleting.Done && it.signedIn == false }
             assertTrue(rig.keychain.isEmpty)
             assertEquals(1, rig.server.sent.count { it.route == deleteMeRoute })
+            rig.stop()
+        }
+
+    @Test
+    fun aLostDeletionsIdIsItsOwnAccountsAloneAnotherAccounts409ReadsAsSignedOutNeverMarkedForADeleteUserItNeverPressed(): Unit =
+        runBlocking {
+            // This step's call 6 (`deletionOf`): two accounts on one phone are ruled impossible for the pilot, the rule kept all the same.
+            val (rig, routed) = inLesson()
+            val account = checkNotNull(routed.account)
+            account.deleting { it.ask() }
+            val stopping = async { account.deleteAccount() }
+            past(rig, deleteMeRoute).reply(null)
+            withTimeout(patience) { stopping.await() }
+            rig.signIn.signOut()
+            rig.through(account, scoped("b1"), me = Answer.me())
+            routed.until { it.screen == Screen.Focus }
+            rig.engine.retryNow()
+            past(rig, meRoute).reply(409, deletedOnServer)
+            signedOut(rig, routed, "b1's read, a1's deletion's answer lost")
+            assertFalse(rig.signIn.deletionPending())
+            assertTrue(rig.server.sent.none { it.route == deleteUserRoute })
             rig.stop()
         }
 

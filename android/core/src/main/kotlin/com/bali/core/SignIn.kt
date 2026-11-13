@@ -175,10 +175,11 @@ interface Browser {
 
 /**
  * Who is signed in, as [SignIn.landings] says it (Q2): whether someone [signedIn] is, and their [account], the tokens'
- * `sub`; and [count], how many sign-ins have landed in the sign-in's life, a renewal never one, so each sign-in is told
- * from the last, the same account's again included.
+ * `sub`; [count], how many sign-ins have landed in the sign-in's life, a renewal never one, so each sign-in is told
+ * from the last, the same account's again included; and [deleted], the account deleted on Bali's server, its sign-in
+ * kept for Cognito's DeleteUser ([SignIn.deletionPending]) while signed in, or forgotten for it ([SignIn.forgetDeleted]).
  */
-data class Landing(val signedIn: Boolean, val account: String?, val count: Int)
+data class Landing(val signedIn: Boolean, val account: String?, val count: Int, val deleted: Boolean = false)
 
 /**
  * One sign-in attempt's secrets (RFC 7636): the verifier, which leaves the phone only for the token
@@ -416,6 +417,7 @@ class SignIn(
     /** The renewal under way, which every caller shares. */
     private var renewing: Deferred<Boolean>? = null
     private var tokenArrived: (suspend () -> Unit)? = null
+    private var deletionHeard: (suspend (String?) -> Unit)? = null
 
     /** Whether someone is signed in, once the store could be read: none until then. */
     private val known = MutableStateFlow<Boolean?>(null)
@@ -428,6 +430,17 @@ class SignIn(
 
     /** Runs [action] after every token but one [refresh] asked for, so the engine sends everything again at once. */
     suspend fun whenTokenArrives(action: suspend () -> Unit) = alone { tokenArrived = action }
+
+    /**
+     * Runs [action] with each account Bali's server says is deleted, heard by an [ApiClient] over this sign-in ([deletedOnServer]):
+     * the engine's, which reads it as signed out (AN9j).
+     */
+    suspend fun whenDeletedOnServer(action: suspend (String?) -> Unit) = alone { deletionHeard = action }
+
+    /** What an [ApiClient] heard ([TokenProvider.deletedOnServer]), told to [whenDeletedOnServer]'s action with the sign-in let go. */
+    override suspend fun deletedOnServer(account: String?) {
+        alone { deletionHeard }?.let { hook -> orElse(Unit) { hook(account) } }
+    }
 
     /**
      * The access token to send now. None when nobody is signed in, the store can't be read right now, an
@@ -574,6 +587,20 @@ class SignIn(
             adopt(null)
         }
 
+    /**
+     * Forgets [account]'s sign-in, its `sub` as [account] read it, as [signOut] forgets it, once Bali's server said its account is
+     * deleted (`409 account_deleted`, AN9j): while the sign-in held is [account]'s, never one this phone's own deletion keeps for
+     * Cognito's DeleteUser ([deletionPending]), and with no DeleteUser of its own: the API's deleter removes it (C3-cognito). Said
+     * as a landing that is [Landing.deleted]. True once forgotten. It never throws: a store that can't forget them now does at the
+     * next ask, as a refused refresh token's sign-out.
+     */
+    suspend fun forgetDeleted(account: String?): Boolean =
+        alone {
+            current()?.takeIf { Tokens.isFor(it.access, account) && it.deleted != true } ?: return@alone false
+            adopt(null, saved = keep(null), deleted = true)
+            true
+        }
+
     /** Whether this sign-in can delete its own account (C4, [Tokens.deleteEndpoint]); false: a fresh sign-in first. */
     suspend fun mayDelete(): Boolean = alone { current()?.let { Tokens.deleteEndpoint(it.access) } != null }
 
@@ -581,12 +608,15 @@ class SignIn(
      * The API has deleted [account]'s account (C4), its `sub` as [account] read it: while the sign-in held is
      * that account's, no token goes to the API from now on, a relaunch's included, until Cognito's DeleteUser
      * ([deleteUser]) or a sign-out; a store that can't take it now, at the next ask. Another's is left as it is.
+     * Said as a landing that is [Landing.deleted], so the account follows it in the run as a relaunch reads it
+     * (AN9j). True once marked; false for another's, none, or one marked already.
      */
-    suspend fun accountDeleted(account: String?) =
+    suspend fun accountDeleted(account: String?): Boolean =
         alone {
-            val held = current()?.takeIf { Tokens.subject(it.access) == account } ?: return@alone
-            tokens = held.copy(deleted = true)
-            unsaved = !keep(tokens)
+            val held = current()?.takeIf { Tokens.subject(it.access) == account && it.deleted != true } ?: return@alone false
+            val marked = held.copy(deleted = true)
+            adopt(marked, saved = keep(marked))
+            true
         }
 
     /** Whether the API has deleted this sign-in's account and its Cognito sign-in waits to be (C4). */
@@ -726,16 +756,17 @@ class SignIn(
     }
 
     /**
-     * The phone's tokens from now on, none signed out, told to every watcher; [saved] when the store has them too, and
-     * [lands] when they are a sign-in's that just landed, never a renewal's ([Landing.count]).
+     * The phone's tokens from now on, none signed out, told to every watcher; [saved] when the store has them too, [lands]
+     * when they are a sign-in's that just landed, never a renewal's ([Landing.count]), and [deleted] when none are, forgotten
+     * for their account's deletion ([Landing.deleted], which tokens marked deleted say too).
      */
-    private fun adopt(tokens: Tokens?, saved: Boolean = true, lands: Boolean = false) {
+    private fun adopt(tokens: Tokens?, saved: Boolean = true, lands: Boolean = false, deleted: Boolean = false) {
         this.tokens = tokens
         loaded = true
         unsaved = !saved
         known.value = tokens != null
         if (lands) landed += 1
-        landing.value = Landing(tokens != null, tokens?.let { Tokens.subject(it.access) }, landed)
+        landing.value = Landing(tokens != null, tokens?.let { Tokens.subject(it.access) }, landed, deleted || tokens?.deleted == true)
     }
 
     /** Whether the store now holds [tokens]; none forgets what it had. */
