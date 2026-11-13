@@ -86,6 +86,29 @@ fun fields(body: ByteArray?): Map<String, String> =
 /** The hosted UI, as the app's browser hands it back: signed in, with a code for the attempt the page was opened for. */
 val signsIn: suspend (URI) -> String = { url -> "bali://auth/callback?code=the-code&state=${query(url, "state")}" }
 
+/**
+ * A browser whose sign-in page answers with [answer], as [signsIn] by default, and whose tab left Cognito's session behind (AN6f):
+ * the sign-out page the sign-in asks for once the code is traded is [asked], then comes back or is closed only when the test says
+ * ([comeBack], [close]).
+ */
+class SignOutPage(private val answer: suspend (URI) -> String = signsIn) : Browser {
+    val asked = CompletableDeferred<Unit>()
+    private val ended = CompletableDeferred<Unit>()
+
+    override suspend fun open(page: URI): String = answer(page)
+
+    override suspend fun signedOut() {
+        asked.complete(Unit)
+        ended.await()
+    }
+
+    /** Its return, at the client's sign-out URL. */
+    fun comeBack() = ended.complete(Unit)
+
+    /** Its end with no return: [why]. */
+    fun close(why: SignInError) = ended.completeExceptionally(why)
+}
+
 /** The Keychain's stand-in: memory, which can be locked, as a store that can't be read right now is. */
 class MemoryStore : TokenStore {
     class Locked : Exception("the store is locked")

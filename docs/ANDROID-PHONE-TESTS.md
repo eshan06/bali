@@ -150,16 +150,30 @@ the Auth Tab nor ephemeral tabs, and stops at its first run. Once the owner has 
 client and its id is in the build (`docs/DEPLOY.md`, "The phone's sign-in"), and a screen or AN7's
 readout starts a sign-in, on both phones, each with its browser and that browser's version noted.
 Since AN6e, a browser with no ephemeral tab (Chrome before 136) gets one more page after each
-sign-in, Cognito's sign-out page, which ends the session the sign-in left there
+sign-in, Cognito's sign-out page, which ends the session the sign-in left there; since AN6f, the
+sign-in's code is traded before that page opens, and a sign-in page closed with no answer gets it too
 (`docs/DECISIONS.md`, 2026-11-13).
 
 - **Sign up, then sign in**, through the hosted UI: which tab opens (an Auth Tab on Chrome 137 and
   later), and Bali signed in after.
-- **On a Chrome before 136** (AN6e; a phone that has one, or a second browser that offers no
-  ephemeral tab set as the default): sign in, and see the one extra page come and go, then Bali
-  signed in (the readout says so; `failed: Refused…` would mean Cognito refused the code after
-  `/logout`, and `failed: BrowserNotSignedOut` that Chrome closed that page before its return);
-  sign in again, and see the password asked for again.
+- **On a Chrome before 136** (AN6e and AN6f; a phone that has one, or a second browser that offers no
+  ephemeral tab set as the default), the readout's Sign in each time, each part opening with the phone,
+  its Android version and the browser's version, then its starting state:
+  - **Signing in.** *Start:* out of a class, unlocked, the readout on screen, signed out, Airplane mode
+    off, no sticker. Sign in, and sign in on Cognito's page: the extra page comes and goes, then the
+    readout says signed in.
+  - **Signing in again.** *Start:* out of a class, unlocked, the readout on screen, signed in by the last
+    part, then Sign out pressed, Airplane mode off, no sticker. Sign in: Cognito's page asks for the
+    password again.
+  - **The sign-in page closed.** *Start:* out of a class, unlocked, the readout on screen, signed out,
+    Airplane mode off, no sticker. Sign in, then close Cognito's page without signing in: the extra page
+    comes and goes, and the readout shows no failure, still signed out.
+  - **The token renewed.** *Start:* out of a class, unlocked, the readout on screen, signed in by the first
+    part over an hour before, so its access token has expired, Airplane mode off, no sticker. History: it
+    loads, no sign-in asked, since the refresh token, traded before `/logout`, still renews the session.
+
+  If every such sign-in ends as `failed: BrowserNotSignedOut` in the readout, the browser closed the
+  extra page's tab before sending its return (AN6f's open question).
 - **Sign out, then sign in again:** the password asked again, on every browser.
 - **The tab closed with no sign-in:** nothing said, and Sign in works again.
 - **The phone rotated while the tab is open,** then the sign-in finished: signed in.

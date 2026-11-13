@@ -237,11 +237,11 @@ class ReadoutActivity : ComponentActivity() {
 
     /**
      * Signs in as Sign in will, through the hosted UI's tab (AN6c), and its sign-out page where that tab left Cognito's session
-     * in the browser (AN6e), over the app's own run alone ([ownSignIn]).
+     * in the browser (AN6e, AN6f), over the app's own run alone ([ownSignIn]).
      */
     private suspend fun signingIn(): String {
         val signIn = ownSignIn() ?: return "${notOwn()}: nothing opened"
-        signIn.signIn { hostedUi(it, signIn.cognito) }
+        signIn.signIn(browser = hostedUi(signIn.cognito))
         return "signed in"
     }
 

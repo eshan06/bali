@@ -9,6 +9,7 @@ import androidx.browser.auth.AuthTabIntent
 import androidx.browser.customtabs.CustomTabsClient
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
 import com.bali.core.SignInError
 
 /**
@@ -17,15 +18,26 @@ import com.bali.core.SignInError
  * one, else a Custom Tab, ephemeral wherever it offers that, with its own look (the hosted UI's is Cognito's,
  * D2d); never a WebView, whose page an app can read (RFC 8252). The sign-out page that follows a tab that left
  * Cognito's session in the browser opens like that tab, never ephemeral, since it must reach the cookies that
- * tab left (AN6e). Back in front with that page still shown, the tab closed with no answer, the student's
- * close, as AppAuth reads it; and so is the host's task swiped away. Made again (a rotation while the tab is
- * open), it keeps the tab it opened, never opening another.
+ * tab left (AN6e); shown once the answer's code is traded, it's opened by the host waiting in front (AN6f). Back
+ * in front with that page still shown, once the browser has covered it, the tab closed with no answer: the
+ * student's close, as AppAuth reads it; before the browser covers it, a host made again or a tab not over it
+ * yet, so it waits (AN13g's finding, AN6f). Its task swiped away, the sign-in ends. Made again (a rotation while
+ * the tab is open), it keeps the tab it opened, never opening another.
  */
 class HostedUiActivity : ComponentActivity() {
     private val pages get() = (application as BaliApp).hostedUi
 
     /** The page whose tab this host opened. */
     private var opened: String? = null
+
+    /**
+     * Whether the browser has had this host off screen since it opened that page (AN6f): only then is the page still shown as it
+     * comes back the student's close. Kept across a remake, as [opened] is; Android stopping it to make it again never sets it.
+     */
+    private var covered = false
+
+    /** This host told, in front, that the sign-out page is shown once the code is traded (AN6f): it opens it. */
+    private val toFront: () -> Unit = { runOnUiThread { if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) next() } }
 
     private val authTab =
         AuthTabIntent.registerActivityResultLauncher(this) { result ->
@@ -35,28 +47,49 @@ class HostedUiActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         opened = savedInstanceState?.getString(OPENED)
+        covered = savedInstanceState?.getBoolean(COVERED) == true
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(OPENED, opened)
+        outState.putBoolean(COVERED, covered)
     }
 
     // The Auth Tab's answer is handed over before this, as an activity's result always is.
     override fun onResume() {
         super.onResume()
-        val page = pages.page()
-        if (page != null && page.id != opened) open(page) else finish()
+        pages.front = toFront
+        next()
     }
 
-    // Leaving with its page still shown ends the sign-in: no answer can come now. Otherwise it ends nothing.
+    override fun onPause() {
+        if (pages.front === toFront) pages.front = null
+        super.onPause()
+    }
+
+    // Off screen: the browser over it, unless Android is stopping it to make it again (AN6f).
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) covered = true
+    }
+
+    // Leaving for good with a page of its own still shown ends the sign-in: nothing can open after it. Otherwise it ends nothing.
     override fun onDestroy() {
-        if (isFinishing) opened?.let { pages.ended(it, SignInError.Cancelled) }
+        if (isFinishing) opened?.let(pages::left)
         super.onDestroy()
+    }
+
+    /** Opens the page shown next, waits on with none to open, or goes once nothing waits; nothing on its way out ([HostedUi.left]). */
+    private fun next() {
+        if (isFinishing) return
+        val page = pages.resumed(opened, covered)
+        if (page != null) open(page) else if (pages.waiting() == null) finish()
     }
 
     private fun open(page: HostedUi.Page) {
         opened = page.id
+        covered = false
         val address = page.url.toString().toUri()
         // Where it sends the student back: the sign-in page's redirect URI, the sign-out page's sign-out URL.
         val scheme = (address.getQueryParameter("redirect_uri") ?: address.getQueryParameter("logout_uri"))?.toUri()?.scheme
@@ -88,6 +121,7 @@ class HostedUiActivity : ComponentActivity() {
 
     private companion object {
         const val OPENED = "opened"
+        const val COVERED = "covered"
     }
 }
 

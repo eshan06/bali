@@ -44,7 +44,8 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
    Android's Room, writes it through the store at FULL and settles a send's answer there; the
    sign-in's tokens sealed by the Keystore; the hosted UI's tab and its answer back, against the
    emulator's own Chrome, which stops at its first run: a test closes it with Back and force-stops
-   Chrome after, never accepting its terms, and puts back the font scale it changes; and the lock's
+   Chrome after, never accepting its terms, and puts back the font scale it changes, and the host made
+   again before the browser covers it, under a see-through activity of the tests' own (`Veil.java`); and the lock's
    service, switched on and off as a student would, through the shell of a UiAutomation that leaves
    accessibility services running (one that doesn't has Android unbind them all), the screen turned
    off and on, each put back as found; the Debug readout, driven as a tester drives it, its Join, History

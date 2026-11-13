@@ -1257,11 +1257,12 @@ the first Android build reaches a student.
 has one, which answers Bali alone, else a Custom Tab, whose answer, a link any app can send, is taken
 only for the waiting sign-in with its state; each ephemeral where the browser offers that, and where
 it doesn't, or no browser has Custom Tabs, Cognito's session there ended right after each sign-in, one
-more page for the student (the owner, 2026-11-12; built by AN6e, #589): Cognito's `/logout` in the same
-browser and kind of tab, never ephemeral, the code traded only once it comes back at the client's
-sign-out URL (`com.bali.bali://auth/signout`), and a sign-in whose page closed first left unfinished
-(AN6e's calls, awaiting the owner; `docs/DECISIONS.md`, 2026-11-05 and 2026-11-13). Sign out needs no
-`/logout`: a sign-in that finishes there has ended its session. The code grant with PKCE, through app clients of
+more page for the student (the owner, 2026-11-12; built by AN6e, #589, and AN6f, #591): Cognito's `/logout`
+in the same browser and kind of tab, never ephemeral, opened once the answer's code is traded, the tokens
+kept only once it comes back at the client's sign-out URL (`com.bali.bali://auth/signout`), and dropped,
+the sign-in left unfinished, when it closed first; a sign-in page closed with no answer opens it too, the
+sign-in still ending as that close (AN6e's and AN6f's calls, awaiting the owner; `docs/DECISIONS.md`,
+2026-11-05 and 2026-11-13). Sign out needs no `/logout`: a sign-in that finishes there has ended its session. The code grant with PKCE, through app clients of
 Android's own on each pool, with no secret, the answer at the app id's own scheme
 (`com.bali.bali://auth/callback`, two slashes, the form Cognito's console takes). Auth's rules hold:
 only a real `401` signs anyone out, and no token reaches Bali's API before the 13+ check but the check's own read and a deletion's.
