@@ -299,7 +299,8 @@ class Account internal constructor(
             naming = Naming()
             leaving = Leaving()
         }
-        if (pending && deleting == Deleting.None) deleting = Deleting.Pending
+        // Marked in the run, a stop showing too: its deletion's lost answer heard, the account deleted on the server (AN9j).
+        if (pending && (deleting == Deleting.None || deleting is Deleting.Stopped)) deleting = Deleting.Pending
         // The account deleted on Bali's server: its sign-in still to go (a relaunch finding it so, the app closed between the two,
         // or its deletion's lost answer heard, AN9j), or forgotten for it (AN9j). The notes under the student go now, and its `me`,
         // as a finished Delete account takes them (the owner's ruling, 2026-10-23).

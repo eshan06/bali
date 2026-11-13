@@ -216,6 +216,12 @@ class SyncEngine private constructor(
     private var deletionOf: String? = null
 
     /**
+     * A `409 account_deleted` being read ([deletedOnServer]): the drain holds while that account's unlocks go, and another heard
+     * meanwhile, theirs included, is this one's.
+     */
+    private var signingOut = false
+
+    /**
      * The account deletion under way, whose answer a second press shares: never two at once, one of which would
      * let the loops go while the other's `DELETE /v1/me` is on its way. One that has ended is shared no more.
      */
@@ -265,11 +271,12 @@ class SyncEngine private constructor(
      * The top of a pass, which answers every ring made before it: the record due, marked on its way and
      * counted so ([request]), and whether it was already, a send of it cut short or answered in a write the
      * file refused; or when one is due. A file it can't read is shown, and read again within a minute. An
-     * account deletion sends the outbox itself (C4): nothing goes from here till its end rings.
+     * account deletion sends the outbox itself (C4), and a deleted account read as signed out its unlocks (AN9j): nothing
+     * goes from here till its end rings.
      */
     private suspend fun due(request: Counted): Pair<Outbox.Due, Boolean> {
         drainRings.answer()
-        if (deleting) return Outbox.Due.Idle to false
+        if (deleting || signingOut) return Outbox.Due.Idle to false
         val due = tried { outbox.nextDue(clock.now()) }.getOrElse { return Outbox.Due.Wait(failed()) to false }
         // Never an unlock not filed yet (`nextDue`): it has nowhere to go.
         if (due !is Outbox.Due.Send) return due to false
@@ -1171,25 +1178,53 @@ class SyncEngine private constructor(
 
     /**
      * Bali's server answered a call under [account]'s token `409 account_deleted` (C3d), whichever call it was: that account is
-     * gone, read as signed out (the owner, 2026-11-12; AN9j), in one stretch, so loops hearing it at once read it once, the same
-     * way. Only for the account signed in now ([SignIn.forgetDeleted]'s rule): its sign-in forgotten as Sign out forgets it, with
-     * no DeleteUser, the API's deleter's (C3-cognito); what it still had queued let go, every Emergency Unlock kept apart
-     * ([letGo]); and the phone in no session, its lock off at once, as a deletion leaves it. This phone's own deletion finishes its
-     * own way (AN9b): under way, it goes on, and with its sign-in kept for DeleteUser, that is Try again's. Its `DELETE /v1/me` sent
-     * with no answer settling it, this is that answer, the account deleted: the sign-in marked and kept for DeleteUser
-     * ([SignIn.accountDeleted]), which the deletion's own screen finishes, as a relaunch finds it. The sign-in's calls here wait on
-     * no renewal, so neither waits for the engine, which a renewal tells.
+     * gone, read as signed out (the owner, 2026-11-12; AN9j), once, the same way, however many loops hear it ([signingOut]). Every
+     * Emergency Unlock still queued goes first, under that account's own token alone, renewed once on a 401: the server records
+     * one under a deleted sign-in's old token, as no one's (C3d), so none is kept back that could reach it (santa's round 1). Then,
+     * in one stretch, only for the account signed in now ([SignIn.forgetDeleted]'s rule): its sign-in forgotten as Sign out
+     * forgets it, with no DeleteUser, the API's deleter's (C3-cognito); what it still had queued let go, an unlock that still
+     * didn't record kept apart ([letGo]); the phone in no session, its lock off, as a deletion leaves it; and a change counted, so
+     * a read sent before it, older, never puts the session back (`readMayReconcile`). This phone's own deletion finishes its own way
+     * (AN9b): under way, it goes on, and with its sign-in kept for DeleteUser, that is Try again's. Its `DELETE /v1/me` sent with no
+     * answer settling it, this is that answer, the account deleted: the sign-in marked and kept for DeleteUser
+     * ([SignIn.accountDeleted]), which the deletion's own screen finishes, as a relaunch finds it. The sign-in's calls in that
+     * stretch wait on no renewal, so neither waits for the engine, which a renewal tells. In the engine's scope: its caller
+     * cancelled stops waiting, and it goes on.
      */
-    internal suspend fun deletedOnServer(account: String?): Unit =
-        call {
-            val signIn = signIn ?: return@call
-            if (deletion?.isActive == true) return@call
-            val lost = deletionId != null && deletionOf == account
-            if (lost) deletionId = null
-            if (!(if (lost) signIn.accountDeleted(account) else signIn.forgetDeleted(account))) return@call
-            letGo()
-            update { it.copy(standing = Standing.Out) }
+    internal suspend fun deletedOnServer(account: String?): Unit = scope.async { signOutDeleted(account) }.await()
+
+    private suspend fun signOutDeleted(account: String?) {
+        val signIn = signIn ?: return
+        val unlocks =
+            alone {
+                if (deletion?.isActive == true || signingOut) return@alone null
+                signingOut = true
+                tried { outbox.records() }.getOrNull().orEmpty().filter { it.change.isUnlock && !it.change.isUnfiled }
+            } ?: return
+        try {
+            val own = client.forDeletion(account)
+            for (record in unlocks) {
+                var sent = record.send(own) ?: continue
+                if (sent.noAnswer == NoAnswer.NoToken) break
+                if (sent.result == SendResult.Status(401) && hooked(false) { signIn.refresh(account) }) sent = record.send(own) ?: continue
+                alone { stored { outbox.settle(sent, clock.now()) }.map { answered(record, sent, it) { signIn.refresh(account) } }.getOrNull() }
+                    ?.await()
+            }
+            alone {
+                val lost = deletionId != null && deletionOf == account
+                if (lost) deletionId = null
+                if (!(if (lost) signIn.accountDeleted(account) else signIn.forgetDeleted(account))) return@alone
+                changes += 1
+                letGo()
+                update { it.copy(standing = Standing.Out) }
+            }
+        } finally {
+            alone {
+                signingOut = false
+                drainRings.ring()
+            }
         }
+    }
 
     /** Whether a deletion waits out a request of the loops' now ([waitOut]): the point its tests wait for, which nothing else reads. */
     internal suspend fun waitingOut(): Boolean = alone { landed != null }
