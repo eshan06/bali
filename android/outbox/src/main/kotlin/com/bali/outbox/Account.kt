@@ -114,9 +114,9 @@ class Account internal constructor(
     private var listSeenBy: String? = notes.listSeenBy
 
     /**
-     * A deletion's `DELETE /v1/me` went out and no answer since proved the account stands: the notes under the student stay off
-     * the store for the rest of the run, the screens reading them from here, so a relaunch finds none of a student whose account
-     * may be gone (the owner, 2026-11-12; AN9k).
+     * A deletion's `DELETE /v1/me` went out and its answer didn't prove the account stands: the notes under the student stay off
+     * the store for the rest of the run, whatever comes after, the screens reading them from here, so a relaunch finds none of a
+     * student whose account may be gone (the owner, 2026-11-12; AN9k).
      */
     private var offTheStore = false
     private var email: String? = null
@@ -246,10 +246,10 @@ class Account internal constructor(
      * sign-in gone from the phone and its Cognito user the server's deleter's (C3-cognito; AN9b's call). The notes under the
      * student leave the store before anything is sent, written through, so a process ended mid-deletion keeps nothing of the
      * student's (AN10c), the screens reading them from here meanwhile. A stop before its `DELETE /v1/me` went out writes them
-     * back, so the same student isn't asked again; one after keeps them off the store for the run, whatever came back, the
-     * account perhaps gone, unless the server refused it having read the account, a teacher's with classes (the owner,
-     * 2026-11-12; AN9k). The account deleted on the server, they go here too, and its `me` with them, as iOS's `forgetNotes`
-     * forgets them (the owner's rulings, 2026-10-23).
+     * back, so the same student isn't asked again, unless one before it went out unproved; one after keeps them off the store
+     * for the run, whatever came back, the account perhaps gone, unless the server refused it having read the account, a
+     * teacher's with classes (the owner, 2026-11-12; AN9k). The account deleted on the server, they go here too, and its `me`
+     * with them, as iOS's `forgetNotes` forgets them (the owner's rulings, 2026-10-23).
      */
     suspend fun deleteAccount(): Unit = call { delete() }
 
@@ -284,9 +284,9 @@ class Account internal constructor(
                     forgetNotes()
                     forgot()
                 } else {
-                    // Off the store for the run once its request went out, or one before it did, unless this answer is the server's
-                    // refusal of an account it read standing (AN9k).
-                    offTheStore = kept != AccountDeletion.TeacherHasClasses && (sent || offTheStore)
+                    // Off the store for the run once its request went out, unless this answer is the server's refusal of an account
+                    // it read standing; and once off, never back in the run, whatever a later deletion answers (AN9k).
+                    offTheStore = offTheStore || sent && kept != AccountDeletion.TeacherHasClasses
                     if (!offTheStore) {
                         notes.inClass = inClass
                         notes.listSeenBy = listSeenBy

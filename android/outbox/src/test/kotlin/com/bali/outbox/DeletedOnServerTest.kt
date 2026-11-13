@@ -14,6 +14,9 @@ import com.bali.core.SendResult
 import com.bali.core.UnlockReason
 import com.bali.core.UpdateMeRequest
 import java.net.URI
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -21,6 +24,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
@@ -60,6 +64,31 @@ suspend fun keptApart(outbox: Outbox): Map<String, JsonObject> =
 
 /** [kept]'s field [name], as text; none for none. */
 fun JsonObject.text(name: String): String? = get(name)?.jsonPrimitive?.contentOrNull
+
+/** The notes in [kept], the student's forget held once [arm]ed until [release], as a slow disk holds a commit. */
+private class HeldForget(val kept: RecordedNotes = RecordedNotes()) : Notes by kept {
+    private val armed = AtomicBoolean(false)
+    private val begun = CompletableDeferred<Unit>()
+    private val released = CountDownLatch(1)
+
+    override fun forgetStudent() {
+        if (armed.get()) {
+            begun.complete(Unit)
+            released.await(patience.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        }
+        kept.forgetStudent()
+    }
+
+    fun arm() = armed.set(true)
+
+    /** Waits for the forget to begin; none in time fails the test. */
+    suspend fun began() = withTimeoutOrNull(patience) { begun.await() } ?: fail("no forget began")
+
+    fun release() {
+        armed.set(false)
+        released.countDown()
+    }
+}
 
 /** The access token Cognito's DeleteUser was sent, in its body. */
 private fun Server.Exchange.deleteUserToken(): String? =
@@ -523,6 +552,38 @@ class DeletedOnServerTest : EngineFiles() {
             assertEquals(listOf(RecordedNotes.FORGOT), notes.student)
             assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
             rig.until { it.me == null }
+            rig.stop()
+        }
+
+    @Test
+    fun whileAN9jsForgetIsOnItsWayToTheDiskAStateSentBeforeThe409AndTheConsentListSeenThenWriteNothingBack(): Unit =
+        runBlocking {
+            // Santa's round 1, reviewer A: AN9j's forget is made after the account's stretch now (AN9k, this step's call 3), so a
+            // state the engine sent before the 409, still listing the student in a class, and the consent list seen, each landing
+            // while the forget is on its way to the disk, find no `me` to keep: the stretch hid it until the engine forgets it.
+            val notes = HeldForget()
+            val rig = signedRig(gated = true)
+            val routed = routed(rig.engine, rig.clock, notes = notes)
+            val account = checkNotNull(routed.account)
+            rig.through(account, scoped("a1"), me = Answer.me(classes = listOf(Answer.inClass("p3"))))
+            account.until { it.inClass == "u" }
+            account.sawList()
+            val listed = rig.engine.updates.value
+            notes.kept.writes.clear()
+            notes.arm()
+            try {
+                rig.engine.retryNow()
+                past(rig, meRoute).reply(409, deletedOnServer)
+                notes.began()
+                account.synced(listed)
+                account.sawList()
+                assertEquals(emptyList(), notes.kept.student)
+            } finally {
+                notes.release()
+            }
+            eventually { notes.kept.student.isNotEmpty() }
+            assertEquals(listOf(RecordedNotes.FORGOT), notes.kept.student)
+            signedOut(rig, routed, "the read of the truth, the forget held")
             rig.stop()
         }
 

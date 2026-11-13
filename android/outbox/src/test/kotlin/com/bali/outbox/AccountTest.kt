@@ -695,29 +695,80 @@ class AccountTest : EngineFiles() {
         }
 
     @Test
-    fun anAnswerThatProvesTheAccountStandsATeachersClassesWritesThemBackAfterALostAnswerToo(): Unit =
+    fun anAnswerThatProvesTheAccountStandsATeachersClassesWritesThemBackAndALaterPressStoppedBeforeItsRequestToo(): Unit =
         runBlocking {
-            // AN9k: `409 teacher_has_classes` is answered once the server has read the account, which stands, nothing deleted; a
-            // lost answer before it may have deleted nothing either, the same account read standing since.
-            for (lostFirst in listOf(false, true)) {
+            // AN9k: `409 teacher_has_classes` is answered once the server has read the account standing, nothing deleted, so the
+            // stop writes the notes back. A later press is a deletion of its own (santa's round 1, reviewer A): the engine's word of
+            // the last one's request cleared as it starts, one stopped before its own request goes writes them back too.
+            val notes = RecordedNotes(MemoryNotes().apply { listSeenBy = "u" })
+            val rig = signedRig(gated = true)
+            val account = account(rig, notes)
+            rig.through(account, scoped("a1"), me = Answer.me(null, classes = listOf(Answer.inClass("p3"))))
+            account.deleting { it.ask() }
+            notes.writes.clear()
+            val refused = scope.async { account.deleteAccount() }
+            rig.pastReads(deleteMeRoute).reply(409, Answer.refused("teacher_has_classes"))
+            withTimeout(patience) { refused.await() }
+            assertEquals(Deleting.Stopped(Deleting.Stop.TeacherHasClasses), account.state.value.deleting)
+            assertEquals(listOf(RecordedNotes.FORGOT, "inClass=u", "listSeenBy=u"), notes.writes)
+            // Back, an Emergency Unlock the server hasn't recorded, and Delete account again: it stops before its request goes.
+            account.deleting { it.close() }
+            assertNotNull(rig.engine.record(Change.Unlock("s", null)))
+            rig.pastReads(unlockRoute).reply(null)
+            rig.until { it.retryAt == at(2) }
+            account.deleting { it.ask() }
+            notes.writes.clear()
+            val held = scope.async { account.deleteAccount() }
+            rig.pastReads(unlockRoute).reply(null)
+            withTimeout(patience) { held.await() }
+            assertEquals(Deleting.Stopped(Deleting.Stop.UnlockUnsent), account.state.value.deleting)
+            assertEquals(listOf(RecordedNotes.FORGOT, "inClass=u", "listSeenBy=u"), notes.writes)
+            assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy))
+            rig.stop()
+        }
+
+    @Test
+    fun afterALostAnswerEveryLaterStopInTheRunKeepsThemOffATryAgainStoppedBeforeItsRequestAndOneRefusedTeacherHasClasses(): Unit =
+        runBlocking {
+            // AN9k, this step's call 2 (santa's round 1, both reviewers): once a request went out unproved, not again in the run.
+            // The lost one may have deleted the account, which a later stop proves nothing about: one before its own request goes,
+            // and one whose request is refused `409 teacher_has_classes`, a refusal any account standing then would get.
+            for (case in listOf("no token", "an Emergency Unlock unsent")) {
                 val notes = RecordedNotes(MemoryNotes().apply { listSeenBy = "u" })
                 val rig = signedRig(gated = true)
                 val account = account(rig, notes)
                 rig.through(account, scoped("a1"), me = Answer.me(null, classes = listOf(Answer.inClass("p3"))))
                 account.deleting { it.ask() }
-                if (lostFirst) {
-                    val stopping = scope.async { account.deleteAccount() }
-                    rig.pastReads(deleteMeRoute).reply(null)
-                    withTimeout(patience) { stopping.await() }
-                    assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy), "the lost answer")
-                }
                 notes.writes.clear()
+                val lost = scope.async { account.deleteAccount() }
+                rig.pastReads(deleteMeRoute).reply(null)
+                withTimeout(patience) { lost.await() }
+                if (case == "no token") {
+                    withTimeout(patience) { rig.running.cancelAndJoin() }
+                    rig.clock.advance(3600) // a1 has expired: renewed for DELETE /v1/me first, Cognito never answering
+                } else {
+                    assertNotNull(rig.engine.record(Change.Unlock("s", null)))
+                    rig.pastReads(unlockRoute).reply(null)
+                    rig.until { it.retryAt != null }
+                }
+                val stopped = scope.async { account.deleteAccount() }
+                if (case == "no token") rig.server.next(tokenRoute).reply(null) else rig.pastReads(unlockRoute).reply(null)
+                withTimeout(patience) { stopped.await() }
+                assertEquals(1, rig.server.sent.count { it.route == deleteMeRoute }, case)
+                assertEquals(listOf(RecordedNotes.FORGOT, RecordedNotes.FORGOT), notes.writes, case)
+                // Once more, its request out and refused `409 teacher_has_classes`: still off.
                 val refused = scope.async { account.deleteAccount() }
+                if (case == "no token") {
+                    rig.server.next(tokenRoute).reply(200, grant(scoped("a1", issued = 1_000_003_600)))
+                } else {
+                    rig.pastReads(unlockRoute).reply(200, Answer.unlocked())
+                }
                 rig.pastReads(deleteMeRoute).reply(409, Answer.refused("teacher_has_classes"))
                 withTimeout(patience) { refused.await() }
-                assertEquals(Deleting.Stopped(Deleting.Stop.TeacherHasClasses), account.state.value.deleting, "$lostFirst")
-                assertEquals(listOf(RecordedNotes.FORGOT, "inClass=u", "listSeenBy=u"), notes.writes, "$lostFirst")
-                assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy), "$lostFirst")
+                assertEquals(Deleting.Stopped(Deleting.Stop.TeacherHasClasses), account.state.value.deleting, case)
+                assertEquals(listOf(RecordedNotes.FORGOT, RecordedNotes.FORGOT, RecordedNotes.FORGOT), notes.writes, case)
+                assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy), case)
+                assertEquals(listOf("u", "u"), account.state.value.let { listOf(it.inClass, it.listSeenBy) }, case)
                 rig.stop()
             }
         }
