@@ -49,12 +49,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
     the descriptor a draw hands over is refused on each emulator (a test), and a map that fails is a draw that failed, never a
     crash.
   - **Android 10's file is named for an instant with no byte in it**: created, opened a second time read-only, its name deleted,
-    and only then written through the first descriptor. A run cut short leaves at most an empty name, which the next start
-    removes.
+    and only then written through the first descriptor. A run cut short, or a second open or a deletion that fails (the phone
+    out of descriptors, say), leaves at most an empty name, which the next start removes: no byte of a deck is ever in a file
+    with a name.
   - **Android 10's descriptor is handed over read-only** (santa's reviewer B, a blocker, fixed): a renderer a deck had taken
     over could otherwise write through it and fill the phone's storage while the deck is open, so Bali's own writes, an
-    Emergency Unlock's among them, would fail. The memory file of Android 11 and later stays writable: a write there costs only
-    the renderer's own memory, Bali's last reference to it being gone once the open answers (both reviewers agreed, round 2).
+    Emergency Unlock's among them, would fail. The memory file of Android 11 and later stays writable: Bali's last reference to
+    it is gone once the open answers and Bali never reads it again, so a write there changes only what the renderer reads, and
+    takes memory, never storage, as the renderer could take with memory of its own (both of santa's round 2 reviewers held it).
   - **Bali closes its own descriptor as the open answers:** from there the renderer's process holds the deck's only copy outside
     Bali's memory, freed as its document closes or the process ends.
   - **Every call bounded at 10 s, the bind's wait included, timed in the renderer's own scope** (santa's reviewer A): an open,
@@ -115,12 +117,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
   RESULTS_PLACEHOLDER
 
-  **Santa's review:** two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context isolation holds and
-  model diversity doesn't). Round 1: one blocker (reviewer B, Android 10's read-write descriptor) and WARNs, all fixed: a draw's
-  bound skipped when its caller left (A), a page outside the count not shown to keep its document unlost (A), the start's
-  emptying untested (both), the PR number taken (A), and Q4 credited to the owner (A). Round 2, on the fixes: no blocker, the
-  memory file left writable held up by both; its WARNs, fixed: ARCHITECTURE credited the read-only handover to the owner (both),
-  and this entry missing (B).
+  **Santa's review:** two Claude Opus reviewers at max effort each round (no Codex or Gemini CLI on this PC, so context isolation
+  holds and model diversity doesn't). Round 1: one blocker (reviewer B, Android 10's read-write descriptor) and WARNs, all fixed:
+  a draw's bound skipped when its caller left (A), a page outside the count not shown to keep its document unlost (A), the
+  start's emptying untested (both), the PR number taken (A), and Q4 credited to the owner (A). The step's first worker stopped
+  mid-step, in round 2 and before its PR, and its round 2 left no record of its reviewers; a fresh worker restored its commits
+  and saved edits, reviewed them and ran round 2 again, on the fixes and the one dismissal (the memory file left writable): no
+  blocker, the fixes working and the dismissal held by both. Its WARNs, fixed: this entry's round 2 lines, written before that
+  round ran (both); two failure paths that leave an empty name until the next start (B, said above); and the page memory test's
+  comment claiming more than the test shows (B). Left, as harmless (A): a caller whose wait ends at the limit gets none a
+  dispatch before the watchdog loses the binding, so an open taking that binding in that instant shows failed, with Try again.
 
   **For AN13g and AS8:** AN13g makes one `IsolatedRenderer(context, app.scope)` for the app's life and hands it to `Lessons`;
   nothing waits on an open from the main thread, since Android answers the bind there. AS8 draws a `Ready` slide through its

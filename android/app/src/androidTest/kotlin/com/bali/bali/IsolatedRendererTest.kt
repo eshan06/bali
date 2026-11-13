@@ -257,7 +257,8 @@ class IsolatedRendererTest {
         }
 
     // The page's memory is Bali's, made at the size Bali asked for and read back by Bali: a renderer holding its descriptor, as a
-    // draw hands it over, can't shrink it, which would have Bali read past its end and crash.
+    // draw hands it over, can't truncate it, which would have Bali read past its end and crash. (Ashmem's own resize, before
+    // anything maps the region, fails Bali's map instead: a draw that failed.)
     @Test
     fun thePagesMemoryIsOneNoRendererCanShrinkUnderBali() {
         SharedMemory.create("page", 1440 * 810 * 4).use { memory ->
