@@ -38,8 +38,8 @@ import kotlinx.serialization.json.longOrNull
 // AN9j, `409 account_deleted` read as signed out (the owner, 2026-11-12; DECISIONS 2026-11-13): over the engine as the app makes
 // it, its sign-in gated as the app's is, the account, an enforcer over its fake lock and the router running as the app runs them,
 // and the API and Cognito answered by hand. Each place the answer can arrive; the lock off as it's read; another account's 409 and
-// every other 409 changing nothing; an Emergency Unlock kept apart; this phone's own deletion finished its own way; and two loops
-// hearing it at once. No iOS twin yet: C4d, the Mac's.
+// every other 409 changing nothing; an Emergency Unlock kept apart; this phone's own deletion finished its own way; two loops
+// hearing it at once; and the student's notes off the disk, written through (AN9k). No iOS twin yet: C4d and C4e, the Mac's.
 
 /** Bali's server's answer to a call under a deleted account's old token (C3d). */
 val deletedOnServer = Answer.refused("account_deleted")
@@ -501,10 +501,12 @@ class DeletedOnServerTest : EngineFiles() {
         }
 
     @Test
-    fun theDeletedStudentsNotesAndMeGoWithTheirSignInAsAFinishedDeleteAccountTakesThemHereAndInTheStore(): Unit =
+    fun theDeletedStudentsNotesAndMeGoWithTheirSignInAsAFinishedDeleteAccountTakesThemHereAndOffTheDiskWrittenThrough(): Unit =
         runBlocking {
-            // The conductor's call 3, santa's round 1 (both reviewers): listed in a class here, the consent list seen.
-            val notes = MemoryNotes()
+            // The conductor's call 3, santa's round 1 (both reviewers): listed in a class here, the consent list seen. Off the disk
+            // as a deletion's press takes them, written through with the account let go, so a process ended right after leaves none
+            // there (AN9k).
+            val notes = RecordedNotes()
             val rig = signedRig(gated = true)
             val routed = routed(rig.engine, rig.clock, notes = notes)
             val account = checkNotNull(routed.account)
@@ -512,12 +514,45 @@ class DeletedOnServerTest : EngineFiles() {
             account.until { it.inClass == "u" }
             account.sawList()
             assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy))
+            notes.writes.clear()
             rig.engine.retryNow()
             past(rig, meRoute).reply(409, deletedOnServer)
             signedOut(rig, routed, "the read of the truth, the notes kept")
             account.until { it.inClass == null && it.listSeenBy == null && it.sync?.me == null }
+            eventually { notes.student.isNotEmpty() }
+            assertEquals(listOf(RecordedNotes.FORGOT), notes.student)
             assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
             rig.until { it.me == null }
+            rig.stop()
+        }
+
+    @Test
+    fun aDeletionsLostAnswerKeepsTheNotesOffTheStoreAndThe409ThatMarksItsSignInForgetsTheScreensOnesWrittenThroughNeverBehind(): Unit =
+        runBlocking {
+            // AN9k at AN9j's hook: the sign-in marked for its DeleteUser, the notes off the store since the lost answer, the
+            // screens' own then gone too, through to the disk.
+            val notes = RecordedNotes()
+            val rig = signedRig(gated = true)
+            val routed = routed(rig.engine, rig.clock, notes = notes)
+            val account = checkNotNull(routed.account)
+            val listed = Answer.me(null, classes = listOf(Answer.inClass("p3")))
+            rig.through(account, scoped("a1"), me = listed)
+            account.until { it.inClass == "u" }
+            account.sawList()
+            account.deleting { it.ask() }
+            notes.writes.clear()
+            val stopping = async { account.deleteAccount() }
+            past(rig, deleteMeRoute, me = listed).reply(null)
+            withTimeout(patience) { stopping.await() }
+            assertEquals(listOf(RecordedNotes.FORGOT), notes.student)
+            assertEquals(listOf("u", "u"), account.state.value.let { listOf(it.inClass, it.listSeenBy) })
+            rig.engine.retryNow()
+            past(rig, meRoute, me = listed).reply(409, deletedOnServer)
+            account.until { it.deleting == Deleting.Pending && it.inClass == null && it.listSeenBy == null }
+            assertTrue(rig.signIn.deletionPending())
+            eventually { notes.student.size > 1 }
+            assertEquals(listOf(RecordedNotes.FORGOT, RecordedNotes.FORGOT), notes.student)
+            assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
             rig.stop()
         }
 

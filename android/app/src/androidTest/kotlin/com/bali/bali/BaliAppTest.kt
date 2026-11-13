@@ -1,7 +1,9 @@
 package com.bali.bali
 
+import android.content.Context
 import android.content.pm.FeatureInfo
 import android.content.pm.PackageManager
+import androidx.core.content.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.bali.core.AppConfig
@@ -257,10 +259,11 @@ class BaliAppTest {
         }
 
     // AN10b's notes in the app's own store (AN10c), handed to each run's account: what one run keeps, a later run reads back, the
-    // store's file the app's own SharedPreferences, whose domain the backup rules leave out (OutboxFileTest); once the account is
-    // deleted, none, off the disk too, and a later run reads none. Over sign-ins, a server and a file of the test's own.
+    // store's file the app's own SharedPreferences, whose domain the backup rules leave out (OutboxFileTest); once a deletion's
+    // request went out, none on the disk, its answer lost too (AN9k); once the account is deleted, none, and a later run reads
+    // none. Over sign-ins, a server and a file of the test's own.
     @Test
-    fun theNotesARunKeepsALaterRunReadsBackAndOnceTheAccountIsDeletedNoneOffTheDiskTooAndALaterRunReadsNone(): Unit =
+    fun theNotesARunKeepsALaterRunReadsBackOnceADeletionsRequestWentOutNoneOnTheDiskItsAnswerLostTooAndALaterRunReadsNone(): Unit =
         runBlocking {
             val server = Server()
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -287,14 +290,22 @@ class BaliAppTest {
                 // A later run, nobody signed in: its account reads them back.
                 val (again, later) = run(outbox, server, scope)
                 assertEquals(listOf("u1", "u1"), later.state.value.run { listOf(inClass, listSeenBy) })
-                // The student signs in there and deletes the account: none, off the disk too, and a later run reads none.
+                // The student signs in there and deletes the account: its first request on its way, the notes already off the
+                // disk, written through; its answer lost, they stay off, the store's own writes put through to the disk to show it.
                 server.signStudentIn(again, scope, "u1", mayDelete = true)
                 server.next(AGE_CHECK).reply(200, PASSED)
                 later.deleting { it.ask() }
-                val deleting = scope.async { later.deleteAccount() }
-                // Its first request on its way: the notes already off the disk, written through.
-                val delete = server.pastReads("DELETE /v1/me")
+                val stopping = scope.async { later.deleteAccount() }
+                val lost = server.pastReads("DELETE /v1/me")
                 until { disk(file) }.let { assertFalse(it, "u1" in it) }
+                lost.drop()
+                withTimeout(30.seconds) { stopping.await() }
+                assertTrue("${later.state.value.deleting}", later.state.value.deleting is Deleting.Stopped)
+                prefs().edit(commit = true) {}
+                until { disk(file) }.let { assertFalse(it, "u1" in it) }
+                // Try again: deleted, none, off the disk too, and a later run reads none.
+                val deleting = scope.async { later.deleteAccount() }
+                val delete = server.pastReads("DELETE /v1/me")
                 delete.reply(200, """{"outcome":"deleted"}""")
                 server.next("POST /").reply(200, "{}")
                 withTimeout(30.seconds) { deleting.await() }
@@ -312,8 +323,14 @@ class BaliAppTest {
                 context.deleteDatabase(FILE)
                 app.notes.inClass = found.first
                 app.notes.listSeenBy = found.second
+                // Through to the disk now, as the notes write behind: a run's process can end with this test, and the next run
+                // would read the student's notes back (LessonAppTest's, AN13g).
+                prefs().edit(commit = true) {}
             }
         }
+
+    /** The app's own notes' SharedPreferences, the same the store writes ([PreferencesNotes]). */
+    private fun prefs() = context.getSharedPreferences(NOTES_FILE, Context.MODE_PRIVATE)
 
     /** The app's run started over [outbox] afresh, as a relaunch starts one, the last ended first: a sign-in of the test's own, nobody signed in. */
     private suspend fun run(outbox: Outbox, server: Server, scope: CoroutineScope): Pair<SignIn, Account> {
