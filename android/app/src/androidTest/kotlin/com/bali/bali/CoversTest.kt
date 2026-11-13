@@ -186,7 +186,7 @@ class CoversTest {
             // there the tests' own app does it (StandIn.Calls).
             shell("input keyevent KEYCODE_ENDCALL")
             until { Unit.takeIf { Regex("""mCallState=[12]""") !in shell("dumpsys telephony.registry") } }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 until { Unit.takeIf { "Row:" in shell("content query --uri content://call_log/calls --where date>=$calling") } }
                 shell("content delete --uri content://call_log/calls --where date>=$calling")
                 assertEquals("No result found.", shell("content query --uri content://call_log/calls --where date>=$calling").trim())
@@ -310,7 +310,7 @@ class CoversTest {
         val (x2, y2) = moved.bounds.centerX to moved.bounds.centerY
         shell("input tap $x2 $y2")
         val open =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 until {
                     seen().takeIf { windows ->
                         windows.any { it.type == AccessibilityWindowInfo.TYPE_SYSTEM && (it.bounds meets moved.bounds) != null } && windows.firstOrNull { it.id == small.id }?.cover == moved.bounds
@@ -324,7 +324,7 @@ class CoversTest {
         // sent it home first. Android 10 may list it where its animation left it, short of the screen, and say no more, so
         // there it can stay in front under its cover instead, until the screen next changes (AN7h).
         shell("input tap ${open.centerX} ${open.centerY}")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             until { Unit.takeIf { covers { it.homes } == homes + 2 } }
         } else {
             until { Unit.takeIf { covers { it.homes } == homes + 2 || seen().any { it.app == STAND_IN_APP && !it.pictureInPicture && it.cover != null } } }
@@ -479,19 +479,22 @@ class CoversTest {
             }
         }
 
+    // Android 11 takes Android 10's paths here, untested: by AOSP's reading it has 10's menu activity and 10's shell with no
+    // call-log permission, both gone in 12 (AN7h).
+
     /**
      * The apps a small window's cover is listed for: the stand-in's. Android 10 can leave the service's list of windows as its
      * picture-in-picture animations had it, saying no more changed (AN7h): there System UI's menu may stay listed at the small
      * window's place after it has gone, its cover standing in for the small window's.
      */
-    private val pinned get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) setOf(STAND_IN_APP) else setOf(STAND_IN_APP, SYSTEM_UI)
+    private val pinned get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) setOf(STAND_IN_APP) else setOf(STAND_IN_APP, SYSTEM_UI)
 
     /**
      * Where System UI takes the picture-in-picture window's touches, as `dumpsys input` places its input consumer (Android 10
      * quoting its name). None on Android 10 while its menu is up, an activity that takes them, the consumer still listed then.
      */
     private fun pipTouches(): Area? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && menuUp()) return null
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && menuUp()) return null
         return Regex("""name='?pip_input_consumer'?, .*?frame=\[(-?\d+),(-?\d+)]\[(-?\d+),(-?\d+)]""").find(shell("dumpsys input"))?.groupValues?.let { Area(it[1].toInt(), it[2].toInt(), it[3].toInt(), it[4].toInt()) }
     }
 
@@ -503,14 +506,14 @@ class CoversTest {
      * 3.5 s (AOSP's PipTouchHandler and PipMenuActivity): a window event each way, so the screen is still only after it.
      */
     private fun menuCameAndWent() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return
         until { Unit.takeIf { menuUp() } }
         until { Unit.takeIf { !menuUp() } }
     }
 
     /** Whether a small window is where System UI takes its [touches]: on Android 10, which lists a scaled window's place a pixel short, within that pixel. */
     private infix fun Area.at(touches: Area?): Boolean =
-        touches != null && if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) this == touches else listOf(left - touches.left, top - touches.top, right - touches.right, bottom - touches.bottom).all { it in -1..0 }
+        touches != null && if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) this == touches else listOf(left - touches.left, top - touches.top, right - touches.right, bottom - touches.bottom).all { it in -1..0 }
 
     /** [place]'s answer once it has stopped moving: the same at two reads a moment apart. */
     private fun atRest(place: () -> Area?): Area? {
