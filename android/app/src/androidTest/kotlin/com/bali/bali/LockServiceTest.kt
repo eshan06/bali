@@ -6,8 +6,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
+import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityManager
 import androidx.room.Room
@@ -166,6 +168,24 @@ class LockServiceTest {
             until { enforcer.updates.value.takeIf { it.checked && !it.locked && it.until == null } }
             assertEquals("", until { listening()?.takeIf { it.isEmpty() } })
             assertEquals(narrow, told())
+        }
+
+    @Test
+    fun anotherAppsWindowEventsReachTheServiceInALessonAndInTheNextOneAfterEmergencyUnlock(): Unit =
+        runBlocking {
+            switchOn()
+            readOut()
+            // What Android delivers, not only what it reads back (told) and dumps (listening): on Android 10 both said the
+            // window events from every app while no other app's event reached the service (AN7h).
+            for (lesson in 1..2) {
+                // A tap not answered yet locks at once, to its cap (decision 7); after Emergency Unlock, the next tap again.
+                engine.record(Change.Tap("tag"))
+                until { enforcer.updates.value.takeIf { it.locked } }
+                assertEquals(WIDE, until { listening()?.takeIf { it == WIDE } })
+                heard(lesson)
+                engine.emergencyUnlock()
+                until { enforcer.updates.value.takeIf { it.checked && !it.locked && it.until == null } }
+            }
         }
 
     @Test
@@ -459,6 +479,31 @@ class LockServiceTest {
     }
 
     private val narrow get() = listOf(0, 0, listOf(context.packageName))
+
+    /**
+     * Settings opened in [lesson], an app no lock covers: its window named by its own state event, as Android delivers it to
+     * the service; then Home. None within the patience fails, saying what the service was told and listens to.
+     */
+    private fun heard(lesson: Int) {
+        val settings = checkNotNull(context.packageManager.resolveActivity(Intent(Settings.ACTION_SETTINGS), PackageManager.MATCH_DEFAULT_ONLY)).activityInfo.packageName
+        shell("am start -a ${Settings.ACTION_SETTINGS}")
+        try {
+            until { Unit.takeIf { settings in named() } }
+        } catch (never: IllegalStateException) {
+            throw AssertionError("lesson $lesson: no window event from $settings reached the service, told ${told()}, listening ${listening()}", never)
+        }
+        shell("input keyevent KEYCODE_HOME")
+    }
+
+    /** The apps the service has named the windows on the screen for, by their own state events, on its own thread. */
+    private fun named(): Set<String> {
+        var named = emptySet<String>()
+        instrumentation.runOnMainSync {
+            val service = app.lock.service ?: return@runOnMainSync
+            named = service.windows.mapNotNull { service.rule.app(it.id) }.toSet()
+        }
+        return named
+    }
 
     /** Out of a session, the screen on as the service binds: the truth read, answered with no session. */
     private fun readOut() {
