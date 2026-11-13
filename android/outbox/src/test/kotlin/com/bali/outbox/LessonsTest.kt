@@ -31,6 +31,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
+import kotlin.coroutines.ContinuationInterceptor
+import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -43,12 +45,14 @@ import kotlin.test.fail
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -212,14 +216,33 @@ private fun EngineFiles.lessonRig(): LessonRig {
 }
 
 /**
- * [lessonRig]'s, its lesson half's own scope [Dispatchers.Unconfined]: each call it starts runs on the thread that starts or wakes
- * it up to its first wait, a reply's, a sleep's or its lock's, so once a call returns, whatever it sent is sent and whatever it
- * waits on it waits on, never a window of time.
+ * [lessonRig]'s, its lesson half's own scope on the test's own thread ([TestsThread]): each call the test starts, and each wait the
+ * test ends (a reply, the clock moved, a hold let go), runs at once there up to its first wait, a reply's, a sleep's or its lock's,
+ * as [Dispatchers.Unconfined] runs it, so once a call returns, whatever it sent is sent and whatever it waits on it waits on, never
+ * a window of time. What another thread wakes, the deck's check above all (core's `sha256`, on [Dispatchers.Default]), runs there
+ * as the test next waits, never at once with a step of the test: on Unconfined it ran on, and held the lesson half's lock on, a
+ * thread of its own (the flake of 2026-11-12, staged in [SlideTest]), as iOS's AppTests never do, their `Phone` and the test both
+ * on the main actor.
  */
-private fun EngineFiles.deckRig(accounts: Flow<Account.State> = emptyFlow()): LessonRig {
+private suspend fun EngineFiles.deckRig(accounts: Flow<Account.State> = emptyFlow()): LessonRig {
     val (server, clock, renderer) = Triple(Server(), TestClock(), FakeRenderer())
-    val unconfined = CoroutineScope(scope.coroutineContext + Dispatchers.Unconfined)
-    return LessonRig(Lessons(accounts, client(server), renderer, unconfined, clock), server, clock, renderer)
+    val confined = CoroutineScope(scope.coroutineContext + TestsThread(currentCoroutineContext()))
+    return LessonRig(Lessons(accounts, client(server), renderer, confined, clock), server, clock, renderer)
+}
+
+/**
+ * The test's own thread as a dispatcher, made in its `runBlocking` from [test], that call's context: on that thread, what is
+ * started or woken runs at once up to its first wait, as [Dispatchers.Unconfined] runs it; from any other thread it goes to the
+ * test's own loop, `runBlocking`'s, and runs on the test's thread as the test next waits. So nothing it runs ever runs at once
+ * with the test.
+ */
+private class TestsThread(test: CoroutineContext) : CoroutineDispatcher() {
+    private val thread = Thread.currentThread()
+    private val loop = checkNotNull(test[ContinuationInterceptor] as? CoroutineDispatcher) { "a deck rig is made in its test's runBlocking" }
+
+    override fun isDispatchNeeded(context: CoroutineContext): Boolean = Thread.currentThread() !== thread
+
+    override fun dispatch(context: CoroutineContext, block: Runnable) = loop.dispatch(context, block)
 }
 
 /** The reads of the truth answered with [me] as they come until the next request to [route], returned: a deletion waits out the loops'. */
@@ -818,7 +841,7 @@ class LessonsTest : EngineFiles() {
         runBlocking {
             // Claude Review's WARN on #577: the bell's job is the lesson half's scope's, not the run's, so a bell woken as the run
             // ends could follow the next lesson after the run's end. Staged with no window of time: the run's end holds the lesson
-            // half's lock, closing the slide's document, as the bell wakes on this thread (the rig's scope is Unconfined) and waits
+            // half's lock, closing the slide's document, as the bell wakes on this thread (the rig's lesson half runs here) and waits
             // there for the lock; then the run's end lets the bell go, and the lock. At Period 3's bell, Period 4's would follow.
             val accounts = MutableStateFlow(twoInSession())
             val rig = deckRig(accounts)
