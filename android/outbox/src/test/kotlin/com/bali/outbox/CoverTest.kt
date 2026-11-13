@@ -13,10 +13,10 @@ private const val BALI = "com.bali.bali"
 private const val CONTACTS = "com.google.android.contacts"
 private const val VIDEO = "com.example.video"
 private const val MESSAGES = "com.google.android.apps.messaging"
-private const val SYSTEM_UI = "com.android.systemui"
+private const val DIALER = "com.google.android.dialer"
 
 /** The allow-list as AllowList.kt asks it of Android, on the emulator, Bali left out to show it's never covered all the same. */
-private val ALLOWED = setOf(MESSAGES, "com.google.android.dialer", "com.android.phone", "com.android.settings", SYSTEM_UI, "android")
+private val ALLOWED = setOf(MESSAGES, DIALER, "com.android.phone", "com.android.settings", SYSTEM_UI, "android")
 
 private val SAFE = Area(0, 136, 1080, 2337)
 private val SCREEN = Area(0, 0, 1080, 2400)
@@ -92,6 +92,50 @@ class CoverTest {
         assertEquals(covers, named(29 to SYSTEM_UI, 27 to VIDEO, 18 to MESSAGES).over(STATUS_BAR, menu, video, OnScreen(18, WindowKind.App, SCREEN)))
         val notification = OnScreen(30, WindowKind.Drawn, Area(0, 136, 1080, 1600))
         assertEquals(listOf(Covering(27, Area(440, 1600, 1038, 1831), home = false, held = false)), named(30 to SYSTEM_UI, 27 to VIDEO).over(STATUS_BAR, notification, video))
+    }
+
+    @Test
+    fun androidTensMenuListedInPlaceOfABlockedAppsSmallWindowIsCoveredAsItWasWhileAnythingIsInPictureInPicture() {
+        // Android 10's menu is System UI's activity in the small window's own task: while it's up, as the window comes into
+        // picture-in-picture and while the student has it open, Android lists the menu's window alone at the small window's
+        // place (AN7h, on Android 10's emulator). Covered as the small window was: its touches the menu's, never sent home.
+        val small = Area(440, 1495, 1038, 1831)
+        val video = OnScreen(27, WindowKind.App, small, pictureInPicture = true)
+        val menu = OnScreen(29, WindowKind.App, small, pictureInPicture = true)
+        val rule = named(27 to VIDEO, 18 to MESSAGES)
+        val under = OnScreen(18, WindowKind.App, SCREEN)
+        assertEquals(listOf(Covering(27, small, home = false, held = false)), rule.over(STATUS_BAR, video, under))
+        // Listed before its own event names it, as no window is, it isn't covered yet; named, it is.
+        assertEquals(emptyList(), rule.over(STATUS_BAR, menu, under))
+        rule.named(29, SYSTEM_UI)
+        assertEquals(listOf(Covering(29, small, home = false, held = false)), rule.over(STATUS_BAR, menu, under))
+        // Opened, the menu grows with the small window under it: covered as it grows.
+        val grown = Area(290, 1367, 1038, 1831)
+        assertEquals(listOf(Covering(29, grown, home = false, held = false)), rule.over(STATUS_BAR, menu.copy(bounds = grown), under))
+        // Gone, the small window listed again: its own cover back.
+        assertEquals(listOf(Covering(27, small, home = false, held = false)), rule.over(STATUS_BAR, video, under))
+        // Closed from the menu, nothing in picture-in-picture: System UI's window in picture-in-picture later stands for nothing.
+        assertEquals(emptyList(), rule.over(STATUS_BAR, under))
+        assertEquals(emptyList(), rule.over(STATUS_BAR, menu, under))
+    }
+
+    @Test
+    fun androidTensMenuOverAnAllowedAppsSmallWindowOrWithNoneListedBeforeItIsNeverCovered() {
+        val small = Area(440, 1495, 1038, 1831)
+        val menu = OnScreen(29, WindowKind.App, small, pictureInPicture = true)
+        // A call's small window, the dialer's: its menu in its place stands for an app the student keeps.
+        val call = named(26 to DIALER, 29 to SYSTEM_UI)
+        assertEquals(emptyList(), call.over(STATUS_BAR, OnScreen(26, WindowKind.App, small, pictureInPicture = true)))
+        assertEquals(emptyList(), call.over(STATUS_BAR, menu))
+        // A blocked app's after the dialer's: the dialer's no longer stands, the blocked one's does.
+        call.named(27, VIDEO)
+        assertEquals(listOf(Covering(27, small, home = false, held = false)), call.over(STATUS_BAR, OnScreen(27, WindowKind.App, small, pictureInPicture = true)))
+        assertEquals(listOf(Covering(29, small, home = false, held = false)), call.over(STATUS_BAR, menu))
+        // A menu with no small window listed before it, or one the lock's end forgot: nothing it stands for is known.
+        assertEquals(emptyList(), named(29 to SYSTEM_UI).over(STATUS_BAR, menu))
+        call.over(STATUS_BAR, menu, until = null)
+        call.named(29, SYSTEM_UI)
+        assertEquals(emptyList(), call.over(STATUS_BAR, menu))
     }
 
     @Test

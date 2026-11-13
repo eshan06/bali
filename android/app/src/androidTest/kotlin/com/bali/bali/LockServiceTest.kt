@@ -1,5 +1,6 @@
 package com.bali.bali
 
+import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.UiAutomation
 import android.content.ComponentName
@@ -7,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.provider.Settings
@@ -62,11 +64,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.xmlpull.v1.XmlPullParser
 
 /**
  * The lock's service on the emulator, Android's own: its switch, read from Android's list and its binding;
  * what it listens to, as ARCHITECTURE's battery plan has it, read in `dumpsys accessibility` and from
- * Android's AccessibilityManager; rule 3's check as the app starts and as the switch changes; the screen
+ * Android's AccessibilityManager, and in a lesson what Android delivers it, which on Android 10 those two
+ * didn't show (AN7h); rule 3's check as the app starts and as the switch changes; the screen
  * heard for the check-ins; and the lock kept for the next run. Each test runs an engine of its own, over its
  * own transport, outbox and clock, handed to the app's start, and switches the service on and off as a
  * student would, through the shell of a UiAutomation that leaves accessibility services running (one that
@@ -155,6 +159,8 @@ class LockServiceTest {
     @Test
     fun theServiceListensToNothingOutsideALessonToTheWindowsInOneAndToNothingAgainAtEmergencyUnlock(): Unit =
         runBlocking {
+            // As it binds, before Bali tells it anything: its XML's, which the filter its events pass starts from.
+            assertEquals(narrowed, bindsWith())
             switchOn()
             readOut()
             assertEquals("", listening())
@@ -478,7 +484,27 @@ class LockServiceTest {
         return listOf(info.eventTypes, info.flags, info.packageNames?.toList().orEmpty())
     }
 
-    private val narrow get() = listOf(0, 0, listOf(context.packageName))
+    /**
+     * The packages the service's XML names, as Android parses it on this phone (`res/xml`, or from Android 12 `xml-v31`): what
+     * a binding's filter starts from at the phone's start. Read from the XML itself, since Android 10 keeps no copy of it apart
+     * from the service's info, which `setServiceInfo` writes over.
+     */
+    private fun bindsWith(): List<String> {
+        @Suppress("DEPRECATION") val service = context.packageManager.getServiceInfo(ComponentName(context, LockService::class.java), PackageManager.GET_META_DATA)
+        checkNotNull(service.loadXmlMetaData(context.packageManager, AccessibilityService.SERVICE_META_DATA)).use { xml ->
+            while (xml.next() != XmlPullParser.END_DOCUMENT) {
+                if (xml.eventType == XmlPullParser.START_TAG && xml.name == "accessibility-service") {
+                    return xml.getAttributeValue(ANDROID, "packageNames")?.split(',')?.map { it.trim() }.orEmpty()
+                }
+            }
+        }
+        error("no accessibility-service in the service's XML")
+    }
+
+    /** Outside a lesson, the packages it listens to: from Android 12 Bali's own alone; on 10 and 11, which never take a name back, none named (AN7h). */
+    private val narrowed get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) listOf(context.packageName) else emptyList()
+
+    private val narrow get() = listOf(0, 0, narrowed)
 
     /**
      * Settings opened in [lesson], an app no lock covers: its window named by its own state event, as Android delivers it to
@@ -545,6 +571,7 @@ class LockServiceTest {
     private companion object {
         const val FILE = "lock-service-test.sqlite"
         const val SERVICE = "com.bali.bali/com.bali.bali.LockService"
+        const val ANDROID = "http://schemas.android.com/apk/res/android"
         const val CHECK_IN = "POST /v1/sessions/s/checkin"
         const val WINDOW_EVENTS = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOWS_CHANGED
         const val WIDE = "[TYPE_WINDOW_STATE_CHANGED, TYPE_WINDOWS_CHANGED]"

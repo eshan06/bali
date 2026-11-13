@@ -3,6 +3,7 @@ package com.bali.bali
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentName
 import android.content.Context
+import android.os.Build
 import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 import com.bali.outbox.Lock
@@ -107,7 +108,7 @@ class ServiceLock(private val context: Context) : Lock {
     /**
      * Whether a lock holds now, this run's before its end or the last run's, the file and the service
      * following it: the file there while one does, and the service listening to the windows while one
-     * does, to nothing but its own package's nothing while none does. A change that didn't take is made
+     * does, to nothing while none does ([listen]). A change that didn't take is made
      * again at the next call, so a lock ended by its end leaves no file and no listening behind it.
      */
     private fun follow(): Boolean {
@@ -131,15 +132,16 @@ class ServiceLock(private val context: Context) : Lock {
 
     /**
      * What [service] listens to once it's told: in a [lesson], the window events alone, a window's own
-     * and the list of them, never its contents; else nothing, from its own package alone, since an event
-     * type of none still has every app send its window events. Unchanged where the system can't be told.
+     * and the list of them, never its contents; else nothing, from its own package alone where Android
+     * takes a name back ([NARROWS]), since an event type of none still has every app send its window
+     * events. Unchanged where the system can't be told.
      */
     private fun listen(service: LockService, lesson: Boolean): Boolean? =
         try {
             service.serviceInfo?.let { info ->
                 info.eventTypes = if (lesson) WINDOW_EVENTS else 0
                 info.flags = if (lesson) AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS else 0
-                info.packageNames = if (lesson) null else arrayOf(context.packageName)
+                info.packageNames = if (lesson || !NARROWS) null else arrayOf(context.packageName)
                 service.serviceInfo = info
                 lesson
             } ?: listening
@@ -157,5 +159,13 @@ class ServiceLock(private val context: Context) : Lock {
 
     private companion object {
         const val WINDOW_EVENTS = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOWS_CHANGED
+
+        /**
+         * Whether Android takes a package's name back from the service: from Android 12. On 10 and 11, `setServiceInfo` only
+         * adds names to the filter its events pass, never clears it, so with Bali's own named, no other app's window would
+         * reach it in any lesson after (AN7h). There it names none, outside a lesson too, and binds with none
+         * (`res/xml/lock_service.xml`; from 12, `xml-v31`'s).
+         */
+        val NARROWS = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     }
 }
