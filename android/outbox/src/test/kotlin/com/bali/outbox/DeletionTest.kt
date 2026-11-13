@@ -12,6 +12,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /**
  * The outbox before an account deletion (C4): BaliOutbox's DeletionOrderTests, and the rules no iOS test
@@ -68,19 +70,21 @@ class DeletionOrderTest : OutboxFiles() {
         }
 
     @Test
-    fun onceTheApiHasDeletedTheAccountEveryRecordQueuedIsLetGoButAnEmergencyUnlockWhichNeverIs(): Unit =
+    fun onceTheApiHasDeletedTheAccountEveryRecordQueuedIsLetGoAnEmergencyUnlockKeptApartOutOfTheQueue(): Unit =
         runBlocking {
+            // AN9j's call (the conductor's, 2026-11-13): never discarded, and never in the queue the next account's sign-in sends.
             val (outbox, _) = makeOutbox()
             record(outbox, Change.Tap("tag"))
             record(outbox, Change.ProtectionOff("s"))
             val unlock = record(outbox, Change.Unlock("s", null))
             record(outbox, Change.Refocus("s"))
             outbox.accountDeleted()
-            assertEquals(listOf(unlock.eventId), outbox.records().map { it.eventId })
+            assertEquals(emptyList(), outbox.records())
+            assertEquals(setOf(unlock.eventId), keptApart(outbox).keys)
         }
 
     @Test
-    fun theDeletionKeepsEveryKindOfEmergencyUnlockAsItWasInItsSessionUnderItsTapNotFiledYetARefiledOnesFollowUpAndOneStuck(): Unit =
+    fun theDeletionKeepsEveryKindOfEmergencyUnlockApartWholeInItsSessionUnderItsTapNotFiledYetARefiledOnesFollowUpAndOneStuck(): Unit =
         runBlocking {
             val (outbox, _) = makeOutbox()
             val stuck = record(outbox, Change.Unlock("s", UnlockReason.Nurse))
@@ -95,9 +99,21 @@ class DeletionOrderTest : OutboxFiles() {
             record(outbox, Change.ProtectionOff("s"))
             val unlocks = outbox.records().filter { it.change.isUnlock }
             assertEquals(5, unlocks.size, "${outbox.records()}")
+            val rows = unlocks.map { assertNotNull(outbox.dao.record(it.eventId)).row }
             outbox.accountDeleted()
-            assertEquals(unlocks, outbox.records())
-            assertTrue(assertNotNull(current(outbox, stuck.eventId)).stuck)
+            assertEquals(emptyList(), outbox.records())
+            // Each kept as its row held it: its session or its tap, its reason, its time, and its place in what the phone did.
+            val kept = keptApart(outbox)
+            assertEquals(unlocks.map { it.eventId }.toSet(), kept.keys)
+            for (row in rows) {
+                val fields = assertNotNull(kept[row.eventId])
+                assertEquals(
+                    listOf(row.sessionId, row.tapId, row.reason, Times().text(row.recordedAt)),
+                    listOf(fields.text("sessionId"), fields.text("tapId"), fields.text("reason"), fields.text("recordedAt")),
+                    row.eventId,
+                )
+                assertEquals(row.orderSeq ?: row.seq, fields["seq"]?.jsonPrimitive?.longOrNull, row.eventId)
+            }
         }
 
     @Test

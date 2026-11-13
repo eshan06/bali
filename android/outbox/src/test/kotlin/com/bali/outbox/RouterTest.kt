@@ -36,7 +36,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 // choosing again; and the account and the router each reading the other's last published value, neither waiting on the other's lock.
 
 /** A run as the app makes one (BaliApp's `start`), and the router over it, each running: what a test drives. */
-private class Routed(val router: Router, val enforcer: Enforcer, val account: Account?, val lock: FakeLock, val inputs: Channel<Router.Input>) {
+class Routed(val router: Router, val enforcer: Enforcer, val account: Account?, val lock: FakeLock, val inputs: Channel<Router.Input>) {
     suspend fun until(condition: (Screen.Shown) -> Boolean): Screen.Shown = router.until(condition)
 
     /** The student or Android switches Bali's service [to], and rule 3's check reads it. */
@@ -51,7 +51,7 @@ private class Routed(val router: Router, val enforcer: Enforcer, val account: Ac
  * over an engine with none, and the router over them with the same notes, the screens' inputs the test's, Android's [looks], and
  * [routerClock], by default the rig's.
  */
-private fun EngineFiles.routed(
+fun EngineFiles.routed(
     engine: SyncEngine, clock: TestClock, lock: FakeLock = FakeLock(clock), notes: Notes = MemoryNotes(), looks: Flow<Unit> = emptyFlow(),
     routerClock: SyncClock = clock,
 ): Routed {
@@ -67,11 +67,11 @@ private fun EngineFiles.routed(
 }
 
 /** Waits for an answer [condition] holds for, and returns it; none in time fails the test. */
-private suspend fun Router.until(condition: (Screen.Shown) -> Boolean): Screen.Shown =
+suspend fun Router.until(condition: (Screen.Shown) -> Boolean): Screen.Shown =
     withTimeoutOrNull(patience) { shown.first(condition) } ?: fail("the router never showed what was waited for: ${shown.value}")
 
 /** Waits for a claim [condition] holds for, and returns it; none in time fails the test. */
-private suspend fun Enforcer.until(condition: (Protection) -> Boolean): Protection =
+suspend fun Enforcer.until(condition: (Protection) -> Boolean): Protection =
     withTimeoutOrNull(patience) { updates.first(condition) } ?: fail("the enforcer never reached the claim waited for: ${updates.value}")
 
 /** `GET /v1/me`'s answer for student [id], named so, in [classes], each as [Answer.inClass] writes one, in no session. */
