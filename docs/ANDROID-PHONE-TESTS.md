@@ -149,15 +149,16 @@ What the emulator couldn't show (`docs/DECISIONS.md`, 2026-11-05, AN6c): its Chr
 the Auth Tab nor ephemeral tabs, and stops at its first run. Once the owner has made Android's dev
 client and its id is in the build (`docs/DEPLOY.md`, "The phone's sign-in"), and a screen or AN7's
 readout starts a sign-in, on both phones, each with its browser and that browser's version noted.
-Until AN6e lands, sign in only where the phone's Chrome is 136 or later: an older one shares its
-cookies with the tab, so Cognito's session stays there for another app to use (`docs/DECISIONS.md`,
-2026-11-13).
+Since AN6e, a browser with no ephemeral tab (Chrome before 136) gets one more page after each
+sign-in, Cognito's sign-out page, which ends the session the sign-in left there
+(`docs/DECISIONS.md`, 2026-11-13).
 
 - **Sign up, then sign in**, through the hosted UI: which tab opens (an Auth Tab on Chrome 137 and
   later), and Bali signed in after.
-- **Sign out, then sign in again:** the password asked again where the tab was ephemeral; where the
-  browser has no ephemeral tab, whether the hosted UI skips it (its cookies kept, the conductor's
-  call).
+- **On a Chrome before 136** (AN6e; a phone that has one, or a second browser that offers no
+  ephemeral tab set as the default): sign in, and see the one extra page come and go, then Bali
+  signed in (the readout says so); sign in again, and see the password asked for again.
+- **Sign out, then sign in again:** the password asked again, on every browser.
 - **The tab closed with no sign-in:** nothing said, and Sign in works again.
 - **The phone rotated while the tab is open,** then the sign-in finished: signed in.
 - **Bali relaunched:** still signed in; **reinstalled:** signed out.

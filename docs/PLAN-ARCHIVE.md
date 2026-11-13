@@ -10,6 +10,27 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN6e's on 2026-11-13: _Last updated: 2026-11-13 (Central) — AN6d, Android's dev sign-in client in the build (#588; `docs/DECISIONS.md`,
+2026-11-13): the build signs in through dev's `bali-android-dev-public`, made on 2026-11-12 on the owner's ask, at
+`com.bali.bali://auth/callback`, two slashes since Cognito's console refused RFC 8252's one; dev's authorize endpoint sends
+it to `/login`. Every Debug build's start now runs the engine and the account over the app's own sign-in, nobody signed in on
+the emulators and nothing on the wire; the not-set-up start keeps its tests through a start given no config, and no test
+reaches the hosted UI, Cognito or dev's API. It also records the owner's go-ahead of 2026-11-12 and that evening's dev
+consoles: AN6e, AN9j, AN9k and the help page's line (AP2b) are new steps, AN11 runs on this PC, and dev's Firebase is made.
+No screen, no word. Before it, AN7h, the lock on Android 10. Next: AN6e, AN13g, AN9j and AN9k, AN11, AN12 and Phase 10's
+screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed
+the 13+ check on an iPhone (Q7); prod's Android client, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX
+and OkHttp 5.5 in the step that needs them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
+
+`docs/PLAN.md`'s, replaced by AN6e's on 2026-11-13: _Last updated: 2026-11-13 (Central) — Android's build signs in on dev, through dev's Android client at
+its two-slash callback (AN6d, #588; DECISIONS 2026-11-13), and the owner's go-ahead of 2026-11-12 is
+recorded with its new steps. Before it, the lock on Android 10 (AN7h, #587). Next: the owner's switch
+of prod's domain, the release call and disabling the review account (Open owner items); a session
+builds the retire-a-block command and S12; the owner the sitting's findings' calls; GA5's known
+limit, the owner's call (DECISIONS 2026-11-02); AN6e, AN9j, AN9k, AN11–AN13; AN1's part 2 on the
+owner's phones; the audit's polish waits._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN6d's on 2026-11-13: _Last updated: 2026-11-13 (Central) — AN7h, the lock on Android 10: a lesson's cover reaches every app (#587;
 `docs/DECISIONS.md`, 2026-11-13). Android 10 and 11 only add the packages an accessibility service names to the filter its
 events pass, never clearing it, so with Bali's own named outside a lesson no other app's window reached the service there and
@@ -2982,6 +3003,27 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN6e's line, as it read when it was done (2026-11-13; `docs/DECISIONS.md`, 2026-11-13).
+
+- **AN6e** Cognito's session ended after each sign-in where the phone's browser offers no ephemeral tab (Chrome before 136;
+  the owner, 2026-11-12, owner item 8): Cognito's `/logout` at the client's sign-out URL, `com.bali.bali://auth/signout`, a
+  page the student sees, with the ephemeral-tab check and any AndroidX it needs, AN6e's call (no iOS twin: iOS's sign-in is
+  ephemeral) — validation: the JVM tests, and the instrumented tests on `Bali_Spike_API29`, `35` and `37`, none reaching
+  Cognito
+
+Open owner item 8, as it read until AN6e (2026-11-13), word for word: AN6e built the cookie call, so the phone checks
+sign in on any Chrome.
+
+8. 🔧 **Android's Cognito app clients:** dev's ✅ (made 2026-11-12 by the conductor, on the owner's ask:
+   `bali-android-dev-public`, on dev's `AUTH_AUDIENCE`, in the build since AN6d). Prod's still the owner's,
+   as `docs/DEPLOY.md`'s "Android's app clients" sets it out (the callback `com.bali.bali://auth/callback`,
+   the sign-out URL `com.bali.bali://auth/signout`, SRP and refresh only, Bali's style), its id then on
+   prod's `AUTH_AUDIENCE`, or the API refuses Android's tokens with a `401`, and in the release build
+   (AP). ✅ **The cookie call** (the owner, 2026-11-12): where the phone's browser offers no ephemeral tab
+   (Chrome before 136), Bali will end Cognito's session after each sign-in, one more page for the student
+   (AN6e). Until AN6e lands, a sign-in there shares the browser's cookies, as AN6c left it, now through dev's
+   client: the phone checks sign in only on Chrome 136 or later (DECISIONS 2026-11-05, 2026-11-13).
 
 `docs/PLAN.md`'s Android lines, as they read until AN6d (2026-11-13), word for word: AN6d shortened them for room, their
 finished parts kept on `docs/PLAN-ANDROID.md`'s lines. The Now line:
