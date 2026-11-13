@@ -1256,9 +1256,11 @@ the first Android build reaches a student.
 **7. Sign-in through Cognito's managed login**, as on iOS: in an Auth Tab where the phone's browser
 has one, which answers Bali alone, else a Custom Tab, whose answer, a link any app can send, is taken
 only for the waiting sign-in with its state; each ephemeral where the browser offers that, and where
-it doesn't, sharing the browser's cookies (the conductor's call, awaiting the owner; `docs/DECISIONS.md`,
-2026-11-05). The code grant with PKCE, through app clients of Android's own on each pool, with no
-secret, the answer at the app id's own scheme. Auth's rules hold: only a real `401` signs anyone
+it doesn't, Cognito's session there ended right after each sign-in, one more page for the student (the
+owner, 2026-11-12: AN6e builds it, the tab sharing the browser's cookies until then; `docs/DECISIONS.md`,
+2026-11-05 and 2026-11-13). The code grant with PKCE, through app clients of Android's own on each pool,
+with no secret, the answer at the app id's own scheme (`com.bali.bali://auth/callback`, two slashes, the
+form Cognito's console takes). Auth's rules hold: only a real `401` signs anyone
 out, and no token reaches Bali's API before the 13+ check but the check's own read and a deletion's.
 
 ### Rules that keep the phone honest, where Android's differ
@@ -1287,7 +1289,7 @@ out, and no token reaches Bali's API before the 13+ check but the check's own re
   start that runs nothing, and where the phone's storage fails to give back where it stood (Room opens
   its file at the first read, so that is the engine's load, never the start); a later read that works
   puts it back from the standing, and a lock this run put on still ends at its own end. The conductor's
-  calls, awaiting the owner (`docs/DECISIONS.md`, 2026-11-11 and 2026-11-12).
+  calls, the owner's by the go-ahead of 2026-11-12 (`docs/DECISIONS.md`, 2026-11-11, 2026-11-12 and 2026-11-13).
 - **A reinstall starts signed out, with an outbox of its own.** Android deletes an app's files and
   its Keystore keys with the app, but its backup can bring the files back on a reinstall or a new
   phone. Bali leaves its own out of the backup and of a transfer to a new phone (the outbox, its
@@ -1298,8 +1300,8 @@ out, and no token reaches Bali's API before the 13+ check but the check's own re
 - **The live lesson's calls queue apart from the engine's.** OkHttp lets 5 requests a host go at
   once and queues the rest, so the lesson's poll and answers go through a transport of their own
   over the app's connections (`OkHttpTransport.apart`), and none ever holds an Emergency Unlock's
-  send behind it (Live lesson, decision 5). The conductor's call, awaiting the owner
-  (`docs/DECISIONS.md`, 2026-11-12).
+  send behind it (Live lesson, decision 5). The conductor's call, the owner's by the go-ahead of
+  2026-11-12 (`docs/DECISIONS.md`, 2026-11-12 and 2026-11-13).
 - **A deck is parsed in a process of its own.** pdfium reads a teacher's deck and draws its page in a
   service process Android isolates, bound only while a deck is open: no permission, none of Bali's
   files, given only the deck's bytes and what to draw. A deck that breaks pdfium reaches neither the
@@ -1362,11 +1364,11 @@ ISSUES #6 lists every gap with the way it is checked before Android launches, an
   (AN1, part 1).
 - On Android 10 the deck's bytes sit on the phone's storage, in a file with no name, for as long as
   its document is open: its name is deleted the moment it opens (the owner's ruling, 2026-11-12),
-  before a byte is written, and the renderer can read it but never write it (AN13f's calls, awaiting
-  the owner). From Android 11 the deck stays in memory (the owner's ruling), the renderer's copy a
+  before a byte is written, and the renderer can read it but never write it (AN13f's calls, the owner's
+  by the go-ahead of 2026-11-12). From Android 11 the deck stays in memory (the owner's ruling), the renderer's copy a
   second one, up to 25 MB, while its document is open.
 - TalkBack reads a slide's text from Android 15 alone; on Android 10 to 14 it says which slide it is
-  (the conductor's call, awaiting the owner; `docs/DECISIONS.md`, 2026-11-12).
+  (the conductor's call, the owner's by the go-ahead of 2026-11-12; `docs/DECISIONS.md`, 2026-11-12).
 - Phones differ by maker, so the device gate (AP3) runs on a Pixel and a Samsung, not one phone.
 
 ### Decided later, on purpose

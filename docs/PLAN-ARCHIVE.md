@@ -10,6 +10,28 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN6d's on 2026-11-13: _Last updated: 2026-11-13 (Central) — AN7h, the lock on Android 10: a lesson's cover reaches every app (#587;
+`docs/DECISIONS.md`, 2026-11-13). Android 10 and 11 only add the packages an accessibility service names to the filter its
+events pass, never clearing it, so with Bali's own named outside a lesson no other app's window reached the service there and
+the lock covered nothing. From Android 12 the service names Bali's package outside a lesson as before; on 10 and 11 it names
+none, in its XML or in `ServiceLock`, so there every app sends its window-state events outside a lesson too, for Android to drop
+(the conductor's call, awaiting the owner). Android 10's picture-in-picture menu, System UI's activity listed in the small
+window's place, is covered as that window; around it Android 10's list of windows can lag (ISSUES #6, gap 10). LockServiceTest
+checks what Android delivers in a lesson, and CoversTest runs on Android 10's image; the tests on `Bali_Spike_API29`, `_API33`
+(Android 13, first booted), `35` and `37`. No screen, no word. Before it, AN13f, the slide's page drawn in an isolated
+process. Next: AN13g, the lesson in the app; AN11, AN12 and Phase 10's screens, in the conductor's
+order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone
+(Q7); Android's Cognito clients, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the
+step that needs them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
+`docs/PLAN.md`'s, replaced by AN6d's on 2026-11-13: _Last updated: 2026-11-13 (Central) — The lock on Android 10 fixed: Android 10 and 11 never take back a
+package an accessibility service names, so Bali names none there, and Android 10's picture-in-picture
+menu is covered (AN7h, #587; DECISIONS 2026-11-13). Before it, the sign-in deletion case's CI flake
+(#586). Next: the owner's switch of prod's domain, the release call and disabling
+the review account (Open owner items); a session builds the retire-a-block command; the owner the
+sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11–AN13;
+AN1's part 2 on the owner's phones; the audit's polish waits._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN7h's on 2026-11-13: _Last updated: 2026-11-12 (Central) — AN13f, the slide's page drawn with `PdfRenderer` in an isolated process (#585;
 `docs/DECISIONS.md`, 2026-11-12), the sixth of AN13's seven steps: `app`'s `IsolatedRenderer.kt` and `RendererService.kt`,
 AN13e's seam filled to the owner's answers to Q2 and Q3: pdfium in a service process Android isolates, bound while a deck is
@@ -2960,6 +2982,39 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+`docs/PLAN.md`'s Android lines, as they read until AN6d (2026-11-13), word for word: AN6d shortened them for room, their
+finished parts kept on `docs/PLAN-ANDROID.md`'s lines. The Now line:
+
+- **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
+  AN1's part 2 on a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱),
+  before launch; AN2–AN10's and AN13a–AN13f's code ✅ (#488–#585), AN13e2's CI flake fix ✅ (#584),
+  AN7h, the lock on Android 10, ✅ (#587); AN11–AN13 next. Not on the pilot's critical path.
+
+Phase 8's row's status: building: AN1's parts 1 and 1c on the emulators ✅ (2026-11-03); AN1b, lock (a) decided ✅
+(2026-11-04); AN1's part 2 📱 waits for the phones, before launch. And the owner-items line:
+
+- Android's five still open (the phones, the Play account, the timing, the SDK's Android 11 or 12 image (10's, 13's and 17's installed 2026-11-12); 🔧 the Cognito clients, AN6c's; AS0's canvas, the lock and CodeQL settled, 2026-11-04): `docs/PLAN-ANDROID.md`, Open owner items.
+
+Open owner item 8, as it read until AN6d (2026-11-13), word for word: dev's client made on 2026-11-12, and the cookie call
+taken (the owner, 2026-11-12; AN6e).
+
+8. 🔧 **Android's Cognito app clients,** dev then prod, as `docs/DEPLOY.md`'s "The phone's sign-in"
+   sets them out (public, no secret; the code grant; iOS's scopes; the callback
+   `com.bali.bali:/auth/callback`; the refresh token's 365 days), each id then on that environment's
+   `AUTH_AUDIENCE`, or the API refuses Android's tokens with a `401`, which signs the student out. Dev's
+   id then goes into the build in a small PR; until then the app says sign-in isn't set up (AN6c).
+   **Before that PR, your call** on the conductor's: where the phone's browser offers no ephemeral tab
+   (Chrome before 136), the sign-in's tab shares its cookies, so while Cognito's session lasts there,
+   another app on the phone could sign in as the student without a password. Keep it, fail closed
+   (an error to draw), or end the session after each sign-in (DECISIONS 2026-11-05).
+
+Who builds what's cloud line, as it read until AN6d (2026-11-13), word for word: AN11 runs on the PC (the owner,
+2026-11-12).
+
+- **Cloud sessions:** the API's push (AN11) and docs. Also the steps that are Kotlin alone, tested
+  on the JVM with no emulator, once the owner allows Gradle's hosts in the cloud environment
+  (GOTCHAS, "Egress is allowlisted").
 
 `docs/PLAN.md`'s Now line for Android, as it read until AN7h (2026-11-13), word for word: AN7h shortened it for room,
 AN1's parts 1 and 1c, AN1b and AS0 being done and on the Phases table's rows.

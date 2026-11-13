@@ -116,7 +116,9 @@ checked with a public authorize request (`bali://auth/callback`, scope
 - **Hosted-UI domain:** `https://bali-dev.auth.us-east-1.amazoncognito.com`, on managed login
   since 2026-11-12 (`infra/cognito/managed-login/README.md`)
 - **The phone's app client:** `bali-ios-dev-public`, id `7u6trs6gv805oi35ima29em6oe` — a public client, no secret. The first one, `bali-ios-dev` (`33qr62dl4ee4inigneidmfe2s9`), was made with a client secret, which Cognito's token endpoint then demands (`invalid_client`) and a phone must never hold; a secret cannot be removed, so it was replaced (2026-09-26, the device check). It allows `aws.cognito.signin.user.admin` too (the owner, 2026-10-05, for C4's `DeleteUser`; an authorize request asking for it reaches the login page)
-- **The portal's app client:** `bali-web-dev`, id `2f0vj9o545imu4qth5phanki1v` (created 2026-10-04): a public SPA client with PKCE and no secret (`docs/WEB.md`); access and ID tokens a day (the owner, 2026-10-13). Dev's `AUTH_AUDIENCE` is the phone's id plus this one, `7u6trs6gv805oi35ima29em6oe,2f0vj9o545imu4qth5phanki1v`, and the demo's below
+- **The portal's app client:** `bali-web-dev`, id `2f0vj9o545imu4qth5phanki1v` (created 2026-10-04): a public SPA client with PKCE and no secret (`docs/WEB.md`); access and ID tokens a day (the owner, 2026-10-13). It is on dev's `AUTH_AUDIENCE` with the phones' and the demo's (below)
+- **Android's app client:** `bali-android-dev-public`, id `1njpekb5sg8nd6lkb53rpimjke` (created 2026-11-12 by the conductor, on the owner's ask): type Mobile app, public, no secret (the token endpoint answered a made-up code `invalid_grant`); callback `com.bali.bali://auth/callback`, since the console refused `com.bali.bali:/auth/callback` ("Syntax of return URL is not valid"); sign-out URL `com.bali.bali://auth/signout`, for AN6e; scopes `openid`, `email`, `profile` and `aws.cognito.signin.user.admin`, `phone` off; identity provider the Cognito user pool; the authorization code grant only; `ALLOW_USER_SRP_AUTH` and `ALLOW_REFRESH_TOKEN_AUTH` only; refresh token 365 days, rotation off; access and ID tokens 60 minutes; token revocation and prevent-user-existence-errors on; Bali's managed-login style, `e885a39b-0ea5-48aa-8c2f-522660f42a9e` (`infra/cognito/managed-login/README.md`). In the build since AN6d (`android/app/build.gradle.kts`): dev's authorize endpoint sends its two-slash callback to `/login`, the one-slash form to `redirect_mismatch`
+- **Dev's `AUTH_AUDIENCE`**, five ids: `6qcvcp0ubqmb8gunkt1d6dpkeo,33qr62dl4ee4inigneidmfe2s9,7u6trs6gv805oi35ima29em6oe,2f0vj9o545imu4qth5phanki1v,1njpekb5sg8nd6lkb53rpimjke`, the demo's, the first iOS client's (made with a secret), iOS's public client's, the portal's and Android's, Android's appended 2026-11-12 and deployed at 17:14 Central (`/healthz` ok, the boot log clean)
 - **The demo's app client:** `bali-ios`, id `6qcvcp0ubqmb8gunkt1d6dpkeo`, which `npm run demo`'s remote run signs its actors in through (`USER_PASSWORD_AUTH`, `apps/api/scripts/demo/cognito.ts`; `DEMO_COGNITO_CLIENT_ID`). Dev's API accepted its tokens on 2026-10-14 (PV8's screenshots), and it accepts only the clients `AUTH_AUDIENCE` lists (`apps/api/src/auth/verify.ts`), so dev's list holds it too: keep this client
 - **Dev's API:** `https://bali-production-09a2.up.railway.app` — dev's, despite
   the name: Railway named the service before the environment was renamed dev.
@@ -192,8 +194,9 @@ console → Cognito → that user pool:
      (C4a: Cognito's `DeleteUser` needs the last), so a client without one
      refuses every sign-in from the phone.
    - **Its style,** on a managed-login domain: Bali's, by
-     `infra/cognito/managed-login/README.md` ("A new client"). Without it the
-     client shows Cognito's default look, or no page at all if the CLI made it.
+     `infra/cognito/managed-login/README.md` ("A new client"). Without it
+     managed login shows the client no page, whether the console or the CLI
+     made it (Android's dev client, made in the console, had none: 2026-11-12).
 3. **Refresh-token expiration.** On the client's **App client information →
    Edit**, raise **Refresh token expiration** above Cognito's 30-day default —
    365 days, say. Cognito refusing the refresh token is the app's one
@@ -229,30 +232,40 @@ console → Cognito → that user pool:
   (dev's first client did, found at the device check; the authorize request
   above passes either way, so it proves nothing about the secret).
 
-**Android's app clients — to do** (🔧 the owner's, dev first, then prod;
-`docs/PLAN-ANDROID.md`, Open owner items, 8). The Android app signs in through
-clients of its own in the same pools, made as iOS's are (steps 1–3 above):
+**Android's app clients — dev's done, prod's to do** (dev's made 2026-11-12, above;
+prod's 🔧 the owner's; `docs/PLAN-ANDROID.md`, Open owner items, 8). The Android app
+signs in through clients of its own in the same pools, made as iOS's are (steps 1–3
+above):
 
 - **Type:** Mobile app: a public client, no client secret.
-- **Allowed callback URLs:** `com.bali.bali:/auth/callback`, exactly: the app
-  id's own scheme, with RFC 8252's one slash (iOS's stays `bali://auth/callback`).
-  If the console refuses it, use `com.bali.bali://auth/callback` and have a
-  session change the build and its pin test to match.
+- **Allowed callback URLs:** `com.bali.bali://auth/callback`, exactly, in both
+  pools: the app id's own scheme, with two slashes, since the console refuses RFC
+  8252's one-slash `com.bali.bali:/auth/callback` ("Syntax of return URL is not
+  valid", 2026-11-12). iOS's stays `bali://auth/callback`.
+- **Allowed sign-out URLs:** `com.bali.bali://auth/signout`: where the phone's
+  browser offers no ephemeral tab, Bali ends Cognito's session after each sign-in
+  (AN6e; `docs/DECISIONS.md`, 2026-11-13).
 - **Identity providers:** Cognito user pool. **OAuth grant types:** Authorization
   code grant only (the app sends PKCE, S256).
 - **OpenID Connect scopes:** `openid`, `email`, `profile` and
-  `aws.cognito.signin.user.admin` (Delete account), Profile ticked by hand.
+  `aws.cognito.signin.user.admin` (Delete account), Profile ticked by hand and
+  `phone` unticked.
+- **Authentication flows:** `ALLOW_USER_SRP_AUTH` and `ALLOW_REFRESH_TOKEN_AUTH`
+  only: choice-based sign-in (`ALLOW_USER_AUTH`) off, so the username and password
+  share one page (`infra/cognito/managed-login/README.md`).
 - **Refresh token expiration:** 365 days. **Refresh token rotation:** left off,
   Cognito's default: Delete account sends only the sign-in it began with, known
   by its refresh token, so with rotation on it takes a second try after a renewal
   (`docs/DECISIONS.md`, 2026-11-05, AN9a).
+- **Its style:** Bali's, by `infra/cognito/managed-login/README.md` ("A new
+  client"), which a client made in the console doesn't get by itself.
 - **Then:** append the id to that environment's `AUTH_AUDIENCE`
   (`<the ids there>,<Android's>`), or the API refuses Android's tokens with a
   `401`, which signs the student out; and check the client is public with the
   token-endpoint request above, its `client_id` and `redirect_uri`
-  (`com.bali.bali%3A%2Fauth%2Fcallback`) Android's. Dev's id then goes into
-  `android/app/build.gradle.kts`'s `BALI_COGNITO_CLIENT_ID` in a small PR (until
-  then the app says sign-in isn't set up); prod's into the release build (AP).
+  (`com.bali.bali%3A%2F%2Fauth%2Fcallback`) Android's. Dev's id is in
+  `android/app/build.gradle.kts`'s `BALI_COGNITO_CLIENT_ID` since AN6d; prod's
+  goes into the release build (AP).
 
 ## TestFlight — owner action (needs App Store Connect and GitHub settings)
 

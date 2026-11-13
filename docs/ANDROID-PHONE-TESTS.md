@@ -195,8 +195,8 @@ is typed in the Debug readout (AN7d), or scanned from a block (AN8):
   Settings: what Android shows, and App info's "Allow restricted settings" (AN1 saw "App was denied
   access").
 
-**The readout (AN7d),** the Debug build's launcher entry, Bali readout (Debug): until sign-in is set up
-its engine runs over no token, as a signed-out phone, so these need no server and no sticker, the tag
+**The readout (AN7d),** the Debug build's launcher entry, Bali readout (Debug): signed out, its engine
+sends nothing (the build signs in on dev since AN6d), so these need no server and no sticker, the tag
 typed:
 
 - **A typed tap held offline to its cap.** *Start:* out of a class, unlocked, the readout on screen,
@@ -242,9 +242,9 @@ lock a typed tap in the readout, as above:
   whether the service stays on and still covers, and whether it can be switched on again (gap 7).
 
 The readout's Launch line, how long the service took to bind, is read in the service's reboot part above.
-What the readout records with no sign-in stays queued on the phone, and a build with sign-in set up
-would send it to dev under the first account signed in: clear Bali's storage, or uninstall it, before
-installing that build.
+What the readout records with nobody signed in stays queued on the phone, and goes to dev under the
+first account signed in there: clear Bali's storage, or uninstall it, before signing in on a phone that
+ran these checks.
 
 ## AN8, the tap on the phones
 
