@@ -14,7 +14,7 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-13 (Central) — AN6d, Android's dev sign-in client in the build (#NNN; `docs/DECISIONS.md`,
+_Last updated: 2026-11-13 (Central) — AN6d, Android's dev sign-in client in the build (#588; `docs/DECISIONS.md`,
 2026-11-13): the build signs in through dev's `bali-android-dev-public`, made on 2026-11-12 on the owner's ask, at
 `com.bali.bali://auth/callback`, two slashes since Cognito's console refused RFC 8252's one; dev's authorize endpoint sends
 it to `/login`. Every Debug build's start now runs the engine and the account over the app's own sign-in, nobody signed in on
@@ -148,7 +148,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN6a** Sign-in's parts — ✅ (#515; DECISIONS 2026-11-04)
 - **AN6b** Sign-in itself — ✅ (#518; DECISIONS 2026-11-05)
 - **AN6c** Sign-in's app side — ✅ (#520; DECISIONS 2026-11-05)
-- **AN6d** Android's dev sign-in client in the build — ✅ (#NNN; DECISIONS 2026-11-13)
+- **AN6d** Android's dev sign-in client in the build — ✅ (#588; DECISIONS 2026-11-13)
 - **AN6e** Cognito's session ended after each sign-in where the phone's browser offers no ephemeral tab (Chrome before 136;
   the owner, 2026-11-12, owner item 8): Cognito's `/logout` at the client's sign-out URL, `com.bali.bali://auth/signout`, a
   page the student sees, with the ephemeral-tab check and any AndroidX it needs, AN6e's call (no iOS twin: iOS's sign-in is

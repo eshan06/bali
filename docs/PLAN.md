@@ -9,7 +9,7 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
 _Last updated: 2026-11-13 (Central) — Android's build signs in on dev, through dev's Android client at
-its two-slash callback (AN6d, #NNN; DECISIONS 2026-11-13), and the owner's go-ahead of 2026-11-12 is
+its two-slash callback (AN6d, #588; DECISIONS 2026-11-13), and the owner's go-ahead of 2026-11-12 is
 recorded with its new steps. Before it, the lock on Android 10 (AN7h, #587). Next: the owner's switch
 of prod's domain, the release call and disabling the review account (Open owner items); a session
 builds the retire-a-block command and S12; the owner the sitting's findings' calls; GA5's known
@@ -68,7 +68,7 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   Delete account's screen follow it, and the app's text scale at the large sizes, the owner's calls.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md`;
   AN1's part 2 on a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱),
-  before launch; AN2–AN10's and AN13a–AN13f's code ✅ (#488–#NNN), signing in on dev since AN6d;
+  before launch; AN2–AN10's and AN13a–AN13f's code ✅ (#488–#588), signing in on dev since AN6d;
   AN6e, AN9j, AN9k, AN11–AN13 next. Not on the pilot's critical path.
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
   (#434; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file

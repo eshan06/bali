@@ -11,7 +11,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 - **2026-11-13** — **AN6d, Android's dev sign-in client in the build: dev's `bali-android-dev-public` at
   `com.bali.bali://auth/callback`, two slashes because Cognito's console refused RFC 8252's one; a Debug build's start now runs
   over the app's own sign-in, and the tests that read a build not set up moved where their rule still holds (this step's calls,
-  marked, each awaiting the owner's look; AN6d, #NNN).** The owner said to take the recommended option on every regular call, so
+  marked, each awaiting the owner's look; AN6d, #588).** The owner said to take the recommended option on every regular call, so
   each call here is this step's, for the owner to look at. The console work it builds on, and the owner's go-ahead, are the
   entry below.
 
@@ -135,7 +135,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-13** — **The owner's go-ahead of 2026-11-12 ("take all your reccomended decisions as well"): the conductor's seven
   recommendations taken, AS7's list-changed screen left for the owner's eyes; and that evening's dev consoles, done by the
-  conductor on the owner's ask ("do what you need to do"), dev only, prod untouched (recorded by AN6d, #NNN, as the conductor
+  conductor on the owner's ask ("do what you need to do"), dev only, prod untouched (recorded by AN6d, #588, as the conductor
   relayed them).**
 
   **The seven calls, the owner's now:**
