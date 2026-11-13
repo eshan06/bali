@@ -1,5 +1,6 @@
 package com.bali.bali
 
+import android.app.Activity
 import android.app.Instrumentation
 import android.app.UiAutomation
 import android.content.Intent
@@ -149,14 +150,17 @@ class ReadoutTest {
         assertTrue("Server last answered: never" in readout.lines())
     }
 
+    // This test's run is a Debug build's start with no config (ThisBuild, Q2), the one place sign-in isn't set up since AN6d
+    // set every value, and the readout reads that from the run. Every start is held here, so a press that got through to the
+    // app's own sign-in would open nothing, never dev's hosted UI, and fail by name.
     @Test
     fun signInOpensNothingWhileSignInIsNotSetUpAndSaysSo() {
         val started = CopyOnWriteArrayList<Intent>()
         val recorder =
             object : Instrumentation.ActivityMonitor() {
-                override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult {
                     started += Intent(intent)
-                    return null
+                    return Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
                 }
             }
         val readout = open()
@@ -164,12 +168,13 @@ class ReadoutTest {
         instrumentation.addMonitor(recorder)
         try {
             readout.onActivity { it.signIn.performClick() }
-            // The press's own end, its note: by then nothing was started.
-            val said = until { ReadoutActivity.note.value.takeIf { it.isNotEmpty() } }
+            // The press's own end, its note, or a start it asked for: by then nothing was started.
+            val said = until { ReadoutActivity.note.value.takeIf { it.isNotEmpty() } ?: started.firstOrNull()?.let { "started $it" } }
             assertTrue(said, said.startsWith("sign-in isn't set up in this build"))
             assertEquals(emptyList<Intent>(), started)
         } finally {
             instrumentation.removeMonitor(recorder)
+            app.hostedUi.waiting()?.let(app.hostedUi::forget)
         }
     }
 
@@ -224,11 +229,13 @@ class ReadoutTest {
             val readout = open()
             until { readout.lines().takeIf { "Engine: start failed: java.io.IOException: the disk refused the outbox" in it } }
             assertTrue(readout.shows { it.tryAgain })
-            // Tried again, the app's own start, over its own file.
+            // Tried again, the app's own start, over its own file and its own sign-in (AN6d), nobody signed in: the truth read
+            // in front waits on sign-in, never on the wire, so the server never heard from.
             readout.onActivity { it.tryAgain.performClick() }
             until { ReadoutActivity.note.value.takeIf { it == "started" } }
             assertNull(app.problem.value)
-            until { readout.lines().takeIf { "Engine: over no token, as a signed-out phone" in it } }
+            until { readout.lines().takeIf { "Engine: over the sign-in\n" in it && "Signed in: no\n" in it && "Link: SignIn\n" in it } }
+            assertTrue("Server last answered: never" in readout.lines())
             assertFalse(until { readout.shows { it.tryAgain }.takeIf { !it } })
         }
 
@@ -265,7 +272,7 @@ class ReadoutTest {
         val signIn = signed()
         val readout = open()
         until { readout.lines().takeIf { "Signed in: no\n" in it } }
-        // The Engine line reads the run too: this one's engine is over a sign-in, the app's own not set up.
+        // The Engine line reads the run too: this one's engine is over a sign-in of the test's own, never the app's.
         until { readout.lines().takeIf { "Engine: over the sign-in\n" in it } }
         server.signStudentIn(signIn, scope, "student-1")
         val asked = server.next(AGE_CHECK)

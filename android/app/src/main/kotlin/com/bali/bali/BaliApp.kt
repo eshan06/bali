@@ -173,9 +173,12 @@ class BaliApp : Application() {
         }
     }
 
-    /** This build's engine over the app's own outbox: over the sign-in where it's set up, else a Debug build's over no token; none: Release's (Q2). */
-    private suspend fun made(): SyncEngine? =
-        config?.let { config -> signIn?.let { SyncEngine.make(outboxFile, config.api, it, scope, transport) } }
+    /**
+     * This build's engine over the app's own outbox: over the sign-in where [config], the build's, sets it up, else a Debug
+     * build's over no token; none: Release's (Q2). The build sets every value since AN6d, so a test gives it none.
+     */
+    internal suspend fun made(config: AppConfig? = this.config): SyncEngine? =
+        config?.let { set -> signIn?.let { SyncEngine.make(outboxFile, set.api, it, scope, transport) } }
             ?: ThisBuild.unsigned(getString(R.string.BALI_API_URL), transport, scope) { outboxFile }
 
     /**

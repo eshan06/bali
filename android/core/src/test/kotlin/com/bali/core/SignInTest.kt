@@ -85,6 +85,9 @@ class SignInTest : SignIns() {
             "bali://auth/callback?code=c0de&state=another-attempt",
             "bali://auth/callback?code=c0de",
             "bali://auth/elsewhere?code=c0de&state=st",
+            "bali://elsewhere/callback?code=c0de&state=st",
+            "bali://auth/callback/more?code=c0de&state=st",
+            "bali:/auth/callback?code=c0de&state=st", // one slash, for a redirect with two (Android's, AN6d)
             "evil://auth/callback?code=c0de&state=st",
             "bali://auth/callback?state=st",
             "bali://auth/callback?code=&state=st",

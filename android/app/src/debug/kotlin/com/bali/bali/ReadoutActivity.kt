@@ -23,6 +23,7 @@ import androidx.lifecycle.lifecycleScope
 import com.bali.core.BlockRead
 import com.bali.core.EnrollmentJoinRequest
 import com.bali.core.EventId
+import com.bali.core.SignIn
 import com.bali.outbox.Account
 import com.bali.outbox.AgeCheck
 import com.bali.outbox.Change
@@ -83,7 +84,7 @@ class ReadoutActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         lines = TextView(this).apply { typeface = Typeface.MONOSPACE }
         signIn = button("Sign in") { signingIn() }
-        val signOut = button("Sign out") { app.signIn?.let { it.signOut(); "signed out" } ?: "sign-in isn't set up in this build: nobody to sign out" }
+        val signOut = button("Sign out") { ownSignIn()?.let { it.signOut(); "signed out" } ?: "sign-in isn't set up in this build: nobody to sign out" }
         // iOS's Allow Screen Time: Android asks nothing, the student switches the service on there.
         val settings = Button(this).apply { text = "Open Accessibility settings"; setOnClickListener { accessibility() } }
         // B6's: the block read over NFC and tapped, or only read, to register it on dev.
@@ -164,7 +165,7 @@ class ReadoutActivity : ComponentActivity() {
 
     /** Who is signed in, and the 13+ check as the run's account has it (Q3): there's no button for it before AS2. */
     private fun signedIn(account: Account.State?): String {
-        if (account == null) return if (app.signIn == null) "sign-in isn't set up in this build" else "not known yet"
+        if (account == null) return if (ownSignIn() == null) "sign-in isn't set up in this build" else "not known yet"
         return when (account.signedIn) {
             null -> "not known yet"
             false -> "no"
@@ -231,12 +232,18 @@ class ReadoutActivity : ComponentActivity() {
         return if (after.isZero) "${read.name.lowercase()} at the first read" else "starting for ${seconds(after)}, then ${read.name.lowercase()}"
     }
 
-    /** Signs in as Sign in will, through the hosted UI's tab (AN6c); nothing opens while sign-in isn't set up. */
+    /** Signs in as Sign in will, through the hosted UI's tab (AN6c); nothing opens while sign-in isn't set up ([ownSignIn]). */
     private suspend fun signingIn(): String {
-        val signIn = app.signIn ?: return "sign-in isn't set up in this build (the client id is empty until the owner's): nothing opened"
+        val signIn = ownSignIn() ?: return "sign-in isn't set up in this build: nothing opened"
         signIn.signIn { hostedUi(it) }
         return "signed in"
     }
+
+    /**
+     * The app's own sign-in, which its start runs the engine over; none where sign-in isn't set up, and none over a run whose
+     * engine has no sign-in, a Debug build's start with no config (Q2), so Sign in and Sign out there do nothing and say so.
+     */
+    private fun ownSignIn(): SignIn? = app.signIn?.takeUnless { app.running.value?.let { it.account == null } == true }
 
     private fun accessibility() =
         try { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } catch (none: ActivityNotFoundException) { note.value = "not opened: $none" }
