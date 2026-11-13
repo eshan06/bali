@@ -451,13 +451,16 @@ class CoversTest {
     /** The window with the focus, as `dumpsys window` names it. */
     private fun focused(): String = shell("dumpsys window").lineSequence().firstOrNull { "mCurrentFocus" in it }.orEmpty()
 
-    /** The activity Android has resumed on top, its record and its name, as `dumpsys activity activities` names them (Android 10 with no space). */
+    /**
+     * The activity Android has resumed on top, its record and its name, as `dumpsys activity activities` names them: Android 10
+     * with no space after the colon, Android 13 closing a brace after the name.
+     */
     private fun resumed(): Pair<String, String>? =
-        Regex("""^\s*ResumedActivity: ?ActivityRecord\{(\w+) u0 (\S+) t-?\d+\}""", RegexOption.MULTILINE).find(shell("dumpsys activity activities"))?.groupValues?.let { it[1] to it[2] }
+        Regex("""^\s*ResumedActivity: ?ActivityRecord\{(\w+) u0 ([^\s\}]+)\}? t-?\d+\}""", RegexOption.MULTILINE).find(shell("dumpsys activity activities"))?.groupValues?.let { it[1] to it[2] }
 
     /** The records Android holds now of [activity], as `dumpsys activity activities` names them. */
     private fun records(activity: String): Set<String> =
-        Regex("""ActivityRecord\{(\w+) u0 ${Regex.escape(activity)} """).findAll(shell("dumpsys activity activities")).map { it.groupValues[1] }.toSet()
+        Regex("""ActivityRecord\{(\w+) u0 ${Regex.escape(activity)}\}? """).findAll(shell("dumpsys activity activities")).map { it.groupValues[1] }.toSet()
 
     /** How many covers the window manager holds: each window's own line in `dumpsys window windows`. */
     private fun coversOnScreen(): Int = Regex("""Window #\d+ Window\{\w+ u0 ${Covers.TITLE}\}""").findAll(shell("dumpsys window windows")).count()
