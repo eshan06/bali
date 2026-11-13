@@ -1324,7 +1324,10 @@ them (`docs/DECISIONS.md`, 2026-11-04, with its sources). AN1's part 2 measures 
 - **The service listens only in a lesson.** Outside one it subscribes to nothing: `setServiceInfo`
   with eventTypes 0, flags 0 and packageNames [Bali], and `setCacheEnabled(false)` from API 33. In a
   lesson it takes window events only: never content or scroll events, and no node read, since a
-  single read turns on the accessibility cache's event stream from every app.
+  single read turns on the accessibility cache's event stream from every app. On Android 10 and 11,
+  which never take back a package a service has named, it names none, from its XML or ever, so
+  there every app sends its window-state events outside a lesson too, for Android to drop (AN7h,
+  `docs/DECISIONS.md`, 2026-11-13; the conductor's call, awaiting the owner).
 - **Nothing runs with the screen off:** no alarm, exact or not, no foreground service, no wake lock
   past the few seconds of the screen-off check-in, and no request to skip battery optimization,
   which Play forbids an app like Bali.
@@ -1347,6 +1350,10 @@ ISSUES #6 lists every gap with the way it is checked before Android launches, an
 - A blocked app can show for a moment before the cover lands, and behind a permission prompt. Its
   sound can play on where sending it to the background doesn't stop it: a music app, a
   picture-in-picture window, a split-screen half.
+- On Android 10, around picture-in-picture, Bali's list of windows can lag: a blocked app's small
+  window can show for a tenth of a second as System UI's menu comes and goes, and one opened full
+  screen from that menu can stay in front under its cover, a strip of it bare at one edge, until the
+  screen next changes, where on later versions it is sent to the background (AN7h).
 - The lock may not switch on at all: where Play refuses the Accessibility route (ISSUES #7), on
   Android 17 with Advanced Protection on, which limits Accessibility to verified accessibility tools,
   and on a phone whose device or profile owner (a school's, an employer's or a parent's management

@@ -14,15 +14,16 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-12 (Central) — AN13f, the slide's page drawn with `PdfRenderer` in an isolated process (#585;
-`docs/DECISIONS.md`, 2026-11-12), the sixth of AN13's seven steps: `app`'s `IsolatedRenderer.kt` and `RendererService.kt`,
-AN13e's seam filled to the owner's answers to Q2 and Q3: pdfium in a service process Android isolates, bound while a deck is
-open; the deck handed over from memory, an anonymous memory file from Android 11, on Android 10 a file in `no_backup/deck/`
-whose name goes as it opens, that folder emptied at each start; a page drawn there onto a white bitmap, as large as fits and
-centred, its pixels back through memory Bali made, its text with it from Android 15; every failure none; that process's death
-each document's loss, Bali's process living on; `BaliApp.onCreate` returning at once there. Its tests on `Bali_Spike_API29`
-(Android 10, set up 2026-11-12), `35` and `37`. No screen, no word. Before it, AN13e2, the slide-deck case's CI flake fixed in
-its rig, and AN13e, the slide's deck. Next: AN13g, the lesson in the app; AN11, AN12 and Phase 10's screens, in the conductor's
+_Last updated: 2026-11-13 (Central) — AN7h, the lock on Android 10: a lesson's cover reaches every app (#NNN;
+`docs/DECISIONS.md`, 2026-11-13). Android 10 and 11 only add the packages an accessibility service names to the filter its
+events pass, never clearing it, so with Bali's own named outside a lesson no other app's window reached the service there and
+the lock covered nothing. From Android 12 the service names Bali's package outside a lesson as before; on 10 and 11 it names
+none, in its XML or in `ServiceLock`, so there every app sends its window-state events outside a lesson too, for Android to drop
+(the conductor's call, awaiting the owner). Android 10's picture-in-picture menu, System UI's activity listed in the small
+window's place, is covered as that window; around it Android 10's list of windows can lag (ISSUES #6, gap 10). LockServiceTest
+checks what Android delivers in a lesson, and CoversTest runs on Android 10's image; the tests on `Bali_Spike_API29`, `_API33`
+(Android 13, first booted), `35` and `37`. No screen, no word. Before it, AN13f, the slide's page drawn in an isolated
+process. Next: AN13g, the lesson in the app; AN11, AN12 and Phase 10's screens, in the conductor's
 order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone
 (Q7); Android's Cognito clients, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the
 step that needs them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
@@ -35,8 +36,9 @@ owner in a console · ⚖️ the lawyer.
 - **The PC whose clone is `C:\dev\bali`:** every Android step, the screens included. It has the
   SDK, Google's command-line tools and four test emulators, each a Pixel 7 with 4 GB:
   `Bali_Spike_API35`, `Bali_Spike_API36` and `Bali_Spike_API37` (Android 15, 16 and 17; set up and
-  cold-booted 2026-11-03), and `Bali_Spike_API29`, Android 10 (`system-images;android-29;google_apis;x86_64`,
-  revision 13; set up 2026-11-12 with the owner's OK). The owner's own `Pixel_7` is never used. Its traps are in
+  cold-booted 2026-11-03), `Bali_Spike_API29`, Android 10 (`system-images;android-29;google_apis;x86_64`,
+  revision 13; set up 2026-11-12 with the owner's OK), and `Bali_Spike_API33`, Android 13 (`android-33`'s `google_apis`
+  image, revision 17; set up 2026-11-12, first booted by AN7h). The owner's own `Pixel_7` is never used. Its traps are in
   `docs/GOTCHAS.md`'s "Android's SDK on Windows".
 - **Cloud sessions:** the API's push (AN11) and docs. Also the steps that are Kotlin alone, tested
   on the JVM with no emulator, once the owner allows Gradle's hosts in the cloud environment
@@ -158,6 +160,8 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   write: B5 round 1's steps in Android's terms, offline before AN9, on dev after it (DECISIONS
   2026-11-05, Q8) — validation: every line answered on both phones
 - **AN7g** The cover test's SMS step waiting out Google Messages — ✅ (#562; DECISIONS 2026-11-11)
+- **AN7h** The lock on Android 10: a lesson's cover reaches every app (no iOS twin: Android's lock is its own) — ✅
+  (#NNN; DECISIONS 2026-11-13)
 - **AN8** 📱 The tap over NFC — ✅ its code (#532; DECISIONS 2026-11-05); left, its 📱 check, a real
   block on both phones, offline (`docs/ANDROID-PHONE-TESTS.md`, AN8); and the block's link opening Bali
   when it's closed, not built: it waits for AN1's part 2 to find whether it works, and for Phase 10, since
@@ -270,9 +274,9 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
    from Google's SDK repository) is on the PC (the owner's OK, 2026-11-12; DECISIONS 2026-11-12).
    compileSdk 37, which today's AndroidX needs (androidx.core 1.19, Compose 1.12; DECISIONS
    2026-11-04), as OkHttp 5.5 does, comes in the step that needs it, so `core` stays on 5.4.0 until
-   then (AN3d). Android 10's image is on the PC (`Bali_Spike_API29`, the owner's OK, 2026-11-12); still
-   the owner's: Android 12 or 13 to test on, as an emulator image (a download) or a phone, for ISSUES
-   #6's gap 10.
+   then (AN3d). Android 10's and 13's images are on the PC (`Bali_Spike_API29`, the owner's OK, and
+   `_API33`, 2026-11-12); still the owner's: Android 11 or 12 to test on, as an emulator image (a
+   download) or a phone, for ISSUES #6's gap 10.
 7. ✅ **CodeQL and Android's Kotlin:** scanned, through CodeQL's advanced setup
    (`.github/workflows/codeql.yml`), beside GitHub Actions and JavaScript/TypeScript; default setup
    switched off by the owner (the owner, 2026-11-04: "Yes, prep it"; DECISIONS 2026-11-04).

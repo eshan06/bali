@@ -8,13 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-12 (Central) — The sign-in deletion case's flake on main's CI, the test's: a
-retry while the first try is at Cognito leaves the row a try of its own, as C3d designed; each order
-is now a case, the race staged in a test that failed first (#586; DECISIONS 2026-11-12). Before it,
-the slide-deck case's flake (#584). Next: the owner's switch of prod's domain, the release call and
-disabling the review account (Open owner items); a session builds the retire-a-block command; the
-owner the sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02);
-AN11–AN13; AN1's part 2 on the owner's phones; the audit's polish waits._
+_Last updated: 2026-11-13 (Central) — The lock on Android 10 fixed: Android 10 and 11 never take back a
+package an accessibility service names, so Bali names none there, and Android 10's picture-in-picture
+menu is covered (AN7h, #NNN; DECISIONS 2026-11-13). Before it, the sign-in deletion case's CI flake
+(#586). Next: the owner's switch of prod's domain, the release call and disabling
+the review account (Open owner items); a session builds the retire-a-block command; the owner the
+sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11–AN13;
+AN1's part 2 on the owner's phones; the audit's polish waits._
 
 ## Now
 
@@ -67,13 +67,9 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   page ✅ (#582) and the app's Sign in ✅ (#583), DECISIONS 2026-11-12; whether the 13+ question and
   Delete account's screen follow it, and the app's text scale at the large sizes, the owner's calls.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
-  AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
-  2026-11-03); AN1b ✅ (DECISIONS 2026-11-04); part 2 on
-  a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱), before
-  launch; AN2–AN10's and AN13a–AN13f's code ✅ (#488–#585), AN13e2's CI flake fix ✅ (#584);
-  AN11–AN13 next. AS0, the
-  screens' canvas, ✅ approved as it stands
-  (#484, #486; DECISIONS 2026-11-04). Not on the pilot's critical path.
+  AN1's part 2 on a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱),
+  before launch; AN2–AN10's and AN13a–AN13f's code ✅ (#488–#585), AN13e2's CI flake fix ✅ (#584),
+  AN7h, the lock on Android 10, ✅ (#NNN); AN11–AN13 next. Not on the pilot's critical path.
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
   (#434; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file
   (`docs/WEB.md`, Testing the portal), `try-again.test.tsx` the pattern. Each UI step from now on
@@ -193,7 +189,7 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), S8 (the owner's decision) |
 | 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
 | 8 | Android: the lock, the candidates measured on the emulators, then (a) on a Pixel and a Samsung (iOS's Phase 0) | building: AN1's parts 1 and 1c on the emulators ✅ (2026-11-03); AN1b, lock (a) decided ✅ (2026-11-04); AN1's part 2 📱 waits for the phones, before launch |
-| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | building: AN2–AN10's and AN13a–AN13f's code ✅ (2026-11-12); AN11–AN13 next |
+| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | building: AN2–AN10's and AN13a–AN13f's code ✅ (2026-11-12), AN7h ✅ (2026-11-13); AN11–AN13 next |
 | 10 | Android: the screens, from the approved boards | AS0's canvas approved ✅ (2026-11-04); AS1–AS8 build from it |
 | 11 | Android: on Play, its testing tracks, device gate and exit check | planned |
 
@@ -374,7 +370,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
     review; a forgotten password is reset through AWS.
   - App Review may ask for a tap the reviewer can try (§4's options B and C), about students' names
     on Present (guideline 1.2), or about a teacher's deletion by email (DECISIONS 2026-11-07).
-- Android's five still open (the phones, the Play account, the timing, the SDK's Android 12 or 13 image (10's and 17's installed 2026-11-12); 🔧 the Cognito clients, AN6c's; AS0's canvas, the lock and CodeQL settled, 2026-11-04): `docs/PLAN-ANDROID.md`, Open owner items.
+- Android's five still open (the phones, the Play account, the timing, the SDK's Android 11 or 12 image (10's, 13's and 17's installed 2026-11-12); 🔧 the Cognito clients, AN6c's; AS0's canvas, the lock and CodeQL settled, 2026-11-04): `docs/PLAN-ANDROID.md`, Open owner items.
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
 - #165 the Me page: D2j's redesign was rolled back (2026-10-06), so a better Me waits for a design the owner approves; the issue, closed by #266, is the owner's to reopen.
 - #130 App Store readiness.
