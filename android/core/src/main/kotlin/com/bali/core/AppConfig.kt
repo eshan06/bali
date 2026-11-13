@@ -18,6 +18,9 @@ data class AppConfig(val api: URI, val cognito: Cognito, val portal: URI) {
         CognitoClientId("BaliCognitoClientID"),
         CognitoRedirectUri("BaliCognitoRedirectURI"),
 
+        /** Where Cognito's `/logout` sends the browser back (AN6e): Android's alone, as iOS's sign-in leaves no session to end. */
+        CognitoSignOutUri("BaliCognitoSignOutURI"),
+
         /** The portal whose privacy policy and terms the app links (C2b). */
         Portal("BaliPortalURL"),
     }
@@ -45,6 +48,7 @@ data class AppConfig(val api: URI, val cognito: Cognito, val portal: URI) {
                         domain = url(Key.CognitoDomain) ?: return null,
                         clientId = value(Key.CognitoClientId) ?: return null,
                         redirectUri = url(Key.CognitoRedirectUri) ?: return null,
+                        signOutUri = url(Key.CognitoSignOutUri) ?: return null,
                     ),
                 portal = url(Key.Portal) ?: return null,
             )

@@ -27,7 +27,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 // B4's test rig, SignInTests.swift's: Cognito's token endpoint answered by hand, the Keychain's
 // stand-in, a clock the test sets, and the scope the app gives its sign-in.
 
-val cognito = Cognito(URI("https://bali-dev.auth.us-east-1.amazoncognito.com"), "phone-client", URI("bali://auth/callback"))
+val cognito = Cognito(URI("https://bali-dev.auth.us-east-1.amazoncognito.com"), "phone-client", URI("bali://auth/callback"), URI("bali://auth/signout"))
 const val TOKEN_ENDPOINT = "https://bali-dev.auth.us-east-1.amazoncognito.com/oauth2/token"
 
 /** The phone's clock: 2026, while the tokens' own claims are the server's, in 2001. */

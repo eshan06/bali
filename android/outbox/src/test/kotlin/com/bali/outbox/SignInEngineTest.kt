@@ -100,7 +100,7 @@ class SignedRig(
  */
 suspend fun EngineFiles.signedRig(outbox: Outbox = makeOutbox().first, gated: Boolean = false, age: (suspend () -> Unit)? = null): SignedRig {
     val (server, clock, keychain) = Triple(Server(), TestClock(), MemoryKeychain())
-    val cognito = Cognito(URI("https://bali-dev.auth.us-east-1.amazoncognito.com"), "phone-client", URI("bali://auth/callback"))
+    val cognito = Cognito(URI("https://bali-dev.auth.us-east-1.amazoncognito.com"), "phone-client", URI("bali://auth/callback"), URI("bali://auth/signout"))
     // Ungated unless a test asks, as iOS's rig is: the 13+ check is the sign-in's own tests' and AgeFallbackTest's.
     val signIn = SignIn(cognito, keychain, scope, server, clock::now, gated)
     val engine = SyncEngine.make(outbox, URI("https://api.bali.test"), signIn, scope, server, clock)

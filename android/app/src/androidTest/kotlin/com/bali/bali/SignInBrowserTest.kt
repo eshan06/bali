@@ -39,6 +39,8 @@ import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,9 +50,12 @@ import org.junit.runner.RunWith
  * Auth Tab nor ephemeral browsing, and stops at its first run (AN1), which no test goes past: a student's
  * Back closes it, nothing is accepted. What's proven is Bali's side: the tab it asks for, the answer's way
  * back through Android's hop from another app (the shell) as the text it was sent, at the build's two-slash
- * callback (AN6d), the guards on it, the student's close, and a host recreated while the tab is open. A real
- * tab and a real sign-in, on dev's Android client, are the owner's device check (📱): no test here opens the
- * hosted UI or reaches Cognito, and none keeps tokens in the app's own store.
+ * callback (AN6d), the guards on it, the student's close, and a host recreated while the tab is open. And the
+ * sign-out page each answer brings where the browser offers no ephemeral tab (AN6e): its tab, its return and its
+ * close on Android 15's Chrome 124 and Android 10's 74; none on Android 17's Chrome 145, which offers one, with the
+ * Auth Tab. A real tab and a real sign-in, on dev's Android client, are the owner's device check (📱): no test here
+ * opens the hosted UI or reaches Cognito, every tab goes to the tests' own made-up domain, and none keeps tokens
+ * in the app's own store.
  */
 @RunWith(AndroidJUnit4::class)
 class SignInBrowserTest {
@@ -58,6 +63,15 @@ class SignInBrowserTest {
     private val context = instrumentation.targetContext
     private val pages = (context.applicationContext as BaliApp).hostedUi
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** The sign-in's own Cognito, at the tests' made-up domain, which nothing resolves. */
+    private val cognito = Cognito(URI("https://bali.auth.test"), "the-client", URI("com.bali.bali://auth/callback"), URI(SIGNED_OUT))
+
+    /**
+     * Whether the phone's browser leaves Cognito's session after a sign-in, so a sign-out page follows each answer (AN6e): Chrome 124
+     * on Android 15's emulator and 74 on Android 10's offer no ephemeral tab; Chrome 145 on Android 17's does, with the Auth Tab.
+     */
+    private val leaves = CustomTabsClient.getPackageName(context, null)?.let { !CustomTabsClient.isEphemeralBrowsingSupported(context, it) } ?: true
 
     /**
      * Where the whole sign-in keeps its tokens, sealed by the Keystore as the app's are, in a file of its own: the app's own
@@ -135,10 +149,11 @@ class SignInBrowserTest {
 
     @Test
     fun theHostOpensTheTabThePhonesBrowserOffersWithItsOwnLookAndTheStudentsBackIsAClose() {
-        val call = scope.async { runCatching { context.hostedUi(page("s1")) } }
+        val call = scope.async { runCatching { context.hostedUi(page("s1"), cognito) } }
         val tab = tab()
         // The browser Custom Tabs name: an Auth Tab where it has one, else a Custom Tab, ephemeral asked
-        // either way; Chrome 124 here has neither, so a Custom Tab that shares its cookies.
+        // either way; Chrome 124 and 74 here have neither, so a Custom Tab that shares its cookies, and
+        // Chrome 145 on Android 17 has both.
         val browser = CustomTabsClient.getPackageName(context, null)
         assertEquals(browser, tab.`package`)
         assertEquals(page("s1").toString(), tab.dataString)
@@ -170,7 +185,7 @@ class SignInBrowserTest {
     // comes back (Android leaves a stopped activity as it is until then).
     @Test
     fun aHostMadeAgainForAChangeWhileTheTabIsOpenOpensNoOtherTabAndTheAnswerStillReachesTheCall() {
-        val call = scope.async { runCatching { context.hostedUi(page("s1")) } }
+        val call = scope.async { runCatching { context.hostedUi(page("s1"), cognito) } }
         tab()
         val host = host()
         covered(host)
@@ -180,15 +195,17 @@ class SignInBrowserTest {
             // on Android 16 and 17 at AN7c, the host back and done before the change arrived).
             until { context.resources.configuration.fontScale.takeIf { it == 1.3f } }
             send(answer("s1"))
+            // The host made again shows the sign-out page the answer brings where the browser offers no ephemeral tab (AN6e).
+            signedOutWhereLeft()
             assertEquals(answer("s1"), await(call).getOrThrow())
             assertNotSame(host, until { hosts.lastActivity?.takeIf { it !== host } })
         }
-        assertEquals(1, started.count { it.action == Intent.ACTION_VIEW })
+        assertEquals(listOfNotNull(page("s1").toString(), LOGOUT.takeIf { leaves }), views().map { it.dataString })
     }
 
     @Test
     fun aHostMadeAgainForAChangeWhileTheTabIsOpenTakesTheStudentsBackForACloseNotATabToOpenAgain() {
-        val call = scope.async { runCatching { context.hostedUi(page("s1")) } }
+        val call = scope.async { runCatching { context.hostedUi(page("s1"), cognito) } }
         tab()
         val host = host()
         covered(host)
@@ -207,14 +224,89 @@ class SignInBrowserTest {
 
     @Test
     fun aLinkSentToClearBalisTaskWhileTheTabIsOpenLandsInATaskOfItsOwnAndEndsNothing() {
-        val call = scope.async { runCatching { context.hostedUi(page("s1")) } }
+        val call = scope.async { runCatching { context.hostedUi(page("s1"), cognito) } }
         tab()
         covered(host())
         // FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK: what an app would send to clear the task the
         // tab is open in, which would end the sign-in as the student's close.
         send(answer("s2"), "-f 0x10008000")
         send(answer("s1"))
+        signedOutWhereLeft()
         assertEquals(answer("s1"), await(call).getOrThrow())
+    }
+
+    /**
+     * AN6e where the browser offers no ephemeral tab (Chrome 124 and 74 here): after the answer, the sign-out page opens in the same
+     * browser and kind of tab, never ephemeral, at the sign-in's own Cognito's `/logout`, the tests' made-up domain; the answer
+     * waits for its return, a near miss dropped and starting nothing; and the return, sent as Chrome sends one, brings the host
+     * back over the tab, closing it, and hands the answer over.
+     */
+    @Test
+    fun afterTheAnswerTheSignOutPageOpensLikeTheSignInsTabAtTheSignInsOwnLogoutAndItsReturnHandsTheAnswerOver() {
+        assumeTrue("the browser offers an ephemeral tab", leaves)
+        val call = scope.async { runCatching { context.hostedUi(page("s1"), cognito) } }
+        val signIn = tab()
+        val host = host()
+        covered(host)
+        send(answer("s1"))
+        val signOut = tab(2)
+        assertEquals(LOGOUT, signOut.dataString)
+        assertEquals(signIn.`package`, signOut.`package`)
+        assertEquals(CustomTabsClient.getPackageName(context, null), signOut.`package`)
+        assertEquals(signIn.getBooleanExtra(AuthTabIntent.EXTRA_LAUNCH_AUTH_TAB, false), signOut.getBooleanExtra(AuthTabIntent.EXTRA_LAUNCH_AUTH_TAB, false))
+        assertTrue(signOut.hasExtra(CustomTabsIntent.EXTRA_SESSION))
+        assertFalse(signOut.getBooleanExtra(CustomTabsIntent.EXTRA_ENABLE_EPHEMERAL_BROWSING, false))
+        covered(host)
+        val before = started.size
+        send("$SIGNED_OUT/more")
+        assertFalse(call.isCompleted)
+        assertEquals(before, started.size)
+        send(SIGNED_OUT)
+        assertEquals(answer("s1"), await(call).getOrThrow())
+        hostCameAndWent()
+        // Every tab at the tests' own made-up domain: nothing reached Cognito or dev's hosted UI.
+        assertEquals(listOf("bali.auth.test", "bali.auth.test"), views().map { it.data?.host })
+    }
+
+    /** The student's Back on the sign-out page: the browser not signed out of Cognito (AN6e), nothing handed over. */
+    @Test
+    fun theStudentsBackOnTheSignOutPageIsTheBrowserNotSignedOutAndNothingIsHandedOver() {
+        assumeTrue("the browser offers an ephemeral tab", leaves)
+        val call = scope.async { runCatching { context.hostedUi(page("s1"), cognito) } }
+        tab()
+        val host = host()
+        covered(host)
+        send(answer("s1"))
+        tab(2)
+        covered(host)
+        shell("input keyevent 4")
+        assertSame(SignInError.BrowserNotSignedOut, await(call).exceptionOrNull())
+        assertEquals(2, views().size)
+    }
+
+    /** Where the browser offers an ephemeral tab (Chrome 145 here), the answer is handed over at once, with no sign-out page (AN6e). */
+    @Test
+    fun whereTheBrowserOffersAnEphemeralTabTheAnswerIsHandedOverAtOnceWithNoSignOutPage() {
+        assumeFalse("the browser offers no ephemeral tab", leaves)
+        val call = scope.async { runCatching { context.hostedUi(page("s1"), cognito) } }
+        assertTrue(tab().getBooleanExtra(CustomTabsIntent.EXTRA_ENABLE_EPHEMERAL_BROWSING, false))
+        covered(host())
+        send(answer("s1"))
+        assertEquals(answer("s1"), await(call).getOrThrow())
+        hostCameAndWent()
+        assertEquals(listOf(page("s1").toString()), views().map { it.dataString })
+    }
+
+    /** A sign-out link with no sign-out page shown is dropped, starting nothing, and a waiting sign-in waits on (AN6e). */
+    @Test
+    fun aSignOutLinkWithNoSignOutPageShownIsDroppedStartingNothingAndTheSignInWaitsOn() {
+        send(SIGNED_OUT)
+        assertNull(pages.waiting())
+        val waiting = pages.start(page("s1"), cognito)
+        send(SIGNED_OUT)
+        assertSame(waiting, pages.waiting())
+        assertFalse(waiting.answer.isCompleted)
+        assertEquals(emptyList<Intent>(), started)
     }
 
     @Test
@@ -229,12 +321,19 @@ class SignInBrowserTest {
                     return HttpAnswer(200, emptyMap(), """{"access_token":"$access","refresh_token":"r","id_token":"$id"}""".encodeToByteArray())
                 }
             }
-        val cognito = Cognito(URI("https://bali.auth.test"), "the-client", URI("com.bali.bali://auth/callback"))
         val signIn = SignIn(cognito, KeystoreTokenStore(kept), scope, transport)
-        val call = scope.async { runCatching { signIn.signIn { context.hostedUi(it) } } }
-        // The address Chrome was sent, its state the attempt's own.
+        val call = scope.async { runCatching { signIn.signIn { context.hostedUi(it, cognito) } } }
+        // The address Chrome was sent, its state the attempt's own; the answer comes once the tab covers the host, as a
+        // browser's does after the student signs in, so the host comes back to show the sign-out page where one follows.
         val state = tab().dataString!!.toUri().getQueryParameter("state")
+        covered(host())
         send("com.bali.bali://auth/callback?code=the-code&state=$state")
+        // Where the browser offers no ephemeral tab, its sign-out page first, the code not traded while it's open (AN6e).
+        if (leaves) {
+            assertEquals(LOGOUT, tab(2).dataString)
+            assertEquals(emptyList<String>(), bodies)
+        }
+        signedOutWhereLeft()
         await(call).getOrThrow()
         assertTrue(bodies.single(), bodies.single().contains("grant_type=authorization_code&client_id=the-client&code=the-code&"))
         runBlocking {
@@ -265,8 +364,25 @@ class SignInBrowserTest {
         }
     }
 
-    /** The intent the host sent the browser, once it has. */
-    private fun tab(): Intent = until { started.firstOrNull { it.action == Intent.ACTION_VIEW } }
+    /**
+     * The sign-out page an answer brings where the browser offers no ephemeral tab (AN6e), seen through as a browser would: its tab,
+     * its return once the tab covers the host, then the host back and gone. Sent sooner on Android 10's emulator, the return came as
+     * Chrome's first run was still opening through its `IntentDispatcher`, whose window then covered the host brought back, so it
+     * outlived the test, and the next test's start of the host reached it as the runner finished it, opening no tab.
+     */
+    private fun signedOutWhereLeft() {
+        if (!leaves) return
+        tab(2)
+        covered(host())
+        send(SIGNED_OUT)
+        hostCameAndWent()
+    }
+
+    /** The [nth] intent the host sent the browser, once it has: the sign-in page's first, then its sign-out page's. */
+    private fun tab(nth: Int = 1): Intent = until { views().getOrNull(nth - 1) }
+
+    /** Every intent the host sent the browser so far. */
+    private fun views(): List<Intent> = started.filter { it.action == Intent.ACTION_VIEW }
 
     /** The host last made or brought to the front, once there is one. */
     private fun host(): Activity = until { hosts.lastActivity }
@@ -316,6 +432,12 @@ class SignInBrowserTest {
 
     private companion object {
         val PATIENCE = 30.seconds.inWholeMilliseconds
+
+        /** The sign-in's sign-out URL, the build's form, where Cognito sends the sign-out page back (AN6e). */
+        const val SIGNED_OUT = "com.bali.bali://auth/signout"
+
+        /** Its sign-out page: the sign-in's Cognito's `/logout`, its client id and sign-out URL each escaped. */
+        const val LOGOUT = "https://bali.auth.test/logout?client_id=the-client&logout_uri=com%2Ebali%2Ebali%3A%2F%2Fauth%2Fsignout"
 
         /** Chrome's windows, as the input dispatcher names them. */
         const val CHROME = " com.android.chrome/"

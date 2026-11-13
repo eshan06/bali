@@ -57,6 +57,12 @@ data class Cognito(
      * so only its state makes an answer this attempt's ([code]).
      */
     val redirectUri: URI,
+    /**
+     * Where Cognito's `/logout` sends the browser back once it has ended the hosted UI's session there ([logoutUrl], AN6e): one of
+     * the client's allowed sign-out URLs, which the app's browser catches as it catches the answer. It carries nothing of the
+     * attempt. iOS has none: its sign-in is ephemeral, so no session outlives it.
+     */
+    val signOutUri: URI,
 ) {
     /**
      * The hosted UI's [page] for [attempt]: its challenge and state, never its verifier. Its scopes
@@ -113,6 +119,19 @@ data class Cognito(
 
     /** The hosted UI's [path], however many slashes the domain was set with. */
     internal fun endpoint(path: String): String = domain.toString().trimEnd('/') + "/" + path
+
+    /**
+     * The hosted UI's sign-out page, `/logout` (AN6e): it ends the hosted UI's session in the browser that opens it, then sends
+     * that browser to [signOutUri], given with the client id, each escaped; to a sign-out URL the client doesn't allow, Cognito
+     * sends it to its own sign-in page instead (the live check, 2026-11-13). None, never in practice: the domain is a URL and the
+     * rest is escaped.
+     */
+    fun logoutUrl(): URI? =
+        try {
+            URI(endpoint("logout") + "?" + form(listOf("client_id" to clientId, "logout_uri" to signOutUri.toString())))
+        } catch (error: URISyntaxException) {
+            null
+        }
 }
 
 /**
@@ -196,6 +215,13 @@ sealed class SignInError : Exception(null, null, false, false) {
 
     /** The phone couldn't keep the tokens (the store refused them): nothing changed. */
     data object NotKept : SignInError()
+
+    /**
+     * The sign-in page answered, but the browser it opened in, one that offers no ephemeral tab, wasn't signed out of the hosted
+     * UI after it (AN6e): the page that ends that session closed before Cognito sent it back, the student's close or a page that
+     * couldn't load. Nothing changed: the code is never traded, and the next sign-in ends the session again.
+     */
+    data object BrowserNotSignedOut : SignInError()
 }
 
 /**
@@ -435,7 +461,8 @@ class SignIn(
     /**
      * Signs the student in through Cognito's hosted UI, replacing any tokens the phone had. [browser] opens
      * [page] and returns where the hosted UI sent the student back, as text (AN6c), or throws why not: the
-     * student's close [SignInError.Cancelled], anything else [SignInError.NotOpened]. Its code is exchanged
+     * student's close [SignInError.Cancelled], the browser not signed out of the hosted UI after it
+     * [SignInError.BrowserNotSignedOut] (AN6e), anything else [SignInError.NotOpened]. Its code is exchanged
      * in the sign-in's scope: a caller cancelled after the browser answered stops waiting, and it goes on.
      * [yes], a Sign up's 13 or older (C7-server), keeps the tokens through the check with that yes's event
      * id before anything hears of them, so the account it made is never asked.

@@ -8,6 +8,158 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-13** — **AN6e, Cognito's session ended after each sign-in where the phone's browser offers no ephemeral tab: the
+  sign-in page's answer kept while Cognito's `/logout` opens in the same browser, the code traded only once that page comes
+  back at the client's sign-out URL, and a sign-in whose sign-out page closed first left unfinished (this step's calls,
+  marked, each awaiting the owner's look; AN6e, #589).** The owner's call of 2026-11-12 (the go-ahead's item 4; PLAN-ANDROID's
+  owner item 8; AN6c's entry, 2026-11-05) was to end that session after each sign-in, one more page for the student. The owner
+  said to take the recommended option on every regular call, so each call below is this step's, for the owner to look at. It
+  closes the window AN6d's entry named: since #588 every build carries dev's client id, and a sign-in in a browser with no
+  ephemeral tab left Cognito's session there for an app that also claims `com.bali.bali` (RFC 8252, 8.6).
+
+  **Where it lives:** `app`'s `HostedUi.kt`, the waiting sign-in's pages and `Tab`, on the JVM, and `HostedUiActivity.kt`, the
+  tab each page opens in; `core`'s `Cognito.signOutUri`, `Cognito.logoutUrl()` and `SignInError.BrowserNotSignedOut`; the
+  build's `BALI_COGNITO_SIGN_OUT_URI`, `com.bali.bali://auth/signout`, read as `BaliCognitoSignOutURI` beside the redirect,
+  pinned by core's AppConfigTest; and the Debug readout's Sign in, which gives the browser its sign-in's own Cognito. No
+  screen, no user-facing word, no library, no bump and no SDK package: `CustomTabsClient.isEphemeralBrowsingSupported` is
+  androidx.browser 1.10.0's, not experimental there.
+
+  **The calls, each awaiting the owner's look:**
+  1. **Which browsers get the extra page:** where the browser Custom Tabs name offers no ephemeral tab
+     (`isEphemeralBrowsingSupported` false: Chrome before 136, the emulators' 124 and 74 among them, or an Auth Tab in a browser
+     with none), and where no browser has Custom Tabs, so one that opens the page did, with its own cookies. Where one is offered
+     (Chrome 136 and later; 145 on Android 17's emulator), nothing changes and there's no extra page.
+  2. **The same browser and kind of tab, never ephemeral:** the sign-out page opens in the browser the sign-in page's tab opened
+     in, an Auth Tab where that was one, else a Custom Tab, asking for no ephemeral browsing, since it must reach the cookies that
+     tab left. Never a WebView. With no Custom Tabs browser it opens as the sign-in page did, in whatever opens the page: where
+     Android asks the student which and they pick another browser, `/logout` ends nothing in the first one, Cognito still sends
+     that page back, and the session stays there (said plainly; nearly every Android browser has Custom Tabs).
+  3. **The code is traded after the session ends:** the browser hands the sign-in its answer only once Cognito sends the
+     sign-out page back, so no sign-in keeps tokens while its session stays in the browser, and an answer whose session wasn't
+     ended is never redeemed. A code lasts five minutes (AWS's authorize endpoint page), and the sign-out page comes straight
+     back (the live check, below).
+  4. **A session that can't be ended leaves the sign-in unfinished (fail closed):** the sign-out page closed before Cognito
+     sent it back, by the student or over a page that couldn't load for want of a network, is `SignInError.BrowserNotSignedOut`:
+     nothing changed, the code never traded. One that couldn't open, or that the Auth Tab ended elsewhere or with another
+     result, is a `NotOpened` saying it was the sign-out page. Why not sign in anyway: the cookie would then stay its hour with
+     nothing left to end it. Failing doesn't end it either, but the student's next try does: its sign-in page passes on that
+     cookie, no password asked, and its sign-out page ends the session. Said plainly: a student who closes the extra page every
+     time can't sign in on such a browser, and a client without the sign-out URL (prod's, if made without it) leaves every
+     such sign-in unfinished. Each outcome is a type the readout says (`failed: BrowserNotSignedOut`); no new word:
+     `SignInError.words` gives it none for now, as a closed sign-in page, and AS2 gives it words, since a page that couldn't load
+     comes after a typed password (its PLAN-ANDROID line says so; santa's reviewer B).
+  5. **Its return:** a Custom Tab's return is a link any app can send Bali, and it carries nothing of the attempt (Cognito
+     sends the browser to the sign-out URL alone), so it's taken only while the sign-out page is shown, as the sign-out URL
+     exactly, and once; otherwise dropped, starting nothing. A sign-out link while the sign-in page is shown is dropped too, the
+     sign-in waiting on. The Auth Tab's return comes to Bali alone, taken at the sign-out URL alone.
+  6. **The name:** `BALI_COGNITO_SIGN_OUT_URI` in the build, `BaliCognitoSignOutURI` in the manifest and `Cognito.signOutUri`
+     in `core`, beside the redirect's three; iOS has no twin, its sign-in being ephemeral.
+  7. **Sign out stays as it is:** every sign-in of Bali's that finishes now leaves no session in the browser, ended or
+     ephemeral, so `SignIn.signOut` needs no `/logout`.
+
+  **AWS's `/logout`** ([the managed login sign-out endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/logout-endpoint.html),
+  read 2026-11-13): it "signs out the user and redirects either to an authorized sign-out URL" of the app client, or to its
+  sign-in page. Given `client_id` and `logout_uri`, it sends the browser to that URL when the client allows it, ignoring the
+  request's other parameters; it clears the browser's cookie; and tokens already given stay valid until they expire or are
+  revoked. **The live check** (read-only, no credentials, no session; 2026-11-13): dev's `/logout` with the build's client id and
+  its sign-out URL, escaped as the app escapes it or not, answered `302` to `com.bali.bali://auth/signout`, exactly; with a
+  sign-out URL the client doesn't allow (`com.bali.bali://auth/other`), `302` to its own `/login`.
+
+  **What AN6e doesn't close, plainly:**
+  - **A forged return while the sign-out page is open.** Any app can send Bali the sign-out URL, and a stray one is dropped
+    without a trace, so an app allowed to start activities from the background can send it over and over, needing no timing:
+    one that lands while the sign-out page is shown, before Cognito's page has loaded, hands the answer over and closes the tab,
+    the session left in the browser. Android 10 and later keep most apps from starting activities from the background while
+    Chrome is in front; the overlay permission or an accessibility service lets one. Nothing in Cognito's return tells the two
+    apart (both santa reviewers). Not a regression: before AN6e every such sign-in left the session.
+  - **A sign-in page closed after Cognito signed the student in.** Cognito sets its session as it sends the answer; where that
+    answer never reaches Bali (another app that claims `com.bali.bali` picked in Android's chooser, RFC 8252 8.6's own setup,
+    or the chooser dismissed) and the student closes the tab, the close is `Cancelled` and no sign-out page opens, so the
+    session stays (santa's reviewer A). Bali can't tell such a close from one before any password. **For the owner:** whether a
+    closed sign-in page in such a browser opens the sign-out page too, one more page even after a close; this step's
+    recommendation is yes, a small step of its own.
+  - **Two things only a real sign-in on a Chrome before 136 can show** (the emulators' Chromes never load a page; santa's
+    reviewers): that Cognito still trades a code whose session `/logout` has just ended (AWS's pages don't say; if it doesn't,
+    every such sign-in fails as `Refused`, and the fix is to trade the code first and keep the tokens only once the sign-out page
+    comes back), and that Chrome sends the sign-out page's return before closing that tab (if it closed it first, every such
+    sign-in would end as `BrowserNotSignedOut`). `docs/ANDROID-PHONE-TESTS.md`'s check on a Chrome before 136 shows both, before
+    any build leaves the owner's phones.
+  - **The pool-wide question** (#588's santa reviewer B and its Claude Review): AN6e ends only the session Bali's own sign-in
+    leaves, and claims nothing more. AWS's [Managing user sessions](https://docs.aws.amazon.com/cognito/latest/developerguide/managing-user-sessions.html),
+    "How session management works", says a managed login (SSO) session, kept in a browser cookie, lets the user into the
+    pool's other app clients without signing in again; how long a client reuses one, `SSOSession.MaxValidityMinutes` (60 by
+    default, 0 never), is the client signed in to's, not the session's maker's, and it needs session tracking (the Essentials
+    or Plus plan). The [authorize endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/authorization-endpoint.html)'s
+    `prompt=none` says the same: a valid session signs a user in silently across a pool's app clients. So a session a portal
+    or student-web sign-in leaves in a phone's browser may serve any public client in that pool, iOS's prod
+    `bali://auth/callback` included. Nothing here is built for it: the conductor is offering the owner a separate check.
+  - **A Release build carries dev's values** (#588's Claude Review): AP2's line now says its upload workflow refuses a build
+    that carries them. Not built here.
+
+  **The tests,** failing first in their own commit (`cbb9c4db`): against main's code none compiled, each missing piece named
+  (`Cognito`'s fourth value, `logoutUrl`, `SignInError.BrowserNotSignedOut`, `Tab`, `HostedUi.page` and `opened`, and
+  `hostedUi`'s Cognito). New: core's SignInTest, the sign-out page's address, its domain, client id and sign-out URL each
+  escaped; HostedUiTest's four, which browsers get the sign-out page and which don't, its return taken only while it's shown,
+  exactly and once, every stray or near miss dropped (another host, another path, a path with a tail, a trailing slash, a
+  query, a fragment, the one- and three-slash forms, another scheme, the sign-in page's answer again), each way it ends with no
+  return as its own failure, and the code traded only once it came back; SignInBrowserTest's four: the sign-out page's tab and
+  its return, and the student's Back on it, where the browser offers no ephemeral tab; the answer handed over at once, with no
+  sign-out page, where it offers one; and a sign-out link with no sign-out page shown, dropped. Changed: AppConfigTest's six
+  keys and its pin; BaliAppTest's value test pins the sign-out URL; SignInBrowserTest's tests that answer a sign-in see its
+  sign-out page through where the browser leaves a session, and its whole sign-in checks nothing is traded while that page is
+  open; every test's Cognito names a sign-out URL; WordsTest and ScreenTest hold the new outcome, with no words.
+
+  **Broken on purpose, each failing by name, then reverted:**
+  - the sign-out page skipped where no ephemeral tab is offered (`leavesSession` as `browser == null`): HostedUiTest's
+    `theSignOutPageFollows…`, `Tab(browser=com.android.chrome, auth=false, ephemeral=false) ==> expected: <true> but was:
+    <false>`, and three more; on `Bali_Spike_API35`, SignInBrowserTest's five that wait for that page, `never came`;
+  - the sign-out page opened where an ephemeral tab is offered (`leavesSession` as `true`): `theSignOutPageFollows…`,
+    `Tab(browser=com.android.chrome, auth=false, ephemeral=true) ==> expected: <false> but was: <true>`; broken in `signedIn`
+    instead, `… ephemeral=true) handed nothing over`;
+  - a stray sign-out link taken while no sign-out page waits (taken over the sign-in page): HostedUiTest's
+    `aSignOutLinkIsTakenOnly…`, `taken while the sign-in page was shown`; on API 35, `aSignOutLinkWithNoSignOutPageShown…`,
+    `expected same:<com.bali.bali.HostedUi$Waiting@…> was not:<null>`;
+  - the sign-out URL emptied: AppConfigTest, `the build's values make no config: is one of them empty?`; on API 35,
+    BaliAppTest's value test, `sign-in isn't set up in this build`, and its set-up start, `Required value was null.`
+
+  **Found on the way, on Android 17's emulator (break 2's run there):** with an Auth Tab open, the sign-in page's tab closing
+  late, as the host came back over it, ended the sign-out page as the browser not signed out: `HostedUi.ended` also took the
+  sign-in page's own id once its sign-out page was shown, a clause for a host leaving between the two pages, a humanly
+  impossible window. A page now ends only while it's shown; HostedUiTest's `theSignInPagesTabEndingLate…` failed first (`the
+  sign-in page's tab's late close`), its own commit.
+
+  **The emulators' browsers:** Android 15's image has Chrome 124 and Android 10's Chrome 74, neither offering an ephemeral tab;
+  Android 17's has Chrome 145, which offers both the Auth Tab and ephemeral tabs, where the brief had all three on 124. So the
+  device tests follow each emulator's browser: the sign-out page's where it offers no ephemeral tab, skipped by assumption on
+  Android 17, and there `whereTheBrowserOffersAnEphemeralTab…` checks that no sign-out page opens (break 2 failed it,
+  `Timed out waiting for 30000 ms`, the answer held for a sign-out page that shouldn't have opened).
+
+  **Found by the final runs on Android 10 (test only, their own commits):** the device tests sent the sign-out page's return,
+  and the whole sign-in its answer, while Chrome's first run was still opening through its `IntentDispatcher`. The host,
+  brought back, was covered again and outlived its test, and the next test's start of the host reached it as the test runner
+  finished it, opening no tab (`never came`); or the host never came back to open the sign-out page. Before AN6e an answer ended
+  the call by itself; now the host has to come back to show the sign-out page. The tests now send each once the tab covers the
+  host, as a browser's comes after the student signs in, and wait for the host to go. A real browser answers from a page that's
+  up, so the app is unchanged.
+
+  **The runs,** on the final code: on the JVM, every task run again, core 154 (one new), outbox 571, the app's 23 and 26 (five
+  new each, Debug's and Release's); Gradle's `assemble :app:assembleDebugAndroidTest :app:lint check` green, Android 10's API
+  check with it; `npm run typecheck && npm run lint && npm test` green, the portal's suite whole. SignInBrowserTest, BaliAppTest
+  and ReadoutTest on `Bali_Spike_API29` (Chrome 74) and `_API35` (Chrome 124), 30 passed and 1 skipped on each, the
+  ephemeral-tab test; on `_API37` (Chrome 145), 29 passed and 2 skipped, the two that need a browser with no ephemeral tab. On
+  `Bali_Spike_API33` (Chrome 109), the whole suite, 85 passed and 1 skipped of 86 (82 at #588: SignInBrowserTest's four new
+  tests). Polled through the API 35 and 37 runs, `dumpsys netstats` listed no traffic for Bali's uid. Each emulator after: Bali
+  and its test app uninstalled, AN1's spike apps kept, every setting as found (Android 13's font scale, written 1.0 during its
+  run, unset again), stopped. Nothing was added to the PC's SDK.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): no blocker. Their WARNs: the forged return, now said plainly above (both); a
+  closed sign-in page leaving the session, now above, for the owner (A); the code's trade after `/logout` and Chrome's order of
+  the return and the tab's close, unverified until the phone check (A, B); the no-Custom-Tabs chooser's other browser, now in
+  call 2 (B); the new outcome's words, now AS2's to give (B); the placeholder for these runs (A). Left: no test pins the
+  sign-out page opening as an Auth Tab, since no emulator's browser has the Auth Tab without ephemeral tabs; the JVM pins the
+  page's tab as the sign-in page's (A).
+
 - **2026-11-13** — **AN6d, Android's dev sign-in client in the build: dev's `bali-android-dev-public` at
   `com.bali.bali://auth/callback`, two slashes because Cognito's console refused RFC 8252's one; a Debug build's start now runs
   over the app's own sign-in, and the tests that read a build not set up moved where their rule still holds (this step's calls,

@@ -503,4 +503,7 @@ fun SignInError.words(page: HostedPage): String? =
                 else -> "The sign-in was refused. Try again, or ask your teacher."
             }
         SignInError.NotKept -> "Your phone couldn't keep the sign-in. Try again."
+        // AN6e: the page that signs a browser with no ephemeral tab out of the hosted UI closed first. Nothing changed, as with a
+        // closed sign-in page, so nothing yet: its words, if any, are AS2's (docs/PLAN-ANDROID.md).
+        SignInError.BrowserNotSignedOut -> null
     }

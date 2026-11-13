@@ -14,18 +14,16 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-13 (Central) — AN6d, Android's dev sign-in client in the build (#588; `docs/DECISIONS.md`,
-2026-11-13): the build signs in through dev's `bali-android-dev-public`, made on 2026-11-12 on the owner's ask, at
-`com.bali.bali://auth/callback`, two slashes since Cognito's console refused RFC 8252's one; dev's authorize endpoint sends
-it to `/login`. Every Debug build's start now runs the engine and the account over the app's own sign-in, nobody signed in on
-the emulators and nothing on the wire; the not-set-up start keeps its tests through a start given no config, and no test
-reaches the hosted UI, Cognito or dev's API. It also records the owner's go-ahead of 2026-11-12 and that evening's dev
-consoles: AN6e, AN9j, AN9k and the help page's line (AP2b) are new steps, AN11 runs on this PC, and dev's Firebase is made.
-No screen, no word. Before it, AN7h, the lock on Android 10. Next: AN6e, AN13g, AN9j and AN9k, AN11, AN12 and Phase 10's
-screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed
-the 13+ check on an iPhone (Q7); prod's Android client, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX
-and OkHttp 5.5 in the step that needs them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
-pilot's critical path._
+_Last updated: 2026-11-13 (Central) — AN6e, Cognito's session ended after each sign-in where the phone's browser offers no
+ephemeral tab (#589; `docs/DECISIONS.md`, 2026-11-13): there, and with no Custom Tabs browser, the sign-in page's answer is
+kept while Cognito's `/logout` opens in the same browser and kind of tab, never ephemeral, and handed over, its code traded,
+only once that page comes back at the build's new sign-out URL, `com.bali.bali://auth/signout`, exactly. That page closed
+first leaves the sign-in unfinished, `SignInError.BrowserNotSignedOut`, nothing traded; Sign out is left as it is (this
+step's calls, awaiting the owner). No screen, no word. Before it, AN6d, Android's dev sign-in client in the build. Next:
+AN13g, AN9j and AN9k, AN11, AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's
+phones, on any Chrome now, signed in on dev as an account that passed the 13+ check on an iPhone (Q7); prod's Android client,
+the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that needs them (Open owner
+items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -149,11 +147,8 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN6b** Sign-in itself — ✅ (#518; DECISIONS 2026-11-05)
 - **AN6c** Sign-in's app side — ✅ (#520; DECISIONS 2026-11-05)
 - **AN6d** Android's dev sign-in client in the build — ✅ (#588; DECISIONS 2026-11-13)
-- **AN6e** Cognito's session ended after each sign-in where the phone's browser offers no ephemeral tab (Chrome before 136;
-  the owner, 2026-11-12, owner item 8): Cognito's `/logout` at the client's sign-out URL, `com.bali.bali://auth/signout`, a
-  page the student sees, with the ephemeral-tab check and any AndroidX it needs, AN6e's call (no iOS twin: iOS's sign-in is
-  ephemeral) — validation: the JVM tests, and the instrumented tests on `Bali_Spike_API29`, `35` and `37`, none reaching
-  Cognito
+- **AN6e** Cognito's session ended after each sign-in where the phone's browser offers no ephemeral tab — ✅ (#589; DECISIONS
+  2026-11-13)
 - **AN7a** The lock follows the engine — ✅ (#521; DECISIONS 2026-11-05)
 - **AN7b** Rule 3's report: protection off, the lock back on, the launch grace — ✅ (#522; DECISIONS
   2026-11-05)
@@ -243,7 +238,9 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 - **AS1** 👀 The theme and shared pieces (twin: `Theme.swift`): `bali-tokens.json` in Compose, type
   that follows the font scale, and the hold-to-unlock control (one second, as on iOS)
 - **AS2** 👀 Sign in and sign up: the 13+ check, the intro and Your name (twin: `SignInView`,
-  `AgeView`, `IntroView`, `NameView`)
+  `AgeView`, `IntroView`, `NameView`); AN6e's new outcome, `SignInError.BrowserNotSignedOut` (the extra page that ends
+  Cognito's session in a browser with no ephemeral tab closed before Cognito sent it back, nothing changed), says nothing
+  for now, as a closed page: this step gives it words, since a page that couldn't load comes after a typed password
 - **AS3** 👀 The permission steps and the push prompt (twin: `ScreenTimeView`, and the prompt iOS
   asks as Home shows)
 - **AS4** 👀 Home, the tap's "hold your phone to the block" screen, Join with the consent preview,
@@ -263,7 +260,8 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
   its in-app disclosure (lock (a), AN1b; ISSUES #7), how Play's reviewer tries Bali without a
   block, and the testing tracks
 - **AP2** 🔧 The Play Console: the account (Open owner items, 2), the app record and Play App
-  Signing; and a workflow that uploads to the internal track (twin: `testflight.yml`)
+  Signing; and a workflow that uploads to the internal track (twin: `testflight.yml`), which refuses a build that carries
+  dev's values (#588's Claude Review)
 - **AP2b** The help page names Android's lock beside Screen Time, "or Bali's lock off" where it says "or Screen Time
   off", before the first Android build reaches a student (the owner, 2026-11-12): a portal step, its words through
   `no-ai-slop` and DESIGN.md's voice; the privacy policy's line is the owner's and the lawyer's (AP4) — validation:
@@ -306,9 +304,9 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
    the sign-out URL `com.bali.bali://auth/signout`, SRP and refresh only, Bali's style), its id then on
    prod's `AUTH_AUDIENCE`, or the API refuses Android's tokens with a `401`, and in the release build
    (AP). ✅ **The cookie call** (the owner, 2026-11-12): where the phone's browser offers no ephemeral tab
-   (Chrome before 136), Bali will end Cognito's session after each sign-in, one more page for the student
-   (AN6e). Until AN6e lands, a sign-in there shares the browser's cookies, as AN6c left it, now through dev's
-   client: the phone checks sign in only on Chrome 136 or later (DECISIONS 2026-11-05, 2026-11-13).
+   (Chrome before 136), Bali ends Cognito's session after each sign-in, one more page for the student: built
+   by AN6e (#589; DECISIONS 2026-11-05, 2026-11-13). Prod's client needs the sign-out URL too: without it,
+   that page stops at Cognito's own sign-in page, and every such sign-in is left unfinished.
 
 ## How to update this file
 

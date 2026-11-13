@@ -76,6 +76,29 @@ class SignInTest : SignIns() {
     }
 
     @Test
+    fun theHostedUisSignOutPageNamesTheClientAndItsSignOutUrlEachEscapedAtTheDomainsLogout() {
+        // AN6e: the page that ends the hosted UI's session in a browser with no ephemeral tab, Cognito's /logout, which sends
+        // that browser on to the sign-out URL given with the client id, where the client allows it.
+        assertEquals(
+            URI("https://bali-dev.auth.us-east-1.amazoncognito.com/logout?client_id=phone-client&logout_uri=bali%3A%2F%2Fauth%2Fsignout"),
+            cognito.logoutUrl(),
+        )
+        // Each value escaped as the sign-in page's are, and a domain set with a trailing slash names the same endpoint.
+        val odd =
+            cognito.copy(
+                domain = URI("https://bali-dev.auth.us-east-1.amazoncognito.com/"), clientId = "a b&c=d+e",
+                signOutUri = URI("com.bali.bali://auth/signout?x=1"),
+            )
+        assertEquals(
+            URI(
+                "https://bali-dev.auth.us-east-1.amazoncognito.com/logout?client_id=a%20b%26c%3Dd%2Be" +
+                    "&logout_uri=com%2Ebali%2Ebali%3A%2F%2Fauth%2Fsignout%3Fx%3D1",
+            ),
+            odd.logoutUrl(),
+        )
+    }
+
+    @Test
     fun theAnswersCodeIsTakenOnlyAtTheRedirectUriForThisAttemptWithNoError() {
         val attempt = Attempt(verifier = RFC_VERIFIER, state = "st")
         assertEquals("c0de", cognito.code("bali://auth/callback?code=c0de&state=st", attempt))
@@ -131,7 +154,7 @@ class SignInTest : SignIns() {
 
     @Test
     fun aSignInErrorIsAnOutcomeThatKeepsNoStackTraceAndTakesNoSuppressedExceptionThrowOneOftenAsYouLike() {
-        for (error in listOf(SignInError.Cancelled, SignInError.Unreachable, SignInError.NotKept, SignInError.Refused(null))) {
+        for (error in listOf(SignInError.Cancelled, SignInError.Unreachable, SignInError.NotKept, SignInError.Refused(null), SignInError.BrowserNotSignedOut)) {
             repeat(2) { error.addSuppressed(IllegalStateException("another failure")) }
             assertEquals(0, error.suppressed.size, "$error")
             assertEquals(0, error.stackTrace.size, "$error")
@@ -268,7 +291,7 @@ class SignInTest : SignIns() {
             MockWebServer().use { server ->
                 server.enqueue(MockResponse(200, headersOf("Content-Type", "application/json"), granted(jwt("a1"), refresh = "refresh-1")))
                 server.start()
-                val local = Cognito(server.url("/").toUri(), "phone-client", URI("bali://auth/callback"))
+                val local = Cognito(server.url("/").toUri(), "phone-client", URI("bali://auth/callback"), URI("bali://auth/signout"))
                 val phone = SignIn(local, MemoryStore(), scope, OkHttpTransport(), Now(), gated = false)
                 phone.signIn(browser = signsIn)
                 val sent = server.takeRequest()

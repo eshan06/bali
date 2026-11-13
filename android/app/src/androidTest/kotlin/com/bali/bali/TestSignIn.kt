@@ -23,7 +23,7 @@ internal const val API = "https://api.bali.test"
 internal const val AGE_CHECK = "GET /v1/me/age-check"
 internal const val PASSED = """{"passed":true}"""
 
-private val cognito = Cognito(URI("https://bali.auth.test"), "the-client", URI("com.bali.bali:/auth/callback"))
+private val cognito = Cognito(URI("https://bali.auth.test"), "the-client", URI("com.bali.bali:/auth/callback"), URI("com.bali.bali://auth/signout"))
 
 /** A sign-in over [server], its calls in [scope], the test's. */
 internal fun testSignIn(server: Server, scope: CoroutineScope): SignIn = SignIn(cognito, Memory(), scope, server)

@@ -81,6 +81,8 @@ class BaliAppTest {
         // Dev's Android app client, at the callback Cognito's console took: two slashes (docs/DEPLOY.md).
         assertEquals("1njpekb5sg8nd6lkb53rpimjke", config.cognito.clientId)
         assertEquals(URI("com.bali.bali://auth/callback"), config.cognito.redirectUri)
+        // Where Cognito's /logout sends the browser back once a sign-in's session there has ended (AN6e).
+        assertEquals(URI("com.bali.bali://auth/signout"), config.cognito.signOutUri)
         // The portal's address since the owner's ruling (2026-11-07, #540).
         assertEquals(URI("https://app.getbali.app"), config.portal)
     }

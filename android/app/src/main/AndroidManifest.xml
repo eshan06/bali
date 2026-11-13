@@ -45,6 +45,7 @@
         <meta-data android:name="BaliCognitoDomain" android:value="@string/BALI_COGNITO_DOMAIN" />
         <meta-data android:name="BaliCognitoClientID" android:value="@string/BALI_COGNITO_CLIENT_ID" />
         <meta-data android:name="BaliCognitoRedirectURI" android:value="@string/BALI_COGNITO_REDIRECT_URI" />
+        <meta-data android:name="BaliCognitoSignOutURI" android:value="@string/BALI_COGNITO_SIGN_OUT_URI" />
         <meta-data android:name="BaliPortalURL" android:value="@string/BALI_PORTAL_URL" />
 
         <!-- Hosts the hosted UI's tab and draws nothing; one at a time, so the answer finds it over the tab. -->
@@ -62,9 +63,10 @@
             android:isolatedProcess="true"
             android:process=":renderer" />
 
-        <!-- A Custom Tab's answer, by the redirect URI's scheme, the app id (RFC 8252, 7.1). Any app can
-             send it a link, so it takes one only for the waiting sign-in, and lands in no task of Bali's,
-             so no link can clear the one the tab is open in (HostedUiActivity.kt). -->
+        <!-- A Custom Tab's answer, and its sign-out page's return (AN6e), by the scheme the redirect URI and
+             the sign-out URL share, the app id (RFC 8252, 7.1). Any app can send it a link, so it takes one
+             only for the page shown, and lands in no task of Bali's, so no link can clear the one the tab is
+             open in (HostedUiActivity.kt). -->
         <activity
             android:name=".SignInAnswerActivity"
             android:exported="true"

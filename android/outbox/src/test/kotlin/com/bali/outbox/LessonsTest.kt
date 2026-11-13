@@ -773,7 +773,7 @@ class LessonsTest : EngineFiles() {
             }.use { api ->
                 try {
                     val (cognito, clock, keychain) = Triple(Server(), TestClock(), MemoryKeychain())
-                    val pool = Cognito(URI("https://bali-dev.auth.us-east-1.amazoncognito.com"), "phone-client", URI("bali://auth/callback"))
+                    val pool = Cognito(URI("https://bali-dev.auth.us-east-1.amazoncognito.com"), "phone-client", URI("bali://auth/callback"), URI("bali://auth/signout"))
                     val signIn = SignIn(pool, keychain, scope, cognito, clock::now, gated = false)
                     val transport = OkHttpTransport()
                     val outbox = makeOutbox().first
