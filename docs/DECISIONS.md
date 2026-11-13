@@ -8,6 +8,260 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-13** — **AN9j, `409 account_deleted` read as signed out: Bali's server's answer to any call under an account's
+  token, heard where every answer comes, ends that account's sign-in as Sign out ends it, with no Cognito DeleteUser; every
+  Emergency Unlock it still has goes first, under its own token, the rest of its queue let go, an unlock that still didn't
+  record kept apart and never sent; and a phone locked in a lesson comes off its lock at once. Only for the account signed in,
+  and this phone's own deletion finishes its own way, DeleteUser included (the owner's call of 2026-11-12; the conductor's four
+  calls and this step's, marked, each awaiting the owner's look; AN9j, #592).**
+
+  **The owner's call** (the go-ahead of 2026-11-12, call 2, recorded on 2026-11-13): "The server's `409 account_deleted` reads as
+  signed out, in both apps: today a deleted account's other phone says 'Something went wrong at Bali', and one locked in a lesson
+  stays locked until the bell." This is Android's half; the iPhone's is C4d, the Mac's, below.
+
+  **Where it lives:** `core`'s `ApiClient.kt`: `TokenProvider.deletedOnServer`, which the client's one exchange tells, with the
+  `sub` of the token it sent, whenever an answer is `409` with the reason `account_deleted`, before its caller hears the answer;
+  the wrapper `forAccount` and `forDeletion` make passes it on. `SignIn.kt`: `whenDeletedOnServer`, the engine's hook, told with
+  the sign-in let go; `forgetDeleted`, the sign-out; `accountDeleted` (AN9b's mark), which now says whether it marked and says the
+  mark as a landing; and `Landing.deleted`. `outbox`'s `SyncEngine.kt`: `deletedOnServer` and its `signOutDeleted`, hooked in
+  `make`; `signingOut`, which holds the drain while a deleted account's unlocks go; and `deletionOf`. `Outbox.kt`:
+  `accountDeleted`, which keeps every unlock left apart; `Account.kt`: `signed`, which forgets the notes and `me` for a sign-in
+  forgotten for its deletion, and shows Pending over a stop too. `android/app` is unchanged. No screen, no word, no library and
+  no SDK package.
+
+  **The conductor's calls (2026-11-13), awaiting the owner's look:**
+  1. **Emergency Unlocks are never discarded.** One still queued when the account is found deleted is kept, never sent under
+     another account, and never changes another account's lock or holds back its queue. Where it stays, below. Its premise, that
+     such an unlock "can never be sent under it", didn't hold: the server records one under a deleted sign-in's old token (C3d),
+     so each is sent first and only one that still doesn't record is kept (this step's call 7, from santa's review).
+  2. **Signed out means the sign-in forgotten as Sign out forgets it, with no Cognito DeleteUser from this path,** this phone's
+     own deletion aside: the API's own deleter removes a deleted account's Cognito sign-in (C3-cognito), and a server's answer
+     isn't the student's press.
+  3. **The student's notes: what AN9b's own deletion does with them today, no more.** Once the account is deleted on the server
+     they go, `inClass` and `listSeenBy`, here and in the store (written behind, as `forgetNotes` writes them), and `me` with
+     them. AN9k keeps them off the phone's storage once a deletion's request went out.
+  4. **No screen and no new word.** The phone ends on Sign in, the signed-out state that exists.
+
+  **This step's calls, each awaiting the owner's look:**
+  1. **Read where every answer comes: the API client, told to the provider that gave the token, with the token's `sub`.** So every
+     client over the sign-in reads it alike (the engine's, the lesson's apart from it, each one-account client, AN11's push token
+     once it lands), and "only for the account the call went under" is exact: the account is the one whose token went, read from
+     it, never whoever is signed in when the answer comes. A token naming no account tells none, which changes nothing. The other
+     way, each caller checking its own answers, would leave a call to be forgotten.
+  2. **The engine reacts in one stretch,** so loops hearing it at once read it once: the second finds the sign-in gone, or, after
+     this phone's lost answer, marked, and does nothing. In that stretch it calls the sign-in's two short stretches
+     (`forgetDeleted`, `accountDeleted`), against the engine's rule of calling the sign-in with the engine let go (AN9b's entry):
+     neither waits on a renewal, and the sign-in never holds its lock while it calls the engine, so neither waits on the other.
+     The account's unlocks go before that stretch (call 7), while it reads as under way (`signingOut`, the drain held, another
+     `409` heard meanwhile this one's), and the stretch reads the deletion's guard again, so a Delete account pressed while they go
+     finishes its own way (round 2). In the stretch the sign-in goes first, then the queue and the session: a phone unlocked or
+     protection off goes straight to Sign in, never Home on the way; a phone focused stays on Focus until the stretch ends, a
+     moment later, out of the session; and a change is counted, so a read sent before the stretch, older, never puts the session
+     back (santa's round 1).
+  3. **One let-go for both deletions:** `Outbox.accountDeleted` keeps every unlock apart for AN9b's deletion too. AN9b's sends
+     every unlock before `DELETE /v1/me` and refuses to delete while one waits, so it keeps one apart only if one is made after
+     its `DELETE /v1/me`, which C4b's screen keeps from happening; before, such an unlock stayed queued and went under the next
+     account's sign-in. AN9b's two DeletionOrderTest tests that pinned the unlocks queued now pin them kept apart.
+  4. **This phone's lost answer, finished at its Try again:** the `409` is that `DELETE /v1/me`'s answer, the account deleted, so
+     the engine does what its answer would have done up to DeleteUser (the sign-in marked, the queue let go, out of the session,
+     the lock off) and leaves DeleteUser to the deletion's own screen, which shows Pending, as a relaunch finds it. The engine
+     doesn't run DeleteUser by itself: the account half drives Delete account and its states (Busy, Pending, Done), and a
+     DeleteUser it didn't start would leave Pending showing over a signed-out phone.
+  5. **The mark is said as a landing** (`Landing.deleted`), so the account sees it in the run, not only at a relaunch: Pending
+     shows where nothing else does, and the notes and `me` go. For AN9b's own deletion that moves their going from its answer to
+     its mark, a moment earlier, both after the server deleted the account.
+  6. **`deletionOf`:** the account a held `deletionId` is for, so a `409` for another account (two on one phone, ruled
+     impossible for the pilot) is never read as this phone's deletion landing, which would mark that account for a DeleteUser
+     this phone never pressed for.
+  7. **Every Emergency Unlock the account still has goes first, under its own token** (from santa's round 1, both reviewers'
+     blocker): call 1's premise didn't hold. The server records an unlock under a deleted sign-in's old token, as no one's, a
+     row born removed (C3d's `asUnlocker`, `recordedAs: not_enrolled`), and main's drain would have sent it so; keeping it back
+     unsent would have made the `409` the end of a record main gets recorded. So before the sign-in is forgotten, or marked for
+     this phone's own deletion, each filed unlock goes once under that account's token alone (`forDeletion`, never another's),
+     renewed once on a 401, marked on its way as the drain marks one, and settles as the drain's would; the queue is read again
+     for each, so one pressed meanwhile, or filed again by a settle (B6d), goes too (round 2). Only one that still doesn't record
+     (no answer, a 5xx or a 429 at that moment) is kept apart, as call 1 keeps one. AN9b's ruling that the phone sends nothing
+     more once its own deletion is answered stands for its own path, whose `sendAll` sends every unlock before `DELETE /v1/me`;
+     here the deletion was learned after the fact, and an unlock sent now makes no account (C3d). A sign-in not through the 13+
+     check sends Bali nothing but the check's own read, which never answers `409`, so none of its unlocks goes this way.
+
+  **Every arrival point, and what it does now** (today's server, C3d: `apps/api/src/auth/student.ts`, `accountOf`):
+  - **The drain's sends,** a tap, a refocus, protection off and the lock back on: each `409 account_deleted`. Before, a tap was
+    kept, stuck and said refused, and a state change dropped and said; now signed out, the record let go with the queue. An
+    Emergency Unlock's send is recorded, never refused (C3d's row born removed), so it never brings one.
+  - **The reads:** the check-in and `GET /v1/me`, Home's and Me's truth and a sign-in's own first read: before, a read that failed,
+    Home saying "Something went wrong at Bali. Try again in a moment.", the check-in refused every 30 s with the lock on to the
+    bell; now signed out, the lock off. History's read answers an empty page today, not a `409`; a `409` there reads the same.
+  - **Join and Your name:** before, Join's words for any `409`, the generic line; now signed out. **Leave** answers
+    `403 unknown_user` today, "Bali couldn't find you in this class", and its re-read of the truth then reads as signed out.
+  - **The 13+ check's yes** (`PUT /v1/me/age-check`): before, let go, the account asked again only where the server has no yes;
+    now signed out (AgeFallbackTest's C7 case, changed). Its read (`GET /v1/me/age-check`) answers `{ passed: false }`, never a
+    `409`, so it changes nothing.
+  - **The lesson's own calls:** its answer is `409 account_deleted` for an account deleted on its way, `AnswerResult.AccountDeleted`
+    as before; now signed out too, and the lesson goes with the sign-in. Its poll answers `403` today; a `409` reads the same.
+  - **A change of an unlock's reason:** `404 unlock_not_found` (C3d), unchanged.
+  - **Delete account's own sends:** this phone's own deletion, below.
+
+  **Where a kept Emergency Unlock stays (call 1):** first, every one the account still has queued goes under its own token, and
+  the server records it (call 7); one not filed yet, made where the phone stood unread, has nowhere to go and is kept. One that
+  still doesn't record is kept in the outbox's file, out of the queue: one row of the rules' state table (`outboxState`), its key
+  `kept:` and the unlock's event id, its value what the unlock's row held as JSON: its session or its tap, its reason, its time
+  and its place in what the phone did. Nothing reads it: the drain never sends it, the unlock guard (`holdsUnlock`) and a read's
+  stamp never count it, and Sign out's hold never sees it, so the next account's queue, reads and lock go on as if it weren't
+  there. It stays until Bali's data goes (uninstalled, or its storage cleared). A send of it still on its way may have landed all
+  the same; its kept copy stays, a replay if it were ever sent. The unlock contract is untouched (no answer deletes one), and so
+  is the queue's order for what remains. **Said plainly, for the owner:** a kept copy is the deleted student's, on the phone after
+  their account is gone: when they unlocked, in which session, and the reason they picked, if any. It leaves the phone never, and
+  goes with Bali's data; no name is in it.
+
+  **For AN9k:** its hook is `Account.signed`, where the deleted account's notes go (`forgetNotes`, written behind) for a sign-in
+  forgotten for its deletion or marked for its DeleteUser: there they go written through; and `Account.delete`'s stop, which
+  writes them back even once its `DELETE /v1/me` went out (the lost answer this step's `409` can later settle).
+
+  **This phone's own deletion (AN9b's way):** while `deleteAccount` runs, a `409` heard by any call, the lesson's own calls
+  included (AN13g), changes nothing: the deletion goes on to its `DELETE /v1/me`, its mark, DeleteUser under the sign-in's token,
+  and the sign-in forgotten. While its DeleteUser waits (`deletionPending`), a `409` from a call sent before the mark changes
+  nothing: Pending's Try again deletes it. Its `DELETE /v1/me` sent with no answer settling it (`deletionId` held, `deletionOf` the
+  account): the `409` is that answer (call 4). A relaunch loses `deletionId`, which lives in memory alone, so a `409` after one
+  reads as signed out with no DeleteUser, the API's deleter's, the same as another phone's deletion.
+
+  **What C4d should mirror on the iPhone:** read `account_deleted` in `APIClient`'s one exchange and tell the sign-in with the
+  token's `sub`. In the engine: this phone's deletion under way, or one such answer being read already, nothing; else, while
+  the drain holds, send each filed unlock still queued once under that account's token alone, the queue read again for each,
+  each marked on its way, renewed once on a 401, settled as the drain settles one; then one actor stretch, which a deletion
+  pressed meanwhile leaves to that deletion: its `DELETE /v1/me` answer lost, the mark (`SignIn.accountDeleted`); else,
+  only while the held sign-in is that account's and not marked, forget the tokens as Sign out does, with no DeleteUser; then,
+  either way, a change counted, `outbox.accountDeleted`, out of the session. `Outbox.accountDeleted` keeps each unlock left
+  apart, out of the queue, whole. `Phone` forgets the notes and `me` when the sign-in is forgotten for a deletion, and shows
+  Pending when the mark lands while nothing shows or a stop does. iOS has the same gaps that made this step (C3d's entry, "How
+  each client takes it").
+
+  **What it doesn't close, plainly:**
+  - **Sign in says nothing of why:** a student whose account was deleted on another phone finds Bali on Sign in with no word of
+    it. For the owner and AS2: a line on Sign in would be a new word, and isn't built.
+  - **A relaunch loses `deletionId`** (above): this phone's own deletion, its answer lost, then a relaunch, ends with no DeleteUser
+    of its own; until runbook 9 sets the deleter's key, that Cognito user stays.
+  - **The notes** a stop wrote back stay on the disk until the `409` comes (AN9k's).
+  - **Every queued record goes under whoever is signed in** (AN9e): an unlock kept apart no longer does, but a record queued
+    while signed out still goes under the next sign-in, as before. Two accounts on one phone are ruled impossible for the pilot.
+  - **A let-go the file refuses** (its storage failing at that moment) is shown, as every storage failure is, and tried no more:
+    the sign-in is already gone, so no later press tries it again as AN9b's Try again does, and the deleted account's records,
+    unlocks too, stay queued for the next sign-in.
+  - **While the account's unlocks go,** a round trip before the sign-out, it is still signed in: a phone on Home then can say
+    Home's line for the read that failed until the stretch ends. Only where an unlock is queued, and an unlock queued has as a
+    rule taken the phone to Unlocked, which says no such line.
+  - **Accounts are told apart by `sub`** (santa, reviewer B, a WARN for the owner): until the deleter removes the Cognito user
+    (runbook 9's key), a person who comes back signs in under the same `sub`, so a `409` to a request sent under the old token
+    and answered after that new sign-in landed would sign the new one out too, at worst one more sign-in. A rare window, not a
+    ruled-impossible one: the request's own wait (15 s for each byte) against a whole sign-in typed meanwhile. Telling the two
+    apart takes the tokens' `auth_time`, for the owner if wanted.
+  - **A renewal Cognito refuses while the unlocks go** (santa's round 2, reviewer A, for the owner, its reach doubtful): a send
+    whose token runs out in that window renews it, and where the other phone's DeleteUser has removed the Cognito user the
+    renewal is refused, `invalid_grant`, which signs the student out plainly, as any refused renewal does. The stretch then finds
+    no sign-in of that account and does nothing: the lock stays on to the bell, Emergency Unlock there, the queue waits for the
+    next sign-in, and the notes and `me` stay, as after any refused renewal today. It needs an unlock queued and the token's
+    last minute inside that window.
+  - **A sign-in made after the deletion is its person coming back** (C3d): the server makes a new account, so Sign in works again.
+
+  **The tests,** failing first in their own commit (`17c72e95`). Against main's code `core`'s didn't compile (`deletedOnServer`
+  overrides nothing; `forgetDeleted` and `whenDeletedOnServer` unresolved; `Landing` has no `deleted`; `accountDeleted` gives
+  Unit), and of the 30 targeted in `outbox`, 9 failed by name: `eachPlace…` (the drain's tap: the router stayed on Focus),
+  `the13PlusChecksYes…` (stayed on Name), `aPhoneLockedInALesson…`, `anEmergencyUnlockQueued…` (stayed on Unlocked),
+  `aDeletionWhoseAnswerWasLost…`, `twoLoopsHearingItAtOnce…` (stayed on Focus), DeletionOrderTest's two (the unlocks still
+  queued) and AgeFallbackTest's C7 case. The four that passed there guard the rule's edges, and each fails under its break below:
+  another account's `409`, every other `409`, a deletion under way, and DeleteUser waiting. Two changed in the fix's commit:
+  `signedOut` waits for the session's end, as the sign-in goes first in the stretch (call 2), and the deletion under way hears
+  the `409` while it still sends what was queued, before its `DELETE /v1/me`, the window its guard keeps (found by its break, below);
+  and one was added there, call 6's. Santa's round 1 added four more, failing first in their own commit (`e9c9ee03`) against the
+  code before its fix: the unlock sent first and the one kept apart, each `No request to POST /v1/sessions/s/unlock came in time`;
+  the lost answer's `409` over its stop, `deleting=Stopped(…)`, never Pending; and a read answered after the `409`, `expected:
+  <Out> but was: <InSession(…, state=Focused)>`, the lock back on a signed-out phone. The notes' test passed there, the behavior
+  already built, and fails under its break. Round 2 added three more (`9f596e28`): against the code before its fix, the one over
+  the window the unlocks go in failed at its reason (`expected: <OnItsWay> but was: <null>`), and the Delete account pressed in
+  it at its `DELETE /v1/me`, which never came, the sign-in gone under it; the 401's renewal passed there, already built, and
+  fails under its break.
+  - **`core`, four:** ApiClientTest's: a `409 account_deleted` told to the provider that gave the token, with its `sub`, through
+    `forAccount` and `forDeletion` too, none for a token naming none, and never another answer (another `409`'s reason, a `409`
+    with none, an unknown one, the reason under a `403`, a `200`). DeletedOnServerTest's three: the sign-in forgotten for its
+    account alone, once, said as a landing that is `deleted`, never a sign-in marked for DeleteUser, which `accountDeleted` marks
+    once and says; a store that can't forget now, signed out all the same and forgotten at the next ask; the hook told with the
+    sign-in let go, free to call it back, and a hook that throws or none changing nothing there.
+  - **`outbox`, seventeen, over the engine as the app makes it, the account, an enforcer over its fake lock and the router:** each
+    arrival point (the drain's tap, refocus, protection off and lock back on; the check-in; the read of the truth; History; Join;
+    Leave; Your name; the lesson's answer and poll), each from a phone focused in a lesson, read as signed out: the router on Sign
+    in, the keychain empty, out of the session, the lock off; the 13+ yes and a sign-in's own first read the same; the lock off as
+    the `409` is read, the bell still ahead, the standing out on file; another account's `409` changing nothing of the one signed
+    in (its sign-in, its tap on its way, its lock, Focus); every other `409` (a tap's `event_id_conflict`, Your name taken, Leave
+    in session, History's with no reason, the lesson's `question_closed`, Delete account's `teacher_has_classes`) as before; an
+    unlock queued sent first under a1's token, the sign-in still held, recorded as no one's, nothing kept; one whose send then
+    gets no answer kept apart whole, never sent under b1, b1's read, tap and lock in session s as if it weren't there; this
+    phone's deletion under way, a `409` mid-way, DeleteUser under a1's token, Deleted; its lost answer, then the `409`, Back
+    pressed and the stop still showing: marked, the lock off, Pending, Try again running DeleteUser, one `DELETE /v1/me`; a lost
+    deletion's id held for its own account, b1's `409` a plain sign-out, no DeleteUser; DeleteUser waiting, a late `409` changing
+    nothing; a check-in sent before the `409` and answered live after it, the phone still out of its lesson, the lock off; the
+    notes and `me` gone, here and in the store; two loops at once, plainly and after a lost answer; while an unlock held for its
+    reason goes, the drain sending nothing once its hold is over, another call's `409` answered at once with the sign-in still
+    held, a reason picked then on its way, and an unlock pressed then sent too; Delete account pressed then, finishing its own way,
+    DeleteUser under a1's token; and an unlock refused `401`, renewed and sent once more. And DeletionOrderTest's two and
+    AgeFallbackTest's C7 case, changed as above.
+
+  **Broken on purpose, each failing by name, then reverted:**
+  - one arrival point left as today, the one-account clients telling nothing (`AccountTokens` not passing it on): ApiClientTest's
+    `a409AccountDeleted…`, `expected: <[a1, a1, a1]> but was: <[a1]>`; `the13PlusChecksYes…`, `the 13+ check's yes: the router
+    stayed on Shown(screen=Name, tabbed=false)`; and AgeFallbackTest's C7 case, `never came true`;
+  - the lock left on after the `409` (no step out of the session): `eachPlace…` (`the drain's tap: the router stayed on Focus`),
+    `aPhoneLockedInALesson…` and `aDeletionWhoseAnswerWasLost…` (`never came true`), `anEmergencyUnlockQueued…` (`the phone stayed
+    InSession(…, state=Unlocked)`) and `twoLoops…` (`two loops at once: the router stayed on Focus`);
+  - another account's `409` signing out the one signed in (`forgetDeleted` with no account check): `core`'s `theSignInForgets…`,
+    `Expected value to be false`, and `a409ForAnAccountNoLongerSignedIn…`, `expected: <b1> but was: <null>`;
+  - an Emergency Unlock let go with the rest (`accountDeleted` deleting every row): `anEmergencyUnlockThatStillDoesntRecord…`,
+    `actual value is null`, and DeletionOrderTest's two, `expected: <[…]> but was: <[]>`;
+  - santa's round 1, each new: the account's unlocks not sent first, `anEmergencyUnlockQueued…GoesFirst…`, `No request to POST
+    /v1/sessions/s/unlock came in time`; no change counted in the stretch, `aReadSentBefore…`, `expected: <Out> but was:
+    <InSession(…, state=Focused)>`; Pending only where nothing shows, `aDeletionWhoseAnswerWasLost…`, `deleting=Stopped(…)`;
+    and the notes and `me` kept (`gone` false), `theDeletedStudentsNotes…`, `the account never reached the state waited for`;
+  - santa's round 2, each new: the drain not held, `whileTheUnlocksGo…`, `the engine never reached the state waited for` (it sent
+    the unlock again); a `409` heard meanwhile starting a sign-out of its own, the same test, its History call `Timed out waiting for
+    60000 ms`, behind that sign-out's own send; the unlocks not marked on their way, the same test, `expected: <OnItsWay> but was:
+    <null>`; the queue read once, the same test, `No request to POST /v1/sessions/s/unlock came in time`, the second never sent; the
+    stretch not reading the deletion's guard again, `deleteAccountPressedWhileTheUnlocksGo…`, `No request to any route came in
+    time`; and no renewal on a `401`, `anUnlockSentFirstAndRefused401…`, `No request to POST /v1/sessions/s/unlock came in time`;
+  - the sign-in forgotten mid-way through this phone's own deletion, before its DeleteUser: with no guard for the deletion under
+    way, `aDeletionUnderWay…`, `Expected value to be false` (the keychain emptied); with its lost answer read as a plain sign-out,
+    `aDeletionWhoseAnswerWasLost…` and `twoLoops…`, `Expected value to be true` (no mark kept). The first try at this break passed:
+    the test's `409` came with `DELETE /v1/me` on its way, its id held, so the lost answer's path marked the sign-in, harmlessly;
+    the test now hears it while the deletion still sends what was queued, and fails by name;
+  - and call 6's, a lost deletion's id read for any account: `aLostDeletionsId…`, `the router stayed on Shown(screen=Deleting)`.
+
+  The engine's breaks were made again on the final code, after santa's fix, each failing by name again: the lock left on
+  (`eachPlace…` and `aPhoneLockedInALesson…`, the two run), an unlock let go (its three), the deletion's guard, its lost answer
+  (both) and call 6's. The two in `core` (the one-account clients, the account check) touch nothing the fix changed.
+
+  **The proof:** `android/app` is unchanged, the app's run (`BaliApp`, the lock's service) with it, so the JVM tests are the proof
+  and no emulator ran. On the final code, `./gradlew assemble :app:assembleDebugAndroidTest :app:lint check` green from scratch
+  (`--rerun-tasks`, all 167 of its tasks run), Android 10's API check with it: `core` 162 (158 at #591, four new), `outbox` 588
+  (571, seventeen new), the app's 28 and 31, Debug's and Release's, as they were. `npm run typecheck && npm run lint && npm test`
+  green, the portal's suite whole. Nothing was added to the PC's SDK, and no library.
+
+  **Santa's review:** two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context isolation holds and
+  model diversity doesn't). Round 1: two blockers, each from both. (1) An Emergency Unlock queued as the `409` came was kept apart
+  unsent, where main's drain sends it under the old token and the server records it (C3d): a record main gets recorded never
+  reached the server. Fixed by call 7, its tests failing first (below). (2) The notes and `me` going with a sign-in forgotten for
+  its deletion had no test: added. Reviewer A's WARNs: a read sent before the stretch and answered after it put the session, and
+  the lock, back on a signed-out phone (fixed, the stretch counting a change; its test failed first), and the lost answer's
+  `409` read while the deletion's stop still showed left that stop up, no Pending (fixed: Pending from a stop too; its test
+  failed first); the kept rows' privacy, for the owner (above); and no deadlock found. Reviewer B's: accounts told apart by
+  `sub` (above, for the owner); the kept rows; a let-go the file refuses (above); ARCHITECTURE's sign-out rule amended in this
+  PR (the owner's call); and three test comments still saying the owner's call waits (fixed). Round 2, fresh reviewers on the
+  fixes alone: one blocker, reviewer A's, the drain's hold and the guard for a `409` heard meanwhile with no test that fails
+  without them (race coverage): tests added, each failing by name under its break (above). Their WARNs: the unlocks read once
+  and not marked on their way, so one pressed meanwhile was kept apart and a reason picked then was lost (both; fixed, read again
+  for each and marked, its test failing first); a Delete account pressed while they went signed out under it (reviewer B;
+  fixed, the stretch reading the deletion's guard again, its test failing first); the 401's renewal untested (reviewer A; tested);
+  a renewal refused in that window (reviewer A; for the owner, above); the 13+ gate (reviewer A; said in call 7: a sign-in not
+  through the check never hears a `409`); and two windows of seconds labelled humanly impossible (both; relabelled rare, for the
+  owner). Each item left for the owner held up in round 2's eyes. No round 3: the GitHub Claude Review checks the final code.
+
 - **2026-11-13** — **AN6f, the sign-out page made sure, where the phone's browser offers no ephemeral tab: the sign-in page's
   answer reaches the sign-in at once and its code is traded first, the sign-out page opening once the token endpoint has
   answered, and the tokens kept only once that page comes back; a sign-in page closed with no answer opens the sign-out page

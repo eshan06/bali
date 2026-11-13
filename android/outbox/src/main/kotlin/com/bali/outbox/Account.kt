@@ -284,7 +284,8 @@ class Account internal constructor(
      * its page was open goes, an ask on its way is dropped ([changes]), Delete account's question or stop goes with the last
      * sign-in, and Me's name and Leave start afresh, so an answer to the last student's save or leave is dropped. Another
      * student's `me` is forgotten, and so is one this run's sign-in has none of: a read that failed before it, with no token to
-     * send, isn't its read ([forgot]); and, at a relaunch finding the account deleted, the notes under the student. A sign-in
+     * send, isn't its read ([forgot]); and, once the account is deleted on Bali's server, a relaunch finding it so or a sign-in
+     * forgotten for it (AN9j, [Landing.deleted]), the notes under the student and its `me`. A sign-in
      * not through the check is asked about it ([askAge]). Returns whether the engine is to forget `me`, and whether to ask,
      * each the caller's to do with the account let go.
      */
@@ -298,13 +299,16 @@ class Account internal constructor(
             naming = Naming()
             leaving = Leaving()
         }
-        if (pending && deleting == Deleting.None) deleting = Deleting.Pending
-        // A relaunch finding the account deleted on Bali's server and its sign-in still to go (the app closed between the two):
-        // the notes under the student go now, as a finished Delete account takes them (the owner's ruling, 2026-10-23).
-        val notesGone = pending && (inClass != null || listSeenBy != null)
+        // Marked in the run, a stop showing too: its deletion's lost answer heard, the account deleted on the server (AN9j).
+        if (pending && (deleting == Deleting.None || deleting is Deleting.Stopped)) deleting = Deleting.Pending
+        // The account deleted on Bali's server: its sign-in still to go (a relaunch finding it so, the app closed between the two,
+        // or its deletion's lost answer heard, AN9j), or forgotten for it (AN9j). The notes under the student go now, and its `me`,
+        // as a finished Delete account takes them (the owner's ruling, 2026-10-23).
+        val gone = landing.deleted && !landing.signedIn
+        val notesGone = (pending || gone) && (inClass != null || listSeenBy != null)
         if (notesGone) forgetNotes()
         // Made here, not the store read at launch (none before it).
-        val forget = notesGone || another || changed && landing.signedIn && signedIn != null && shown()?.me == null
+        val forget = notesGone || gone || another || changed && landing.signedIn && signedIn != null && shown()?.me == null
         landing.account?.let { account = it }
         landed = landing.count
         signedIn = landing.signedIn

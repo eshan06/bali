@@ -147,8 +147,8 @@ class LeaveTest {
                     Triple(fixture("enrollments/403-unknown-user.json"), Leaving.Failure.NotLeft(SendResult.Status(403), ApiErrorReason.UnknownUser), lost),
                     Triple(client(Canned(403, later)), Leaving.Failure.NotLeft(SendResult.Status(403), null), lost),
                     Triple(client(Canned(403)), Leaving.Failure.NotLeft(SendResult.Status(403), null), lost),
-                    // No iOS twin: an account deleted from another phone, its sign-in's old token refused (C3d, #558), said as any 409
-                    // while the owner's call on reading it as signed out waits (C3d's "For the owner").
+                    // No iOS twin: an account deleted from another phone, its sign-in's old token refused (C3d, #558), kept as any 409
+                    // here; the phone reads it as signed out since AN9j, the router on Sign in, so no screen says it.
                     Triple(client(Canned(409, Answer.refused("account_deleted"))), Leaving.Failure.NotLeft(SendResult.Status(409), ApiErrorReason.AccountDeleted), generic),
                     Triple(client(Canned(null)), Leaving.Failure.NotLeft(SendResult.NetworkError, null), unreachable),
                     Triple(client(Canned(401)), Leaving.Failure.NotLeft(SendResult.Status(401), null), "Bali couldn't check your sign-in. Try again."),

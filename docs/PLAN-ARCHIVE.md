@@ -10,6 +10,25 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN9j's on 2026-11-13: _Last updated: 2026-11-13 (Central) — AN6f, the sign-out page made sure, where the phone's browser offers no ephemeral tab (#591;
+`docs/DECISIONS.md`, 2026-11-13): the sign-in page's answer reaches the sign-in at once and its code is traded first, the
+sign-out page opening once the token endpoint has answered, so the tokens are given before `/logout`, as AWS documents; they're
+kept only once that page comes back, and dropped when it closed or couldn't open. A sign-in page closed with no answer opens the
+sign-out page too, still ending as the close; a host made again before the browser covers it waits on; SignInBrowserTest's
+font-scale change is undone to Bali's window size too (the conductor's calls and this step's, awaiting the owner's look). No
+screen, no word. Before it, AN13g, the lesson in the app, and with it AN13. Next: AN9j and AN9k, AN11, AN12 and Phase 10's
+screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, on any Chrome now, signed in on dev as an
+account that passed the 13+ check on an iPhone (Q7), and AN6f's checks on a Chrome before 136; prod's Android client, the
+owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that needs them (Open owner items,
+6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
+`docs/PLAN.md`'s, replaced by AN9j's on 2026-11-13: _Last updated: 2026-11-13 (Central) — Android's sign-out page made sure where the browser offers no
+ephemeral tab (AN6f, #591; DECISIONS 2026-11-13). Before it, Android's live lesson in the app, AN13
+done (AN13g, #590). Next: the owner's switch of prod's domain, the release call and
+disabling the review account (Open owner items); a session builds the retire-a-block command and S12;
+the owner the sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02);
+AN9j, AN9k, AN11, AN12; AN1's part 2 on the owner's phones; the audit's polish waits._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN6f's on 2026-11-13: _Last updated: 2026-11-13 (Central) — AN13g, the lesson in the app, and with it AN13 (#590; `docs/DECISIONS.md`, 2026-11-13):
 `BaliApp.start` makes the lesson half once a run beside the account, in the run's own scope, so the run's end ends all of it;
 its client is the run's API under the run's sign-in on `transport.apart()`, a queue apart from the engine's, the app's own run
@@ -3039,6 +3058,12 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN9j's line, as it read when it was done (2026-11-13; `docs/DECISIONS.md`, 2026-11-13).
+
+- **AN9j** `409 account_deleted` read as signed out (the owner, 2026-11-12): today a deleted account's other phone says
+  "Something went wrong at Bali", and one locked in a lesson stays locked until the bell (twin: the iPhone's half, PLAN's C4d,
+  the Mac's) — validation: the JVM tests, the engine's and the router's
 
 AN6f's line, as it read when it was done (2026-11-13; `docs/DECISIONS.md`, 2026-11-13), the conductor's calls 3 and 4 added
 in a few words as the step's brief asked.

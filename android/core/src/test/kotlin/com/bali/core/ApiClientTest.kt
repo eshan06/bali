@@ -361,6 +361,53 @@ class ApiClientTest {
         }
 
     @Test
+    fun a409AccountDeletedIsToldToTheProviderThatGaveItsTokenWithTheAccountItNamesBeforeTheCallReturnsNoOtherAnswerIs(): Unit =
+        runBlocking {
+            // AN9j (the owner, 2026-11-12): read where every call's answer comes, so each client over one provider reads it alike,
+            // a client held to one account or a deletion's included; the answer is still the caller's, as before.
+            val told = mutableListOf<String?>()
+            var token: String? = jwt("a1")
+            val tokens =
+                object : TokenProvider {
+                    override suspend fun accessToken() = token
+
+                    override suspend fun deletedOnServer(account: String?) {
+                        told += account
+                    }
+                }
+            val deleted = """{"error":{"code":"conflict","reason":"account_deleted","message":"this account was deleted"}}"""
+            var reply = 409 to deleted
+            val client = ApiClient(base, tokens, TransportDouble { HttpAnswer(reply.first, emptyMap(), reply.second.encodeToByteArray()) })
+            val me = client.me()
+            assertEquals(listOf<String?>("a1"), told)
+            assertEquals(SendResult.Status(409), me.result)
+            assertEquals(ApiErrorReason.AccountDeleted, me.error?.error?.reason)
+            client.forAccount("a1").recordAgeCheck(RecordAgeCheckRequest("y1"))
+            client.forDeletion("a1").deleteMe(DeleteMeRequest("e1"))
+            assertEquals(listOf<String?>("a1", "a1", "a1"), told)
+            // A token naming no account: told so, for none.
+            token = token("""{"iat":1000000000,"exp":1000003600}""")
+            client.tap(TapRequest("TAG-1", "e2", at))
+            assertEquals(listOf("a1", "a1", "a1", null), told)
+            // Every other answer is the caller's alone: another 409's reason, a 409 naming none, the reason under another status.
+            token = jwt("a1")
+            val others =
+                listOf(
+                    409 to """{"error":{"code":"conflict","reason":"event_id_conflict","message":"no"}}""",
+                    409 to """{"error":{"code":"conflict","message":"no"}}""",
+                    409 to """{"error":{"code":"conflict","reason":"account_deleted_since","message":"no"}}""",
+                    403 to deleted,
+                    200 to """{"passed":false}""",
+                )
+            for (other in others) {
+                reply = other
+                client.me()
+                client.forDeletion("a1").ageCheck()
+            }
+            assertEquals(4, told.size)
+        }
+
+    @Test
     fun eachRequestAsksForTheTokenAfreshSoARefreshedOneGoesOnTheNext(): Unit =
         runBlocking {
             val transport = TransportDouble.answering(200)

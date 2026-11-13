@@ -39,11 +39,22 @@ interface TokenProvider {
      * as Delete account does, and the check's own read, which makes no account either, goes first.
      */
     suspend fun deletionToken(account: String?): String? = accessToken(account)
+
+    /**
+     * Bali's server answered a call made under [account]'s token `409 account_deleted` (C3d): that account is deleted there. The
+     * [ApiClient] tells the provider that gave the token, whichever call heard it, before its caller hears the answer, so every
+     * client over one provider reads it alike, the lesson's and AN11's push token's too: the sign-in's reads it as signed out
+     * (AN9j; [SignIn.whenDeletedOnServer]). [account] is the token's `sub`, none for a token that names none. By default nothing;
+     * it never throws.
+     */
+    suspend fun deletedOnServer(account: String?) {}
 }
 
 /** A provider's tokens for [account] alone: its deletion token, [deletion], else its access token. */
 private class AccountTokens(private val tokens: TokenProvider, private val account: String?, private val deletion: Boolean) : TokenProvider {
     override suspend fun accessToken() = if (deletion) tokens.deletionToken(account) else tokens.accessToken(account)
+
+    override suspend fun deletedOnServer(account: String?) = tokens.deletedOnServer(account)
 }
 
 /** Why a call has no answer: [SendResult.NetworkError], which every outbox table reads as retry. */
@@ -247,10 +258,13 @@ class ApiClient(
         val reply = try { transport.send(request) } catch (error: IOException) { return noAnswer(NoAnswer.Unreachable) }
         // A body is read only as its status's: a 2xx's as the answer, any other's as the error.
         val ok = reply.status in 200..299
+        val error = if (ok) null else decoded(ApiErrorBody.serializer(), reply.body)
+        // The account the token names, deleted on Bali's server: told to the provider that gave it, every call's alike (AN9j).
+        if (reply.status == 409 && error?.error?.reason == ApiErrorReason.AccountDeleted) tokens.deletedOnServer(Tokens.subject(token))
         return ApiResponse(
             result = SendResult.Status(reply.status),
             answer = if (ok) decoded(answer, reply.body) else null,
-            error = if (ok) null else decoded(ApiErrorBody.serializer(), reply.body),
+            error = error,
             noAnswer = null,
             etag = reply.header("ETag"),
             retryAfter = reply.header("Retry-After")?.toIntOrNull(),

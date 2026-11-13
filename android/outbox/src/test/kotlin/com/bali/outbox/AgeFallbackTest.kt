@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -160,14 +161,18 @@ class AgeFallbackTest : EngineFiles() {
         }
 
     @Test
-    fun aYesBalisServerRefusesForGoodTheAccountDeletedOnItsWayIsLetGoNeverSentAgainTheAccountAskedOnceMoreOnlyWhereTheServerHasNoYes(): Unit =
+    fun aYesBalisServerRefusesAsTheAccountDeletedOnItsWayIsLetGoWithItsSignInReadAsSignedOutNothingMoreSentUnderIt(): Unit =
         runBlocking {
-            // C7-server: `409 account_deleted`.
+            // C7-server: `409 account_deleted`, read as signed out since AN9j (the owner, 2026-11-12), as every call's is.
             val rig = signedRig(gated = true)
             rig.signStudentIn(accessToken("a1"), yes = "y1")
             yesSent(rig, listOf(409 to """{"error":{"code":"conflict","reason":"account_deleted","message":"gone"}}"""))
-            eventually { rig.signIn.yes() == null }
-            noYesAtTheNextWake(rig)
+            eventually { rig.keychain.isEmpty }
+            assertNull(rig.signIn.yes())
+            assertNull(rig.signIn.account())
+            rig.engine.retryNow()
+            rig.until { it.link == Link.SignIn && it.meFailed == SendResult.NetworkError }
+            assertEquals(emptyList(), rig.server.waiting)
             rig.stop()
         }
 
