@@ -14,14 +14,11 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-12 (Central) — AN13e, the slide's deck, asked for once, one document at a time (#578; `docs/DECISIONS.md`,
-2026-11-12), the fifth of AN13's seven steps: `Lessons.kt`'s deck half, BaliApp.swift's `Phone`'s, and `Slide.kt`: the slide the
-lesson shows, its deck loading, failed or ready; asked for by a screen alone, once per `sha256`, never while on its way nor on a
-page turn, Try again once more after it came; one document open at a time, closed once the slide's deck changes, at the bell, a
-change of who is signed in, a deletion and the run's end; a page past the document's pages, or a document lost after it opened,
-failed; the slide's two lines, iOS's; and the seam the app's renderer fills (`Renderer`). Two of #577's WARNs closed: a bell let
-go follows nothing, and Bali's screen in front twice runs one poll. Nothing kept, no screen. The owner answered Q2 and Q3
-(DECISIONS 2026-11-12). Before it, AN13d, the lesson followed. Next: AN13f, the page drawn, then AN13g; AN11, AN12 and Phase
+_Last updated: 2026-11-12 (Central) — AN13e2, the slide-deck case's flake on main's CI, fixed in its rig (#584; `docs/DECISIONS.md`,
+2026-11-12), test-only, Bali's code unchanged: the deck's check hashes on `Dispatchers.Default`, and SlideTest's deck rig, which
+ran the lesson half on Unconfined, went on there with the rest, the lesson half's lock held as the test answered the next read;
+the rig now keeps the lesson half on the test's own thread, the race staged in a test that failed first with CI's message.
+Before it, AN13e, the slide's deck, asked for once, one document at a time. Next: AN13f, the page drawn, then AN13g; AN11, AN12 and Phase
 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed
 the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform is on the
 PC (the owner's OK, 2026-11-12), compileSdk 37 with today's AndroidX and OkHttp 5.5 coming in the step that needs them (Open
@@ -205,6 +202,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN13c** Which lesson, its heading, and the answer card's looks and words — ✅ (#576; DECISIONS 2026-11-12)
 - **AN13d** The lesson followed: the poll while Bali is in front, the answer, Hide — ✅ (#577; DECISIONS 2026-11-12)
 - **AN13e** The slide's deck, asked for once, one document at a time — ✅ (#578; DECISIONS 2026-11-12)
+- **AN13e2** The slide-deck case's flake on main's CI: the deck rig's lesson half on the test's own thread — ✅ (#584; DECISIONS 2026-11-12)
 - **AN13f** The page drawn with `PdfRenderer` (twin: SlideView.swift's PDFKit page), to the owner's answers to Q2 and Q3
   (DECISIONS 2026-11-12) — validation: the instrumented tests on `Bali_Spike_API35` and `37`
 - **AN13g** The lesson in the app, AN13 done (twin: BaliApp.swift's `start` and `setForeground`), after AN13f —

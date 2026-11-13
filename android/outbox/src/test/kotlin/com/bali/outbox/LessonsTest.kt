@@ -30,6 +30,9 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.thread
+import kotlin.coroutines.ContinuationInterceptor
+import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -42,12 +45,14 @@ import kotlin.test.fail
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -68,7 +73,8 @@ import kotlinx.serialization.json.jsonObject
 // of the lesson's calls than OkHttp's five a host are held, over real sockets. AN13e's: AppTests' slideOncePerDeck and
 // slideAsksAsItShows, their rules without their views, over a renderer that counts its opens and closes (SlideSupport.kt); a page
 // past the document's, every DeckResult, a stale ask's document, the run's end, the real account's changes; and two of Claude
-// Review's WARNs on #577, the bell let go and Bali's screen in front twice.
+// Review's WARNs on #577, the bell let go and Bali's screen in front twice. And the flake on main's CI (2026-11-12): a read
+// answered while a deck's open holds the lesson half's lock on a thread of its own, staged.
 
 val pollRoute = "GET /v1/sessions/s/presentation"
 val answerRoute = "POST /v1/questions/q/answers"
@@ -210,14 +216,34 @@ private fun EngineFiles.lessonRig(): LessonRig {
 }
 
 /**
- * [lessonRig]'s, its lesson half's own scope [Dispatchers.Unconfined]: each call it starts runs on the thread that starts or wakes
- * it up to its first wait, a reply's, a sleep's or its lock's, so once a call returns, whatever it sent is sent and whatever it
- * waits on it waits on, never a window of time.
+ * [lessonRig]'s, its lesson half's own scope on the test's own thread ([TestsThread]): each call the test starts, and each wait the
+ * test ends (a reply, the clock moved, a hold let go), runs at once there up to its first wait, a reply's, a sleep's or its lock's,
+ * as [Dispatchers.Unconfined] runs it, so once a call returns, whatever it sent is sent and whatever it waits on it waits on, never
+ * a window of time. What another thread wakes, the deck's check above all (core's `sha256`, on [Dispatchers.Default]), runs there
+ * as the test next waits, never at once with a step of the test, so a test reads what it did only after a wait that lets it run:
+ * a mark, or a lock-taking call once that work waits on the lock. On Unconfined it ran on, and held the lock on, a thread of its
+ * own (the flake of 2026-11-12, staged in [SlideTest]), unlike iOS's AppTests, their `Phone` and the test on the main actor. A
+ * run a test starts in a scope of its own (`lessons.run()` in [EngineFiles.scope]) runs its own stretches there, as the app's.
  */
-private fun EngineFiles.deckRig(accounts: Flow<Account.State> = emptyFlow()): LessonRig {
+private suspend fun EngineFiles.deckRig(accounts: Flow<Account.State> = emptyFlow()): LessonRig {
     val (server, clock, renderer) = Triple(Server(), TestClock(), FakeRenderer())
-    val unconfined = CoroutineScope(scope.coroutineContext + Dispatchers.Unconfined)
-    return LessonRig(Lessons(accounts, client(server), renderer, unconfined, clock), server, clock, renderer)
+    val confined = CoroutineScope(scope.coroutineContext + TestsThread(currentCoroutineContext()))
+    return LessonRig(Lessons(accounts, client(server), renderer, confined, clock), server, clock, renderer)
+}
+
+/**
+ * The test's own thread as a dispatcher, made in its `runBlocking` from [test], that call's context: on that thread, what is
+ * started or woken runs at once up to its first wait, as [Dispatchers.Unconfined] runs it; from any other thread it goes to the
+ * test's own loop, `runBlocking`'s, and runs on the test's thread as the test next waits. So nothing it runs ever runs at once
+ * with the test.
+ */
+private class TestsThread(test: CoroutineContext) : CoroutineDispatcher() {
+    private val thread = Thread.currentThread()
+    private val loop = checkNotNull(test[ContinuationInterceptor] as? CoroutineDispatcher) { "a deck rig is made in its test's runBlocking" }
+
+    override fun isDispatchNeeded(context: CoroutineContext): Boolean = Thread.currentThread() !== thread
+
+    override fun dispatch(context: CoroutineContext, block: Runnable) = loop.dispatch(context, block)
 }
 
 /** The reads of the truth answered with [me] as they come until the next request to [route], returned: a deletion waits out the loops'. */
@@ -816,8 +842,10 @@ class LessonsTest : EngineFiles() {
         runBlocking {
             // Claude Review's WARN on #577: the bell's job is the lesson half's scope's, not the run's, so a bell woken as the run
             // ends could follow the next lesson after the run's end. Staged with no window of time: the run's end holds the lesson
-            // half's lock, closing the slide's document, as the bell wakes on this thread (the rig's scope is Unconfined) and waits
+            // half's lock, closing the slide's document, as the bell wakes on this thread (the rig's lesson half runs here) and waits
             // there for the lock; then the run's end lets the bell go, and the lock. At Period 3's bell, Period 4's would follow.
+            // The lock goes to the bell's stretch next, which the rig runs as this test next waits, so the lesson is read once
+            // `polling()` has had the lock after it: even when the run has ended before the test's join, which then never waits.
             val accounts = MutableStateFlow(twoInSession())
             val rig = deckRig(accounts)
             val lessons = rig.lessons
@@ -836,8 +864,8 @@ class LessonsTest : EngineFiles() {
             rig.clock.releaseWakes()
             closing.release()
             withTimeout(patience) { running.join() }
-            assertNull(lessons.state.value.lesson, "a bell let go as the run ended followed a lesson after it")
             assertFalse(lessons.polling())
+            assertNull(lessons.state.value.lesson, "a bell let go as the run ended followed a lesson after it")
         }
 }
 
@@ -903,6 +931,50 @@ class SlideTest : EngineFiles() {
             rig.server.next(bucketRoute("d3")).reply(200, third)
             assertEquals(1, rig.document().pages)
             rig.renderer.holds(lessons, "the third deck in")
+        }
+
+    @Test
+    fun aReadAnsweredWhileTheLastDecksOpenStillHoldsTheLessonHalfsLockOnAThreadOfItsOwnIsShownAsTheRigsNextReturnsSoTheSlideAskedForIsTheOneShown(): Unit =
+        runBlocking {
+            // The flake that turned main's CI red (run 43331986903), the case above's: the deck's check, `sha256` in core on
+            // Dispatchers.Default, woke the second deck's fetch on a thread of its own, where its open kept the document under the
+            // lesson half's lock as the test answered the teacher's next read. The read's watch waited for that lock, so the rig's
+            // `next` returned with the second deck still shown; the test asked for that slide, which the lesson half drops as
+            // stale, and nothing asked for the deck shown: the wait for its document never ended. Staged with no window of time:
+            // the second deck's bytes answered on a thread of the test's own, so its open's stretch never runs on the test's
+            // thread unless the rig puts it there, and that stretch held inside the lock until the test has read the slide.
+            val rig = deckRig()
+            val lessons = rig.lessons
+            val (first, second) = pdf("Factoring", 3) to pdf("Graphs", 2)
+            lessons.setInFront(true)
+            lessons.followed(ana())
+            rig.read(presentation(slide = slideOf(first)))
+            lessons.ask(rig.slide())
+            rig.fetch(first)
+            rig.document()
+            // Asked again once in, as the case is: nothing fetched, and its wait for the lock ends the first deck's stretch.
+            lessons.ask(rig.slide())
+            rig.next(presentation(slide = slideOf(second, id = "d2")))
+            lessons.ask(rig.slide())
+            rig.server.next(downloadRoute("d2")).reply(200, presigned("d2"))
+            val bytes = rig.server.next(bucketRoute("d2"))
+            val keeping = rig.renderer.holdKeep()
+            val answering = thread { bytes.reply(200, second) }
+            try {
+                keeping.taken()
+                // The first deck again, as the case shows it: its read answered while the second's stretch holds the lock, then
+                // the slide shown read and asked for, from LiveLesson's memory, once the stretch has let the lock go.
+                rig.next(presentation(slide = slideOf(first, page = 3)))
+                val shown = rig.slide()
+                keeping.release()
+                lessons.ask(shown)
+                assertEquals(3, rig.document().pages)
+                assertEquals(2, rig.downloads, "the first deck downloaded again")
+                rig.renderer.holds(lessons, "the first deck again")
+            } finally {
+                keeping.release()
+                answering.join()
+            }
         }
 
     @Test
