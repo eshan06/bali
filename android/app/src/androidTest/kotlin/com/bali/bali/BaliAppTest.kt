@@ -222,6 +222,8 @@ class BaliAppTest {
                 val engine = SyncEngine.make(outbox, URI(API), signIn, scope, server)
                 app.start(engine, scope)
                 val account = checkNotNull(checkNotNull(app.running.value).account)
+                // And no lesson half: the app's own lesson client goes with the app's own run alone, and this one hands none (AN13g).
+                assertNull("a test's run given the app's own lesson client", checkNotNull(app.running.value).lessons)
                 until { account.state.value.takeIf { it.signedIn == false } }
                 server.signStudentIn(signIn, scope, "student-1")
                 // Not through the check: Bali asked under the student's own account, the starting mark meanwhile.

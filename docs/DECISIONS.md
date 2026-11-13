@@ -8,6 +8,100 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-13** — **AN13g, the lesson in the app, and with it AN13: `BaliApp.start` makes the lesson half once a run beside
+  the account, in the run's own scope; its client is handed to `start`, the app's own run alone getting one unasked, so no
+  test's lesson half can reach dev; Bali in front drives its poll; its decks open in the app's one renderer (this step's calls,
+  marked, each awaiting the owner's look; AN13g, #590).** The owner said to take the recommended option on every regular call,
+  so each call here is this step's, for the owner to look at. It replaces the wiring AN13d's and AN13e's entries (below)
+  foresaw, `ApiClient(config.api, signIn, transport.apart())` inside `start`: since AN6d the build's config is dev's, and the
+  instrumented tests start runs of their own, so that line would have sent a test's polls to dev's real API.
+
+  **Where it lives:** `app`'s `BaliApp.kt`. `start` makes `Lessons(account.state, lessonClient, renderer, within, looks =
+  looks)` beside the account and launches its `run()` in the run's job; `Running.lessons` carries it, and the screens (AS8)
+  read `running.value?.lessons?.state`; `ownLessonClient` is the app's own run's client; `renderer` is one `IsolatedRenderer(this,
+  scope)` for the app's life, lazy; `transport` is declared `OkHttpTransport`, so `apart()` is callable, the engine and the
+  sign-in keeping the transport they have. `core`'s deck fetch (`LiveLesson.fetch`) gains the 30 s cap's note, as iOS's code
+  names it (#575's Claude Review WARN 1). `outbox` unchanged. No screen and no user-facing word (AS8's), no library, no SDK
+  package.
+
+  **The twin, and where Kotlin differs:** BaliApp.swift's `Phone` follows the lesson through the engine's own client, and its
+  `setForeground` cancels or runs the poll before its `Task` reaches the engine. Here the lesson half takes a client of its own
+  over a transport apart (AN13d, decision 5), made once a run beside the account (AN9i's pattern), and Bali in front tells the
+  lesson half first, then the engine, in the one collector that already told the engine (AN7d's).
+
+  **This step's calls, each awaiting the owner's look:**
+  1. **The run's client is handed to `start`** (`lessonClient`). Unasked, it is the app's own (`ownLessonClient`): the API the
+     engine was made over (`engine.client.baseUrl`), under the app's sign-in, on `transport.apart()`, and only while the engine
+     is the one the app's start made over that sign-in (`overSignIn`, the guard AN6d gave the readout's Sign in). Any other
+     engine, a test's, gets none unless its run hands one, so a test's lesson half reaches only the server its run hands
+     `start`. Weighed: the client made from the engine itself (`engine.client` with its transport set apart), safe for tests by
+     construction, but `ApiClient`'s transport is `core`'s alone, so it needed a new public call in `core` the wiring can do
+     without.
+  2. **None without a client, beside none without an account:** the app's own run has both or neither (its engine is over the
+     app's sign-in exactly when it has an account), so only a test's run can have an account and no lesson half, as the
+     suite's other tests' runs now do.
+  3. **Bali in front tells the lesson half before the engine,** so going behind stops the poll before the engine's release
+     write, iOS's order.
+  4. **The renderer is the app's, lazy, made at the first start** in the app's scope (AN13f's WARN 2: a cancelled scope would
+     leave its service bound), so a run's end closes its document and the close still unbinds. Never made in the renderer's
+     isolated process, whose `onCreate` returns first.
+  5. **AN6f's line in PLAN-ANDROID,** a step to build, is the conductor's call (2026-11-13), awaiting the owner's look; its
+     worker records its why with its code.
+
+  **The run's end ends all of it:** the lesson half's scope is a child of the run's job, so a run's end (a new `start`, or its
+  job ending) cancels its poll, its bell, a fetch and an answer on its way (its caller told by a cancel), and `run()`'s end
+  closes its document; `cancelAndJoin` on the run waits for all of them. A coroutine the lesson half launches after that never
+  runs, so #577's Claude Review WARN 1, a bell woken as the run ends starting a lesson after it, stays unreachable in the app by
+  its structure, beside AN13e's guard inside `Lessons`.
+
+  **The tests** (`LessonAppTest`, instrumented, six new): each run the test's own, as BaliAppTest's are, over a sign-in, a
+  server and an outbox file of the test's own, the lesson's client handed to `start` over the same server through a transport
+  that keeps each call and marks it cut short. The poll only while Bali is in front: none behind from the start, its read on its
+  way cut short as Bali goes behind, again at once back in front. An answer is one request of the lesson's own client, and the
+  engine's queue and the run's outbox file hold no record. A slide's deck asked for with `ask`, as AS8 will, is fetched once,
+  opened by the app's renderer and drawn through the `Deck` its ready phase holds: page 1's pixels, then page 2's from the same
+  document after a page turn that fetched nothing. A run with no account has no lesson half, though handed a client. The run's
+  end, after Period 3's bell has rung and Period 4's lesson is followed afresh (Q7), its deck open, an answer and a read on
+  their way: both cut short, the answer's caller told, the document closed, the renderer unbound and its process ended, and the
+  next run's first read coming with nothing more of the ended run's by then. A new `start` in place of a run makes a lesson half
+  of its own, reading through its own client, the old one's read cut short and its document closed, the renderer's process
+  ended. BaliAppTest's start tests read the lesson half too: the app's own set-up start has one, following nothing; a start
+  given no config has none; and a test's run over a sign-in of its own, handing no client, has none (santa's WARN). Each check
+  that something doesn't happen waits for a mark: a call's sender leaving, a binding's end, or the server's count after a known
+  request. The decks are drawn in code with `PdfDocument` (IsolatedRendererTest's helper, made `internal`), and the tests'
+  `Server` gained a reply of bytes for them.
+
+  **A test's notes, put back through to the disk:** LessonAppTest's restore of the phone's notes ends with an empty `commit`.
+  The notes write behind (`apply`), and the last test's restore was lost as the run's process ended, so the next run's tests
+  "restored" that student's notes (seen on `Bali_Spike_API35` in this step's runs; the emulator's notes file removed by hand
+  after). BaliAppTest's notes test puts them back the same way, behind; it isn't a run's last test, but a run of it alone could
+  leave them.
+
+  **Broken on purpose, each failing by name, then reverted (on `Bali_Spike_API35`):** `front` left unwired to the lesson half
+  (five of the six, `never came in PT30S` at the lesson's first read in front); the lesson half made with no account (`a lesson
+  half with no account expected null`); the lesson half in the app's scope, its `run()` still in the run's (`the answer on its
+  way as the run ended went on`), and both in the app's scope (that, and `the old lesson half's read on its way went on`); a
+  test's lesson half made from the build's config, `ApiClient(config.api, signIn, transport.apart())`, run with the emulator in
+  Airplane mode and the app's own sign-in signed out, so nothing could leave (the poll test, `never came in PT30S`: the request
+  at the test's server never came; a first try without Airplane mode was refused by this session's own safety check before
+  anything ran); and the app's own lesson client given to every run, `ownLessonClient`'s `overSignIn` guard dropped
+  (BaliAppTest's account test, `a test's run given the app's own lesson client expected null`). `transport` for
+  `transport.apart()` in the app's own client: no test in the app can show it, since no test drives the app's own run's lesson
+  half to send (nobody signs in there) and `ApiClient`'s transport is `core`'s alone; AN13d's queue tests in `core` and
+  `outbox` cover the queue.
+
+  **Nothing reached dev:** after each run, `dumpsys netstats`, polled, listed no traffic for Bali's uid or its test app's.
+
+  **The runs:** RUNS
+
+  **Santa's review:** SANTA
+
+  **For AS8 and Phase 10:** AS8 reads `running.value?.lessons?.state` (its card, its slide and its heading), calls `answer` and
+  `hide` from the card, and `ask(slide)` as the slide shows and at each change of `SlideShown` (Try again: `ask(slide, again =
+  true)`), and draws a `Ready` slide's document as a `Deck`, off the main thread; `lessons` is none without an account, nothing
+  to show. The unlock screen calls `setUnlockHeld` as Emergency Unlock's press starts and ends. The screens tell the app they are
+  in front through `BaliApp.front`, as the readout does.
+
 - **2026-11-13** — **AN6e, Cognito's session ended after each sign-in where the phone's browser offers no ephemeral tab: the
   sign-in page's answer kept while Cognito's `/logout` opens in the same browser, the code traded only once that page comes
   back at the client's sign-out URL, and a sign-in whose sign-out page closed first left unfinished (this step's calls,
