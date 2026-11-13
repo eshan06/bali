@@ -284,6 +284,9 @@ class LiveLesson(
         val url = download.answer?.url?.let(::address)
         if (result.code !in 200..299 || url == null) return DeckResult.Refused(result.code, download.error?.error?.reason)
         val request = HttpRequest("GET", url, mapOf("Accept-Encoding" to "identity"), null, client.timeout)
+        // ponytail: a deck rides the client's transport, its whole exchange bounded at 30 s (`OkHttpTransport.EXCHANGE_TIMEOUT`):
+        // 25 MB needs about 7 Mbit/s a phone, and a class fetching it at once shares one access point; give decks a transport of
+        // their own if several phones at once on school Wi-Fi (AP3) find it short.
         val bucket =
             try {
                 client.transport.send(request)

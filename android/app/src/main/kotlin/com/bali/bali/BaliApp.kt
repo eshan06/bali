@@ -10,12 +10,13 @@ import android.database.ContentObserver
 import android.os.Process
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import com.bali.core.ApiClient
 import com.bali.core.AppConfig
-import com.bali.core.HttpTransport
 import com.bali.core.OkHttpTransport
 import com.bali.core.SignIn
 import com.bali.outbox.Account
 import com.bali.outbox.Enforcer
+import com.bali.outbox.Lessons
 import com.bali.outbox.Notes
 import com.bali.outbox.Outbox
 import com.bali.outbox.Problem
@@ -41,14 +42,14 @@ import kotlinx.coroutines.launch
 
 /**
  * The app's process, and what lives as long as it does: the engine, the lock (AN7), the account (AN9i), the notes and the router
- * (AN10c), which the screens (Phase 10) take from here.
+ * (AN10c), the lesson half and its renderer (AN13g), which the screens (Phase 10) take from here.
  */
 class BaliApp : Application() {
     /** The app's scope: never a screen's, a ViewModel's or a service's, in which no renewal starts again once ended (AN6b). */
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    /** The one transport, the sign-in's and the engine's (AN3d). */
-    val transport: HttpTransport by lazy { OkHttpTransport() }
+    /** The one transport, the sign-in's and the engine's (AN3d); the lesson half's calls go through one apart from it (AN13g). */
+    val transport: OkHttpTransport by lazy { OkHttpTransport() }
 
     /** The build's config; none while a value isn't set, as the client id while it's empty: sign-in isn't set up. */
     val config: AppConfig? by lazy {
@@ -66,6 +67,13 @@ class BaliApp : Application() {
 
     /** The lock, Bali's Accessibility service: one for the run, the last run's lock read as it's made (Q4). */
     val lock: ServiceLock by lazy { ServiceLock(this) }
+
+    /**
+     * The slide's deck renderer (AN13f), one for the app's life, handed to each run's lesson half: in the app's scope, so a
+     * document closed as its run ends still unbinds the renderer's process. Made at the first start, never in that isolated
+     * process, where [onCreate] starts nothing of Bali's.
+     */
+    internal val renderer: IsolatedRenderer by lazy { IsolatedRenderer(this, scope) }
 
     /** The screen as the lock's service hears it: on while the service is bound and the screen is on. */
     internal val screen = MutableStateFlow(false)
@@ -117,10 +125,11 @@ class BaliApp : Application() {
     internal lateinit var launched: Job
 
     /**
-     * The app's one engine, the enforcer keeping the lock where its truth says, and the account's half over the engine's
-     * sign-in: none over an engine with no sign-in, a Debug build's while sign-in isn't set up.
+     * The app's one engine, the enforcer keeping the lock where its truth says, the account's half over the engine's sign-in,
+     * and the lesson half beside it (AN13g), whose `state` the screens draw (AS8): neither over an engine with no sign-in, a
+     * Debug build's while sign-in isn't set up.
      */
-    class Running internal constructor(val engine: SyncEngine, val enforcer: Enforcer, val account: Account?, internal val job: Job)
+    class Running internal constructor(val engine: SyncEngine, val enforcer: Enforcer, val account: Account?, val lessons: Lessons?, internal val job: Job)
 
     override fun onCreate() {
         super.onCreate()
@@ -195,22 +204,28 @@ class BaliApp : Application() {
      * (AN7b). The service's connect and unbind run it too ([check]), and Bali's own screen coming to the
      * front ([front]), after the truth is asked for, as iOS's coming back has both. And the account over the
      * engine's sign-in, one a run (AN9e's `Account`), over the phone's [notes]: its 13+ check's ask hooked at
-     * each wake, and each sign-in followed (AN9i).
+     * each wake, and each sign-in followed (AN9i). Beside it the lesson half (AN13d's `Lessons`), over
+     * [lessonClient], the lesson's own client, and the app's [renderer]: none without an account or a client,
+     * which the app's own run alone gets unasked ([ownLessonClient]), a test's handing one over its own server.
+     * In the run's own scope, so the run's end ends all of it, its poll, its bell, a fetch and its document;
+     * Bali's screen in front runs its poll, told before the engine, as iOS's `setForeground` tells it (AN13g).
      */
-    fun start(engine: SyncEngine, scope: CoroutineScope = this.scope) {
+    fun start(engine: SyncEngine, scope: CoroutineScope = this.scope, lessonClient: ApiClient? = ownLessonClient(engine)) {
         val job = SupervisorJob(scope.coroutineContext[Job])
         val within = CoroutineScope(scope.coroutineContext + job)
         val enforcer = Enforcer(engine, lock, within)
         val account = Account.of(engine, within, notes = notes)
-        val running = Running(engine, enforcer, account, job)
+        val lessons = account?.let { held -> lessonClient?.let { Lessons(held.state, it, renderer, within, looks = looks) } }
+        val running = Running(engine, enforcer, account, lessons, job)
         runs.getAndUpdate { running }?.job?.cancel()
         job.invokeOnCompletion { runs.compareAndSet(running, null) }
         within.launch { engine.run() }
         within.launch { enforcer.run() }
         account?.let { within.launch { it.run() } }
+        lessons?.let { within.launch { it.run() } }
         // From the screen's first turn on: the engine starts with it off. Bali's own screen in front likewise.
         within.launch { screen.dropWhile { !it }.collect { engine.setScreenOn(it) } }
-        within.launch { front.dropWhile { !it }.collect { engine.setInFront(it); if (it) check() } }
+        within.launch { front.dropWhile { !it }.collect { lessons?.setInFront(it); engine.setInFront(it); if (it) check() } }
         val switch =
             object : ContentObserver(null) {
                 override fun onChange(selfChange: Boolean) = check()
@@ -219,6 +234,15 @@ class BaliApp : Application() {
         job.invokeOnCompletion { contentResolver.unregisterContentObserver(switch) }
         check()
     }
+
+    /**
+     * The lesson's own client for [engine] while it is the app's own run's, made over the app's sign-in ([overSignIn]): the API
+     * the engine was made over, under that sign-in, on a transport apart from the engine's, so no poll or answer ever waits in a
+     * queue ahead of an Emergency Unlock's send (decision 5). None for any other engine, a test's above all: the build's config is
+     * dev's (AN6d), so a test's lesson half reaches only the server its run hands [start].
+     */
+    private fun ownLessonClient(engine: SyncEngine): ApiClient? =
+        signIn?.takeIf { engine === overSignIn }?.let { ApiClient(engine.client.baseUrl, it, transport.apart()) }
 
     /**
      * Rule 3's check, made now, of the run there is: none before the app's start, whose own check stands for

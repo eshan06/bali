@@ -110,9 +110,10 @@ class BaliAppTest {
             assertTrue(context.getDatabasePath(OUTBOX_FILE).exists())
             app.begin()
             val run = checkNotNull(app.running.value)
-            // Made over the app's own sign-in, whose account it runs.
+            // Made over the app's own sign-in, whose account it runs, and the lesson half beside it (AN13g), following nothing.
             assertSame(app.overSignIn, run.engine)
             until { checkNotNull(run.account).state.value.takeIf { it.signedIn == false } }
+            assertNull(checkNotNull(run.lessons) { "no lesson half beside the account" }.state.value.lesson)
             // The truth read, as Bali in front reads it: never sent, for want of a token, so waiting on sign-in.
             run.engine.setInFront(true)
             until { run.engine.updates.value.takeIf { it.link == Link.SignIn } }
@@ -127,8 +128,9 @@ class BaliAppTest {
         runBlocking {
             app.begin { app.made(config = null) }
             val run = checkNotNull(app.running.value)
-            // An engine with no sign-in has no account half to run.
+            // An engine with no sign-in has no account half to run, and so no lesson half beside it (AN13g).
             assertNull(run.account)
+            assertNull(run.lessons)
             run.engine.setInFront(true)
             until { run.engine.updates.value.takeIf { it.link == Link.SignIn } }
             assertNull(run.engine.updates.value.heardAt)
@@ -220,6 +222,8 @@ class BaliAppTest {
                 val engine = SyncEngine.make(outbox, URI(API), signIn, scope, server)
                 app.start(engine, scope)
                 val account = checkNotNull(checkNotNull(app.running.value).account)
+                // And no lesson half: the app's own lesson client goes with the app's own run alone, and this one hands none (AN13g).
+                assertNull("a test's run given the app's own lesson client", checkNotNull(app.running.value).lessons)
                 until { account.state.value.takeIf { it.signedIn == false } }
                 server.signStudentIn(signIn, scope, "student-1")
                 // Not through the check: Bali asked under the student's own account, the starting mark meanwhile.

@@ -10,6 +10,24 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN13g's on 2026-11-13: _Last updated: 2026-11-13 (Central) — AN6e, Cognito's session ended after each sign-in where the phone's browser offers no
+ephemeral tab (#589; `docs/DECISIONS.md`, 2026-11-13): there, and with no Custom Tabs browser, the sign-in page's answer is
+kept while Cognito's `/logout` opens in the same browser and kind of tab, never ephemeral, and handed over, its code traded,
+only once that page comes back at the build's new sign-out URL, `com.bali.bali://auth/signout`, exactly. That page closed
+first leaves the sign-in unfinished, `SignInError.BrowserNotSignedOut`, nothing traded; Sign out is left as it is (this
+step's calls, awaiting the owner). No screen, no word. Before it, AN6d, Android's dev sign-in client in the build. Next:
+AN13g, AN9j and AN9k, AN11, AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's
+phones, on any Chrome now, signed in on dev as an account that passed the 13+ check on an iPhone (Q7); prod's Android client,
+the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that needs them (Open owner
+items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
+`docs/PLAN.md`'s, replaced by AN13g's on 2026-11-13: _Last updated: 2026-11-13 (Central) — Android's sign-in ends Cognito's session after each sign-in in a
+browser with no ephemeral tab, one more page (AN6e, #589; DECISIONS 2026-11-13). Before it, Android's
+build signing in on dev (AN6d, #588). Next: the owner's switch of prod's domain, the release call and
+disabling the review account (Open owner items); a session builds the retire-a-block command and S12;
+the owner the sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02);
+AN9j, AN9k, AN11–AN13; AN1's part 2 on the owner's phones; the audit's polish waits._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN6e's on 2026-11-13: _Last updated: 2026-11-13 (Central) — AN6d, Android's dev sign-in client in the build (#588; `docs/DECISIONS.md`,
 2026-11-13): the build signs in through dev's `bali-android-dev-public`, made on 2026-11-12 on the owner's ask, at
 `com.bali.bali://auth/callback`, two slashes since Cognito's console refused RFC 8252's one; dev's authorize endpoint sends
@@ -3003,6 +3021,12 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN13g's line, as it read when it was done (2026-11-13; `docs/DECISIONS.md`, 2026-11-13), the last of AN13's seven; its runs
+covered `Bali_Spike_API33` too, as the step's brief asked.
+
+- **AN13g** The lesson in the app, AN13 done (twin: BaliApp.swift's `start` and `setForeground`), after AN13f —
+  validation: the instrumented tests on `Bali_Spike_API29`, `35` and `37`
 
 AN6e's line, as it read when it was done (2026-11-13; `docs/DECISIONS.md`, 2026-11-13).
 
