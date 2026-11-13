@@ -115,7 +115,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   at its start, 13 of 14 "not opened"). And after santa's review, each failing first on `Bali_Spike_API29`: a write through
   Android 10's descriptor that went through, and a draw that never ended, its screen gone, that never ended its process.
 
-  RESULTS_PLACEHOLDER
+  **What the runs showed, after the rebase onto main (`1f864f56`):** `IsolatedRendererTest`, 17 of 17 on `Bali_Spike_API29`
+  (Android 10), `_API35` and `_API37`; Gradle's build, Lint and Android 10's API check green, core's 153 and outbox's 569 JVM
+  tests run again, none failing; the npm checks green. The whole instrumented suite ran once, on `Bali_Spike_API29` before the
+  rebase (78 tests, 72 passed), and stands, since the rebase brought nothing into `android/` but #584's `outbox` tests. Its six
+  failures are `CoversTest`'s, none AN13f's, each for a step of its own (the conductor's). Five are a gap in the lock itself on
+  Android 10, its likely cause read from Android 10's source and the lock's code, not run: there `setServiceInfo` only adds
+  package names, never clears them (AOSP android10-release, `AbstractAccessibilityServiceConnection`), so once the lock has
+  listened to its own package alone outside a lesson (`ServiceLock.listen`), a lesson's `packageNames = null` leaves that filter
+  in place, and no other app's window is named or covered. The sixth is the test's own: it asks for Android 11's alert action
+  alone, where Android 10's cell broadcast app answers only `android.provider.Telephony.SMS_EMERGENCY_CB_RECEIVED`, which
+  `AllowList` already lists.
 
   **Santa's review:** two Claude Opus reviewers at max effort each round (no Codex or Gemini CLI on this PC, so context isolation
   holds and model diversity doesn't). Round 1: one blocker (reviewer B, Android 10's read-write descriptor) and WARNs, all fixed:
