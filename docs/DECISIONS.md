@@ -8,6 +8,126 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **AN13f, the slide's page drawn with `PdfRenderer` in an isolated process: AN13e's seam filled in `android/app`
+  to the owner's answers to Q2 and Q3, the sixth of AN13's seven steps (this step's own calls and the conductor's, marked, each
+  awaiting the owner's look; AN13f, #PRNUM).** The owner said to take the recommended option on every regular call, so each call
+  here is this step's or the conductor's, for the owner to look at.
+
+  **Where it lives:** `app`'s new `RendererService.kt`, the service where pdfium parses, declared in main's manifest with
+  `android:isolatedProcess="true"`, its process `:renderer`, not exported; and `IsolatedRenderer.kt`: `IsolatedRenderer`, the
+  `Renderer`; `Deck`, the `Document` the screens draw through (`draw(page, width, height)`); `Page`, a drawn page's bitmap and
+  its text (`said`). `BaliApp.onCreate` first runs `ownStart()`, which returns at once in an isolated process
+  (`Process.isIsolated()`) and in Bali's own empties `no_backup/deck/` alone. The Debug build's `ThisBuild.rendering` answers
+  the tests' calls into the service (who it is, its end, a hold); Release's answers none, pinned on the JVM. No library, no
+  build feature, no SDK package; `core` and `outbox` unchanged. No screen and no user-facing word (AS8's). Not wired yet: AN13g
+  makes the renderer in `BaliApp.start` and hands it to `Lessons`.
+
+  **The owner's rulings, built (Q2 and Q3, the entry below):** pdfium parses a deck and draws its page in a service process
+  Android isolates, a user id of its own with no permission and none of Bali's files, bound at the first open and unbound once
+  the last document closes, when Android ends it ("isolated not needed"), so the next deck opens in a new process. The deck goes
+  over from memory: from Android 11 as an anonymous memory file (`Os.memfd_create`), nothing on disk; on Android 10 as a file in
+  `no_backup/deck/` whose name is deleted the moment it opens, that folder emptied at each start of Bali's process and never
+  `no_backup/` itself, where the sign-in's file and the lock's stay. A crash of the renderer's process is a deck that failed:
+  every document it held is lost through the seam (`awaitLost`), the slide shows failed with Try again, and Bali's process lives
+  on. The isolated process gets the deck's descriptor and what to draw, nothing more.
+
+  **Said plainly, for the owner:**
+  - **On Android 10 the deck's bytes sit in a nameless file on the phone's storage for as long as its document is open.** Its
+    name lasts an instant and holds no byte; the bytes are written after it is gone and freed as the document closes (or the
+    renderer's process ends), but until then they are on the storage, and blocks freed may stay on the flash until reused.
+    ARCHITECTURE's "What's weaker than on iOS" says so.
+  - **From Android 11 the memory file is a second in-memory copy of the deck (up to 25 MB) while a deck is open**, beside the one
+    `LiveLesson` keeps (AN13b); AP3's low-memory line, which AN13g writes, covers it.
+
+  **This step's calls, each awaiting the owner's look:**
+  - **A Binder written by hand**, no AIDL (no build feature, no generated code) and no Messenger: three calls (open, draw,
+    close), each answer marked done or failed first, so whatever the renderer's process answers, Bali reads at most that mark,
+    two numbers and the page's text.
+  - **The page's pixels through memory Bali makes** (`SharedMemory`, at the size Bali asked for), copied into a bitmap Bali makes,
+    never a `Bitmap` parcelled back from the renderer, so Bali parses nothing of the renderer's but the mark, the numbers and the
+    text. Bali maps the memory at the size it made it, and the renderer can't shrink it under that read: a truncation through
+    the descriptor a draw hands over is refused on each emulator (a test), and a map that fails is a draw that failed, never a
+    crash.
+  - **Android 10's file is named for an instant with no byte in it**: created, opened a second time read-only, its name deleted,
+    and only then written through the first descriptor. A run cut short leaves at most an empty name, which the next start
+    removes.
+  - **Android 10's descriptor is handed over read-only** (santa's reviewer B, a blocker, fixed): a renderer a deck had taken
+    over could otherwise write through it and fill the phone's storage while the deck is open, so Bali's own writes, an
+    Emergency Unlock's among them, would fail. The memory file of Android 11 and later stays writable: a write there costs only
+    the renderer's own memory, Bali's last reference to it being gone once the open answers (both reviewers agreed, round 2).
+  - **Bali closes its own descriptor as the open answers:** from there the renderer's process holds the deck's only copy outside
+    Bali's memory, freed as its document closes or the process ends.
+  - **Every call bounded at 10 s, the bind's wait included, timed in the renderer's own scope** (santa's reviewer A): an open,
+    a draw or a close that never ends loses its binding at the limit, whether or not its caller still waits, the process ended
+    and every document there lost. 10 s is the server's own bound on a deck's check (M2b1).
+  - **A deck with no page is none** at the renderer, beside the lesson half's own check (AN13e).
+  - **A draw under way as its document closes is failed:** a draw gives its page only if the document was still open when it
+    ended, and the close goes after it.
+  - **A draw that fails loses its document** (the seam's "a page fails to draw"), so the slide shows failed and Try again opens it
+    afresh; a page outside the count, or a size under a pixel, is failed at once with no call and no loss, so the teacher's next
+    page within shows, as AN13e keeps the document.
+  - **Unbound at the last close, with no lingering process:** the next deck starts a new one (about 0.1 to 0.3 s on the
+    emulators).
+  - **The page's text** is `getTextContents()` joined by line and trimmed, none when empty, as `PDFPage.said`.
+  - **The tests' calls into the service live in the Debug build alone** (`src/debug`'s `ThisBuild`): who it is, its end, a
+    hold; Release's `ThisBuild` has none of them, so no Release build can be asked to end.
+
+  **The conductor's calls, built:** **Q4,** TalkBack's text is the page's from Android 15 (`getTextContents`), none before, where
+  AS8's label says "Slide N of M"; ARCHITECTURE marks it the conductor's call, not the owner's ruling. **The size,** one PR: 445
+  changed lines of app code at the conductor's call (459 after santa's two fixes), plus 63 of build-variant test hooks in
+  `src/debug` and `src/release`, against santa's ~400, about 11% over (15% after the fixes). The extra is the owner's isolated
+  process (Q2), taken after the split sized AN13f at about 240 (the estimate put to the owner was about 120 more lines); open,
+  draw and close share one hand-written Binder and one service, so a split would ship half a protocol and repeat the three
+  emulators' runs twice. The conductor has kept steps this far over as one PR before (one 12% over).
+
+  **What the emulators showed:** Android 10's isolated process reads the descriptor of a file in Bali's own `no_backup/` handed
+  over Binder, read-only, under Android 10's own SELinux rules (`Bali_Spike_API29`, new today with the owner's OK), the one thing
+  the Android 10 path couldn't be sure of before it ran there. At each start of the isolated process Android logs two
+  `avc: denied { getattr }` lines for Bali's data folder (`isolated_app`, `app_data_file`, `dir`): Android's own start of the
+  process, logged before `BaliApp`'s constructor runs (a probe in its constructor, reverted, showed the order) and a denial Android
+  10's own SELinux bug map lists (`isolated_app app_data_file dir 120394782`), so nothing of Bali's touches the folder there.
+  Without `onCreate`'s isolated check the renderer's process crashes at its start ("SharedPreferences cannot be accessed ... from
+  inside an isolated process", in `PreferencesNotes`), so every open would be none at its bound. And `Os.write` with a read-only
+  heap buffer asks it for its array on Android 10 (`ReadOnlyBufferException`), so the bytes go through a chunk of their own.
+
+  **The tests** (`IsolatedRendererTest`, instrumented, 17, decks drawn in code with `PdfDocument` or by hand, none in the repo):
+  page 2's pixels; white beside a 4:3 page in a 16:9 frame; not a PDF, no pages and a page outside the count failed, the document
+  kept and not lost; a page that fails to draw (a page counted that isn't one) losing its document; a deck locked by a password
+  failed (RC4, revision 2, built by hand; from Android 15 shown to open with its password); the draw in an isolated process where
+  the app's start made nothing of Bali's; each version's path read from the isolated process, Android 10's on Android 10 itself,
+  its descriptor read-only, no file in the deck folder once handed over or open; the deck folder emptied by the app's own start
+  step, the sign-in's and the lock's files left; the page's memory one no renderer can shrink under Bali (its descriptor, as a draw
+  hands it over, refused a truncation), which would have Bali read past its end; a full-width page (1440 by 810, 4.7 MB, past
+  Binder's 1 MB) arriving whole; the page's text, and none for a page with none; the renderer's process ended mid-document, each
+  document lost, Bali's process alive, a fresh open in a new process; a draw racing its document's close; the service unbound
+  once the last document closes; a cancelled open's document closed; an open and a draw that never end, none within the limit,
+  the process ended; and a draw that never ends ending its process at the limit after its screen stopped waiting. Each check that something doesn't happen waits for
+  a mark: an answer, a document's loss, or Android's notice of a process's death. On the JVM: Release's `ThisBuild` holds none of
+  the tests' calls.
+
+  **Tried, each failing by name, then reverted** (on `Bali_Spike_API37`): drawing `page` for `page - 1` (the page-2 test, "page
+  2: #ff0000ff for #ff00ff00", and eleven more on a one-page deck); no white fill ("beside the page, at 5: #0 for #ffffffff");
+  no `isolatedProcess` ("the renderer's process isolated", and the unbind tests, an ordinary process not ended once unbound); the
+  Android 10 file deleted after the read ("Android 10's file, handed over", a file left); `no_backup/` itself emptied (the
+  sign-in's file gone); no loss report (both loss tests, "never lost"); and no isolated check in `onCreate` (the process crashing
+  at its start, 13 of 14 "not opened"). And after santa's review, each failing first on `Bali_Spike_API29`: a write through
+  Android 10's descriptor that went through, and a draw that never ended, its screen gone, that never ended its process.
+
+  RESULTS_PLACEHOLDER
+
+  **Santa's review:** two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context isolation holds and
+  model diversity doesn't). Round 1: one blocker (reviewer B, Android 10's read-write descriptor) and WARNs, all fixed: a draw's
+  bound skipped when its caller left (A), a page outside the count not shown to keep its document unlost (A), the start's
+  emptying untested (both), the PR number taken (A), and Q4 credited to the owner (A). Round 2, on the fixes: no blocker, the
+  memory file left writable held up by both; its WARNs, fixed: ARCHITECTURE credited the read-only handover to the owner (both),
+  and this entry missing (B).
+
+  **For AN13g and AS8:** AN13g makes one `IsolatedRenderer(context, app.scope)` for the app's life and hands it to `Lessons`;
+  nothing waits on an open from the main thread, since Android answers the bind there. AS8 draws a `Ready` slide through its
+  document as `Deck`: `draw(slide.page, width, height)` suspends and does its work off the main thread, none being the failed
+  line with Try again; `Page.said ?: "Slide N of M"` is TalkBack's label. Each draw holds three copies of its bitmap for a moment
+  (the renderer's, the shared memory and Bali's), so AS8 draws at the frame's own size.
+
 - **2026-11-12** — **AN13e2, the slide-deck case's flake on main's CI, found, staged and fixed in its rig: SlideTest's deck rig
   runs the lesson half's own scope on the test's own thread, so none of that scope's work runs at once with a step of the test
   (the owner's ask; the conductor's call, marked, awaiting the owner's look; AN13e2, #584).** Test-only: Bali's own code is

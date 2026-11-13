@@ -1354,9 +1354,10 @@ ISSUES #6 lists every gap with the way it is checked before Android launches, an
 - A guest user on the phone is out of the lock's reach; a work profile and Private Space are covered
   (AN1, part 1).
 - On Android 10 the deck's bytes sit on the phone's storage, in a file with no name, for as long as
-  its document is open: its name is deleted the moment it opens, before a byte is written, and the
-  renderer can read it but never write it (the owner's ruling, 2026-11-12). From Android 11 the deck
-  stays in memory, the renderer's copy a second one, up to 25 MB, while its document is open.
+  its document is open: its name is deleted the moment it opens (the owner's ruling, 2026-11-12),
+  before a byte is written, and the renderer can read it but never write it (AN13f's calls, awaiting
+  the owner). From Android 11 the deck stays in memory (the owner's ruling), the renderer's copy a
+  second one, up to 25 MB, while its document is open.
 - TalkBack reads a slide's text from Android 15 alone; on Android 10 to 14 it says which slide it is
   (the conductor's call, awaiting the owner; `docs/DECISIONS.md`, 2026-11-12).
 - Phones differ by maker, so the device gate (AP3) runs on a Pixel and a Samsung, not one phone.
