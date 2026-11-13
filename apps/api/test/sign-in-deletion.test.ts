@@ -54,11 +54,22 @@ let pool: Map<string, string>;
 let calls: { action: string; username: string }[];
 /** How Cognito answers every call, while set: a refusal's type, or `network`, a failed fetch. */
 let failing: string | undefined;
+/** Cognito's next call of one action, held unanswered while set (`hold`). */
+let held: { action: string; reached: () => void; answered: Promise<void> } | undefined;
 
 const cognitoFetch = ((_url: string, init: { headers: Record<string, string>; body: string }) => {
   const action = init.headers['x-amz-target']!.replace('AWSCognitoIdentityProviderService.', '');
   const { Username: username } = JSON.parse(init.body) as { Username: string };
   calls.push({ action, username });
+  if (held?.action !== action) return answer(action, username);
+  const { reached, answered } = held;
+  held = undefined;
+  reached();
+  return answered.then(() => answer(action, username));
+}) as unknown as typeof fetch;
+
+/** The fake pool's answer to one call, and what the call does there. */
+function answer(action: string, username: string): Promise<Response> {
   if (failing === 'network') return Promise.reject(new TypeError('fetch failed'));
   if (failing) return Promise.resolve(Response.json({ __type: failing }, { status: 400 }));
   const sub = pool.get(username);
@@ -70,7 +81,25 @@ const cognitoFetch = ((_url: string, init: { headers: Record<string, string>; bo
   }
   pool.delete(username);
   return Promise.resolve(new Response('', { status: 200 }));
-}) as unknown as typeof fetch;
+}
+
+/**
+ * Holds Cognito's next `action` call: `made` once a try makes it, and the call answered (and done
+ * in the pool) only once `release()` is called. The try waits there, between its claim and its
+ * finish, for as long as the test needs: no window of time.
+ */
+function hold(action: string) {
+  let release!: () => void;
+  const answered = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let reached!: () => void;
+  const made = new Promise<void>((resolve) => {
+    reached = resolve;
+  });
+  held = { action, reached, answered };
+  return { made, release };
+}
 
 function build(env: Env, clock?: () => Date): FastifyInstance {
   const logStream = new Writable({
@@ -94,6 +123,7 @@ beforeEach(async () => {
   pool = new Map();
   calls = [];
   failing = undefined;
+  held = undefined;
   vi.mocked(captureFailure).mockClear();
   app = build(deleterOn);
 });
@@ -213,6 +243,8 @@ describe('a deleted account’s Cognito sign-in (2026-10-09)', () => {
     expect((await deleteMe(student.cognitoId, 'Google_4004')).json<DeleteMeResponse>()).toEqual({
       outcome: 'deleted',
     });
+    // The retry once the first try is done; one sent while that try is at Cognito is the next case.
+    await settle();
     expect((await deleteMe(student.cognitoId, 'Google_4004')).json<DeleteMeResponse>()).toEqual({
       outcome: 'already_deleted',
     });
@@ -221,6 +253,63 @@ describe('a deleted account’s Cognito sign-in (2026-10-09)', () => {
     expect(calls.filter((call) => call.action === 'AdminDeleteUser')).toHaveLength(1);
     expect(pool.size).toBe(0);
     expect(await queue()).toEqual([]);
+    // The retry queued the finished row anew (C3d), and its own try found the sign-in gone.
+    const outcomes = logged('Cognito sign-in deletion done').map((line) => line.outcome);
+    expect(outcomes).toEqual(['deleted', 'gone']);
+  });
+
+  it('is deleted once when the deletion is sent again while its first try is at Cognito', async () => {
+    // A lost answer's retry, landing between the first try's claim and its finish: that try held
+    // at Cognito, its delete on its way (the flake on main's CI, 2026-11-12).
+    const at = new Date('2026-10-09T15:30:00Z');
+    let now = at;
+    await settle(deleterOn, () => now);
+    const { student } = await seedClassroom(db, 'twice-at-once');
+    pool.set('Google_4014', student.cognitoId);
+    const deletion = hold('AdminDeleteUser');
+    const retried = new Date(at.getTime() + 1_000);
+
+    // Let go whatever fails here, so a failing case never leaves the first try held.
+    try {
+      expect((await deleteMe(student.cognitoId, 'Google_4014')).json<DeleteMeResponse>()).toEqual({
+        outcome: 'deleted',
+      });
+      await deletion.made;
+      now = retried;
+      expect((await deleteMe(student.cognitoId, 'Google_4014')).json<DeleteMeResponse>()).toEqual({
+        outcome: 'already_deleted',
+      });
+    } finally {
+      deletion.release();
+    }
+    await settle(deleterOn, () => now);
+
+    // Deleted once, at once. The retry's deletion, queued since the claim, keeps the row for a try
+    // of its own (C3d), due when the claim put the next try off: a minute on, its username kept.
+    expect(calls.filter((call) => call.action === 'AdminDeleteUser')).toHaveLength(1);
+    expect(pool.size).toBe(0);
+    const due = new Date(at.getTime() + MIN);
+    expect(await queue()).toMatchObject([
+      { attempts: 1, deletedAt: retried, nextAttemptAt: due, username: 'Google_4014' },
+    ]);
+    calls = [];
+    await app.sweep(new Date(due.getTime() - 1));
+    expect(calls).toEqual([]);
+
+    // That try finds the sign-in gone, and finishes the row.
+    now = due;
+    await app.sweep(due);
+    expect(calls).toEqual([{ action: 'AdminGetUser', username: 'Google_4014' }]);
+    expect(await queue()).toEqual([]);
+    expect(await marks()).toMatchObject([{ username: null, deletedAt: retried, finishedAt: due }]);
+    const outcomes = logged('Cognito sign-in deletion done').map((line) => [
+      line.outcome,
+      line.attempts,
+    ]);
+    expect(outcomes).toEqual([
+      ['deleted', 1],
+      ['gone', 2],
+    ]);
   });
 
   it('is never deleted once its person came back: a live account holds it again, and the row is done', async () => {

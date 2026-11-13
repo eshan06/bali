@@ -10,6 +10,14 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-12 (Central) — The slide-deck case's flake on main's CI, fixed in its rig:
+SlideTest's deck rig runs the lesson half's own scope on the test's own thread, the race staged in a
+test that failed first (AN13e2, #584; DECISIONS 2026-11-12). Before it, the app's Sign in from the
+sign-in redesign (#583). Next: the owner's switch of prod's domain, the release call and disabling
+the review account (Open owner items); a session builds the retire-a-block command; the owner the
+sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11–AN13;
+AN1's part 2 on the owner's phones; the audit's polish waits._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN13f's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN13e2, the slide-deck case's flake on main's CI, fixed in its rig (#584; `docs/DECISIONS.md`,
 2026-11-12), test-only, Bali's code unchanged: the deck's check hashes on `Dispatchers.Default`, and SlideTest's deck rig, which
 ran the lesson half on Unconfined, went on there with the rest, the lesson half's lock held as the test answered the next read;

@@ -107,8 +107,9 @@ export function claimCognitoDeletions(
 /**
  * A claimed row whose try finished at `at`, whatever the outcome: kept as its sign-in's mark (C3d),
  * the username dropped, since nothing needs it now. A deletion queued since the claim moved its
- * `deletedAt`, and keeps it queued for a try of its own: this try may have kept a sign-in the
- * person had come back to, then deleted with that account.
+ * `deletedAt`, and keeps it queued for a try of its own, due when the claim put the next one off (a
+ * queued row keeps its backoff): this try may have kept a sign-in the person had come back to, then
+ * deleted with that account.
  */
 export async function finishCognitoDeletion(
   db: Database,
