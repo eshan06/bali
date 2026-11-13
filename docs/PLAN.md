@@ -10,7 +10,7 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 
 _Last updated: 2026-11-12 (Central) — The slide-deck case's flake on main's CI, fixed in its rig:
 SlideTest's deck rig runs the lesson half's own scope on the test's own thread, the race staged in a
-test that failed first (AN13e2, #NNN; DECISIONS 2026-11-12). Before it, the app's Sign in from the
+test that failed first (AN13e2, #584; DECISIONS 2026-11-12). Before it, the app's Sign in from the
 sign-in redesign (#583). Next: the owner's switch of prod's domain, the release call and disabling
 the review account (Open owner items); a session builds the retire-a-block command; the owner the
 sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11–AN13;
@@ -70,7 +70,7 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04); part 2 on
   a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱), before
-  launch; AN2–AN10's and AN13a–AN13e's code ✅ (#488–#578), AN13e2's CI flake fix ✅ (#NNN);
+  launch; AN2–AN10's and AN13a–AN13e's code ✅ (#488–#578), AN13e2's CI flake fix ✅ (#584);
   AN11–AN13 next. AS0, the
   screens' canvas, ✅ approved as it stands
   (#484, #486; DECISIONS 2026-11-04). Not on the pilot's critical path.

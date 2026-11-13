@@ -10,7 +10,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-12** — **AN13e2, the slide-deck case's flake on main's CI, found, staged and fixed in its rig: SlideTest's deck rig
   runs the lesson half's own scope on the test's own thread, so none of that scope's work runs at once with a step of the test
-  (the owner's ask; the conductor's call, marked, awaiting the owner's look; AN13e2, #NNN).** Test-only: Bali's own code is
+  (the owner's ask; the conductor's call, marked, awaiting the owner's look; AN13e2, #584).** Test-only: Bali's own code is
   unchanged, and no phone met it.
 
   **What failed:** CI's push run 43331986903 on `d9ca1c3c` (#582, a portal PR), attempt 1, "Android contract tests (JVM)":
