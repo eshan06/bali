@@ -19,7 +19,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 fun pdf(title: String, pages: Int) = "%PDF-1.7 $title, $pages pages"
 
 /** An open or a close a test holds: [taken] once one waits on it, until [release]. */
-class Held {
+class Held(
+    /** The test's own thread, where a [block] holds nothing ([FakeRenderer.holdKeep]); none, and every thread is held. */
+    private val test: Thread? = null,
+) {
     private val waiting = CompletableDeferred<Unit>()
     private val let = CompletableDeferred<Unit>()
     private val released = CountDownLatch(1)
@@ -38,18 +41,19 @@ class Held {
         withContext(NonCancellable) { let.await() }
     }
 
-    /** A close's wait, on its own thread, as a renderer's close a draw under way holds. */
+    /** A close's wait, on its own thread, as a renderer's close a draw under way holds; none on [test]'s. */
     internal fun block() {
         waiting.complete(Unit)
-        released.await(patience.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        if (Thread.currentThread() !== test) released.await(patience.inWholeMilliseconds, TimeUnit.MILLISECONDS)
     }
 }
 
 /**
  * The renderer as a test holds it: each open and close counted; a deck's pages read from its bytes ([pdf]), any other bytes none,
- * as a file that isn't a PDF; an open, or a close, held while the test does what it must ([holdOpen], [holdClose]); its opens
- * refused, thrown or cancelled against its promise where the test says ([opening]), and its documents breaking theirs
- * ([breaking]); and its documents lost ([lose]). Each deck it is given must be read-only.
+ * as a file that isn't a PDF; an open, or a close, held while the test does what it must ([holdOpen], [holdClose]), and so is the
+ * lesson half's stretch that keeps a document ([holdKeep]); its opens refused, thrown or cancelled against its promise where the
+ * test says ([opening]), and its documents breaking theirs ([breaking]); and its documents lost ([lose]). Each deck it is given
+ * must be read-only.
  */
 class FakeRenderer : Renderer {
     /** How its opens go: as the bytes say, refused, throwing, or in a cancel of its own (a time limit's), as the seam promises never to. */
@@ -62,6 +66,7 @@ class FakeRenderer : Renderer {
     private var broken = false
     private var openHeld: Held? = null
     private var closeHeld: Held? = null
+    private var keepHeld: Held? = null
     private val documents = mutableListOf<Opened>()
 
     var opening: Opening
@@ -84,6 +89,13 @@ class FakeRenderer : Renderer {
     /** The next close, counted, holds its thread until the hold's release. */
     fun holdClose(): Held = Held().also { synchronized(sync) { closeHeld = it } }
 
+    /**
+     * The next document opened holds the lesson half's stretch that keeps it, inside the lesson half's lock: the first read of its
+     * pages, made there, holds that thread until the hold's release, as a loaded runner's scheduler can stop a thread anywhere.
+     * Never the test's own thread, the one that asks for the hold: nothing runs at once with the test there to hold.
+     */
+    fun holdKeep(): Held = Held(Thread.currentThread()).also { synchronized(sync) { keepHeld = it } }
+
     /** Every document it opened is lost, as its process dying loses them: each one's [Document.awaitLost] returns. */
     fun lose() = synchronized(sync) { documents.toList() }.forEach { it.gone.complete(Unit) }
 
@@ -97,11 +109,11 @@ class FakeRenderer : Renderer {
             Opening.AsTheBytesSay -> Unit
         }
         val pages = text.takeIf { it.startsWith("%PDF") }?.substringAfterLast(", ")?.removeSuffix(" pages")?.toIntOrNull() ?: return null
-        val document = Opened(pages)
-        val held = synchronized(sync) {
+        val (document, held) = synchronized(sync) {
+            val document = Opened(pages, keepHeld.also { keepHeld = null })
             opened += 1
             documents += document
-            openHeld.also { openHeld = null }
+            document to openHeld.also { openHeld = null }
         }
         held?.hold()
         return document
@@ -111,8 +123,15 @@ class FakeRenderer : Renderer {
     fun holds(lessons: Lessons, case: String, held: Boolean = lessons.state.value.slide?.phase is SlideShown.Phase.Ready) =
         assertEquals(if (held) 1 else 0, open, "$case: documents open")
 
-    private inner class Opened(override val pages: Int) : Document {
+    private inner class Opened(private val count: Int, private var keeping: Held?) : Document {
         val gone = CompletableDeferred<Unit>()
+
+        /** Its pages, fixed as it opened: the first read held where [holdKeep] asked for it. */
+        override val pages: Int
+            get() {
+                synchronized(sync) { keeping.also { keeping = null } }?.block()
+                return count
+            }
 
         override suspend fun awaitLost() {
             if (breaking) throw IllegalStateException("the renderer broke its promise")

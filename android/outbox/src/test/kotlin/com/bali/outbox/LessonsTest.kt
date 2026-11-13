@@ -30,6 +30,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -68,7 +69,8 @@ import kotlinx.serialization.json.jsonObject
 // of the lesson's calls than OkHttp's five a host are held, over real sockets. AN13e's: AppTests' slideOncePerDeck and
 // slideAsksAsItShows, their rules without their views, over a renderer that counts its opens and closes (SlideSupport.kt); a page
 // past the document's, every DeckResult, a stale ask's document, the run's end, the real account's changes; and two of Claude
-// Review's WARNs on #577, the bell let go and Bali's screen in front twice.
+// Review's WARNs on #577, the bell let go and Bali's screen in front twice. And the flake on main's CI (2026-11-12): a read
+// answered while a deck's open holds the lesson half's lock on a thread of its own, staged.
 
 val pollRoute = "GET /v1/sessions/s/presentation"
 val answerRoute = "POST /v1/questions/q/answers"
@@ -903,6 +905,50 @@ class SlideTest : EngineFiles() {
             rig.server.next(bucketRoute("d3")).reply(200, third)
             assertEquals(1, rig.document().pages)
             rig.renderer.holds(lessons, "the third deck in")
+        }
+
+    @Test
+    fun aReadAnsweredWhileTheLastDecksOpenStillHoldsTheLessonHalfsLockOnAThreadOfItsOwnIsShownAsTheRigsNextReturnsSoTheSlideAskedForIsTheOneShown(): Unit =
+        runBlocking {
+            // The flake that turned main's CI red (run 43331986903), the case above's: the deck's check, `sha256` in core on
+            // Dispatchers.Default, woke the second deck's fetch on a thread of its own, where its open kept the document under the
+            // lesson half's lock as the test answered the teacher's next read. The read's watch waited for that lock, so the rig's
+            // `next` returned with the second deck still shown; the test asked for that slide, which the lesson half drops as
+            // stale, and nothing asked for the deck shown: the wait for its document never ended. Staged with no window of time:
+            // the second deck's bytes answered on a thread of the test's own, so its open's stretch never runs on the test's
+            // thread unless the rig puts it there, and that stretch held inside the lock until the test has read the slide.
+            val rig = deckRig()
+            val lessons = rig.lessons
+            val (first, second) = pdf("Factoring", 3) to pdf("Graphs", 2)
+            lessons.setInFront(true)
+            lessons.followed(ana())
+            rig.read(presentation(slide = slideOf(first)))
+            lessons.ask(rig.slide())
+            rig.fetch(first)
+            rig.document()
+            // Asked again once in, as the case is: nothing fetched, and its wait for the lock ends the first deck's stretch.
+            lessons.ask(rig.slide())
+            rig.next(presentation(slide = slideOf(second, id = "d2")))
+            lessons.ask(rig.slide())
+            rig.server.next(downloadRoute("d2")).reply(200, presigned("d2"))
+            val bytes = rig.server.next(bucketRoute("d2"))
+            val keeping = rig.renderer.holdKeep()
+            val answering = thread { bytes.reply(200, second) }
+            try {
+                keeping.taken()
+                // The first deck again, as the case shows it: its read answered while the second's stretch holds the lock, then
+                // the slide shown read and asked for, from LiveLesson's memory, once the stretch has let the lock go.
+                rig.next(presentation(slide = slideOf(first, page = 3)))
+                val shown = rig.slide()
+                keeping.release()
+                lessons.ask(shown)
+                assertEquals(3, rig.document().pages)
+                assertEquals(2, rig.downloads, "the first deck downloaded again")
+                rig.renderer.holds(lessons, "the first deck again")
+            } finally {
+                keeping.release()
+                answering.join()
+            }
         }
 
     @Test
