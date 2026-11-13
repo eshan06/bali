@@ -68,16 +68,18 @@ class BaliAppTest {
         }
 
     @Test
-    fun everyValueArrivesAsTextAndWhileTheClientIdIsEmptySignInIsNotSetUp() {
+    fun everyValueArrivesAsTextAndTheAppSignsInThroughDevsAndroidClientAtTheTwoSlashCallback() {
         @Suppress("DEPRECATION")
         val meta = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA).metaData
         // Each a string, never a number aapt read one as, which AppConfig would read as not set.
         val built = AppConfig.Key.entries.associate { it.key to checkNotNull(meta.getString(it.key)) { it.key } }
-        val clientId = built.getValue(AppConfig.Key.CognitoClientId.key)
-        assertEquals(clientId.isEmpty(), app.config == null)
-        assertEquals(app.config == null, app.signIn == null)
-        val config = checkNotNull(AppConfig.from(built + (AppConfig.Key.CognitoClientId.key to clientId.ifEmpty { "client" })))
-        assertEquals(URI("com.bali.bali:/auth/callback"), config.cognito.redirectUri)
+        // Set up (AN6d): the app's config is the build's, and its sign-in is over it.
+        val config = checkNotNull(app.config) { "sign-in isn't set up in this build" }
+        assertEquals(AppConfig.from(built), config)
+        assertEquals(config.cognito, checkNotNull(app.signIn).cognito)
+        // Dev's Android app client, at the callback Cognito's console took: two slashes (docs/DEPLOY.md).
+        assertEquals("1njpekb5sg8nd6lkb53rpimjke", config.cognito.clientId)
+        assertEquals(URI("com.bali.bali://auth/callback"), config.cognito.redirectUri)
         // The portal's address since the owner's ruling (2026-11-07, #540).
         assertEquals(URI("https://app.getbali.app"), config.portal)
     }
