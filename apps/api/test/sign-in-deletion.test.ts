@@ -243,6 +243,8 @@ describe('a deleted account’s Cognito sign-in (2026-10-09)', () => {
     expect((await deleteMe(student.cognitoId, 'Google_4004')).json<DeleteMeResponse>()).toEqual({
       outcome: 'deleted',
     });
+    // The retry once the first try is done; one sent while that try is at Cognito is the next case.
+    await settle();
     expect((await deleteMe(student.cognitoId, 'Google_4004')).json<DeleteMeResponse>()).toEqual({
       outcome: 'already_deleted',
     });
@@ -251,6 +253,9 @@ describe('a deleted account’s Cognito sign-in (2026-10-09)', () => {
     expect(calls.filter((call) => call.action === 'AdminDeleteUser')).toHaveLength(1);
     expect(pool.size).toBe(0);
     expect(await queue()).toEqual([]);
+    // The retry queued the finished row anew (C3d), and its own try found the sign-in gone.
+    const outcomes = logged('Cognito sign-in deletion done').map((line) => line.outcome);
+    expect(outcomes).toEqual(['deleted', 'gone']);
   });
 
   it('is deleted once when the deletion is sent again while its first try is at Cognito', async () => {
@@ -266,9 +271,10 @@ describe('a deleted account’s Cognito sign-in (2026-10-09)', () => {
     expect((await deleteMe(student.cognitoId, 'Google_4014')).json<DeleteMeResponse>()).toEqual({
       outcome: 'deleted',
     });
+    const retried = new Date(at.getTime() + 1_000);
     try {
       await deletion.made;
-      now = new Date(at.getTime() + 1_000);
+      now = retried;
       expect((await deleteMe(student.cognitoId, 'Google_4014')).json<DeleteMeResponse>()).toEqual({
         outcome: 'already_deleted',
       });
@@ -277,9 +283,32 @@ describe('a deleted account’s Cognito sign-in (2026-10-09)', () => {
     }
     await settle(deleterOn, () => now);
 
+    // Deleted once, at once. The retry's deletion, queued since the claim, keeps the row for a try
+    // of its own (C3d), due when the claim put the next try off: a minute on, its username kept.
     expect(calls.filter((call) => call.action === 'AdminDeleteUser')).toHaveLength(1);
     expect(pool.size).toBe(0);
+    const due = new Date(at.getTime() + MIN);
+    expect(await queue()).toMatchObject([
+      { attempts: 1, deletedAt: retried, nextAttemptAt: due, username: 'Google_4014' },
+    ]);
+    calls = [];
+    await app.sweep(new Date(due.getTime() - 1));
+    expect(calls).toEqual([]);
+
+    // That try finds the sign-in gone, and finishes the row.
+    now = due;
+    await app.sweep(due);
+    expect(calls).toEqual([{ action: 'AdminGetUser', username: 'Google_4014' }]);
     expect(await queue()).toEqual([]);
+    expect(await marks()).toMatchObject([{ username: null, deletedAt: retried, finishedAt: due }]);
+    const outcomes = logged('Cognito sign-in deletion done').map((line) => [
+      line.outcome,
+      line.attempts,
+    ]);
+    expect(outcomes).toEqual([
+      ['deleted', 1],
+      ['gone', 2],
+    ]);
   });
 
   it('is never deleted once its person came back: a live account holds it again, and the row is done', async () => {
