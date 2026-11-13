@@ -177,8 +177,8 @@ class MeTest : OutboxFiles() {
                         fixture("name/401-unauthorized.json"), Naming.Failure.NotSaved(SendResult.Status(401), null), "Bali couldn't check your sign-in. Try again.",
                     ),
                     Triple(fixture("name/400-invalid-request.json"), Naming.Failure.NotSaved(SendResult.Status(400), ApiErrorReason.InvalidRequest), generic),
-                    // No iOS twin: an account deleted from another phone, its sign-in's old token refused (C3d, #558), said as any 409
-                    // while the owner's call on reading it as signed out waits (C3d's "For the owner").
+                    // No iOS twin: an account deleted from another phone, its sign-in's old token refused (C3d, #558), kept as any 409
+                    // here; the phone reads it as signed out since AN9j, the router on Sign in, so no screen says it.
                     Triple(client(Canned(409, Answer.refused("account_deleted"))), Naming.Failure.NotSaved(SendResult.Status(409), ApiErrorReason.AccountDeleted), generic),
                     Triple(client(Canned(null)), Naming.Failure.NotSaved(SendResult.NetworkError, null), unreachable),
                     Triple(client(Canned(429)), Naming.Failure.NotSaved(SendResult.Status(429), null), "Too many tries for now. Wait a minute, then try again."),

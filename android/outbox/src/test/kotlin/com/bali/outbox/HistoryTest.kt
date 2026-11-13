@@ -435,7 +435,7 @@ class HistoryTest {
                 assertEquals<Any?>(History.Failure.NotRead(SendResult.Status(status), null), history.failure, "$status")
                 assertEquals(words, history.failure?.words, "$status")
             }
-            // A deleted sign-in's 409 as any 409, while the owner's call on it waits (C3d).
+            // A deleted sign-in's 409 kept as any 409 (C3d): the phone reads it as signed out since AN9j, so no screen says it.
             history = history.page(client(Canned(409, Answer.refused("account_deleted"))).history())
             assertEquals<Any?>(History.Failure.NotRead(SendResult.Status(409), ApiErrorReason.AccountDeleted), history.failure)
             assertEquals("Something went wrong at Bali. Try again in a moment.", history.failure?.words)

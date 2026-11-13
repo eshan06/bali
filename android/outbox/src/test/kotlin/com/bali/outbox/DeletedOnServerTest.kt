@@ -43,6 +43,9 @@ import kotlinx.serialization.json.longOrNull
 /** Bali's server's answer to a call under a deleted account's old token (C3d). */
 val deletedOnServer = Answer.refused("account_deleted")
 
+/** An Emergency Unlock under a deleted sign-in's old token, recorded as no one's, a row born removed (C3d). */
+private val recordedAsNoOne = """{"outcome":"recorded","recordedAs":"not_enrolled","state":null,"session":null,"reason":null}"""
+
 private val historyRoute = "GET /v1/me/history"
 private val joinRoute = "POST /v1/enrollments"
 private val renameRoute = "PATCH /v1/me"
@@ -276,7 +279,28 @@ class DeletedOnServerTest : EngineFiles() {
         }
 
     @Test
-    fun anEmergencyUnlockQueuedAsTheAccountIsReadDeletedIsKeptApartWholeNeverSentUnderTheNextAccountNorHoldingItsQueueOrLock(): Unit =
+    fun anEmergencyUnlockQueuedAsTheAccountIsReadDeletedGoesFirstUnderItsOwnTokenRecordedAsNoOnesBeforeItsSignInIsForgotten(): Unit =
+        runBlocking {
+            // Santa's round 1 (both reviewers): the server records an Emergency Unlock under a deleted sign-in's old token, as no
+            // one's (C3d), as main's drain would send it, so the account's own unlocks go first, never kept back unrecorded.
+            val (rig, routed) = inLesson()
+            val unlock = assertNotNull(rig.engine.emergencyUnlock())
+            rig.server.next(unlockRoute).reply(null)
+            rig.until { it.retryAt == at(2) }
+            rig.engine.setInFront(true)
+            rig.server.next(meRoute).reply(409, deletedOnServer)
+            val sent = rig.server.next(unlockRoute)
+            assertEquals(listOf(unlock.eventId, "Bearer ${scoped("a1")}"), listOf(sent.eventId, sent.token))
+            assertFalse(rig.keychain.isEmpty)
+            sent.reply(200, recordedAsNoOne)
+            signedOut(rig, routed, "the read of the truth, an unlock queued")
+            assertEquals(emptyList(), rig.outbox.records())
+            assertEquals(emptyMap(), keptApart(rig.outbox))
+            rig.stop()
+        }
+
+    @Test
+    fun anEmergencyUnlockThatStillDoesntRecordIsKeptApartWholeNeverSentUnderTheNextAccountNorHoldingItsQueueOrLock(): Unit =
         runBlocking {
             val (rig, routed) = inLesson()
             val unlock = assertNotNull(rig.engine.emergencyUnlock())
@@ -284,6 +308,8 @@ class DeletedOnServerTest : EngineFiles() {
             rig.until { it.retryAt == at(2) }
             rig.engine.setInFront(true)
             rig.server.next(meRoute).reply(409, deletedOnServer)
+            // Sent first, under a1's token: no answer, so kept apart, as the conductor's call 1 keeps one that can't go.
+            assertEquals("Bearer ${scoped("a1")}", rig.server.next(unlockRoute).also { it.reply(null) }.token)
             signedOut(rig, routed, "the read of the truth, an unlock queued")
             // Out of the queue, kept whole: its id, its session, its time and its place in what the phone did.
             assertEquals(emptyList(), rig.outbox.records())
@@ -335,35 +361,82 @@ class DeletedOnServerTest : EngineFiles() {
     @Test
     fun aDeletionWhoseAnswerWasLostIsFinishedByA409TheSignInKeptForDeleteUserTheLockOffAtOncePendingItsTryAgainRunsDeleteUser(): Unit =
         runBlocking {
+            // Back pressed on the stop, and (santa's round 1, reviewer A) the stop still showing: Pending either way.
+            for (back in listOf(true, false)) {
+                val (rig, routed) = inLesson()
+                val account = checkNotNull(routed.account)
+                account.deleting { it.ask() }
+                val stopping = async { account.deleteAccount() }
+                past(rig, deleteMeRoute).reply(null)
+                withTimeout(patience) { stopping.await() }
+                assertEquals(Deleting.Stopped(Deleting.Stop.NotDeleted(SendResult.NetworkError, NoAnswer.Unreachable)), account.state.value.deleting)
+                if (back) {
+                    // The lesson's screen again, its lock on.
+                    account.deleting { it.close() }
+                    routed.until { it.screen == Screen.Focus }
+                }
+                assertTrue(routed.lock.holds, "$back")
+                rig.engine.setScreenOn(true)
+                past(rig, checkInRoute).reply(409, deletedOnServer)
+                // That deletion landing: out of the lesson, the lock off at once, the sign-in kept for DeleteUser and giving the API
+                // nothing, and the deletion's own screen, Pending.
+                eventually { rig.engine.updates.value.standing == Standing.Out }
+                assertTrue(rig.signIn.deletionPending(), "$back")
+                assertFalse(rig.keychain.isEmpty, "$back")
+                eventually { !routed.lock.holds }
+                routed.until { it.screen == Screen.Deleting }
+                account.until { it.deleting == Deleting.Pending }
+                val finishing = async { account.deleteAccount() }
+                val cognito = rig.server.next(deleteUserRoute)
+                assertEquals(scoped("a1"), cognito.deleteUserToken(), "$back")
+                cognito.reply(200, "{}")
+                withTimeout(patience) { finishing.await() }
+                account.until { it.deleting == Deleting.Done && it.signedIn == false }
+                assertTrue(rig.keychain.isEmpty, "$back")
+                assertEquals(1, rig.server.sent.count { it.route == deleteMeRoute }, "$back")
+                rig.stop()
+            }
+        }
+
+    @Test
+    fun aReadSentBeforeTheAccountIsReadDeletedAndAnsweredAfterItNeverPutsThePhoneBackInItsLessonNorItsLockOn(): Unit =
+        runBlocking {
+            // Santa's round 1, reviewer A: a check-in on its way, answered live as the server read it before the deletion, landing
+            // once another call's 409 has signed the phone out.
             val (rig, routed) = inLesson()
-            val account = checkNotNull(routed.account)
-            account.deleting { it.ask() }
-            val stopping = async { account.deleteAccount() }
-            past(rig, deleteMeRoute).reply(null)
-            withTimeout(patience) { stopping.await() }
-            assertEquals(Deleting.Stopped(Deleting.Stop.NotDeleted(SendResult.NetworkError, NoAnswer.Unreachable)), account.state.value.deleting)
-            // Back: the lesson's screen again, its lock on.
-            account.deleting { it.close() }
-            routed.until { it.screen == Screen.Focus }
-            assertTrue(routed.lock.holds)
             rig.engine.setScreenOn(true)
-            past(rig, checkInRoute).reply(409, deletedOnServer)
-            // That deletion landing: out of the lesson, the lock off at once, the sign-in kept for DeleteUser and giving the API
-            // nothing, and the deletion's own screen, Pending.
-            eventually { rig.engine.updates.value.standing == Standing.Out }
-            assertTrue(rig.signIn.deletionPending())
-            assertFalse(rig.keychain.isEmpty)
-            eventually { !routed.lock.holds }
-            routed.until { it.screen == Screen.Deleting }
-            assertEquals(Deleting.Pending, account.state.value.deleting)
-            val finishing = async { account.deleteAccount() }
-            val cognito = rig.server.next(deleteUserRoute)
-            assertEquals(scoped("a1"), cognito.deleteUserToken())
-            cognito.reply(200, "{}")
-            withTimeout(patience) { finishing.await() }
-            account.until { it.deleting == Deleting.Done && it.signedIn == false }
-            assertTrue(rig.keychain.isEmpty)
-            assertEquals(1, rig.server.sent.count { it.route == deleteMeRoute })
+            val checkIn = rig.server.next(checkInRoute)
+            val history = async { rig.engine.history(null) }
+            rig.server.next(historyRoute).reply(409, deletedOnServer)
+            history.await()
+            signedOut(rig, routed, "History, a check-in on its way")
+            checkIn.reply(200, Answer.live())
+            // The read loop past that answer, asleep till its next check-in.
+            eventually { rig.clock.deadlines.contains(rig.clock.now() + SyncEngine.CHECK_IN_INTERVAL) }
+            assertEquals(Standing.Out, rig.engine.updates.value.standing)
+            assertFalse(routed.lock.holds)
+            assertEquals(Screen.Shown(Screen.SignIn, false), routed.router.shown.value)
+            rig.stop()
+        }
+
+    @Test
+    fun theDeletedStudentsNotesAndMeGoWithTheirSignInAsAFinishedDeleteAccountTakesThemHereAndInTheStore(): Unit =
+        runBlocking {
+            // The conductor's call 3, santa's round 1 (both reviewers): listed in a class here, the consent list seen.
+            val notes = MemoryNotes()
+            val rig = signedRig(gated = true)
+            val routed = routed(rig.engine, rig.clock, notes = notes)
+            val account = checkNotNull(routed.account)
+            rig.through(account, scoped("a1"), me = Answer.me(classes = listOf(Answer.inClass("p3"))))
+            account.until { it.inClass == "u" }
+            account.sawList()
+            assertEquals(listOf("u", "u"), listOf(notes.inClass, notes.listSeenBy))
+            rig.engine.retryNow()
+            past(rig, meRoute).reply(409, deletedOnServer)
+            signedOut(rig, routed, "the read of the truth, the notes kept")
+            account.until { it.inClass == null && it.listSeenBy == null && it.sync?.me == null }
+            assertEquals(listOf(null, null), listOf(notes.inClass, notes.listSeenBy))
+            rig.until { it.me == null }
             rig.stop()
         }
 
