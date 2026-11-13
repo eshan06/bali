@@ -45,8 +45,8 @@ class AppConfigTest {
     /**
      * Every key the reader reads is the manifest's meta-data, a string the app's build makes and sets once,
      * and every Bali key there, and every value the build makes for one, is one it reads; the build's values
-     * make a config once a client id is given, and none while it's empty; and the scheme the manifest
-     * catches a Custom Tab's answer by is the redirect URI's, the app's id.
+     * make a config as they stand, through dev's Android app client at the callback Cognito took (AN6d); and
+     * the scheme the manifest catches a Custom Tab's answer by is the redirect URI's, the app's id.
      */
     @Test
     fun everyKeyTheReaderReadsIsInTheAppsManifestAsAValueTheBuildSetsOnceAndTheirValuesMakeAConfig() {
@@ -73,10 +73,11 @@ class AppConfigTest {
             }
         assertEquals(named.values.map { it.removePrefix("@string/") }.toSet(), made.map { it.first }.filter { it.startsWith("BALI_") }.toSet())
 
-        val clientId = built.getValue(AppConfig.Key.CognitoClientId.key)
-        assertEquals(clientId.isEmpty(), AppConfig.from(built) == null)
-        val config = assertNotNull(AppConfig.from(built + (AppConfig.Key.CognitoClientId.key to clientId.ifEmpty { "client" })))
-        assertEquals(URI("com.bali.bali:/auth/callback"), config.cognito.redirectUri)
+        val config = assertNotNull(AppConfig.from(built), "the build's values make no config: is one of them empty?")
+        // Dev's Android app client, bali-android-dev-public (docs/DEPLOY.md), at the callback its console took: two
+        // slashes, where RFC 8252's private-use form has one, which the console refused (2026-11-12).
+        assertEquals("1njpekb5sg8nd6lkb53rpimjke", config.cognito.clientId)
+        assertEquals(URI("com.bali.bali://auth/callback"), config.cognito.redirectUri)
         assertEquals(listOf("https", "https", "https"), listOf(config.api.scheme, config.cognito.domain.scheme, config.portal.scheme))
         val id = assertNotNull(Regex("""applicationId = "([^"]+)"""").find(build)).groupValues[1]
         assertEquals(id, config.cognito.redirectUri.scheme)

@@ -8,6 +8,174 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-13** — **AN6d, Android's dev sign-in client in the build: dev's `bali-android-dev-public` at
+  `com.bali.bali://auth/callback`, two slashes because Cognito's console refused RFC 8252's one; a Debug build's start now runs
+  over the app's own sign-in, and the tests that read a build not set up moved where their rule still holds (this step's calls,
+  marked, each awaiting the owner's look; AN6d, #588).** The owner said to take the recommended option on every regular call, so
+  each call here is this step's, for the owner to look at. The console work it builds on, and the owner's go-ahead, are the
+  entry below.
+
+  **Where it lives:** `app/build.gradle.kts`'s `BALI_COGNITO_CLIENT_ID`, `1njpekb5sg8nd6lkb53rpimjke`, and
+  `BALI_COGNITO_REDIRECT_URI`; `BaliApp.made`, which now takes a config, the build's by default; and the Debug readout's
+  `ownSignIn`. No screen, no user-facing word, no library and no SDK package. A Release build carries dev's values too until AP
+  sets production's at release, as `ios/project.yml` keeps dev's for every build but the TestFlight workflow's `prod`.
+
+  **The two slashes.** The console refused `com.bali.bali:/auth/callback` ("Syntax of return URL is not valid"), so the client
+  takes `com.bali.bali://auth/callback`, the fallback AN6c named (2026-11-05), and the build follows: still the app id's own
+  scheme, which Play keeps Bali's, its `auth` now a host and `/callback` a path. Nothing else changes: the manifest's filter
+  names the scheme alone, so it takes either form; the Auth Tab is given the scheme alone; and the sign-in takes an answer only
+  at the build's redirect, exactly (`Cognito.code`, AN6a), so the form the build sets is the one taken. **`HostedUi`'s match is
+  the state's, not the redirect's,** so it already handles both forms: it hands the waiting sign-in any link with its attempt's
+  state, as sent, and the sign-in refuses one at another address, as AN6c's guard has it (a link with the state can end a
+  sign-in, never sign anyone in). No change there; HostedUiTest now drives the two together. Prod's client takes the same form
+  (`docs/DEPLOY.md`), the owner's to make. **The live check** (read-only, no credentials; 2026-11-13): dev's authorize endpoint,
+  given the build's client id and the query the app builds, answered `302` to `/login`; the one-slash form, `302` to
+  `/error?error=redirect_mismatch`.
+
+  **The sign-out URL, `com.bali.bali://auth/signout`,** is on the client for AN6e, the owner's cookie call (below); nothing in
+  this step uses it. **For AN6e:** a sign-out's return carries no state, so today a Custom Tab's lands on `SignInAnswerActivity`
+  and is dropped, starting nothing, the tab left open: AN6e decides how its page closes, and an Auth Tab returns it to Bali alone.
+
+  **The window this step opens, until AN6e lands (both santa reviewers' WARN; said plainly for the owner):** AN6c's entry named
+  the PR that puts Android's client id in the build as the one that makes its cookie-sharing fallback reachable, and this is that
+  PR. On a phone whose browser offers no ephemeral tab (Chrome before 136, the emulators' 124 among them), a sign-in through
+  Bali's Custom Tab leaves Cognito's session in that browser, so while it lasts another app on the phone that also claims
+  `com.bali.bali` could open the hosted UI with Bali's public client id, be handed a code for the student's account with no
+  password asked, and trade it for the student's tokens, the 365-day refresh token among them (RFC 8252, 8.6). The owner's fix,
+  ending that session after each sign-in, is AN6e's, not this step's. Who it reaches today: nobody but the owner. It is dev's
+  client alone, no Android build is given to anyone, and no test or emulator signs in. So, until AN6e lands, the owner's phone
+  checks sign in only on Chrome 136 or later (`docs/ANDROID-PHONE-TESTS.md`, AN6c), and AN6e lands before any build leaves the
+  owner's phones (AP2). **For AN6e, unverified here (santa's reviewer B):** if Cognito's managed-login session serves every app
+  client in a pool, a session a portal sign-in left in a phone's browser could hand such an app a code through any public client
+  whose callback it can claim, iOS's `bali://auth/callback` on prod included, and ending Bali's own session after its sign-in
+  would not close that. Check it as AN6e is designed.
+
+  **The Debug build is set up, so its start runs the engine and the account over the app's own sign-in** at dev's API, as on
+  iOS. Nobody signs in on the emulators, so it's a signed-out phone, every send waiting on sign-in and nothing on the wire. The
+  tests that read a build not set up moved where their rule still holds (this step's calls):
+  - **BaliAppTest's start over no token is two tests now:** the set-up build's start, its account signed out, its engine waiting
+    on sign-in, nobody signed in through the app's sign-in; and a Debug build's start given no config (`made(config = null)`),
+    the path a build with a value emptied takes, an engine over no token with no account. Release's start with no config stays
+    ThisBuildTest's, on the JVM.
+  - **The readout reads "not set up" from the run,** as AN9i made its Engine line read the run, and its Sign in and Sign out
+    reach the app's own sign-in only over the app's own run: `ownSignIn` is the app's sign-in while the run's engine is the one the
+    app's start made over it (`BaliApp.overSignIn`), and none with no run, over a run with no sign-in (a Debug build's start with
+    no config, the engine ReadoutTest and CoversTest run) or over one with a sign-in of its own (a test's); there each press does
+    nothing and says why, and the Signed in line says sign-in isn't set up over a run with none. The app's own run is always over
+    the app's sign-in, so the app changes nothing. (Santa's two reviewers' WARN: the first cut, the app's sign-in over any run with
+    an account, would have let a future press over a test's own run open dev's hosted UI.) ReadoutTest presses each button only
+    with every activity start held, so a press that got through would open nothing and fail by name; the app's own run's sign-in
+    is read there, never pressed. Its line about the app's own sign-in not set up now says its run is over a sign-in of the test's
+    own; its Try again test reads the app's own start as it runs now: over the sign-in, signed out, its link waiting on sign-in,
+    the server never heard from.
+  - **SignInBrowserTest keeps its whole sign-in's tokens in a file of its own** (for the hard rule: no test reaches Cognito or
+    dev's API): they're a real sign-in's shape, good for an hour, and the app's own sign-in reads the app's file once, at the app's
+    start, so a run cut short between their save and the test's `@After` would have left them for the next run's start to send to
+    dev's API and renew with dev's Cognito. KeystoreTokenStoreTest keeps the app's file and key, its subject; its tokens name no
+    account, so the app's sign-in never gives or renews them.
+
+  **The tests:** the pins failing first (their own commit): core's AppConfigTest, `the build's values make no config: is one of
+  them empty?`, and BaliAppTest's value test, renamed, on `Bali_Spike_API35`, `sign-in isn't set up in this build`. New: the
+  set-up start, its engine the one the start made over the app's sign-in, and the start given no config (above); ReadoutTest's
+  `signInAndSignOutReach…`, the readout's two buttons with no run and over a test's own run, each saying why not, and the app's
+  own run's sign-in read, never pressed; HostedUiTest's `anAnswerAtTheTwoSlashCallback…`, a sign-in through the hop at the
+  build's callback, taken for its attempt, and the one-slash form, another host, another path, a path with a tail, a trailing
+  slash and three slashes refused, none exchanged; SignInTest's near misses gain another host, a tail and the one-slash form;
+  SignInBrowserTest's answers come back through Android's hop at the two-slash callback (the activity path: the scheme-only
+  filter). Renamed: BaliAppTest's `everyValueArrivesAsTextAndWhileTheClientIdIsEmptySignInIsNotSetUp`, now
+  `everyValueArrivesAsTextAndTheAppSignsInThroughDevsAndroidClientAtTheTwoSlashCallback`.
+
+  **Broken on purpose, each failing by name, then reverted:**
+  - the one-slash redirect put back: AppConfigTest, `expected: <com.bali.bali://auth/callback> but was:
+    <com.bali.bali:/auth/callback>`; BaliAppTest's value test on API 35, the same;
+  - the client id emptied: AppConfigTest, `the build's values make no config…`; on API 35, BaliAppTest's value test (`sign-in
+    isn't set up in this build`) and its set-up start (`Required value was null.`);
+  - the sign-in taking a one-slash answer for the two-slash redirect, broken where the match is, `Cognito.code` (each side's
+    `://` made `:/`), since `HostedUi`'s is the state's: HostedUiTest's `anAnswerAtTheTwoSlashCallback…`, `com.bali.bali:/auth/callback
+    ==> expected: <Refused(error=null)> but was: <null>`, and SignInTest's `theAnswersCodeIsTaken…`, `bali:/auth/callback?code=c0de&state=st.
+    Expected an exception … but was completed successfully with the result: <c0de>`;
+  - this step's own: a start given no config making no engine, BaliAppTest's `aDebugBuildsStartGivenNoConfig…`, `Required value
+    was null.`; the readout's first `ownSignIn` the app's sign-in alone, `signInOpensNothing…` at its Signed in line ("never
+    came", nothing pressed); its Sign in's guard alone, `started Intent { cmp=com.bali.bali/.HostedUiActivity }`, the press's
+    start held, no tab opened, nothing on the wire (no `START` in the log); and the guard as santa's reviewers found it, the
+    app's sign-in over any run with an account, `signInAndSignOutReach…` over the test's own run, `expected null, but
+    was:<com.bali.core.SignIn@…>`, before any press.
+
+  **CoversTest's race on Android 13 (found by this step's whole run there; test only, its own commit):** the whole suite failed
+  once at `callingForHelp…`'s removal step, the uninstaller's window never named. Its log: Android 13's Settings opened its
+  Accessibility page through a deep link of its own, a first page finishing for `DeepLinkHomepageActivity`, which started the
+  page again 0.8 s later; the test had taken a Settings window before the page itself, pressed Home and asked for the removal, and
+  the page's late start came over the uninstaller, which finished as `noHistory` does (`wm_finish_activity … UninstallerActivity,
+  stop-no-history`). The step now leaves once the page's own window has the focus: the first page never has a window, though the
+  system marks it resumed for a moment, so `ResumedActivity` isn't enough. Nothing of this step's runs there. Settings takes that
+  deep link only some of the time; it took it again in the final whole run, where the step waited out the page's late start,
+  pressing Home 0.9 s after it, and passed.
+
+  **The runs:** on `Bali_Spike_API29`, `_API35` and `_API37`, on the final code, BaliAppTest 9 and ReadoutTest 10, 19 of 19 on
+  each; before santa's WARN fix, which changed only the readout's two buttons and `BaliApp`'s note of its engine, SignInBrowserTest
+  8 and CoversTest 6, with its fix, on each. On `Bali_Spike_API33`, the whole instrumented suite on the final code, 82 of 82 (80 at
+  #587: BaliAppTest's start test is two now, and ReadoutTest has one more), after one earlier run failed at CoversTest's race
+  (above) and one, the fix's, passed 81 of 81. After each run `dumpsys netstats`, polled, listed no traffic for Bali's or its
+  test app's uid. On the JVM, run again: core 153, outbox 571, the app's 18 and 21. Gradle's `assemble
+  :app:assembleDebugAndroidTest :app:lint check` green, Android 10's API check with it; `npm run typecheck && npm run lint && npm
+  test` green, the portal's suite whole, and `npm run test:infra` 24 of 24. Nothing was added to the PC's SDK: its folders were
+  compared before and after. Each emulator after: Bali and its test app uninstalled, AN1's spike apps kept, every setting and the
+  call log as found (Android 13's font scale, written 1.0 during its runs, unset again), stopped.
+
+  **For Phase 10:** the screens' Sign in opens dev's real hosted UI now, so no test presses it on the app's own sign-in: a test
+  signs in over a sign-in of its own (`TestSignIn.kt`), and one that presses Sign in holds every start, as ReadoutTest's `press`
+  does. A real sign-in is the owner's phone check (`docs/ANDROID-PHONE-TESTS.md`, AN6c), on an account that passed the 13+ check.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): no blocker. Their WARNs: the cookie-sharing window this PR opens until AN6e (both),
+  now said plainly above, in PLAN-ANDROID's owner item 8, DEPLOY and the phone checks, and in this step's report to the owner; the readout's first
+  guard, which gave the app's sign-in to a test's own run (both), taken (above); ARCHITECTURE's Live lesson section still marking
+  the TalkBack call as awaiting (A), taken; and PLAN.md's 11 words of room (B), left for the conductor: the next line there needs
+  finished detail moved first.
+
+- **2026-11-13** — **The owner's go-ahead of 2026-11-12 ("take all your reccomended decisions as well"): the conductor's seven
+  recommendations taken, AS7's list-changed screen left for the owner's eyes; and that evening's dev consoles, done by the
+  conductor on the owner's ask ("do what you need to do"), dev only, prod untouched (recorded by AN6d, #588, as the conductor
+  relayed them).**
+
+  **The seven calls, the owner's now:**
+  1. **A student's notes come off the phone's storage once a deletion's request went out,** even where its answer was lost: that
+     student sees the one-time consent screen again. iOS has the same gap. AN9k, and C4e on the iPhone.
+  2. **The server's `409 account_deleted` reads as signed out, in both apps:** today a deleted account's other phone says
+     "Something went wrong at Bali", and one locked in a lesson stays locked until the bell. AN9j, and C4d on the iPhone, the Mac's.
+  3. **A CI check fails any PR with invisible or text-direction characters in source files,** added to a check that's already
+     required: S12, a session's step, for every session's PRs (the Write tool's escape trap, GOTCHAS).
+  4. **The cookie call (owner item 8; AN6c's entry, 2026-11-05):** where the phone's browser offers no ephemeral tab (Chrome
+     before 136), Bali ends Cognito's sign-in session right after each sign-in, one more page for the student, through the client's
+     sign-out URL: AN6e. ARCHITECTURE's decision 7 says so now.
+  5. **AN11, the API's push, runs on the Windows PC,** not in a cloud session.
+  6. **The help page names Android's lock beside Screen Time** ("or Bali's lock off", where it says "or Screen Time off") before
+     the first Android build reaches a student: AP2b, a portal step. The privacy policy's line is left to the owner and the lawyer.
+  7. **ARCHITECTURE's list of where Android's lock rules differ from the iPhone's stands as the owner's, and so does every Android
+     call marked as awaiting the owner's look by 2026-11-12.** AN7h's calls of 2026-11-13 (#587) came after it and still await the
+     owner's look: the battery plan's exception on Android 10 and 11, the cover over Android 10's picture-in-picture menu, and that
+     cover's doubtful edge. ARCHITECTURE's "Android app structure" marks the earlier ones the owner's now, AN7h's as awaiting still.
+
+  **The exception, still the owner's: the list-changed screen (AS7).** The approved board draws its two-line version, and Android
+  can show only three lines, so it needs the owner's eyes on a drawing: a blanket yes can't approve an unseen board.
+
+  **The consoles, 2026-11-12** (the conductor, in the owner's Chrome on the Mac; every value in `docs/DEPLOY.md`, the managed-login
+  README, RUNBOOKS and PLAN-ANDROID):
+  - **Cognito, dev's pool:** Android's app client, `bali-android-dev-public`, public (the token endpoint answered a made-up code
+    `invalid_grant`), and Bali's managed-login style for it, made with `create-managed-login-branding` in CloudShell from
+    `node infra/cognito/managed-login/request.mjs dev`, its settings read back as `settings.json` holds them. A client made in the
+    console had no style and its page said "Unavailable", where the managed-login README (#581) said such a client gets
+    Cognito's default style: corrected.
+  - **Railway dev:** `AUTH_AUDIENCE` with Android's id appended, deployed at 17:14 Central, `/healthz` ok and the boot log clean.
+  - **Firebase dev** (AN11's 🔧): "Bali Dev", `bali-dev-58473`, its Android app and a send-only service account, its key on Railway
+    dev as `FCM_SERVICE_ACCOUNT_JSON`, which the API ignores until AN11 reads it (its env schema isn't strict).
+    `google-services.json` wasn't downloaded: AN12 asks the owner first.
+  - **Runbook 9 on dev:** its policy and user; the access key and the two variables the owner's, set the same evening, dev's deploy
+    at 17:34 Central saying deletion is on. Its step 4, the check with a throwaway sign-in, is the owner's, not run.
+  - **The emulators** (the owner's OK for Android 12's or 13's image): `system-images;android-33;google_apis;x86_64` r17 and
+    `Bali_Spike_API33`, first booted by AN7h; Android 10's, `Bali_Spike_API29`, earlier that day. The PC's AWS CLI answered
+    `InvalidClientTokenId`, so the AWS steps ran in CloudShell (GOTCHAS).
+
 - **2026-11-13** — **AN7h, the lock on Android 10: a lesson's cover reaches every app. Android 10 and 11 never take back a
   package an accessibility service has named, so Bali names none there; and Android 10's picture-in-picture menu, an activity of
   System UI's, is covered as the small window it stands in for (this step's calls and the conductor's, marked, each awaiting the

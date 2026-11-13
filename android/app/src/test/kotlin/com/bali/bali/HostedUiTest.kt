@@ -1,8 +1,15 @@
 package com.bali.bali
 
 import androidx.browser.auth.AuthTabIntent
+import com.bali.core.Cognito
+import com.bali.core.HttpAnswer
+import com.bali.core.HttpRequest
+import com.bali.core.HttpTransport
+import com.bali.core.SignIn
 import com.bali.core.SignInError
+import com.bali.core.TokenStore
 import java.net.URI
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -10,6 +17,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -131,5 +140,68 @@ class HostedUiTest {
         assertNull(waiting.state)
         assertFalse(pages.redirected("com.bali.bali:/auth/callback?code=c"))
         assertTrue(pages.answered(waiting.id, "com.bali.bali:/auth/callback?code=c"))
+    }
+
+    /**
+     * The build's callback since AN6d, two slashes (core's AppConfigTest pins it), through the hop and the sign-in as the app's
+     * activities hand an answer over: taken for its attempt, and the one-slash form and every near miss refused, nothing
+     * exchanged for one. The waiting sign-in takes a link by its attempt's state alone, as sent; its address is the sign-in's to
+     * judge, against the build's redirect exactly (`Cognito.code`, AN6a), so the form the build sets is the one taken.
+     */
+    @Test
+    fun anAnswerAtTheTwoSlashCallbackSignsInAndTheOneSlashFormAndOtherNearMissesAreRefusedUnexchanged() {
+        val exchanged = AtomicInteger()
+        val cognito = Cognito(URI("https://bali.auth.test"), "the-client", URI("com.bali.bali://auth/callback"))
+        val token =
+            object : HttpTransport {
+                override suspend fun send(request: HttpRequest): HttpAnswer {
+                    exchanged.incrementAndGet()
+                    return HttpAnswer(200, emptyMap(), """{"access_token":"a.b.c","refresh_token":"r"}""".encodeToByteArray())
+                }
+            }
+
+        fun signInAt(callback: String): Throwable? =
+            runBlocking {
+                val signIn = SignIn(cognito, Memory(), CoroutineScope(Job()), token)
+                runCatching {
+                    signIn.signIn { page ->
+                        val waiting = pages.start(page)
+                        try {
+                            assertTrue(pages.redirected("$callback?code=the-code&state=${waiting.state}"), callback)
+                            waiting.answer.await()
+                        } finally {
+                            pages.forget(waiting)
+                        }
+                    }
+                }.exceptionOrNull()
+            }
+        assertNull(signInAt("com.bali.bali://auth/callback"))
+        assertEquals(1, exchanged.get())
+        for (near in listOf(
+            "com.bali.bali:/auth/callback", // one slash, RFC 8252's form, which Cognito's console refused (2026-11-12)
+            "com.bali.bali://another/callback",
+            "com.bali.bali://auth/another",
+            "com.bali.bali://auth/callback/more",
+            "com.bali.bali://auth/callback/",
+            "com.bali.bali:///auth/callback",
+        )) {
+            assertEquals(SignInError.Refused(null), signInAt(near), near)
+        }
+        assertEquals(1, exchanged.get())
+    }
+
+    /** The Keystore store's stand-in, in memory. */
+    private class Memory : TokenStore {
+        private var saved: ByteArray? = null
+
+        override fun load(): ByteArray? = saved
+
+        override fun save(tokens: ByteArray) {
+            saved = tokens
+        }
+
+        override fun clear() {
+            saved = null
+        }
     }
 }

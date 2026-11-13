@@ -1,5 +1,6 @@
 package com.bali.bali
 
+import android.app.Activity
 import android.app.Instrumentation
 import android.app.UiAutomation
 import android.content.Intent
@@ -17,6 +18,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.bali.core.BaliJson
 import com.bali.core.EnrollmentJoinRequest
 import com.bali.core.SignIn
+import com.bali.core.SignInError
 import com.bali.outbox.AgeCheck
 import com.bali.outbox.Change
 import com.bali.outbox.Enforcer
@@ -47,6 +49,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -149,28 +152,39 @@ class ReadoutTest {
         assertTrue("Server last answered: never" in readout.lines())
     }
 
+    // This test's run is a Debug build's start with no config (ThisBuild, Q2), the one place sign-in isn't set up since AN6d
+    // set every value, and the readout reads that from the run: its Sign in and Sign out reach no sign-in.
     @Test
     fun signInOpensNothingWhileSignInIsNotSetUpAndSaysSo() {
-        val started = CopyOnWriteArrayList<Intent>()
-        val recorder =
-            object : Instrumentation.ActivityMonitor() {
-                override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
-                    started += Intent(intent)
-                    return null
-                }
-            }
         val readout = open()
         until { readout.lines().takeIf { "Signed in: sign-in isn't set up in this build" in it } }
-        instrumentation.addMonitor(recorder)
-        try {
-            readout.onActivity { it.signIn.performClick() }
-            // The press's own end, its note: by then nothing was started.
-            val said = until { ReadoutActivity.note.value.takeIf { it.isNotEmpty() } }
-            assertTrue(said, said.startsWith("sign-in isn't set up in this build"))
-            assertEquals(emptyList<Intent>(), started)
-        } finally {
-            instrumentation.removeMonitor(recorder)
+        readout.onActivity { assertNull(it.ownSignIn()) }
+        assertEquals("sign-in isn't set up in this build: nothing opened", press(readout) { it.signIn })
+        assertEquals("sign-in isn't set up in this build: nobody signed out", press(readout) { it.signOut })
+    }
+
+    // The readout signs in and out through the app's own sign-in over the app's own start's run alone (AN6d): never with no run,
+    // nor over a sign-in of a test's own, as the tests' runs here are, where each press says why not. The app's own is read, and
+    // never pressed: its Sign in opens dev's hosted UI.
+    @Test
+    fun signInAndSignOutReachTheAppsSignInOverTheAppsOwnRunAloneAndElsewhereSayWhyNot() {
+        val readout = open()
+        runBlocking { withTimeout(PATIENCE) { scope.coroutineContext.job.cancelAndJoin() } }
+        until { readout.lines().takeIf { "Signed in: not known yet\n" in it } }
+        readout.onActivity { assertNull(it.ownSignIn()) }
+        assertEquals("no engine runs: nothing opened", press(readout) { it.signIn })
+        assertEquals("no engine runs: nobody signed out", press(readout) { it.signOut })
+        signed()
+        until { readout.lines().takeIf { "Signed in: no\n" in it } }
+        readout.onActivity { assertNull(it.ownSignIn()) }
+        val another = "this run's engine is over a sign-in of its own, not the app's"
+        assertEquals("$another: nothing opened", press(readout) { it.signIn })
+        assertEquals("$another: nobody signed out", press(readout) { it.signOut })
+        runBlocking {
+            withTimeout(PATIENCE) { scope.coroutineContext.job.cancelAndJoin() }
+            app.begin()
         }
+        readout.onActivity { assertSame(app.signIn, it.ownSignIn()) }
     }
 
     @Test
@@ -224,11 +238,13 @@ class ReadoutTest {
             val readout = open()
             until { readout.lines().takeIf { "Engine: start failed: java.io.IOException: the disk refused the outbox" in it } }
             assertTrue(readout.shows { it.tryAgain })
-            // Tried again, the app's own start, over its own file.
+            // Tried again, the app's own start, over its own file and its own sign-in (AN6d), nobody signed in: the truth read
+            // in front waits on sign-in, never on the wire, so the server never heard from.
             readout.onActivity { it.tryAgain.performClick() }
             until { ReadoutActivity.note.value.takeIf { it == "started" } }
             assertNull(app.problem.value)
-            until { readout.lines().takeIf { "Engine: over no token, as a signed-out phone" in it } }
+            until { readout.lines().takeIf { "Engine: over the sign-in\n" in it && "Signed in: no\n" in it && "Link: SignIn\n" in it } }
+            assertTrue("Server last answered: never" in readout.lines())
             assertFalse(until { readout.shows { it.tryAgain }.takeIf { !it } })
         }
 
@@ -265,7 +281,7 @@ class ReadoutTest {
         val signIn = signed()
         val readout = open()
         until { readout.lines().takeIf { "Signed in: no\n" in it } }
-        // The Engine line reads the run too: this one's engine is over a sign-in, the app's own not set up.
+        // The Engine line reads the run too: this one's engine is over a sign-in of the test's own, never the app's.
         until { readout.lines().takeIf { "Engine: over the sign-in\n" in it } }
         server.signStudentIn(signIn, scope, "student-1")
         val asked = server.next(AGE_CHECK)
@@ -369,6 +385,33 @@ class ReadoutTest {
 
     /** What the last press did, once it has ended. */
     private fun said(): String = until { ReadoutActivity.note.value.takeIf { it.isNotEmpty() } }
+
+    /**
+     * What a press of [button] did, its note, with every start Bali asks for held: a press that got through to the app's own
+     * sign-in opens nothing, never dev's hosted UI, and fails here by name, its sign-in ended.
+     */
+    private fun press(readout: ActivityScenario<ReadoutActivity>, button: (ReadoutActivity) -> Button): String {
+        val started = CopyOnWriteArrayList<Intent>()
+        val held =
+            object : Instrumentation.ActivityMonitor() {
+                override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult {
+                    started += Intent(intent)
+                    return Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
+                }
+            }
+        ReadoutActivity.note.value = ""
+        instrumentation.addMonitor(held)
+        try {
+            readout.onActivity { button(it).performClick() }
+            // The press's own end, its note, or a start it asked for.
+            val said = until { ReadoutActivity.note.value.takeIf { it.isNotEmpty() } ?: started.firstOrNull()?.let { "started $it" } }
+            assertEquals(said, emptyList<Intent>(), started)
+            return said
+        } finally {
+            instrumentation.removeMonitor(held)
+            app.hostedUi.waiting()?.let { app.hostedUi.ended(it.id, SignInError.Cancelled) }
+        }
+    }
 
     /** A page of the history holding [moments], each its wire type and when, in the order given. */
     private fun page(moments: List<Pair<String, Instant>>): String =

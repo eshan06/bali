@@ -965,6 +965,13 @@ Railway project. The pools (`docs/DEPLOY.md`): dev `us-east-1_YTloqilwT`, produc
 pool), `arn:aws:cognito-idp:us-east-1:<account id>:userpool/<pool id>`, where `<account id>` is the
 12 digits under the console's account menu, top right. Not a secret, but keep it out of the repo.
 
+**Dev, 2026-11-12:** steps 1 and 2's policy and user, `bali-cognito-deleter-dev`, made by the conductor on
+the owner's ask (step 1's JSON exactly; no console access, that one policy), and the access key and step
+3's two variables set by the owner: dev's deploy at 17:34 Central logs `Cognito sign-in deletion is on: a
+deleted account's sign-in is deleted`, `/healthz` answers ok, and no `deletion done` or `failed` line
+came in its first minute. Step 4, the check with a throwaway sign-in, is the owner's, not yet run, and so
+are production's steps 5 and 6.
+
 1. **The dev policy.** AWS console → **IAM** → **Policies** → **Create policy** → **JSON**, and
    replace the editor's contents with this, the ARN copied from dev's pool:
 

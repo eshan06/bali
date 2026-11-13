@@ -138,6 +138,9 @@ The PC whose clone is `C:\dev\bali` holds Android's SDK and its test emulators
   system-images/android-36/google_apis/x86_64`, with slashes. Make an AVD through the JBR's `java`
   with `-classpath <cmdline-tools>/lib/avdmanager-classpath.jar com.android.sdklib.tool.AvdManagerCli
   create avd …`, where a quoted argument keeps its semicolons.
+- **`avdmanager` from `cmdline-tools/latest` says "The tools directory property is not set"** unless
+  the `java` running it is given `-Dcom.android.sdkmanager.toolsdir=<sdk>/cmdline-tools/latest`
+  (seen 2026-11-12).
 - **A worktree has no `android/local.properties`.** It is gitignored, so a fresh worktree's
   `./gradlew assemble` stops at "SDK location not found" (`:core:test` and `:outbox:test` run
   without it). Export `ANDROID_HOME` as the SDK's folder (Android Studio's SDK Manager shows it)
@@ -200,6 +203,10 @@ The PC whose clone is `C:\dev\bali` holds Android's SDK and its test emulators
   that fixes it, the teacher's id filled in (README, "Running it against a deployed API", step 3).
   The owner pastes it into Railway's query tab on dev's Postgres; a session cannot reach that
   database.
+- **The AWS CLI's key on the PC whose clone is `C:\dev\bali` is dead** (`InvalidClientTokenId`,
+  2026-11-12), so that day's AWS steps ran in the console's CloudShell. Delete this entry once the
+  owner gives the CLI a working key.
+
 - **Egress is allowlisted by the cloud environment's network policy.** Any
   new external host a session needs (an API, a registry) must first be added
   by the owner in the environment settings. A proxy 403 is an org policy

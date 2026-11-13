@@ -23,7 +23,7 @@ import androidx.lifecycle.lifecycleScope
 import com.bali.core.BlockRead
 import com.bali.core.EnrollmentJoinRequest
 import com.bali.core.EventId
-import com.bali.outbox.Account
+import com.bali.core.SignIn
 import com.bali.outbox.AgeCheck
 import com.bali.outbox.Change
 import com.bali.outbox.Enforcer
@@ -67,6 +67,7 @@ class ReadoutActivity : ComponentActivity() {
     private val app get() = application as BaliApp
     internal lateinit var lines: TextView
     internal lateinit var signIn: Button
+    internal lateinit var signOut: Button
     internal lateinit var scan: Button
     internal lateinit var readCode: Button
     internal lateinit var blockTag: EditText
@@ -83,7 +84,7 @@ class ReadoutActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         lines = TextView(this).apply { typeface = Typeface.MONOSPACE }
         signIn = button("Sign in") { signingIn() }
-        val signOut = button("Sign out") { app.signIn?.let { it.signOut(); "signed out" } ?: "sign-in isn't set up in this build: nobody to sign out" }
+        signOut = button("Sign out") { ownSignIn()?.let { it.signOut(); "signed out" } ?: "${notOwn()}: nobody signed out" }
         // iOS's Allow Screen Time: Android asks nothing, the student switches the service on there.
         val settings = Button(this).apply { text = "Open Accessibility settings"; setOnClickListener { accessibility() } }
         // B6's: the block read over NFC and tapped, or only read, to register it on dev.
@@ -149,7 +150,7 @@ class ReadoutActivity : ComponentActivity() {
                 "Screen: ${screen(app.router.shown.value)}",
                 "Link: ${state?.link ?: "no exchange yet"}",
                 "Server last answered: ${state?.heardAt?.let(::time) ?: "never"}",
-                "Signed in: ${signedIn(run?.account?.state?.value)}",
+                "Signed in: ${signedIn(run)}",
                 "Standing: ${standing(state)}",
                 "Lock: ${claim(run?.enforcer?.updates?.value)}",
                 "Service: ${service()}",
@@ -162,9 +163,12 @@ class ReadoutActivity : ComponentActivity() {
         tryAgain.isVisible = run == null && app.problem.value != null
     }
 
-    /** Who is signed in, and the 13+ check as the run's account has it (Q3): there's no button for it before AS2. */
-    private fun signedIn(account: Account.State?): String {
-        if (account == null) return if (app.signIn == null) "sign-in isn't set up in this build" else "not known yet"
+    /**
+     * Who is signed in, and the 13+ check as the run's account has it (Q3): there's no button for it before AS2. A run with no
+     * account is one over no sign-in, a Debug build's start with no config (Q2).
+     */
+    private fun signedIn(run: BaliApp.Running?): String {
+        val account = run?.account?.state?.value ?: return if (run == null) "not known yet" else NOT_SET_UP
         return when (account.signedIn) {
             null -> "not known yet"
             false -> "no"
@@ -231,11 +235,24 @@ class ReadoutActivity : ComponentActivity() {
         return if (after.isZero) "${read.name.lowercase()} at the first read" else "starting for ${seconds(after)}, then ${read.name.lowercase()}"
     }
 
-    /** Signs in as Sign in will, through the hosted UI's tab (AN6c); nothing opens while sign-in isn't set up. */
+    /** Signs in as Sign in will, through the hosted UI's tab (AN6c), over the app's own run alone ([ownSignIn]). */
     private suspend fun signingIn(): String {
-        val signIn = app.signIn ?: return "sign-in isn't set up in this build (the client id is empty until the owner's): nothing opened"
+        val signIn = ownSignIn() ?: return "${notOwn()}: nothing opened"
         signIn.signIn { hostedUi(it) }
         return "signed in"
+    }
+
+    /**
+     * The app's own sign-in while the run's engine is the one the app's start made over it ([BaliApp.overSignIn]); none
+     * otherwise, so Sign in and Sign out never reach it from another run: none, one over no sign-in (a Debug build's start with
+     * no config, Q2), or one over a sign-in of its own, as a test's is. There they do nothing and say why ([notOwn]).
+     */
+    internal fun ownSignIn(): SignIn? = app.signIn?.takeIf { app.running.value?.engine?.let { it === app.overSignIn } == true }
+
+    /** Why Sign in and Sign out reach no sign-in: no run, a run over none, or one over another's. */
+    private fun notOwn(): String {
+        val run = app.running.value ?: return "no engine runs"
+        return if (run.account == null) NOT_SET_UP else "this run's engine is over a sign-in of its own, not the app's"
     }
 
     private fun accessibility() =
@@ -324,6 +341,7 @@ class ReadoutActivity : ComponentActivity() {
         /** The phone's own way of writing a time, with its seconds. */
         val TIME: DateTimeFormatter = DateTimeFormatter.ofLocalizedTime(FormatStyle.MEDIUM)
         private const val CAPPED = "capped"
+        private const val NOT_SET_UP = "sign-in isn't set up in this build"
         private const val PAD = 32
         private const val REDRAW = 1000L
 

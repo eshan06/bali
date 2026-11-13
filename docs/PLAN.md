@@ -8,13 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-13 (Central) — The lock on Android 10 fixed: Android 10 and 11 never take back a
-package an accessibility service names, so Bali names none there, and Android 10's picture-in-picture
-menu is covered (AN7h, #587; DECISIONS 2026-11-13). Before it, the sign-in deletion case's CI flake
-(#586). Next: the owner's switch of prod's domain, the release call and disabling
-the review account (Open owner items); a session builds the retire-a-block command; the owner the
-sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11–AN13;
-AN1's part 2 on the owner's phones; the audit's polish waits._
+_Last updated: 2026-11-13 (Central) — Android's build signs in on dev, through dev's Android client at
+its two-slash callback (AN6d, #588; DECISIONS 2026-11-13), and the owner's go-ahead of 2026-11-12 is
+recorded with its new steps. Before it, the lock on Android 10 (AN7h, #587). Next: the owner's switch
+of prod's domain, the release call and disabling the review account (Open owner items); a session
+builds the retire-a-block command and S12; the owner the sitting's findings' calls; GA5's known
+limit, the owner's call (DECISIONS 2026-11-02); AN6e, AN9j, AN9k, AN11–AN13; AN1's part 2 on the
+owner's phones; the audit's polish waits._
 
 ## Now
 
@@ -66,10 +66,10 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   [Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB): the portal's sign-in
   page ✅ (#582) and the app's Sign in ✅ (#583), DECISIONS 2026-11-12; whether the 13+ question and
   Delete account's screen follow it, and the app's text scale at the large sizes, the owner's calls.
-- **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
+- **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md`;
   AN1's part 2 on a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱),
-  before launch; AN2–AN10's and AN13a–AN13f's code ✅ (#488–#585), AN13e2's CI flake fix ✅ (#584),
-  AN7h, the lock on Android 10, ✅ (#587); AN11–AN13 next. Not on the pilot's critical path.
+  before launch; AN2–AN10's and AN13a–AN13f's code ✅ (#488–#588), signing in on dev since AN6d;
+  AN6e, AN9j, AN9k, AN11–AN13 next. Not on the pilot's critical path.
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
   (#434; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file
   (`docs/WEB.md`, Testing the portal), `try-again.test.tsx` the pattern. Each UI step from now on
@@ -163,8 +163,8 @@ drafts stand on `/privacy` and `/terms`.
   the portal's UI included (`apps/web/src/app`, `apps/web/src/components`, its user-facing strings).
 - The Mac session: Xcode and the iPhone (`ios/Bali/UI`, `ios/BaliShield`, the app's user-facing
   strings): the next prod TestFlight build.
-- Android (Phases 8–11): the Windows PC builds its steps, the screens included; cloud sessions its
-  API step (AN11) and docs; the owner its phones and Google's consoles (`docs/PLAN-ANDROID.md`).
+- Android (Phases 8–11): the Windows PC builds its steps, the screens and the API's push (AN11)
+  included; cloud sessions its docs; the owner its phones and Google's consoles (`docs/PLAN-ANDROID.md`).
 - The owner: the consoles (AWS, Railway, Vercel, Sentry, App Store Connect), Apple, the
   lawyer, the school, and every iPhone check.
 
@@ -188,8 +188,8 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 5 | Pilot readiness: prod, Sentry, TestFlight, App Store, runbooks | ✅ cloud steps done; **prod live 2026-10-05**; open: the owner's items |
 | 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), S8 (the owner's decision) |
 | 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
-| 8 | Android: the lock, the candidates measured on the emulators, then (a) on a Pixel and a Samsung (iOS's Phase 0) | building: AN1's parts 1 and 1c on the emulators ✅ (2026-11-03); AN1b, lock (a) decided ✅ (2026-11-04); AN1's part 2 📱 waits for the phones, before launch |
-| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | building: AN2–AN10's and AN13a–AN13f's code ✅ (2026-11-12), AN7h ✅ (2026-11-13); AN11–AN13 next |
+| 8 | Android: the lock, the candidates measured on the emulators, then (a) on a Pixel and a Samsung (iOS's Phase 0) | building: AN1's part 2 📱 waits for the phones, before launch |
+| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | building: AN2–AN10's and AN13a–AN13f's code ✅ (2026-11-12), AN7h and AN6d ✅ (2026-11-13); AN6e, AN9j, AN9k, AN11–AN13 next |
 | 10 | Android: the screens, from the approved boards | AS0's canvas approved ✅ (2026-11-04); AS1–AS8 build from it |
 | 11 | Android: on Play, its testing tracks, device gate and exit check | planned |
 
@@ -293,6 +293,9 @@ One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
 - **S8** 🔧 Least-privilege database roles (Phase 6): the owner's decision (Open owner items, 1)
 - **C3d** Deleted sign-ins refused on the server — ✅ (#558; DECISIONS 2026-11-11); its case's CI flake fixed (#586; DECISIONS 2026-11-12)
 - **C4c** AN9h's iPhone twin: one account's token for Delete account and the 13+ check (the owner, 2026-11-10: "Close it now"), the Mac's; DECISIONS 2026-11-10, "For C4c"; AN9e's two iOS gaps (DECISIONS 2026-11-11)
+- **C4d** AN9j's iPhone twin, the Mac's: `409 account_deleted` read as signed out (the owner, 2026-11-12; DECISIONS 2026-11-13)
+- **C4e** AN9k's iPhone twin, the Mac's: a student's notes kept off the phone's storage once a deletion's request went out (the owner, 2026-11-12; DECISIONS 2026-11-13)
+- **S12** A CI scan that fails any PR with invisible or text-direction characters in source files, added to a check that's already required (the owner, 2026-11-12; DECISIONS 2026-11-13)
 - **D2k** ⏸ The shield's new look (Phase 3): waits for a design the owner approves in Claude Design
 - **The push's app half** — ✅ (#456; DECISIONS 2026-10-24); N6's end-to-end check passed on prod (2026-11-08); left, runbook 7's step 4, dev's `APNS_*` variables, the owner's
 
@@ -370,7 +373,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
     review; a forgotten password is reset through AWS.
   - App Review may ask for a tap the reviewer can try (§4's options B and C), about students' names
     on Present (guideline 1.2), or about a teacher's deletion by email (DECISIONS 2026-11-07).
-- Android's five still open (the phones, the Play account, the timing, the SDK's Android 11 or 12 image (10's, 13's and 17's installed 2026-11-12); 🔧 the Cognito clients, AN6c's; AS0's canvas, the lock and CodeQL settled, 2026-11-04): `docs/PLAN-ANDROID.md`, Open owner items.
+- Android's five still open (the phones, the Play account, the timing, the SDK's Android 11 or 12 image; 🔧 prod's Cognito client): `docs/PLAN-ANDROID.md`, Open owner items.
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
 - #165 the Me page: D2j's redesign was rolled back (2026-10-06), so a better Me waits for a design the owner approves; the issue, closed by #266, is the owner's to reopen.
 - #130 App Store readiness.

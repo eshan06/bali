@@ -33,12 +33,13 @@ the logo.
 
 ## Where it is
 
-| Pool                        | Its domain                                                        | Client                                              | Its style                              |
-| --------------------------- | ----------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------- |
-| dev, `us-east-1_YTloqilwT`  | `bali-dev`, managed login since 2026-11-12                        | `bali-web-dev`, `2f0vj9o545imu4qth5phanki1v`        | `cbeebf20-d5b7-4e9b-a224-2f838078b0ba` |
-|                             |                                                                   | `bali-ios-dev-public`, `7u6trs6gv805oi35ima29em6oe` | `ef4f008c-9737-4454-9b97-ee61903d8026` |
-| prod, `us-east-1_C55e0fhX8` | `us-east-1c55e0fhx8`, classic until the owner switches it (below) | `bali-web`, `36meb9r9h0cdrt2a1schcv9abs`            | `31bab39d-64bb-4cba-8486-2fe12508c6e7` |
-|                             |                                                                   | `bali-ios`, `5dr74i0iqnth9p4c4k594r27aj`            | `b1c89cc3-dcff-4910-86d2-0beeaf80962a` |
+| Pool                        | Its domain                                                        | Client                                                  | Its style                              |
+| --------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------- |
+| dev, `us-east-1_YTloqilwT`  | `bali-dev`, managed login since 2026-11-12                        | `bali-web-dev`, `2f0vj9o545imu4qth5phanki1v`            | `cbeebf20-d5b7-4e9b-a224-2f838078b0ba` |
+|                             |                                                                   | `bali-ios-dev-public`, `7u6trs6gv805oi35ima29em6oe`     | `ef4f008c-9737-4454-9b97-ee61903d8026` |
+|                             |                                                                   | `bali-android-dev-public`, `1njpekb5sg8nd6lkb53rpimjke` | `e885a39b-0ea5-48aa-8c2f-522660f42a9e` |
+| prod, `us-east-1_C55e0fhX8` | `us-east-1c55e0fhx8`, classic until the owner switches it (below) | `bali-web`, `36meb9r9h0cdrt2a1schcv9abs`                | `31bab39d-64bb-4cba-8486-2fe12508c6e7` |
+|                             |                                                                   | `bali-ios`, `5dr74i0iqnth9p4c4k594r27aj`                | `b1c89cc3-dcff-4910-86d2-0beeaf80962a` |
 
 Dev's demo client, `bali-ios` (`6qcvcp0ubqmb8gunkt1d6dpkeo`), signs the demo's actors in by
 password through Cognito's API (`USER_PASSWORD_AUTH`, `docs/DEPLOY.md`), never on these pages, so
@@ -61,10 +62,11 @@ The request names two images, the logo and the favicon. An update changes only w
 an image a style doesn't hold is Cognito's own: dev's two styles, read back with
 `--return-merged-resources` on 2026-11-12, had every image they don't hold filled from Cognito's.
 
-A new client: one made in the console gets Cognito's default style, which the update above then
-replaces (the first command below finds its id). One made by the CLI or the API has none, and
-managed login shows it no page until it has one: the second command gives it Bali's. Either way,
-add its row above.
+A new client, however it was made, has no style, and managed login shows it no page until it has
+one: the second command below gives it Bali's. Android's dev client, made in the console on
+2026-11-12, had none either, its page saying "Unavailable", where this file had said the console
+gives a new client Cognito's default style. The first command finds a client's style, if it has
+one, for the update above. Either way, add its row above.
 
 ```bash
 aws cognito-idp describe-managed-login-branding-by-client --region us-east-1 \
@@ -116,7 +118,8 @@ the repo when this folder replaced them; git's history keeps them.
 A client with choice-based sign-in (`ALLOW_USER_AUTH` among its authentication flows) gets
 managed login's identifier-first form: the username alone, then the password on a page of its own,
 where other ways to sign in can be offered. Bali's clients leave it off, so the two fields share
-one page (the owner's ask, 2026-11-12): dev's two clients had it until then, prod's never did. Keep
+one page (the owner's ask, 2026-11-12): dev's first two clients had it until then, Android's was
+made without it, and prod's never did. Keep
 it off on every client that signs in on these pages (`docs/RUNBOOKS.md`, runbook 2, step 8).
 **Check:** this lists `ALLOW_REFRESH_TOKEN_AUTH` and `ALLOW_USER_SRP_AUTH` alone.
 

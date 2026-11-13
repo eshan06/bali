@@ -143,12 +143,15 @@ for the sign-in it began with, before a renewal and after it, and only for the a
 `BaliApp.kt`, AN6c): the tokens sealed with AES-GCM under a Keystore key of the app's own, in
 `no_backup/`, a file that can never be opened again read as nothing saved; Cognito's hosted UI in the
 phone's browser, an Auth Tab where it has one, else a Custom Tab, ephemeral where it offers that,
-hosted by an activity that draws nothing; and its answer at `com.bali.bali:/auth/callback`, a Custom
-Tab's taken only for the waiting sign-in with its state. `BaliApp` holds the app's scope, one
-transport, the build's config and the sign-in, for the engine and the screens to take. The build's
-values (`app/build.gradle.kts`, under iOS's settings' names) are string resources the manifest names
-under iOS's Info.plist keys, read into `AppConfig`; `core`'s AppConfigTest pins the three together,
-and the client id stays empty, sign-in not set up, until the owner's (`docs/DEPLOY.md`).
+hosted by an activity that draws nothing; and its answer at `com.bali.bali://auth/callback`, a Custom
+Tab's taken only for the waiting sign-in with its state, two slashes since Cognito's console refused
+RFC 8252's one. `BaliApp` holds the app's scope, one transport, the build's config and the sign-in, for
+the engine and the screens to take. The build's values (`app/build.gradle.kts`, under iOS's settings'
+names) are string resources the manifest names under iOS's Info.plist keys, read into `AppConfig`;
+`core`'s AppConfigTest pins the three together. The client id is dev's Android client's since AN6d
+(`docs/DEPLOY.md`), so every build signs in on dev; production's come at release (AP). No test signs
+in through it: the instrumented tests sign in over a sign-in of their own (`TestSignIn.kt`), and a real
+sign-in is the owner's phone check.
 
 **The lock's service** (`app`'s `ServiceLock.kt`, `LockService.kt` and `BaliApp`'s `start`, AN7c; iOS's
 `PhoneScreenTime` and BaliApp.swift's `start`): Bali's Accessibility service, declared in `app/src/debug`
@@ -173,9 +176,11 @@ Accessibility settings, Join with a typed code, Scan and Read block code (AN8, b
 Emergency Unlock, History's last five moments in the wire's names (AN9i), the phone check's 15-minute cap,
 kept in its own preferences and read at each start, and Try again where the start failed; and the screen the app's
 router shows (Q11, AN10c). In front, it tells the app (`BaliApp.front`), which
-reads the truth and runs the check. While sign-in isn't set up, a Debug build's start runs the engine
-all the same, over no token at the build's API, as a signed-out phone, so a typed tap locks offline to
-its cap and nothing reaches the network; a Release build's makes none, as on iOS (`app/src/release`'s
+reads the truth and runs the check. The build is set up since AN6d, so the app's start runs the engine
+over its sign-in, and signed out it sends nothing: a typed tap still locks offline to its cap. Where
+sign-in isn't set up (a value emptied), a Debug build's start runs the engine all the same, over no token
+at the build's API, as a signed-out phone, so nothing reaches the network, and the readout's Sign in and
+Sign out do nothing over it; a Release build's makes none, as on iOS (`app/src/release`'s
 `ThisBuild`, pinned on the JVM by Release's own tests, which `gradle.properties` turns on). A start that
 runs nothing says why (`BaliApp.problem`, a type: not set up, or the start failed with its cause), never
 swallowed, and takes off the lock the last run left on, which no enforcer runs to end (AN10c).

@@ -28,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -68,16 +69,18 @@ class BaliAppTest {
         }
 
     @Test
-    fun everyValueArrivesAsTextAndWhileTheClientIdIsEmptySignInIsNotSetUp() {
+    fun everyValueArrivesAsTextAndTheAppSignsInThroughDevsAndroidClientAtTheTwoSlashCallback() {
         @Suppress("DEPRECATION")
         val meta = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA).metaData
         // Each a string, never a number aapt read one as, which AppConfig would read as not set.
         val built = AppConfig.Key.entries.associate { it.key to checkNotNull(meta.getString(it.key)) { it.key } }
-        val clientId = built.getValue(AppConfig.Key.CognitoClientId.key)
-        assertEquals(clientId.isEmpty(), app.config == null)
-        assertEquals(app.config == null, app.signIn == null)
-        val config = checkNotNull(AppConfig.from(built + (AppConfig.Key.CognitoClientId.key to clientId.ifEmpty { "client" })))
-        assertEquals(URI("com.bali.bali:/auth/callback"), config.cognito.redirectUri)
+        // Set up (AN6d): the app's config is the build's, and its sign-in is over it.
+        val config = checkNotNull(app.config) { "sign-in isn't set up in this build" }
+        assertEquals(AppConfig.from(built), config)
+        assertEquals(config.cognito, checkNotNull(app.signIn).cognito)
+        // Dev's Android app client, at the callback Cognito's console took: two slashes (docs/DEPLOY.md).
+        assertEquals("1njpekb5sg8nd6lkb53rpimjke", config.cognito.clientId)
+        assertEquals(URI("com.bali.bali://auth/callback"), config.cognito.redirectUri)
         // The portal's address since the owner's ruling (2026-11-07, #540).
         assertEquals(URI("https://app.getbali.app"), config.portal)
     }
@@ -92,24 +95,41 @@ class BaliAppTest {
         assertEquals(FeatureInfo.FLAG_REQUIRED, nfc.flags and FeatureInfo.FLAG_REQUIRED)
     }
 
-    // The build's client id stays empty until the owner's (docs/DEPLOY.md): until then a Debug build's start
-    // runs an engine all the same, over no token, as a signed-out phone (Q2), where a Release build's makes
-    // none, as on iOS (ThisBuildTest, on the JVM). Its file is the app's own, opened as the app started, in the
-    // tests' process too, which is why each test that opens an outbox opens a file of its own.
+    // The build signs in on dev (AN6d), so a Debug build's start runs the engine over the app's own sign-in, and the
+    // account over it, as BaliApp.swift's does. Nobody signs in on these emulators, and no test through this sign-in, so
+    // every send waits on sign-in and nothing reaches dev's API or Cognito. Its file is the app's own, opened as the app
+    // started, in the tests' process too, which is why each test that opens an outbox opens a file of its own.
     @Test
-    fun withSignInNotSetUpADebugBuildsStartRunsAnEngineOverNoTokenAsASignedOutPhone(): Unit =
+    fun aDebugBuildsStartRunsItsEngineAndAccountOverItsSignInNobodySignedInSoNothingGoesOnTheWire(): Unit =
         runBlocking {
-            assertNull(app.signIn)
+            val signIn = checkNotNull(app.signIn)
+            assertFalse(signIn.signedIn().first())
             assertNull(app.problem.value)
             assertTrue(context.getDatabasePath(OUTBOX_FILE).exists())
             app.begin()
-            val engine = checkNotNull(app.running.value).engine
-            // An engine with no sign-in has no account half to run.
-            assertNull(checkNotNull(app.running.value).account)
+            val run = checkNotNull(app.running.value)
+            // Made over the app's own sign-in, whose account it runs.
+            assertSame(app.overSignIn, run.engine)
+            until { checkNotNull(run.account).state.value.takeIf { it.signedIn == false } }
             // The truth read, as Bali in front reads it: never sent, for want of a token, so waiting on sign-in.
-            engine.setInFront(true)
-            until { engine.updates.value.takeIf { it.link == Link.SignIn } }
-            assertNull(engine.updates.value.heardAt)
+            run.engine.setInFront(true)
+            until { run.engine.updates.value.takeIf { it.link == Link.SignIn } }
+            assertNull(run.engine.updates.value.heardAt)
+        }
+
+    // Where sign-in isn't set up, a value emptied (the build sets them all since AN6d), a Debug build's start runs an engine
+    // all the same, over no token, as a signed-out phone (Q2), where a Release build's makes none, as on iOS (ThisBuildTest,
+    // on the JVM): given no config here, as the build no longer is.
+    @Test
+    fun aDebugBuildsStartGivenNoConfigRunsAnEngineOverNoTokenWithNoAccountAsASignedOutPhone(): Unit =
+        runBlocking {
+            app.begin { app.made(config = null) }
+            val run = checkNotNull(app.running.value)
+            // An engine with no sign-in has no account half to run.
+            assertNull(run.account)
+            run.engine.setInFront(true)
+            until { run.engine.updates.value.takeIf { it.link == Link.SignIn } }
+            assertNull(run.engine.updates.value.heardAt)
         }
 
     // CLAUDE.md's "no silent failures": a start that runs nothing says why, each problem its type (AN10a's), held for the

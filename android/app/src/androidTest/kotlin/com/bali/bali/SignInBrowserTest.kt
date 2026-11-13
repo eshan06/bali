@@ -18,6 +18,7 @@ import com.bali.core.HttpRequest
 import com.bali.core.HttpTransport
 import com.bali.core.SignIn
 import com.bali.core.SignInError
+import java.io.File
 import java.net.URI
 import java.util.Base64
 import java.util.concurrent.CopyOnWriteArrayList
@@ -46,9 +47,10 @@ import org.junit.runner.RunWith
  * The hosted UI's browser on the emulator: Android 15, whose Chrome 124 has Custom Tabs but neither the
  * Auth Tab nor ephemeral browsing, and stops at its first run (AN1), which no test goes past: a student's
  * Back closes it, nothing is accepted. What's proven is Bali's side: the tab it asks for, the answer's way
- * back through Android's hop from another app (the shell) as the text it was sent, the guards on it, the
- * student's close, and a host recreated while the tab is open. A real tab and a real sign-in are the
- * owner's device check (📱), once Android's client exists (🔧).
+ * back through Android's hop from another app (the shell) as the text it was sent, at the build's two-slash
+ * callback (AN6d), the guards on it, the student's close, and a host recreated while the tab is open. A real
+ * tab and a real sign-in, on dev's Android client, are the owner's device check (📱): no test here opens the
+ * hosted UI or reaches Cognito, and none keeps tokens in the app's own store.
  */
 @RunWith(AndroidJUnit4::class)
 class SignInBrowserTest {
@@ -56,6 +58,12 @@ class SignInBrowserTest {
     private val context = instrumentation.targetContext
     private val pages = (context.applicationContext as BaliApp).hostedUi
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /**
+     * Where the whole sign-in keeps its tokens, sealed by the Keystore as the app's are, in a file of its own: the app's own
+     * sign-in, set up since AN6d, reads the app's file, and would renew a test's tokens left there with dev's Cognito.
+     */
+    private val kept = File(context.noBackupFilesDir, "sign-in-browser-test.sealed")
 
     /** Every activity Bali's process asked for: the host, and the tab's intent to the browser. */
     private val started = CopyOnWriteArrayList<Intent>()
@@ -82,13 +90,14 @@ class SignInBrowserTest {
         scope.cancel()
         // Chrome's first run, in a task of its own, closed; never accepted.
         shell("am force-stop com.android.chrome")
-        KeystoreTokenStore(context).clear()
+        KeystoreTokenStore(kept).clear()
     }
 
     @Test
     fun aCustomTabsAnswerComesBackThroughAndroidsHopFromAnotherAppAsTheTextItWasSent() {
         val waiting = pages.start(page("s1"))
-        val sent = "com.bali.bali:/auth/callback?code=4f2e-A_b~c%2Bd+e%41&state=s1"
+        // At the build's callback, two slashes and a host (AN6d), which the manifest's filter takes by its scheme alone.
+        val sent = "com.bali.bali://auth/callback?code=4f2e-A_b~c%2Bd+e%41&state=s1"
         send(sent)
         assertEquals(sent, await(waiting.answer))
         // Taken, it brings the host back over the tab, which closes the tab: the one thing it starts.
@@ -220,17 +229,17 @@ class SignInBrowserTest {
                     return HttpAnswer(200, emptyMap(), """{"access_token":"$access","refresh_token":"r","id_token":"$id"}""".encodeToByteArray())
                 }
             }
-        val cognito = Cognito(URI("https://bali.auth.test"), "the-client", URI("com.bali.bali:/auth/callback"))
-        val signIn = SignIn(cognito, KeystoreTokenStore(context), scope, transport)
+        val cognito = Cognito(URI("https://bali.auth.test"), "the-client", URI("com.bali.bali://auth/callback"))
+        val signIn = SignIn(cognito, KeystoreTokenStore(kept), scope, transport)
         val call = scope.async { runCatching { signIn.signIn { context.hostedUi(it) } } }
         // The address Chrome was sent, its state the attempt's own.
         val state = tab().dataString!!.toUri().getQueryParameter("state")
-        send("com.bali.bali:/auth/callback?code=the-code&state=$state")
+        send("com.bali.bali://auth/callback?code=the-code&state=$state")
         await(call).getOrThrow()
         assertTrue(bodies.single(), bodies.single().contains("grant_type=authorization_code&client_id=the-client&code=the-code&"))
         runBlocking {
             assertTrue(signIn.signedIn().first())
-            val relaunched = SignIn(cognito, KeystoreTokenStore(context), scope, transport)
+            val relaunched = SignIn(cognito, KeystoreTokenStore(kept), scope, transport)
             assertEquals("student-1", relaunched.account())
             assertEquals("student@school.test", relaunched.email())
         }
@@ -238,9 +247,9 @@ class SignInBrowserTest {
 
     /** The hosted UI's address for an attempt whose state is [state], as the sign-in builds one. */
     private fun page(state: String) =
-        URI("https://bali.auth.test/oauth2/authorize?response_type=code&client_id=c&redirect_uri=com%2Ebali%2Ebali%3A%2Fauth%2Fcallback&state=$state&code_challenge=x")
+        URI("https://bali.auth.test/oauth2/authorize?response_type=code&client_id=c&redirect_uri=com%2Ebali%2Ebali%3A%2F%2Fauth%2Fcallback&state=$state&code_challenge=x")
 
-    private fun answer(state: String) = "com.bali.bali:/auth/callback?code=the-code&state=$state"
+    private fun answer(state: String) = "com.bali.bali://auth/callback?code=the-code&state=$state"
 
     /**
      * [text] sent to Bali by another app, the shell, as a browser sends a link, with [flags] for `am start`;

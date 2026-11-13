@@ -20,7 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 /** What a Debug build adds to the app's start ([BaliApp.begin]), for the phone checks and the Debug readout (AN7d). */
 internal object ThisBuild {
     /**
-     * While sign-in isn't set up (the client id empty until the owner's), an engine all the same (DECISIONS
+     * While sign-in isn't set up (a value emptied: the build sets them all since AN6d), an engine all the same (DECISIONS
      * 2026-11-05, Q2): over no token at [api], the build's, as a signed-out phone, so nothing is ever sent and a
      * typed tap locks offline to its cap; over the outbox [open] gives, its calls in [scope]. Release's: none.
      */

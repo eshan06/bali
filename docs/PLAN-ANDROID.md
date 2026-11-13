@@ -14,35 +14,34 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-13 (Central) — AN7h, the lock on Android 10: a lesson's cover reaches every app (#587;
-`docs/DECISIONS.md`, 2026-11-13). Android 10 and 11 only add the packages an accessibility service names to the filter its
-events pass, never clearing it, so with Bali's own named outside a lesson no other app's window reached the service there and
-the lock covered nothing. From Android 12 the service names Bali's package outside a lesson as before; on 10 and 11 it names
-none, in its XML or in `ServiceLock`, so there every app sends its window-state events outside a lesson too, for Android to drop
-(the conductor's call, awaiting the owner). Android 10's picture-in-picture menu, System UI's activity listed in the small
-window's place, is covered as that window; around it Android 10's list of windows can lag (ISSUES #6, gap 10). LockServiceTest
-checks what Android delivers in a lesson, and CoversTest runs on Android 10's image; the tests on `Bali_Spike_API29`, `_API33`
-(Android 13, first booted), `35` and `37`. No screen, no word. Before it, AN13f, the slide's page drawn in an isolated
-process. Next: AN13g, the lesson in the app; AN11, AN12 and Phase 10's screens, in the conductor's
-order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone
-(Q7); Android's Cognito clients, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the
-step that needs them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-13 (Central) — AN6d, Android's dev sign-in client in the build (#588; `docs/DECISIONS.md`,
+2026-11-13): the build signs in through dev's `bali-android-dev-public`, made on 2026-11-12 on the owner's ask, at
+`com.bali.bali://auth/callback`, two slashes since Cognito's console refused RFC 8252's one; dev's authorize endpoint sends
+it to `/login`. Every Debug build's start now runs the engine and the account over the app's own sign-in, nobody signed in on
+the emulators and nothing on the wire; the not-set-up start keeps its tests through a start given no config, and no test
+reaches the hosted UI, Cognito or dev's API. It also records the owner's go-ahead of 2026-11-12 and that evening's dev
+consoles: AN6e, AN9j, AN9k and the help page's line (AP2b) are new steps, AN11 runs on this PC, and dev's Firebase is made.
+No screen, no word. Before it, AN7h, the lock on Android 10. Next: AN6e, AN13g, AN9j and AN9k, AN11, AN12 and Phase 10's
+screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed
+the 13+ check on an iPhone (Q7); prod's Android client, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX
+and OkHttp 5.5 in the step that needs them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the
+pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
 
 ## Who builds what
 
-- **The PC whose clone is `C:\dev\bali`:** every Android step, the screens included. It has the
+- **The PC whose clone is `C:\dev\bali`:** every Android step, the screens and the API's push (AN11;
+  the owner, 2026-11-12) included. It has the
   SDK, Google's command-line tools and four test emulators, each a Pixel 7 with 4 GB:
   `Bali_Spike_API35`, `Bali_Spike_API36` and `Bali_Spike_API37` (Android 15, 16 and 17; set up and
   cold-booted 2026-11-03), `Bali_Spike_API29`, Android 10 (`system-images;android-29;google_apis;x86_64`,
   revision 13; set up 2026-11-12 with the owner's OK), and `Bali_Spike_API33`, Android 13 (`android-33`'s `google_apis`
   image, revision 17; set up 2026-11-12, first booted by AN7h). The owner's own `Pixel_7` is never used. Its traps are in
   `docs/GOTCHAS.md`'s "Android's SDK on Windows".
-- **Cloud sessions:** the API's push (AN11) and docs. Also the steps that are Kotlin alone, tested
-  on the JVM with no emulator, once the owner allows Gradle's hosts in the cloud environment
-  (GOTCHAS, "Egress is allowlisted").
+- **Cloud sessions:** docs. Also the steps that are Kotlin alone, tested on the JVM with no emulator,
+  once the owner allows Gradle's hosts in the cloud environment (GOTCHAS, "Egress is allowlisted").
 - **The owner:** the phones (📱), the consoles (🔧: Google Play, Firebase, Cognito's Android app
   clients, Railway's keys) and the lawyer (⚖️).
 - **The Mac:** keeps iOS. No Android step needs it.
@@ -149,6 +148,12 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN6a** Sign-in's parts — ✅ (#515; DECISIONS 2026-11-04)
 - **AN6b** Sign-in itself — ✅ (#518; DECISIONS 2026-11-05)
 - **AN6c** Sign-in's app side — ✅ (#520; DECISIONS 2026-11-05)
+- **AN6d** Android's dev sign-in client in the build — ✅ (#588; DECISIONS 2026-11-13)
+- **AN6e** Cognito's session ended after each sign-in where the phone's browser offers no ephemeral tab (Chrome before 136;
+  the owner, 2026-11-12, owner item 8): Cognito's `/logout` at the client's sign-out URL, `com.bali.bali://auth/signout`, a
+  page the student sees, with the ephemeral-tab check and any AndroidX it needs, AN6e's call (no iOS twin: iOS's sign-in is
+  ephemeral) — validation: the JVM tests, and the instrumented tests on `Bali_Spike_API29`, `35` and `37`, none reaching
+  Cognito
 - **AN7a** The lock follows the engine — ✅ (#521; DECISIONS 2026-11-05)
 - **AN7b** Rule 3's report: protection off, the lock back on, the launch grace — ✅ (#522; DECISIONS
   2026-11-05)
@@ -178,6 +183,12 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   2026-11-11)
 - **AN9f** Me's rules: Your name, Leave and Sign out's hold — ✅ (#560; DECISIONS 2026-11-11)
 - **AN9g** History's rules and its call — ✅ (#561; DECISIONS 2026-11-11)
+- **AN9j** `409 account_deleted` read as signed out (the owner, 2026-11-12): today a deleted account's other phone says
+  "Something went wrong at Bali", and one locked in a lesson stays locked until the bell (twin: the iPhone's half, PLAN's C4d,
+  the Mac's) — validation: the JVM tests, the engine's and the router's
+- **AN9k** A student's notes kept off the phone's storage once a deletion's request went out, even where its answer was lost,
+  so that student sees the one-time consent screen again (the owner, 2026-11-12; twin: the iPhone's half, PLAN's C4e, the
+  Mac's) — validation: the JVM tests, and BaliAppTest's notes test on `Bali_Spike_API29`, `35` and `37`
 - **AN10a** The router — ✅ (#563; DECISIONS 2026-11-11)
 - **AN10b** The router's inputs, and its run — ✅ (#564; DECISIONS 2026-11-11)
 - **AN10c** The router in the app — ✅ (#565; DECISIONS 2026-11-11)
@@ -187,7 +198,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN10f** Unlocked's, Protection off's and Session over's words — ✅ (#571; DECISIONS 2026-11-12)
 - **AN10g** The words of Me, Leave, Sign out, Delete account and the 13+ stop — ✅ (#572; DECISIONS 2026-11-12)
 - **AN10h** History's words and the consent list — ✅ (#573; DECISIONS 2026-11-12)
-- **AN11** The API's push (cloud; twin: `apps/api/src/push/apns.ts`): an FCM sender beside APNs,
+- **AN11** The API's push (on this PC, the owner, 2026-11-12; twin: `apps/api/src/push/apns.ts`): an FCM sender beside APNs,
   under the same rules (after the Start commits, the same words, no personal data, a token reported
   gone deleted); an additive field on the push-token endpoint, `PUT` and `DELETE`, naming the
   token's service, absent meaning APNs, so every shipped iPhone calls it as today; under it, each
@@ -196,14 +207,19 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
   sending to, and deleting, only its own service's tokens; the privacy paths (the deletion, the
   disposal, the retention run, the export) holding FCM's tokens as they hold APNs's; the fixtures
   and `openapi.json` regenerated; integration tests for the happy path, authz, validation and
-  replay. 🔧 The owner makes the Firebase project and puts its key on Railway, dev then prod —
-  validation: `npm run typecheck && npm run lint && npm test`, `npm run demo`
+  replay. 🔧 Dev's ✅ (2026-11-12, the conductor on the owner's ask): the Firebase project "Bali Dev"
+  (`bali-dev-58473`, the Spark plan, Analytics off), its Android app `com.bali.bali`, "Bali Android (dev)",
+  with no SHA-1; FCM's HTTP v1 API on and the legacy API off; the send-only service account
+  `bali-fcm-sender-dev@bali-dev-58473.iam.gserviceaccount.com`, its one role Firebase Cloud Messaging API
+  Admin, its key on Railway dev as `FCM_SERVICE_ACCOUNT_JSON`, the name AN11 reads (the API ignores it until
+  then). Prod's, the owner's — validation: `npm run typecheck && npm run lint && npm test`, `npm run demo`
 - **AN12** The app's push (twin: the push's app half, #456): the FCM token registered at each launch,
   never for a teacher's account (`SyncState.teacher`; #541), and removed at Sign out; Android's notification permission (Android 13 and later) asked once,
   right after onboarding's permission steps, as iOS asks after its Screen Time step; and #336's
   random wait of up to 10 s before the first read after a fresh alert; from SyncEngine.swift,
   `PushWait`, `holdRead`, `endWait` and the token's register and remove (an FCM token sent as it
-  comes, never as hex), with PushTests but its words (AN5's split) — validation: the JVM tests,
+  comes, never as hex), with PushTests but its words (AN5's split). Its `google-services.json`, from dev's
+  Firebase app, is downloaded only on the owner's yes, not given yet — validation: the JVM tests,
   then an end-to-end check like N6's on an Android phone (📱)
 - **AN13a** The live lesson's poll and answer — ✅ (#574; DECISIONS 2026-11-12)
 - **AN13b** The deck downloaded, checked against its `sha256` and kept for the session — ✅ (#575; DECISIONS 2026-11-12)
@@ -248,6 +264,10 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
   block, and the testing tracks
 - **AP2** 🔧 The Play Console: the account (Open owner items, 2), the app record and Play App
   Signing; and a workflow that uploads to the internal track (twin: `testflight.yml`)
+- **AP2b** The help page names Android's lock beside Screen Time, "or Bali's lock off" where it says "or Screen Time
+  off", before the first Android build reaches a student (the owner, 2026-11-12): a portal step, its words through
+  `no-ai-slop` and DESIGN.md's voice; the privacy policy's line is the owner's and the lawyer's (AP4) — validation:
+  `npm run typecheck && npm run lint && npm test`
 - **AP3** 📱 The device test gate (twin: B5 and B6): a Pixel and a Samsung through the whole loop on
   dev, and every gap in ISSUES #6 checked again on both, as its line says, before launch (the owner,
   2026-11-04; `docs/ANDROID-PHONE-TESTS.md`)
@@ -280,15 +300,15 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 7. ✅ **CodeQL and Android's Kotlin:** scanned, through CodeQL's advanced setup
    (`.github/workflows/codeql.yml`), beside GitHub Actions and JavaScript/TypeScript; default setup
    switched off by the owner (the owner, 2026-11-04: "Yes, prep it"; DECISIONS 2026-11-04).
-8. 🔧 **Android's Cognito app clients,** dev then prod, as `docs/DEPLOY.md`'s "The phone's sign-in"
-   sets them out (public, no secret; the code grant; iOS's scopes; the callback
-   `com.bali.bali:/auth/callback`; the refresh token's 365 days), each id then on that environment's
-   `AUTH_AUDIENCE`, or the API refuses Android's tokens with a `401`, which signs the student out. Dev's
-   id then goes into the build in a small PR; until then the app says sign-in isn't set up (AN6c).
-   **Before that PR, your call** on the conductor's: where the phone's browser offers no ephemeral tab
-   (Chrome before 136), the sign-in's tab shares its cookies, so while Cognito's session lasts there,
-   another app on the phone could sign in as the student without a password. Keep it, fail closed
-   (an error to draw), or end the session after each sign-in (DECISIONS 2026-11-05).
+8. 🔧 **Android's Cognito app clients:** dev's ✅ (made 2026-11-12 by the conductor, on the owner's ask:
+   `bali-android-dev-public`, on dev's `AUTH_AUDIENCE`, in the build since AN6d). Prod's still the owner's,
+   as `docs/DEPLOY.md`'s "Android's app clients" sets it out (the callback `com.bali.bali://auth/callback`,
+   the sign-out URL `com.bali.bali://auth/signout`, SRP and refresh only, Bali's style), its id then on
+   prod's `AUTH_AUDIENCE`, or the API refuses Android's tokens with a `401`, and in the release build
+   (AP). ✅ **The cookie call** (the owner, 2026-11-12): where the phone's browser offers no ephemeral tab
+   (Chrome before 136), Bali will end Cognito's session after each sign-in, one more page for the student
+   (AN6e). Until AN6e lands, a sign-in there shares the browser's cookies, as AN6c left it, now through dev's
+   client: the phone checks sign in only on Chrome 136 or later (DECISIONS 2026-11-05, 2026-11-13).
 
 ## How to update this file
 
