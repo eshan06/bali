@@ -31,14 +31,19 @@ struct PolicyLinks: View {
 
     /// Where the links sit: centred, under the intro's Continue and Sign in's caption; leading on Me.
     var alignment: HorizontalAlignment = .center
+    /// Each underlined, so it never rests on colour alone, and a dot between the two while they sit
+    /// side by side: as the sign-in redesign's board draws them under Sign in's caption (the owner's
+    /// approval, 2026-11-12). The intro's and Me's keep their look from before D2h (DESIGN.md §4).
+    var underlined = false
+    var dotted = false
     @State private var opened: Page?
 
     var body: some View {
         if let portal = Self.portal {
             // Side by side, or one under the other once the phone's text size outgrows the row.
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 24) { links }
-                VStack(alignment: alignment, spacing: 0) { links }
+                HStack(spacing: dotted ? 3 : 24) { links(dotted: dotted) }
+                VStack(alignment: alignment, spacing: 0) { links(dotted: false) }
             }
             .frame(maxWidth: .infinity, alignment: Alignment(horizontal: alignment, vertical: .center))
             .sheet(item: $opened) { page in SafariView(url: page.url(on: portal)).ignoresSafeArea() }
@@ -46,14 +51,20 @@ struct PolicyLinks: View {
     }
 
     /// Each page's link: caption text in the brand's ink (DESIGN.md's links), in a 44-pt target,
-    /// read by VoiceOver as the link it is, as the portal's own are.
-    private var links: some View {
+    /// read by VoiceOver as the link it is, as the portal's own are; `dotted`, the dot before the
+    /// second in the tertiary ink, which VoiceOver skips.
+    private func links(dotted: Bool) -> some View {
         ForEach(Page.allCases) { page in
+            if dotted, page != Page.allCases.first {
+                Text("·").textStyle(.caption).foregroundStyle(Theme.textTertiary)
+                    .accessibilityHidden(true)
+            }
             Button {
                 opened = page
             } label: {
-                Text(page.title).textStyle(.caption).foregroundStyle(Theme.brand)
-                    .frame(minWidth: 44, minHeight: 44).contentShape(.rect)
+                Text(page.title).underline(underlined).textStyle(.caption)
+                    .foregroundStyle(Theme.brand).frame(minWidth: 44, minHeight: 44)
+                    .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .accessibilityRemoveTraits(.isButton).accessibilityAddTraits(.isLink)

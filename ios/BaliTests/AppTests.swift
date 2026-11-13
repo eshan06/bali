@@ -2316,10 +2316,12 @@ struct AppTests {
     }
 
     @Test(
-        "Sign in as the approved Sign in & sign up design draws it: its title, with no line under it (the owner's cut, 2026-11-04), then Sign up and Sign in, each a button; while a page opens its button says so and neither takes a press; a page that could not open is said under the buttons, naming its page, before the caption; and the intro's last page's button is Sign up, Signing up… and dimmed while its page opens, and still once the router has gone on from it, the page closed, so the intro held under the sheet holds still (the approved motion spec)"
+        "Sign in as the sign-in redesign's board draws it (the owner's approval, 2026-11-12): Bali, then its line, with nothing read between them — the ring is art, and VoiceOver reads nothing of it, so no number either; then the sheet's line, then Sign up and Sign in, each a button; while a page opens its button says so and neither takes a press; a page that could not open is said under the buttons, naming its page, before the caption; then the two policy links, with no dot read between them; and the intro's last page's button is Sign up, Signing up… and dimmed while its page opens, and still once the router has gone on from it, the page closed, so the intro held under the sheet holds still (the approved motion spec)"
     )
     func signInScreen() async throws {
         let title = "Sign\u{A0}up or sign\u{A0}in"
+        let (wordmark, tagline) = ("Bali", "Quiet until the bell.")
+        let caption = "Trouble signing in? Ask your teacher."
         let cases: [(String, String, String, Bool, String?)] = [
             ("signIn", "Sign up", "Sign in", false, nil),
             ("signInSigningIn", "Sign up", "Signing in…", true, nil),
@@ -2338,12 +2340,17 @@ struct AppTests {
             let read = try await elements(of: RootView(phone: phone), once: title)
             let labels = read.map { $0.label ?? "" }
             let order =
-                [title, up, inside] + (failure.map { [$0] } ?? [])
-                + ["Trouble signing in? Ask your teacher."]
+                [wordmark, tagline, title, up, inside] + (failure.map { [$0] } ?? [])
+                + [caption, "Privacy policy", "Terms"]
             let at = order.compactMap { labels.firstIndex(of: $0) }
             #expect(at.count == order.count && at == at.sorted(), "\(name): \(labels)")
-            #expect(
-                Array(labels.drop { $0 != title }.prefix(2)) == [title, up], "\(name): \(labels)")
+            let together = [(wordmark, [tagline]), (title, [up]), (caption, ["Privacy policy", "Terms"])]
+            for (first, next) in together {
+                #expect(
+                    Array(labels.drop { $0 != first }.prefix(next.count + 1)) == [first] + next,
+                    "\(name): \(labels)")
+            }
+            #expect(!labels.joined().contains { $0.isNumber }, "\(name): \(labels)")
             for button in [up, inside] {
                 let traits = try #require(read.first { $0.label == button }, "\(name)").traits
                 #expect(traits.contains(.button), "\(name): \(button)")
@@ -2358,6 +2365,70 @@ struct AppTests {
             let read = try await elements(of: IntroView(phone: phone, page: page), once: label)
             let button = try #require(read.first { $0.label == label }, "\(name)")
             #expect(button.traits.contains(.notEnabled) == busy, "\(name), page \(page)")
+        }
+    }
+
+    @Test(
+        "Sign in on the iPhone SE and the iPhone 17 Pro as its intermediate-state boards draw it (the sign-in redesign's SignIn boards, drawn first): Sign up and Sign in on the first screen at every text size, a page opening or one that couldn't open said too; at the default size the whole page on it, the ring giving way, and the ring drawn up to the largest size short of the accessibility ones, never at them, where it steps aside; every line within what the page scrolls through, so a page the text outgrows scrolls rather than cut one; never a pixel wider than the phone, nor anything VoiceOver reads past its sides"
+    )
+    func signInFits() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let phones = [CGSize(width: 375, height: 667 - 20), CGSize(width: 402, height: 874 - 62 - 34)]
+        /// The ring's green-200 track, which nothing else on Sign in draws.
+        func track(_ pixel: [Int]) -> Bool {
+            zip(pixel, [0xBC, 0xDC, 0xCA]).allSatisfy { abs($0 - $1) <= 4 }
+        }
+        for name in ["signIn", "signInSigningUp", "signInNotOpened"] {
+            for size in [DynamicTypeSize.large, .xxxLarge, .accessibility1, .accessibility5] {
+                for frame in phones {
+                    let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+                    let hosting = UIHostingController(
+                        rootView: RootView(phone: phone).environment(\.dynamicTypeSize, size))
+                    hosting.safeAreaRegions = []
+                    let window = UIWindow(windowScene: scene)
+                    window.frame = CGRect(origin: .zero, size: frame)
+                    window.rootViewController = hosting
+                    window.isHidden = false
+                    defer { window.isHidden = true }
+                    window.layoutIfNeeded()
+                    let at = "\(name), \(size), \(frame)"
+                    var read: [NSObject] = []
+                    try await until {
+                        read = (try? voiceOver(in: window)) ?? []
+                        return read.contains { $0.accessibilityLabel == "Sign\u{A0}up or sign\u{A0}in" }
+                    }
+                    window.layoutIfNeeded()
+                    let scroll = try #require(scrollViews(in: window).first, "\(at)")
+                    #expect(scroll.contentSize.width <= frame.width + 0.5, "\(at): \(scroll.contentSize)")
+                    if size == .large {
+                        #expect(scroll.contentSize.height <= scroll.bounds.height + 0.5, "\(at)")
+                    }
+                    // Every line in what the page scrolls through, none past its end. Whether the
+                    // SE's page outgrows it at the largest size is the host's to say: iOS rounds
+                    // the text's scale to the screen's pixels, 3 there on a 2x phone, 8/3 on a 3x.
+                    let end = scroll.convert(CGPoint(x: 0, y: scroll.contentSize.height), to: window).y
+                    let last = read.map(\.accessibilityFrame.maxY).max() ?? 0
+                    #expect(last <= end + 0.5, "\(at): \(last) past \(end)")
+                    for button in ["Sign up", "Signing up…", "Sign in"] {
+                        guard let shown = read.first(where: { $0.accessibilityLabel == button }) else {
+                            continue
+                        }
+                        #expect(shown.accessibilityFrame.maxY <= frame.height + 0.5, "\(at): \(button)")
+                    }
+                    #expect(read.filter { $0.accessibilityTraits.contains(.button) }.count == 2, "\(at)")
+                    let outside = read.filter {
+                        $0.accessibilityFrame.minX < -0.5 || $0.accessibilityFrame.maxX > frame.width + 0.5
+                    }
+                    #expect(outside.isEmpty, "\(at): \(outside.map { $0.accessibilityLabel ?? "" })")
+                    let image = try #require(drawn(window).flatMap(UIImage.init(data:)), "\(at)")
+                    let pixel = try pixels(of: image)
+                    let (width, height) = (Int(image.size.width), Int(image.size.height))
+                    let ring = stride(from: 0, to: height, by: 2).contains { y in
+                        stride(from: 0, to: width, by: 2).contains { track(pixel($0, y)) }
+                    }
+                    #expect(ring == !size.isAccessibilitySize, "\(at)")
+                }
+            }
         }
     }
 
