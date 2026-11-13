@@ -188,12 +188,12 @@ describe.each(Object.entries(MAKING))(
   (_, request) => {
     it('is 409 account_deleted, a refreshed token’s too, and makes no account', async () => {
       const w = await deletedStudent('c3d-route');
-      const before = await db.select().from(users);
+      const before = await db.select().from(users).orderBy(users.id);
 
       accountDeleted(await send(w.old, request(w)));
       accountDeleted(await send(w.refreshed, request(w)));
 
-      expect(await db.select().from(users)).toEqual(before);
+      expect(await db.select().from(users).orderBy(users.id)).toEqual(before);
       expect(await findUserByCognitoId(db, w.student.cognitoId)).toBeUndefined();
     });
 
@@ -233,12 +233,12 @@ describe('under a deleted sign-in’s old token, what is never account_deleted (
 
   it('answers the replay of what it sent before the deletion 409 account_deleted, naming nothing of it', async () => {
     const w = await deletedStudent('c3d-replay');
-    const before = await db.select().from(users);
+    const before = await db.select().from(users).orderBy(users.id);
 
     // Each landed before the deletion, its answer lost: sent again under its own id.
     for (const sent of w.sentBefore) accountDeleted(await send(w.old, sent));
 
-    expect(await db.select().from(users)).toEqual(before);
+    expect(await db.select().from(users).orderBy(users.id)).toEqual(before);
   });
 
   it('records an Emergency Unlock, under a row born removed: no account made, and its retry a replay', async () => {
@@ -296,7 +296,7 @@ describe('under a deleted sign-in’s old token, what is never account_deleted (
 
   it('answers a change of an unlock’s reason 404 unlock_not_found, and makes no account', async () => {
     const w = await deletedStudent('c3d-reason');
-    const before = await db.select().from(users);
+    const before = await db.select().from(users).orderBy(users.id);
     const url = `/v1/unlocks/${randomUUID()}`;
 
     const res = await send(w.old, {
@@ -307,13 +307,13 @@ describe('under a deleted sign-in’s old token, what is never account_deleted (
 
     expect(res.statusCode).toBe(404);
     expect(res.json<ApiErrorBody>().error.reason).toBe('unlock_not_found');
-    expect(await db.select().from(users)).toEqual(before);
+    expect(await db.select().from(users).orderBy(users.id)).toEqual(before);
     expect((await send(w.old, { method: 'PATCH', url, payload: {} })).statusCode).toBe(400);
   });
 
   it('keeps the reads’ answers, and DELETE /v1/me’s retry, each making nothing', async () => {
     const w = await deletedStudent('c3d-reads');
-    const before = await db.select().from(users);
+    const before = await db.select().from(users).orderBy(users.id);
 
     const ageCheck = await send(w.old, { method: 'GET', url: '/v1/me/age-check' });
     expect(ageCheck.json()).toEqual({ passed: false });
@@ -326,7 +326,7 @@ describe('under a deleted sign-in’s old token, what is never account_deleted (
     });
     expect(retry.json()).toEqual({ outcome: 'already_deleted' });
 
-    expect(await db.select().from(users)).toEqual(before);
+    expect(await db.select().from(users).orderBy(users.id)).toEqual(before);
     expect(await db.select().from(cognitoDeletions)).toHaveLength(1);
   });
 });

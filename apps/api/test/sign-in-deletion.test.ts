@@ -391,7 +391,7 @@ describe('a deleted sign-in’s old token, refused on the server (C3d; the owner
       payload: { eventId: randomUUID() },
     });
     expect(deletion.json<DeleteMeResponse>()).toEqual({ outcome: 'deleted' });
-    return { ...seeded, old, users: await db.select().from(users) };
+    return { ...seeded, old, users: await db.select().from(users).orderBy(users.id) };
   }
 
   it('GET /v1/me makes no account under it, so nothing is named from its claims: 409 account_deleted', async () => {
@@ -404,7 +404,7 @@ describe('a deleted sign-in’s old token, refused on the server (C3d; the owner
       code: 'conflict',
       reason: 'account_deleted',
     });
-    expect(await db.select().from(users)).toEqual(before);
+    expect(await db.select().from(users).orderBy(users.id)).toEqual(before);
   });
 
   it('a join makes no account under it, and the class’s roster names no one new: 409 account_deleted', async () => {
@@ -419,7 +419,7 @@ describe('a deleted sign-in’s old token, refused on the server (C3d; the owner
 
     expect(res.statusCode).toBe(409);
     expect(res.json<ApiErrorBody>().error).toMatchObject({ reason: 'account_deleted' });
-    expect(await db.select().from(users)).toEqual(before);
+    expect(await db.select().from(users).orderBy(users.id)).toEqual(before);
     const roster = await db
       .select()
       .from(enrollments)

@@ -829,11 +829,11 @@ describe('a deleted sign-in (C3d; the owner, 2026-11-11: â€œNow, on the serverâ€
 
   it('makes no account under a token signed in before the deletion, or saying no time; a sign-in made after it makes one', async () => {
     const { ana, before, after } = await deleted('c3d-old');
-    const users0 = await db.select().from(users);
+    const users0 = await db.select().from(users).orderBy(users.id);
 
     expect(await findOrCreateStudent(db, signedIn(ana.cognitoId, before), 'Ana')).toBeUndefined();
     expect(await findOrCreateStudent(db, signedIn(ana.cognitoId, undefined))).toBeUndefined();
-    expect(await db.select().from(users)).toEqual(users0);
+    expect(await db.select().from(users).orderBy(users.id)).toEqual(users0);
 
     const back = await findOrCreateStudent(db, signedIn(ana.cognitoId, after), 'Ana');
     expect(back).toMatchObject({ cognitoId: ana.cognitoId, displayName: 'Ana', removedAt: null });
