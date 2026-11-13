@@ -11,7 +11,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 - **2026-11-12** — **The sign-in deletion case's flake on main's CI, found, staged and fixed in the test: a deletion sent again
   while its first try is at Cognito leaves its row for a try of its own, as C3d designed, so each order is now a case of its own
   that says what the design leaves (the owner's standing order on findings; the conductor's call, awaiting the owner's look;
-  #585).** Test-only: Bali's code is unchanged but one comment, and no phone met it.
+  #586).** Test-only: Bali's code is unchanged but one comment, and no phone met it.
 
   **What failed:** CI's push run 43367247980 on `1f864f56` (#584, Android tests and docs only), attempt 1, "Integration + race
   tests (real Postgres)": `sign-in-deletion.test.ts`'s "is deleted once, however often the deletion is sent" (C3-cognito, #303)
@@ -75,14 +75,21 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **The loops** (the scratchpad's `apiflake-loop.sh`, each run a fresh vitest process of the file from `apps/api`, and
   `apiflake-hammer.sh`, one case in several processes at once). Before the fix, on main's code, on PGlite: the file 100 times, 0
   failed; the case alone, 8 processes at once of 250 runs each, 2000 runs, 0 failed. Said plainly, it never failed here, as the
-  PGlite lane never showed it: the staged test is the proof that counts. After the fix, on the final code: the file 100 times
-  on PGlite, AFTER_FAILED failed. Real Postgres: not run on this PC. Docker Desktop is installed, but its engine wasn't running, so
-  its images couldn't be listed, and nothing was started or pulled; this PR's real-Postgres job is that proof.
+  PGlite lane never showed it (CI's real-Postgres lane did, once in 54 finished runs since #558): the staged test is the proof
+  that counts. After the fix, on the final code, santa's fix included: the file 100 times on PGlite, 0 failed (58
+  runs before santa's fix, all passing, are not counted). Real Postgres: not run on this PC. Docker Desktop is installed, but
+  its engine wasn't running, so its images couldn't be listed, and nothing was started or pulled; this PR's real-Postgres job is
+  that proof.
 
   **The proof:** `npm run typecheck && npm run lint` green. `npm test`: the API's 66 files and the database's 25 passed (one
   skipped in each, the real-Postgres lane's), `@bali/shared`'s 6 and the infra tests' 24; the portal's suite passed whole run
   alone (78 files), its `tokens.test.ts` case "never set on one icon…" having run past its 5 s in the whole run on this PC, as
-  AN6a's entry records. `npm run demo` not run: no API behavior changed. Santa: SANTA_LINE
+  AN6a's entry records. `npm run demo` not run: no API behavior changed. Santa: NICE in one round, two Claude Opus reviewers at
+  max effort (no Codex or Gemini CLI on this PC: context isolation holds, model diversity doesn't), 0 blockers. Their WARNs:
+  the other order's changed expectation, now said plainly above (reviewer A); the held try let go whatever fails, the case's
+  first check inside its `try` (reviewer B; tried: a failing first check ends the case in 2 s, not the close's 60 s); left, the
+  hold's wait with no bound of its own, so a regression there is the case's 60 s timeout, which names it (reviewer B), and
+  PLAN.md near its cap, 7,980 of 8,000 words (reviewer A).
 
 - **2026-11-12** — **AN13f, the slide's page drawn with `PdfRenderer` in an isolated process: AN13e's seam filled in `android/app`
   to the owner's answers to Q2 and Q3, the sixth of AN13's seven steps (this step's own calls and the conductor's, marked, each
