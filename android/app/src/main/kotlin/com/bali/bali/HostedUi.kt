@@ -130,12 +130,12 @@ internal class HostedUi {
     }
 
     /**
-     * The page [id] ended with no answer, [why], while it's shown, or [id] is the sign-in's own, whose host left before showing the
-     * sign-out page: there, the student's close (a page that couldn't load among them) is the browser not signed out (AN6e), and
-     * one that couldn't open says it was the sign-out page.
+     * The page [id] ended with no answer, [why], while it's shown: a page gone by ends nothing, as the sign-in page's Auth Tab
+     * closing as the host comes back over it. On the sign-out page, the student's close (a page that couldn't load among them) is
+     * the browser not signed out (AN6e), and one that couldn't open says it was the sign-out page.
      */
     @Synchronized fun ended(id: String, why: SignInError): Boolean {
-        val held = waiting?.takeIf { it.page.id == id || it.id == id } ?: return false
+        val held = waiting?.takeIf { it.page.id == id } ?: return false
         return end(
             held,
             when {
