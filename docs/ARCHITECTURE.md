@@ -1301,12 +1301,13 @@ the 13+ check but the check's own read and a deletion's.
   calls, the owner's by the go-ahead of 2026-11-12 (`docs/DECISIONS.md`, 2026-11-11, 2026-11-12 and 2026-11-13).
 - **A deleted account reads as signed out** (the owner, 2026-11-12; AN9j; the iPhone's twin is C4d, not built yet). Bali's
   server answering any call `409 account_deleted` (C3d) is that call's account gone, wherever the answer comes: the API client
-  tells the sign-in whose token it sent. Only for the account signed in then, the sign-in is forgotten as Sign out forgets it,
-  with no Cognito DeleteUser (the API's deleter removes it); what the account still had queued is let go; an Emergency Unlock
-  still queued is kept apart in the outbox's file, never sent, so it never goes under another account nor holds that account's
-  queue or lock; and the phone leaves its session, the lock off at once. This phone's own deletion finishes as Delete account
-  does, DeleteUser included: under way, it goes on; its `DELETE /v1/me` answer lost, the `409` is that answer. The conductor's
-  calls, awaiting the owner (`docs/DECISIONS.md`, 2026-11-13).
+  tells the sign-in whose token it sent. Every Emergency Unlock still queued goes first, under that account's own token, which
+  the server records as no one's (C3d); then, only for the account signed in then, the sign-in is forgotten as Sign out forgets
+  it, with no Cognito DeleteUser (the API's deleter removes it); what the account still had queued is let go, an unlock that
+  still didn't record kept apart in the outbox's file, never sent, so it never goes under another account nor holds that
+  account's queue or lock; and the phone leaves its session, the lock off at once. This phone's own deletion finishes as Delete
+  account does, DeleteUser included: under way, it goes on; its `DELETE /v1/me` answer lost, the `409` is that answer. The
+  conductor's calls and this step's, awaiting the owner (`docs/DECISIONS.md`, 2026-11-13).
 - **A reinstall starts signed out, with an outbox of its own.** Android deletes an app's files and
   its Keystore keys with the app, but its backup can bring the files back on a reinstall or a new
   phone. Bali leaves its own out of the backup and of a transfer to a new phone (the outbox, its
