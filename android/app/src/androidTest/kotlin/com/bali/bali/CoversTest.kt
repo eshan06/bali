@@ -481,9 +481,15 @@ class CoversTest {
      */
     private val pinned get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) setOf(STAND_IN_APP) else setOf(STAND_IN_APP, SYSTEM_UI)
 
-    /** Where System UI takes the picture-in-picture window's touches, as `dumpsys input` places its input consumer (Android 10 quoting its name). */
-    private fun pipTouches(): Area? =
-        Regex("""name='?pip_input_consumer'?, .*?frame=\[(-?\d+),(-?\d+)]\[(-?\d+),(-?\d+)]""").find(shell("dumpsys input"))?.groupValues?.let { Area(it[1].toInt(), it[2].toInt(), it[3].toInt(), it[4].toInt()) }
+    /**
+     * Where System UI takes the picture-in-picture window's touches, as `dumpsys input` places its input consumer (Android 10
+     * quoting its name). None on Android 10 while its menu is up, an activity that takes them, the consumer still listed then:
+     * the top of the small window's task, as `am stack list` names it.
+     */
+    private fun pipTouches(): Area? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && "topActivity=ComponentInfo{$SYSTEM_UI/" in shell("am stack list")) return null
+        return Regex("""name='?pip_input_consumer'?, .*?frame=\[(-?\d+),(-?\d+)]\[(-?\d+),(-?\d+)]""").find(shell("dumpsys input"))?.groupValues?.let { Area(it[1].toInt(), it[2].toInt(), it[3].toInt(), it[4].toInt()) }
+    }
 
     /** Whether a small window is where System UI takes its [touches]: on Android 10, which lists a scaled window's place a pixel short, within that pixel. */
     private infix fun Area.at(touches: Area?): Boolean =
