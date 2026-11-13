@@ -161,8 +161,9 @@ class CoversTest {
         never(holder(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)), { shell("am start -a android.settings.ACCESSIBILITY_SETTINGS") })
         val removing = Intent(Intent.ACTION_DELETE, "package:${context.packageName}".toUri())
         never(holder(removing), { shell("am start -a android.intent.action.DELETE -d package:${context.packageName}") }) {
+            // Back to the home screen, no Home after it: one pressed as Back lands can come after the next step's start.
             shell("input keyevent KEYCODE_BACK")
-            home()
+            until { Unit.takeIf { "${launcher()}/" in focused() } }
         }
         val dialing = never(dialer, { shell("am start -a android.intent.action.DIAL") })
         never(holder(Intent(EMERGENCY_DIALER)), { shell("am start -a $EMERGENCY_DIALER") })
@@ -342,13 +343,14 @@ class CoversTest {
             shell("am start -n $STAND_IN --ez ${StandIn.PIP_ON_LEAVE} true")
             // At rest, where System UI takes its touches, Android 10's menu come and gone first.
             menuCameAndWent()
-            val small = until { seen().firstOrNull { it.app in pinned && it.pictureInPicture && it.cover != null && it.bounds at pipTouches() } }
+            until { seen().firstOrNull { it.app in pinned && it.pictureInPicture && it.cover != null && it.bounds at pipTouches() } }
             // Covered before the end, by the phone's clock; the screen still from here on, so no window event comes.
             assertTrue(Instant.now() < end)
             val gone = until { Instant.now().takeIf { covers { it.shown }.isEmpty() } }
             assertTrue("$gone from $end", !gone.isBefore(end) && gone.isBefore(end.plusSeconds(2)))
-            // The small window still there, bare: its own colour at its place, whichever window Android 10 lists there.
-            until { Unit.takeIf { pixel(small.bounds.centerX, small.bounds.centerY) == StandIn.COLOUR } }
+            // The small window still there, bare: its own colour where it is now (Android 17 may have moved it), read as the window
+            // in picture-in-picture, whichever Android 10 lists there.
+            until { Unit.takeIf { seen().firstOrNull { it.pictureInPicture }?.let { pixel(it.bounds.centerX, it.bounds.centerY) == StandIn.COLOUR } == true } }
         }
 
     /** [value]'s first answer, asked until it gives one; none within 30 s fails the test, saying what the service saw last. */
@@ -528,8 +530,13 @@ class CoversTest {
     /** The student's home screen's app. */
     private fun launcher(): String = holder(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
 
-    /** The student presses Home: back once the home screen has the focus, so nothing opened next is put behind it. */
+    /**
+     * The student presses Home: back once the home screen has the focus, so nothing opened next is put behind it. Not pressed
+     * where the home screen has it already, since nothing would mark that Home's landing, which could come after the next step's
+     * start and put it behind (once on Android 17, AN7h).
+     */
     private fun home() {
+        if ("${launcher()}/" in focused()) return
         shell("input keyevent KEYCODE_HOME")
         until { Unit.takeIf { "${launcher()}/" in focused() } }
     }
