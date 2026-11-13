@@ -1179,9 +1179,10 @@ class SyncEngine private constructor(
     /**
      * Bali's server answered a call under [account]'s token `409 account_deleted` (C3d), whichever call it was: that account is
      * gone, read as signed out (the owner, 2026-11-12; AN9j), once, the same way, however many loops hear it ([signingOut]). Every
-     * Emergency Unlock still queued goes first, under that account's own token alone, renewed once on a 401: the server records
-     * one under a deleted sign-in's old token, as no one's (C3d), so none is kept back that could reach it (santa's round 1). Then,
-     * in one stretch, only for the account signed in now ([SignIn.forgetDeleted]'s rule): its sign-in forgotten as Sign out
+     * Emergency Unlock still queued goes first, each once, one made meanwhile too, marked on its way, under that account's own
+     * token alone, renewed once on a 401: the server records one under a deleted sign-in's old token, as no one's (C3d), so none is
+     * kept back that could reach it (santa's review). Then, in one stretch, unless a deletion was pressed meanwhile, which finishes
+     * its own way, and only for the account signed in now ([SignIn.forgetDeleted]'s rule): its sign-in forgotten as Sign out
      * forgets it, with no DeleteUser, the API's deleter's (C3-cognito); what it still had queued let go, an unlock that still
      * didn't record kept apart ([letGo]); the phone in no session, its lock off, as a deletion leaves it; and a change counted, so
      * a read sent before it, older, never puts the session back (`readMayReconcile`). This phone's own deletion finishes its own way
@@ -1195,22 +1196,32 @@ class SyncEngine private constructor(
 
     private suspend fun signOutDeleted(account: String?) {
         val signIn = signIn ?: return
-        val unlocks =
-            alone {
-                if (deletion?.isActive == true || signingOut) return@alone null
-                signingOut = true
-                tried { outbox.records() }.getOrNull().orEmpty().filter { it.change.isUnlock && !it.change.isUnfiled }
-            } ?: return
+        if (!alone { (deletion?.isActive != true && !signingOut).also { if (it) signingOut = true } }) return
         try {
             val own = client.forDeletion(account)
-            for (record in unlocks) {
+            val sentOnce = mutableSetOf<String>()
+            while (true) {
+                // Read again for each, so one made meanwhile goes too, and one a settle filed again (B6d); marked on its way, as the
+                // drain marks one, so no reason is kept for it that its send has left behind.
+                val record =
+                    alone {
+                        stored { outbox.records() }.getOrNull()
+                            ?.firstOrNull { it.change.isUnlock && !it.change.isUnfiled && it.eventId !in sentOnce }
+                            ?.also { found -> update { it.copy(sending = it.sending + found.eventId) } }
+                    } ?: break
+                sentOnce += record.eventId
                 var sent = record.send(own) ?: continue
-                if (sent.noAnswer == NoAnswer.NoToken) break
                 if (sent.result == SendResult.Status(401) && hooked(false) { signIn.refresh(account) }) sent = record.send(own) ?: continue
+                if (sent.noAnswer == NoAnswer.NoToken) {
+                    alone { update { it.copy(sending = it.sending - record.eventId) } }
+                    break
+                }
                 alone { stored { outbox.settle(sent, clock.now()) }.map { answered(record, sent, it) { signIn.refresh(account) } }.getOrNull() }
                     ?.await()
             }
             alone {
+                // A deletion pressed meanwhile finishes its own way, its sign-in still held for its sends and its DeleteUser.
+                if (deletion?.isActive == true) return@alone
                 val lost = deletionId != null && deletionOf == account
                 if (lost) deletionId = null
                 if (!(if (lost) signIn.accountDeleted(account) else signIn.forgetDeleted(account))) return@alone
