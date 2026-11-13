@@ -245,11 +245,12 @@ class Account internal constructor(
      * stop is [AccountDeletion.SignInChanged], and the account deleted on the server but not its sign-in is deleted, that
      * sign-in gone from the phone and its Cognito user the server's deleter's (C3-cognito; AN9b's call). The notes under the
      * student leave the store before anything is sent, written through, so a process ended mid-deletion keeps nothing of the
-     * student's (AN10c), the screens reading them from here meanwhile. A stop before its `DELETE /v1/me` went out writes them
-     * back, so the same student isn't asked again, unless one before it went out unproved; one after keeps them off the store
-     * for the run, whatever came back, the account perhaps gone, unless the server refused it having read the account, a
-     * teacher's with classes (the owner, 2026-11-12; AN9k). The account deleted on the server, they go here too, and its `me`
-     * with them, as iOS's `forgetNotes` forgets them (the owner's rulings, 2026-10-23).
+     * student's (AN10c), the screens reading them from here meanwhile. A stop writes them back, so the same student isn't asked
+     * again, only where no `DELETE /v1/me` of the run went out unproved: once one did, they stay off the store for the rest of
+     * the run, whatever came back or comes after, the account perhaps gone. A request's own answer proves the account stands
+     * where the server refused it having read the account, a teacher's with classes (the owner, 2026-11-12; AN9k). The account
+     * deleted on the server, they go here too, and its `me` with them, as iOS's `forgetNotes` forgets them (the owner's
+     * rulings, 2026-10-23).
      */
     suspend fun deleteAccount(): Unit = call { delete() }
 

@@ -9,9 +9,9 @@ package com.bali.outbox
  * `answersListSeenBy` has no twin: no Android build ever showed L8a's list). Kept as the outbox is, out of the backup and of a
  * transfer to a new phone (ARCHITECTURE, "Android app structure"). A sign-out keeps them, so the same student is never asked
  * again; the account deleted on Bali's server, the two under the student go ([Account]), and once a deletion's request went out
- * they stay off the disk for the run, unless an answer proves the account stands (AN9k). Read and written in the account's and
- * the router's own stretches, so a store never waits on its disk there: the app's keeps them in memory and writes behind
- * (AN10c). The one write that waits on the disk is [forgetStudent]'s, which the account makes with itself let go.
+ * with no answer of its own proving the account stands, they stay off the disk for the rest of the run (AN9k). Read and written
+ * in the account's and the router's own stretches, so a store never waits on its disk there: the app's keeps them in memory and
+ * writes behind (AN10c). The one write that waits on the disk is [forgetStudent]'s, which the account makes with itself let go.
  */
 interface Notes {
     /** Whether a pass has ever read the lock's switch on (C1b, Q3): set at on, cleared once the check judges it off ([Router]). */
