@@ -497,6 +497,23 @@ class HostedUiTest {
         assertSame(SignInError.BrowserNotSignedOut, runBlocking { runCatching { trading.signedOut.await() }.exceptionOrNull() })
         pages.signOut(trading)
         assertNull(pages.page(), "a sign-out page shown after its host left")
+        // Gone as the code's trade answered: the sign-out page shown, its host told no more, never opened (santa's round 1).
+        val traded = pages.start(page("s1"), cognito)
+        pages.opened(traded.id, chrome124)
+        assertTrue(pages.redirected(answer("s1")))
+        pages.signOut(traded)
+        assertNotNull(pages.page())
+        assertTrue(pages.left(traded.id), "the host gone before it opened the sign-out page ended nothing")
+        assertNull(pages.waiting())
+        assertSame(SignInError.BrowserNotSignedOut, runBlocking { runCatching { traded.signedOut.await() }.exceptionOrNull() })
+        // And gone after the sign-in page's close showed the sign-out page, before it opened it: the close.
+        val closed = pages.start(page("s1"), cognito)
+        pages.opened(closed.id, chrome124)
+        assertTrue(pages.ended(closed.id, SignInError.Cancelled))
+        assertNotNull(pages.page())
+        assertTrue(pages.left(closed.id), "the host gone before it opened the close's sign-out page ended nothing")
+        assertNull(pages.waiting())
+        assertSame(SignInError.Cancelled, runBlocking { runCatching { closed.answer.await() }.exceptionOrNull() })
     }
 
     /**

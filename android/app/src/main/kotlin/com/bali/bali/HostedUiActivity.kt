@@ -80,8 +80,9 @@ class HostedUiActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    /** Opens the page shown next, waits on with none to open, or goes once nothing waits. */
+    /** Opens the page shown next, waits on with none to open, or goes once nothing waits; nothing on its way out ([HostedUi.left]). */
     private fun next() {
+        if (isFinishing) return
         val page = pages.resumed(opened, covered)
         if (page != null) open(page) else if (pages.waiting() == null) finish()
     }

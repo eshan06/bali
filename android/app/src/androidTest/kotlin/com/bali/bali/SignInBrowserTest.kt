@@ -355,6 +355,31 @@ class SignInBrowserTest {
         assertEquals(listOf("bali.auth.test", "bali.auth.test"), views().map { it.data?.host })
     }
 
+    /**
+     * The host in front while the code is traded, finishing as the trade answers (the student's Back on it, in the step before
+     * Android pauses it): it opens no sign-out page, and gone, it ends the sign-in, the browser not signed out (santa's round 1).
+     */
+    @Test
+    fun aHostFinishingAsTheTradeAnswersOpensNoSignOutPageAndGoneEndsTheSignIn() {
+        assumeTrue("the browser offers an ephemeral tab", leaves)
+        val call = signInPage()
+        tab()
+        covered()
+        send(answer("s1"))
+        assertEquals(answer("s1"), await(call).getOrThrow())
+        val host = until { (hosts.lastActivity as HostedUiActivity).takeIf { it.lifecycle(Lifecycle.State.RESUMED) != null } }
+        val waiting = checkNotNull(pages.waiting())
+        // The trade answering as the student's Back finishes the host: one step of the main thread, before Android pauses it.
+        onMain {
+            host.finish()
+            pages.signOut(waiting)
+        }
+        assertSame(SignInError.BrowserNotSignedOut, await(scope.async { runCatching { waiting.signedOut.await() }.exceptionOrNull() }))
+        assertNull(pages.waiting())
+        assertEquals("a sign-out page opened by a host on its way out", 1, views().size)
+        hostCameAndWent()
+    }
+
     /** The student's Back on the sign-out page: the browser not signed out of Cognito (AN6e), the answer's tokens never kept (AN6f). */
     @Test
     fun theStudentsBackOnTheSignOutPageIsTheBrowserNotSignedOut() {

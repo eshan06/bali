@@ -151,14 +151,14 @@ internal class HostedUi {
 
     /**
      * The host gone for good, its task swiped away, with the page [id] it opened: no page can open after it, so the sign-in ends
-     * now, as that page's close would with nothing to follow. While the code is traded, its sign-out page never to open: the
-     * browser not signed out.
+     * now, as that page's close would with nothing to follow. Gone once its sign-in page did (the code being traded, or the
+     * sign-out page shown but never opened), the sign-out page never opens: the browser not signed out, or the close it followed.
      */
     @Synchronized fun left(id: String): Boolean {
         val held = waiting ?: return false
         return when {
-            held.page?.id == id -> if (id == held.id) end(held, SignInError.Cancelled) else signOutEnded(held, SignInError.BrowserNotSignedOut)
-            held.page == null && id == held.id -> signOutEnded(held, SignInError.BrowserNotSignedOut)
+            held.page?.id == id && id == held.id -> end(held, SignInError.Cancelled)
+            held.page?.id == id || id == held.id -> signOutEnded(held, SignInError.BrowserNotSignedOut)
             else -> false
         }
     }
