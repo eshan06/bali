@@ -14,15 +14,18 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-12 (Central) — AN13e2, the slide-deck case's flake on main's CI, fixed in its rig (#584; `docs/DECISIONS.md`,
-2026-11-12), test-only, Bali's code unchanged: the deck's check hashes on `Dispatchers.Default`, and SlideTest's deck rig, which
-ran the lesson half on Unconfined, went on there with the rest, the lesson half's lock held as the test answered the next read;
-the rig now keeps the lesson half on the test's own thread, the race staged in a test that failed first with CI's message.
-Before it, AN13e, the slide's deck, asked for once, one document at a time. Next: AN13f, the page drawn, then AN13g; AN11, AN12 and Phase
-10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed
-the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform is on the
-PC (the owner's OK, 2026-11-12), compileSdk 37 with today's AndroidX and OkHttp 5.5 coming in the step that needs them (Open
-owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-12 (Central) — AN13f, the slide's page drawn with `PdfRenderer` in an isolated process (#585;
+`docs/DECISIONS.md`, 2026-11-12), the sixth of AN13's seven steps: `app`'s `IsolatedRenderer.kt` and `RendererService.kt`,
+AN13e's seam filled to the owner's answers to Q2 and Q3: pdfium in a service process Android isolates, bound while a deck is
+open; the deck handed over from memory, an anonymous memory file from Android 11, on Android 10 a file in `no_backup/deck/`
+whose name goes as it opens, that folder emptied at each start; a page drawn there onto a white bitmap, as large as fits and
+centred, its pixels back through memory Bali made, its text with it from Android 15; every failure none; that process's death
+each document's loss, Bali's process living on; `BaliApp.onCreate` returning at once there. Its tests on `Bali_Spike_API29`
+(Android 10, set up 2026-11-12), `35` and `37`. No screen, no word. Before it, AN13e2, the slide-deck case's CI flake fixed in
+its rig, and AN13e, the slide's deck. Next: AN13g, the lesson in the app; AN11, AN12 and Phase 10's screens, in the conductor's
+order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed the 13+ check on an iPhone
+(Q7); Android's Cognito clients, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the
+step that needs them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -30,9 +33,10 @@ owner in a console · ⚖️ the lawyer.
 ## Who builds what
 
 - **The PC whose clone is `C:\dev\bali`:** every Android step, the screens included. It has the
-  SDK, Google's command-line tools and three test emulators, each a Pixel 7 with 4 GB:
+  SDK, Google's command-line tools and four test emulators, each a Pixel 7 with 4 GB:
   `Bali_Spike_API35`, `Bali_Spike_API36` and `Bali_Spike_API37` (Android 15, 16 and 17; set up and
-  cold-booted 2026-11-03). The owner's own `Pixel_7` is never used. Its traps are in
+  cold-booted 2026-11-03), and `Bali_Spike_API29`, Android 10 (`system-images;android-29;google_apis;x86_64`,
+  revision 13; set up 2026-11-12 with the owner's OK). The owner's own `Pixel_7` is never used. Its traps are in
   `docs/GOTCHAS.md`'s "Android's SDK on Windows".
 - **Cloud sessions:** the API's push (AN11) and docs. Also the steps that are Kotlin alone, tested
   on the JVM with no emulator, once the owner allows Gradle's hosts in the cloud environment
@@ -203,10 +207,9 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN13d** The lesson followed: the poll while Bali is in front, the answer, Hide — ✅ (#577; DECISIONS 2026-11-12)
 - **AN13e** The slide's deck, asked for once, one document at a time — ✅ (#578; DECISIONS 2026-11-12)
 - **AN13e2** The slide-deck case's flake on main's CI: the deck rig's lesson half on the test's own thread — ✅ (#584; DECISIONS 2026-11-12)
-- **AN13f** The page drawn with `PdfRenderer` (twin: SlideView.swift's PDFKit page), to the owner's answers to Q2 and Q3
-  (DECISIONS 2026-11-12) — validation: the instrumented tests on `Bali_Spike_API35` and `37`
+- **AN13f** The page drawn with `PdfRenderer`, in an isolated process — ✅ (#585; DECISIONS 2026-11-12)
 - **AN13g** The lesson in the app, AN13 done (twin: BaliApp.swift's `start` and `setForeground`), after AN13f —
-  validation: the instrumented tests on `Bali_Spike_API35` and `37`
+  validation: the instrumented tests on `Bali_Spike_API29`, `35` and `37`
 
 ## Phase 10, Android: the screens (from the approved boards)
 
@@ -267,8 +270,9 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
    from Google's SDK repository) is on the PC (the owner's OK, 2026-11-12; DECISIONS 2026-11-12).
    compileSdk 37, which today's AndroidX needs (androidx.core 1.19, Compose 1.12; DECISIONS
    2026-11-04), as OkHttp 5.5 does, comes in the step that needs it, so `core` stays on 5.4.0 until
-   then (AN3d). Still the owner's: Android 10 and 12 or 13 to test on, as emulator images (each a
-   download) or phones, for ISSUES #6's gap 10.
+   then (AN3d). Android 10's image is on the PC (`Bali_Spike_API29`, the owner's OK, 2026-11-12); still
+   the owner's: Android 12 or 13 to test on, as an emulator image (a download) or a phone, for ISSUES
+   #6's gap 10.
 7. ✅ **CodeQL and Android's Kotlin:** scanned, through CodeQL's advanced setup
    (`.github/workflows/codeql.yml`), beside GitHub Actions and JavaScript/TypeScript; default setup
    switched off by the owner (the owner, 2026-11-04: "Yes, prep it"; DECISIONS 2026-11-04).

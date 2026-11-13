@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.database.ContentObserver
+import android.os.Process
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.bali.core.AppConfig
@@ -123,6 +124,7 @@ class BaliApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        if (!ownStart()) return
         notes = PreferencesNotes(this)
         router = router()
         val changes = IntentFilter(Intent.ACTION_TIME_CHANGED).apply { addAction(Intent.ACTION_TIMEZONE_CHANGED); addAction(Intent.ACTION_SCREEN_ON) }
@@ -130,6 +132,16 @@ class BaliApp : Application() {
         ContextCompat.registerReceiver(this, looking, changes, ContextCompat.RECEIVER_NOT_EXPORTED)
         scope.launch { router.run() }
         launched = scope.launch { begin() }
+    }
+
+    /**
+     * Bali's own process starting, its deck folder emptied first (Q3); false in the renderer's isolated process (RendererService),
+     * which makes the app too, with none of Bali's files and no receiver allowed, so nothing of Bali's starts there.
+     */
+    internal fun ownStart(): Boolean {
+        if (Process.isIsolated()) return false
+        emptyDecks(this)
+        return true
     }
 
     /** A router over the app's run, its start's problem, its notes and Android's looks, by [clock]: the app's own, by the phone's. */

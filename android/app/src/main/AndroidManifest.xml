@@ -54,6 +54,14 @@
             android:launchMode="singleTask"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!-- Where pdfium parses a deck and draws its page (RendererService.kt; the owner's ruling, 2026-11-12): a process
+             of its own that Android isolates, with no permission and none of Bali's files, bound by Bali alone. -->
+        <service
+            android:name=".RendererService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":renderer" />
+
         <!-- A Custom Tab's answer, by the redirect URI's scheme, the app id (RFC 8252, 7.1). Any app can
              send it a link, so it takes one only for the waiting sign-in, and lands in no task of Bali's,
              so no link can clear the one the tab is open in (HostedUiActivity.kt). -->

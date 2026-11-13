@@ -1203,7 +1203,7 @@ Android can't keep the iOS way is named here, never bent quietly.
 | iOS's sign-in session (`WebAuthenticationSession`) | An Auth Tab where the browser has one, else a Custom Tab, with PKCE as on iOS |
 | The token store (the Keychain, this device only) | Tokens sealed by a key in the Android Keystore |
 | APNs | Firebase Cloud Messaging (FCM) |
-| PDFKit | `PdfRenderer` |
+| PDFKit | `PdfRenderer`, in an isolated process of Bali's own (the owner, 2026-11-12) |
 | Dynamic Type and VoiceOver | Font scale and TalkBack |
 | `ios.yml` on macOS | `android.yml` on Linux |
 | TestFlight and the App Store | Play's testing tracks, then production |
@@ -1300,6 +1300,11 @@ out, and no token reaches Bali's API before the 13+ check but the check's own re
   over the app's connections (`OkHttpTransport.apart`), and none ever holds an Emergency Unlock's
   send behind it (Live lesson, decision 5). The conductor's call, awaiting the owner
   (`docs/DECISIONS.md`, 2026-11-12).
+- **A deck is parsed in a process of its own.** pdfium reads a teacher's deck and draws its page in a
+  service process Android isolates, bound only while a deck is open: no permission, none of Bali's
+  files, given only the deck's bytes and what to draw. A deck that breaks pdfium reaches neither the
+  lock's service nor the sign-in's tokens, and its crash is a deck that failed, never Bali's process,
+  and with it every Android phone's lock, stopping (the owner's ruling, 2026-11-12).
 
 ### The battery plan (the owner, 2026-11-04)
 
@@ -1348,6 +1353,13 @@ ISSUES #6 lists every gap with the way it is checked before Android launches, an
   app) keeps Bali's service from being switched on.
 - A guest user on the phone is out of the lock's reach; a work profile and Private Space are covered
   (AN1, part 1).
+- On Android 10 the deck's bytes sit on the phone's storage, in a file with no name, for as long as
+  its document is open: its name is deleted the moment it opens (the owner's ruling, 2026-11-12),
+  before a byte is written, and the renderer can read it but never write it (AN13f's calls, awaiting
+  the owner). From Android 11 the deck stays in memory (the owner's ruling), the renderer's copy a
+  second one, up to 25 MB, while its document is open.
+- TalkBack reads a slide's text from Android 15 alone; on Android 10 to 14 it says which slide it is
+  (the conductor's call, awaiting the owner; `docs/DECISIONS.md`, 2026-11-12).
 - Phones differ by maker, so the device gate (AP3) runs on a Pixel and a Samsung, not one phone.
 
 ### Decided later, on purpose
@@ -1747,7 +1759,10 @@ bytes against the slide's `sha256` before rendering them, refusing a mismatch as
 (settled 2026-10-10). The phone renders with PDFKit, a deck cached by its
 `sha256` for the session and deleted when the session ends; links inside a deck are not
 opened. Each page's text layer is its VoiceOver label (a page with none says which slide it
-is).
+is). Android renders with `PdfRenderer` in an isolated process, the deck handed over from memory (an
+anonymous memory file from Android 11; on Android 10 a file in a deck folder of its own in
+`no_backup/`, deleted as it opens; the owner's ruling, 2026-11-12), and a page's text is TalkBack's
+label from Android 15, which slide it is before (the conductor's call, awaiting the owner).
 
 **9. Apple and privacy.** Answers are Bali's own data, not Family Controls data. The owner's
 App Review question on §3.3.3(P) (ISSUES #3; case 102994872143, sent 2026-10-13) asks about

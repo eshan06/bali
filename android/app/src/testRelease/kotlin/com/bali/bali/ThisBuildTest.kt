@@ -32,6 +32,15 @@ class ThisBuildTest {
         assertFailsWith<ClassNotFoundException> { Class.forName("com.bali.bali.ReadoutActivity") }
     }
 
+    // The renderer's service answers a Debug build's tests who it is, holds its calls and ends itself (AN13f): none of it is
+    // Release's, so no Release build's renderer can be asked to end.
+    @Test
+    fun aReleaseBuildsRendererServiceHasNoCallForTestsSoNoneCanAskItToEnd() {
+        for (call in listOf("WHO", "END", "HOLD", "LET_GO")) {
+            assertFailsWith<NoSuchFieldException>(call) { ThisBuild::class.java.getDeclaredField(call) }
+        }
+    }
+
     @Test
     fun aReleaseBuildsStartWithNoConfigSaysItIsNotSetUpAndRunsNothing() {
         // BaliApp's start over this build's own engine where sign-in isn't set up (BaliApp.begin): none, so not set up.
