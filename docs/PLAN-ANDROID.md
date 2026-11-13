@@ -15,8 +15,8 @@ structure", decided at AN1b (2026-11-04).
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
 _Last updated: 2026-11-13 (Central) — AN9k, a student's notes kept off the phone's storage once a deletion's request went out
-(#593; `docs/DECISIONS.md`, 2026-11-13): Delete account's stop writes them back only where its `DELETE /v1/me` never went out, or
-the server answered `409 teacher_has_classes`; after any other, nothing puts them back on the storage for the run, the screens
+(#593; `docs/DECISIONS.md`, 2026-11-13): Delete account's stop writes them back only where no `DELETE /v1/me` of the run went out
+unproved, `409 teacher_has_classes` the one proof; after any other, nothing puts them back on the storage for the run, the screens
 reading them from memory, so a relaunch finds none; AN9j's forget is written through (the conductor's calls and this step's,
 awaiting the owner's look). No screen, no word. AN9j's kept unlock copies stay for the pilot (the owner, 2026-11-13). Before it,
 AN9j, `409 account_deleted` read as signed out. Next: AN11, then AN12 and Phase 10's screens, in the conductor's order; AN7f and
