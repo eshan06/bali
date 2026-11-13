@@ -471,15 +471,21 @@ describe('applyRetention (C6b)', () => {
       bytes: 1_000,
       sha256: 'c'.repeat(64),
     });
+    // Each list in a fixed order: without an ORDER BY, two reads may return the same rows in
+    // different orders.
     const snapshot = async () => ({
-      users: await db.select().from(users).where(inArray(users.id, people)),
+      users: await db.select().from(users).where(inArray(users.id, people)).orderBy(users.id),
       events: await db.$count(events),
       armed: await db.$count(armedTaps),
       tokens: await db.$count(deviceTokens),
       ageChecks: await db.$count(ageChecks),
       queued: await db.$count(cognitoDeletions),
-      classes: await db.select().from(classes).where(eq(classes.schoolId, s.school.id)),
-      decks: await db.select().from(decks).where(eq(decks.schoolId, s.school.id)),
+      classes: await db
+        .select()
+        .from(classes)
+        .where(eq(classes.schoolId, s.school.id))
+        .orderBy(classes.id),
+      decks: await db.select().from(decks).where(eq(decks.schoolId, s.school.id)).orderBy(decks.id),
     });
     const before = await snapshot();
 
