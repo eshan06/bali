@@ -67,8 +67,7 @@ states of sign-in (its Teacher row, 2026-11-07), and for
 the portal and the student web the canvas below. The
 [Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB) (the owner, 2026-11-12)
 wins over those two for the app's Sign in screen and the portal's sign-in page, each opening
-Cognito's managed login: the portal's page is built from it (2026-11-12), the app's screen is
-PLAN's next step; its boards of AWS's page draw
+Cognito's managed login: both are built from it (2026-11-12); its boards of AWS's page draw
 the managed-login style itself (`infra/cognito/managed-login/`). Changing any of
 it is the owner's call, never a side effect of a PR: every user-facing screen
 is designed in Claude Design and approved by the owner before it is built
@@ -125,7 +124,19 @@ pinned by `AppTests.tokens`) in D1's shapes. Its Soft premium redraw (D2h–D2j)
 was rolled back on 2026-10-06, the owner's call on seeing it
 (`docs/DECISIONS.md`): every app screen looks as it did before D2h, and a new
 look for any of them waits for a design the owner approves. The words and the
-fixes those steps made stayed (`docs/PLAN-ARCHIVE.md`, D2). The portal draws from them too, from D2c on
+fixes those steps made stayed (`docs/PLAN-ARCHIVE.md`, D2). Sign in is the sign-in redesign's
+since 2026-11-12 (its "1 · Bali's Sign in screen"; `SignInView`): on the page, Bali at 64/68 4 pt
+under the status bar, the session ring as art (`SessionRingArt` in `Theme.swift`, the portal's
+geometry, never a countdown: the owner's ruling) and "Quiet until the bell." at 26/32 (`wordmark`
+and `tagline`, both semibold); then a white sheet from the screen's foot, its top corners 28 and
+`shadow-1`'s warm black 8 pt up and 24 soft, holding today's words in today's places: "Sign up or
+sign in" in `body` and `text-secondary`, Sign up and Sign in as 52-pt pills (`PillButtonStyle`, a
+16/20 label), a page that didn't open said under them in `body`, the caption, then the policy links
+underlined with a dot between them (`PolicyLinks`' `underlined` and `dotted`, Sign in's alone). The
+ring gives way so the sheet shows whole on the first screen, on an SE or with a line under the
+buttons, never under 160 pt; at the accessibility text sizes it steps aside and Bali and its line
+stop growing, so Sign up and Sign in stay on an SE's first screen; past that the screen scrolls.
+Its states as the canvas's SignIn boards draw them (drawn on the canvas first). The portal draws from them too, from D2c on
 (`apps/web/src/app/globals.css`, pinned by `tokens.test.ts`): every semantic
 token as a `--bali-*` variable (and the primitives they and the mark
 reference), their light values on `:root` and only those (the portal is
@@ -398,7 +409,8 @@ on D2a's canvas; the `high-end-visual-design` skill's language, inside Bali's
 tokens), in which the portal is drawn today (D2c–D2g, then PB1–PB5): a page
 keeps that layout until its PV step lands, PV4 restyling the shared pieces
 everywhere at once. The app is drawn in neither: its Soft
-premium redraw (D2h–D2j) was rolled back on 2026-10-06, and it keeps D1's look.
+premium redraw (D2h–D2j) was rolled back on 2026-10-06, and it keeps D1's look, Sign in the
+sign-in redesign's since 2026-11-12 (Sources).
 In this file's terms:
 
 - **Cards straight on the page, no grey tray** (kept: the owner's ruling,
@@ -742,7 +754,8 @@ where they differ (Present's included: §5); the input size stands.
   or pressed `action-primary-bg-hover`, no shadow; a pill (`radius-full`) in
   Soft premium. On iOS: full width, 56 pt tall, a 17 semibold label, dimmed
   to 60% while disabled or busy, at D1's `radius-md` (the app's pills were
-  rolled back with D2h, 2026-10-06). On the web: 40 px tall, `space-4` side
+  rolled back with D2h, 2026-10-06), but Sign in's two, the sign-in redesign's
+  52-pt pills (`PillButtonStyle`). On the web: 40 px tall, `space-4` side
   padding, a `body` semibold label. *v2's look (§1):* 10 px corners
   (`radius-sm`), 18 px side padding, a 15/20 semibold label on one line, dimmed
   to 55% while disabled or busy; small, 34 px tall at 13.5/18; large, the sign-in
@@ -842,7 +855,8 @@ where they differ (Present's included: §5); the input size stands.
   text keeps its underline. The app's policy
   links (`PolicyLinks`, C2-app) keep their look from before D2h, `caption` in
   the brand's ink and no underline: on colour alone, a known gap until the
-  owner approves the app's next design.
+  owner approves the app's next design. Sign in's, its design approved, are
+  underlined, a dot between them (the sign-in redesign's board, 2026-11-12).
 - **The mark:** the session arc as emblem: a green-200 track ring and a
   green-600 arc (~330° with its round caps), open at the upper left. Never
   recolour it, never close the arc. D1 uses it without its stone-50 tile.
@@ -931,7 +945,8 @@ where they differ (Present's included: §5); the input size stands.
   and sheets. In v2's look (§1): `shadow-2` on the reconnect pill, `shadow-3`
   on the unlock pop-up, the side panel and a dialog, whose backdrop is the same
   warm black, `rgba(33, 28, 21, 0.32)`. The sign-in page's card takes the sign-in
-  redesign's own, `shadow-sign-in`: that warm black at 6 %, 8 px down, 24 px soft.
+  redesign's own, `shadow-sign-in`: that warm black at 6 %, 8 px down, 24 px soft;
+  the app's Sign in sheet the same, 8 pt up.
 - **Focus ring, everywhere, no exceptions:** a 2 px page-colour gap, then a
   2 px `focus-ring-color` ring.
 - Dark values: the tokens carry them, and nothing renders them. The app, the

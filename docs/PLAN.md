@@ -8,14 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-12 (Central) — The portal's sign-in page rebuilt from the approved sign-in
-redesign: two panels, the session ring as art, Sign in a pill, its intermediate states drawn first
-(#582; DECISIONS 2026-11-12). Before it, Cognito's sign-in pages on its managed login (#581).
-Next: the owner's switch of prod's domain, the release call and disabling the review account (Open
-owner items); the app's Sign in from the same redesign (the Mac's); a session builds the
-retire-a-block command; the owner the sitting's findings' calls; GA5's known limit, the owner's
-call (DECISIONS 2026-11-02); AN11–AN13; AN1's part 2 on the owner's phones; the audit's polish
-waits._
+_Last updated: 2026-11-12 (Central) — The app's Sign in rebuilt from the approved sign-in redesign:
+Bali, the session ring as art and its line over a white sheet, Sign up and Sign in pills, its
+intermediate states drawn first (#583; DECISIONS 2026-11-12), students' in 1.0.1. Before it, the
+portal's sign-in page (#582). Next: the owner's switch of prod's domain, the release call and
+disabling the review account (Open owner items); a session builds the retire-a-block command; the
+owner the sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02);
+AN11–AN13; AN1's part 2 on the owner's phones; the audit's polish waits._
 
 ## Now
 
@@ -50,7 +49,8 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   boot test's SIGINT-then-SIGTERM case is skipped there alone (Windows has no POSIX signals); CI's
   runs unchanged, and `npm test` passes whole on the PC.
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
-  keeps D1's look until the owner approves a new one (its redesign rolled back, 2026-10-06). The
+  keeps D1's look, Sign in the sign-in redesign's (#583), until the owner approves a new one (its
+  redesign rolled back, 2026-10-06). The
   push's app half is done (#456), and the phone's Phase 7 screens: L8 (L8a, #443, L8b, #448 and
   #450, and L8c, #451), M8's slide view on Focus (#452) and M8b's slide off Focus and card on the
   Screen Time ask (#454). Their 📱 device checks and C7's passed at the sitting (2026-11-08); left,
@@ -64,7 +64,8 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   (`infra/cognito/managed-login/`); dev's domain switched, prod's the owner's (Open owner items).
   Rebuilt from the approved
   [Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB): the portal's sign-in
-  page ✅ (#582; DECISIONS 2026-11-12); next, the app's Sign in screen (the Mac's).
+  page ✅ (#582) and the app's Sign in ✅ (#583), DECISIONS 2026-11-12; whether the 13+ question and
+  Delete account's screen follow it, and the app's text scale at the large sizes, the owner's calls.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md` (AN0 ✅);
   AN1, the lock spike: parts 1 and 1c on the Android 15–17 emulators ✅ (DECISIONS
   2026-11-03); AN1b ✅ (DECISIONS 2026-11-04); part 2 on

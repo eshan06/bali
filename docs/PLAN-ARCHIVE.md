@@ -10,6 +10,15 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-12 (Central) — The portal's sign-in page rebuilt from the approved sign-in
+redesign: two panels, the session ring as art, Sign in a pill, its intermediate states drawn first
+(#582; DECISIONS 2026-11-12). Before it, Cognito's sign-in pages on its managed login (#581).
+Next: the owner's switch of prod's domain, the release call and disabling the review account (Open
+owner items); the app's Sign in from the same redesign (the Mac's); a session builds the
+retire-a-block command; the owner the sitting's findings' calls; GA5's known limit, the owner's
+call (DECISIONS 2026-11-02); AN11–AN13; AN1's part 2 on the owner's phones; the audit's polish
+waits._
+
 _Last updated: 2026-11-12 (Central) — Cognito's sign-in pages move to its managed login, in Bali's
 style, the username and password on one page (#581; DECISIONS 2026-11-12): dev's domain switched,
 both pools' four clients styled (`infra/cognito/managed-login/`). Before it, App Review approved
