@@ -233,6 +233,7 @@ class HostedUiTest {
                 assertFalse(waiting.answer.isCompleted, "$tab")
                 assertTrue(pages.redirected(signedOut), "$tab")
             }
+            assertTrue(waiting.answer.isCompleted, "$tab handed nothing over")
             assertEquals(answer("s1"), runBlocking { waiting.answer.await() }, "$tab")
             assertNull(pages.waiting(), "$tab")
         }
@@ -244,12 +245,12 @@ class HostedUiTest {
      */
     @Test
     fun aSignOutLinkIsTakenOnlyWhileTheSignOutPageIsShownExactlyAndOnceEveryStrayOrNearMissDroppedEndingNothing() {
-        assertFalse(pages.redirected(signedOut))
+        assertFalse(pages.redirected(signedOut), "taken with nothing waiting")
         val waiting = pages.start(page("s1"), cognito)
         val signIn = assertNotNull(pages.page())
         pages.opened(waiting.id, chrome124)
         // Not the sign-in page's answer, which only its attempt's state makes: the sign-in waits on.
-        assertFalse(pages.redirected(signedOut))
+        assertFalse(pages.redirected(signedOut), "taken while the sign-in page was shown")
         assertSame(signIn, pages.page())
         assertFalse(waiting.answer.isCompleted)
         assertTrue(pages.redirected(answer("s1")))
