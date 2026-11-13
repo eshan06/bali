@@ -108,7 +108,8 @@ export async function exportStudentRecord(db: Database, who: string, now: Date =
           redeemEventId: teacherInvites.redeemEventId,
         })
         .from(teacherInvites)
-        .where(eq(teacherInvites.redeemedBy, id));
+        .where(eq(teacherInvites.redeemedBy, id))
+        .orderBy(asc(teacherInvites.redeemedAt), asc(teacherInvites.id));
       // Their phones' APNs tokens (N4), whole: a row keyed to them, the device
       // address included — it opens nothing without Bali's own APNs key.
       const tokens = await tx
