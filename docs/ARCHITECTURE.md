@@ -1261,7 +1261,7 @@ more page for the student (the owner, 2026-11-12; built by AN6e, #589): Cognito'
 browser and kind of tab, never ephemeral, the code traded only once it comes back at the client's
 sign-out URL (`com.bali.bali://auth/signout`), and a sign-in whose page closed first left unfinished
 (AN6e's calls, awaiting the owner; `docs/DECISIONS.md`, 2026-11-05 and 2026-11-13). Sign out needs no
-`/logout`: no session of Bali's outlives its sign-in. The code grant with PKCE, through app clients of
+`/logout`: a sign-in that finishes there has ended its session. The code grant with PKCE, through app clients of
 Android's own on each pool, with no secret, the answer at the app id's own scheme
 (`com.bali.bali://auth/callback`, two slashes, the form Cognito's console takes). Auth's rules hold:
 only a real `401` signs anyone out, and no token reaches Bali's API before the 13+ check but the check's own read and a deletion's.

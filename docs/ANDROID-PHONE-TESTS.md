@@ -157,7 +157,9 @@ sign-in, Cognito's sign-out page, which ends the session the sign-in left there
   later), and Bali signed in after.
 - **On a Chrome before 136** (AN6e; a phone that has one, or a second browser that offers no
   ephemeral tab set as the default): sign in, and see the one extra page come and go, then Bali
-  signed in (the readout says so); sign in again, and see the password asked for again.
+  signed in (the readout says so; `failed: Refused…` would mean Cognito refused the code after
+  `/logout`, and `failed: BrowserNotSignedOut` that Chrome closed that page before its return);
+  sign in again, and see the password asked for again.
 - **Sign out, then sign in again:** the password asked again, on every browser.
 - **The tab closed with no sign-in:** nothing said, and Sign in works again.
 - **The phone rotated while the tab is open,** then the sign-in finished: signed in.

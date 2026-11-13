@@ -240,7 +240,7 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 - **AS2** 👀 Sign in and sign up: the 13+ check, the intro and Your name (twin: `SignInView`,
   `AgeView`, `IntroView`, `NameView`); AN6e's new outcome, `SignInError.BrowserNotSignedOut` (the extra page that ends
   Cognito's session in a browser with no ephemeral tab closed before Cognito sent it back, nothing changed), says nothing
-  for now, as a closed page: its words, if any, are this step's
+  for now, as a closed page: this step gives it words, since a page that couldn't load comes after a typed password
 - **AS3** 👀 The permission steps and the push prompt (twin: `ScreenTimeView`, and the prompt iOS
   asks as Home shows)
 - **AS4** 👀 Home, the tap's "hold your phone to the block" screen, Join with the consent preview,
