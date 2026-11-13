@@ -16,7 +16,7 @@ structure", decided at AN1b (2026-11-04).
 
 _Last updated: 2026-11-13 (Central) — AN9j, `409 account_deleted` read as signed out (#592; `docs/DECISIONS.md`, 2026-11-13):
 Bali's server's answer to any call, heard where every answer comes, ends that account's sign-in as Sign out does, with no
-DeleteUser; its queue let go, every Emergency Unlock kept apart and never sent; a phone in a lesson off its lock at once. Only for
+DeleteUser; its Emergency Unlocks sent first under its own token, the rest of its queue let go; a phone in a lesson off its lock at once. Only for
 the account signed in, and this phone's own deletion finishes its own way, DeleteUser included (the conductor's calls and this
 step's, awaiting the owner's look). No screen, no word. Before it, AN6f, the sign-out page made sure. Next: AN9k, then AN11, AN12
 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, on any Chrome now, signed in on
