@@ -775,7 +775,7 @@ describe('the student’s own phone beside the class’s name (StudentPhoneState
 
   it('is Silent with its minutes, dashed, never green, its line naming when Bali last heard from it', () => {
     show(live({ phone: { state: 'silent', lastSeenAt: SINCE } }), {}, AS_OF);
-    expect(chip().words).toBe('Silent · 3 min');
+    expect(chip().words).toBe('Silent\u00a0· 3 min');
     expect(chip().classes).toEqual(
       expect.arrayContaining([
         'border-dashed',
@@ -797,7 +797,7 @@ describe('the student’s own phone beside the class’s name (StudentPhoneState
   it('is the grid’s Unknown for a state this page has no chip for, with no line (StudentChipStates)', () => {
     const newer = { state: 'charging', lastSeenAt: null } as unknown as Presentation['phone'];
     show(live({ phone: newer }));
-    expect(chip().words).toBe('Unknown · refresh');
+    expect(chip().words).toBe('Unknown\u00a0· refresh');
     expect(chip().classes).toEqual(
       expect.arrayContaining([
         'border-dashed',
@@ -814,7 +814,7 @@ describe('the student’s own phone beside the class’s name (StudentPhoneState
     // Ten minutes on, still unreached: the chip says what the read at 9:41 said.
     show(live({ phone: { state: 'silent', lastSeenAt: SINCE } }, true), {}, AS_OF + 10 * 60_000);
     const asOf = new Date(AS_OF).toISOString();
-    expect(chip().words).toBe('Silent · 3 min');
+    expect(chip().words).toBe('Silent\u00a0· 3 min');
     // "as of" at the chip's end, the head's last words.
     const status = screen.getByText('Your phone').parentElement as HTMLElement;
     const kept = status.lastElementChild as HTMLElement;

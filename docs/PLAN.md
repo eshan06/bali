@@ -8,12 +8,13 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-13 (Central) — Android keeps a student's notes off its storage once a deletion's
-request went out (AN9k, #593; DECISIONS 2026-11-13). Before it, `409 account_deleted` signs Android
-out (AN9j, #592). Next: the owner's switch of prod's domain, the release call and
-disabling the review account (Open owner items); a session builds the retire-a-block command and S12;
-the owner the sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02);
-AN11, AN12; AN1's part 2 on the owner's phones; the audit's polish waits._
+_Last updated: 2026-11-13 (Central) — CI fails any PR carrying an invisible or text-direction
+character, in the required gate (S12, #NNN; DECISIONS 2026-11-13). Before it, Android keeps a
+student's notes off its storage once a deletion's request went out (AN9k, #593). Next: the owner's
+switch of prod's domain, the release call and disabling the review account (Open owner items); a
+session builds the retire-a-block command; the owner the sitting's findings' calls; GA5's known
+limit, the owner's call (DECISIONS 2026-11-02); AN11, AN12; AN1's part 2 on the owner's phones;
+the audit's polish waits._
 
 ## Now
 
@@ -294,7 +295,7 @@ One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
 - **C4c** AN9h's iPhone twin: one account's token for Delete account and the 13+ check (the owner, 2026-11-10: "Close it now"), the Mac's; DECISIONS 2026-11-10, "For C4c"; AN9e's two iOS gaps (DECISIONS 2026-11-11)
 - **C4d** AN9j's iPhone twin, the Mac's: `409 account_deleted` read as signed out (the owner, 2026-11-12; AN9j's entry in DECISIONS, 2026-11-13, says what to mirror)
 - **C4e** AN9k's iPhone twin, the Mac's: a student's notes kept off the phone's storage once a deletion's request went out (the owner, 2026-11-12; AN9k's entry, DECISIONS 2026-11-13)
-- **S12** A CI scan that fails any PR with invisible or text-direction characters in source files, added to a check that's already required (the owner, 2026-11-12; DECISIONS 2026-11-13)
+- **S12** A CI scan that fails any PR with invisible or text-direction characters — ✅ (#NNN; DECISIONS 2026-11-13)
 - **D2k** ⏸ The shield's new look (Phase 3): waits for a design the owner approves in Claude Design
 - **The push's app half** — ✅ (#456; DECISIONS 2026-10-24); N6's end-to-end check passed on prod (2026-11-08); left, runbook 7's step 4, dev's `APNS_*` variables, the owner's
 

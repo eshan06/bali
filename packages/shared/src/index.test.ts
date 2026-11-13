@@ -58,11 +58,11 @@ describe('@bali/shared', () => {
     // an edge (a leading U+2800 was stored as sent).
     expect(tidyDisplayName('⠀Bea')).toBe('Bea');
     expect(tidyDisplayName('Bea\u{1D159}')).toBe('Bea');
-    expect(tidyDisplayName('  Ana   Reyes\t')).toBe('Ana Reyes');
+    expect(tidyDisplayName('  Ana \u00a0 Reyes\t')).toBe('Ana Reyes');
     expect(tidyDisplayName('Bea⠀⠀Ortiz')).toBe('Bea Ortiz');
     expect(tidyDisplayName('Bea \u{1D159} Ortiz')).toBe('Bea Ortiz');
     expect(tidyDisplayName('⠀ \u{1D159}')).toBe('');
     // Visible letters and the joiners names need are left alone.
-    expect(tidyDisplayName('م‌ی')).toBe('م‌ی');
+    expect(tidyDisplayName('م\u200cی')).toBe('م\u200cی');
   });
 });
