@@ -289,7 +289,8 @@ class CoversTest {
         // As a video app goes: full screen, covered and sent home, it goes into picture-in-picture.
         shell("am start -n $STAND_IN --ez ${StandIn.PIP_ON_LEAVE} true")
         // Covered where it is, its cover drawn there on the screen, the small window read afresh each time as it moves in,
-        // and read once at rest, where System UI takes its touches.
+        // and read once at rest, where System UI takes its touches, Android 10's menu come and gone first.
+        menuCameAndWent()
         val small = until { seen().firstOrNull { it.app in pinned && it.pictureInPicture && it.cover == it.bounds && it.bounds at pipTouches() }?.takeIf { pixel(it.bounds.centerX, it.bounds.centerY) == Covers.PLAIN } }
         assertEquals(homes + 1, covers { it.homes })
         // Dragged up or down, as a student drags it off whatever is under it, and let go there, still, so it stays: the touch
@@ -339,7 +340,8 @@ class CoversTest {
             val end = Instant.now().plusSeconds(15)
             app.lock.lock(end)
             shell("am start -n $STAND_IN --ez ${StandIn.PIP_ON_LEAVE} true")
-            // At rest, where System UI takes its touches: on Android 10 System UI's menu comes and goes first, an event each way.
+            // At rest, where System UI takes its touches, Android 10's menu come and gone first.
+            menuCameAndWent()
             val small = until { seen().firstOrNull { it.app in pinned && it.pictureInPicture && it.cover != null && it.bounds at pipTouches() } }
             // Covered before the end, by the phone's clock; the screen still from here on, so no window event comes.
             assertTrue(Instant.now() < end)
@@ -483,12 +485,24 @@ class CoversTest {
 
     /**
      * Where System UI takes the picture-in-picture window's touches, as `dumpsys input` places its input consumer (Android 10
-     * quoting its name). None on Android 10 while its menu is up, an activity that takes them, the consumer still listed then:
-     * the top of the small window's task, as `am stack list` names it.
+     * quoting its name). None on Android 10 while its menu is up, an activity that takes them, the consumer still listed then.
      */
     private fun pipTouches(): Area? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && "topActivity=ComponentInfo{$SYSTEM_UI/" in shell("am stack list")) return null
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && menuUp()) return null
         return Regex("""name='?pip_input_consumer'?, .*?frame=\[(-?\d+),(-?\d+)]\[(-?\d+),(-?\d+)]""").find(shell("dumpsys input"))?.groupValues?.let { Area(it[1].toInt(), it[2].toInt(), it[3].toInt(), it[4].toInt()) }
+    }
+
+    /** Android 10's menu up over the small window: the top of its task, as `am stack list` names it. */
+    private fun menuUp(): Boolean = "topActivity=ComponentInfo{$SYSTEM_UI/" in shell("am stack list")
+
+    /**
+     * On Android 10, System UI's menu come over the small window and gone again, as it comes each time a window is pinned, for
+     * 3.5 s (AOSP's PipTouchHandler and PipMenuActivity): a window event each way, so the screen is still only after it.
+     */
+    private fun menuCameAndWent() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return
+        until { Unit.takeIf { menuUp() } }
+        until { Unit.takeIf { !menuUp() } }
     }
 
     /** Whether a small window is where System UI takes its [touches]: on Android 10, which lists a scaled window's place a pixel short, within that pixel. */
