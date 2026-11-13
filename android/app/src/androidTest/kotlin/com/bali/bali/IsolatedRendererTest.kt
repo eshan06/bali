@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.os.Parcel
 import android.os.ParcelFileDescriptor
 import android.os.Process
+import android.os.SharedMemory
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
@@ -254,6 +255,25 @@ class IsolatedRendererTest {
             assertEquals(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) listOf("Photosynthesis", null) else listOf(null, null), said)
             document.close()
         }
+
+    // The page's memory is Bali's, made at the size Bali asked for and read back by Bali: a renderer holding its descriptor, as a
+    // draw hands it over, can't shrink it, which would have Bali read past its end and crash.
+    @Test
+    fun thePagesMemoryIsOneNoRendererCanShrinkUnderBali() {
+        SharedMemory.create("page", 1440 * 810 * 4).use { memory ->
+            val parcel = Parcel.obtain()
+            try {
+                memory.writeToParcel(parcel, 0)
+                parcel.setDataPosition(0)
+                checkNotNull(parcel.readFileDescriptor()).use { theirs ->
+                    assertThrows(ErrnoException::class.java) { Os.ftruncate(theirs.fileDescriptor, 0) }
+                }
+            } finally {
+                parcel.recycle()
+            }
+            assertEquals(1440 * 810 * 4, memory.mapReadOnly().let { pixels -> pixels.capacity().also { SharedMemory.unmap(pixels) } })
+        }
+    }
 
     // The owner's why for Q2: a deck that ends pdfium's process is a deck that failed, never Bali's process stopping.
     @Test

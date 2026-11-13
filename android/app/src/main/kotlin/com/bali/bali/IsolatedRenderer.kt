@@ -37,7 +37,7 @@ const val DECK_FOLDER = "deck"
 
 /**
  * Empties the deck folder ([DECK_FOLDER]), which a run cut short may have left a file in, at each start of Bali's own process
- * ([BaliApp.onCreate]): that folder alone, never `no_backup/`, which holds the sign-in's file and the lock's.
+ * ([BaliApp.ownStart]): that folder alone, never `no_backup/`, which holds the sign-in's file and the lock's.
  */
 internal fun emptyDecks(context: Context) {
     File(context.noBackupFilesDir, DECK_FOLDER).listFiles()?.forEach { it.delete() }
