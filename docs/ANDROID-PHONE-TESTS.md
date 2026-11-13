@@ -298,3 +298,24 @@ with the phone and its Android version, then the starting state its *Start* name
 Before Android launches: a Pixel and a Samsung through the whole loop on dev, as B5 and B6 ran it on
 the iPhone, on the build students will install; and every gap in `docs/ISSUES.md` #6 checked again
 on both phones, each as its *Checked* line says.
+
+**The live lesson (AN13g),** with AS8's screens: a teacher presents a deck from the portal on dev. Each part on each phone
+opens with the phone and its Android version, then the starting state its *Start* names.
+
+- **A big deck through one access point.** *Start:* both phones, and as many more as the owner has, on one Wi-Fi access
+  point, each in the class, focused by a tap at the block's sticker, the slide on Focus, Airplane mode off. The teacher shows
+  a deck of about 25 MB: on each phone, the time from the slide shown to its page drawn, against the deck download's 30 s cap
+  on a whole exchange (`OkHttpTransport`'s `callTimeout`; `docs/DECISIONS.md`, 2026-10-12, M7). A phone past it shows the
+  slide's failed line with Try again, which downloads the deck again from its first byte: note how many do.
+- **Big decks on a low-memory phone.** *Start:* the phone with the least memory, on Android 11 or later, in the class, focused
+  by a tap at the block's sticker, the slide on Focus, Airplane mode off. Two decks of about 25 MB shown in turn, each paged
+  through: from Android 11 an open deck is in memory twice (Bali's copy and the memory file the renderer reads), and a page
+  being drawn holds its bitmap three times (AN13f). After, Bali still running with its lock on and Emergency Unlock working;
+  if Android ended Bali's process, note when.
+- **TalkBack on Android 10 and on 15.** *Start:* a phone on Android 10 and one on 15 or later, TalkBack on, each in the class,
+  focused by a tap at the block's sticker, the slide on Focus, Airplane mode off, the deck's pages holding text. TalkBack on
+  the slide: from Android 15 the page's text; on Android 10 "Slide N of M" (Q4; `docs/DECISIONS.md`, 2026-11-12).
+- **Android 10's deck on the phone's storage.** *Start:* the Android 10 phone with a Debug build, in the class, focused by a
+  tap at the block's sticker, the slide on Focus, Airplane mode off, USB debugging on. While the slide shows, `adb shell run-as
+  com.bali.bali ls no_backup/deck` lists nothing: the open deck's bytes are in a file with no name. Bali force-stopped with
+  the slide showing, then opened: the folder still empty, and the slide drawn again (AN13f).

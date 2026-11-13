@@ -4,8 +4,8 @@ The student app, the iPhone app's twin, over two modules of plain Kotlin (`docs/
 "Android app structure"). Phase 9 builds the engine and Phase 10 the screens
 (`docs/PLAN-ANDROID.md`); until then the app is Bali's name, the outbox's file, sign-in's app side, the
 lock's service with its cover and a readout for the phone checks (both in the Debug build alone), the
-NFC reader, the engine with the enforcer and the account it starts, and the backup rules that keep them on
-the phone: no screen a student sees, no icon.
+NFC reader, the engine with the enforcer, the account and the lesson half it starts, and the backup rules
+that keep them on the phone: no screen a student sees, no icon.
 
 | Folder                      | What it is                                                                                                                                 |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -57,8 +57,9 @@ You need JDK 21 (Android Studio's own, its JBR, as `JAVA_HOME`) and Android's SD
    over Android's own apps and a blocked app of the tests' own (`StandIn.java`, in Java since it runs in
    the test app's process, which has no Kotlin), with split screen made through System UI's shell and a
    call to the emulator's own pretend network, its call log put back; the readout's Scan on a phone
-   with no NFC, as the emulators are, a real tag being the phone check's; and the slide's page drawn in
-   the renderer's isolated process, Android 10's own path on Android 10 itself. A Debug
+   with no NFC, as the emulators are, a real tag being the phone check's; the slide's page drawn in
+   the renderer's isolated process, Android 10's own path on Android 10 itself; and the lesson half a
+   run makes, over a client of the test's own (`LessonAppTest`). A Debug
    build's start opens the app's own outbox, `outbox.sqlite`, in the tests' process too, so each test
    opens a file of its own, and one that starts a run of its own waits for the app's start first
    (`BaliApp.launched`). CI builds them but has no emulator to run them, so a step that changes what
@@ -382,7 +383,19 @@ fills (`Renderer` in `Slide.kt`, AN13f): one document open at a time, closed onc
 and a page past its pages, or a document lost after it opened, shown failed. The screens read one `StateFlow`: the lesson, its
 card (`AnswerCard`), its slide (`SlideShown`) and its heading. Nothing is stored. Its client is the lesson's own, over a
 transport apart from the engine's (`OkHttpTransport.apart`), so no poll or answer holds an Emergency Unlock's send; the app
-makes it in AN13g. Its tests run on the engine's rig, the queue's over real sockets on the loopback, the JDK's own server.
+makes it once a run (below). Its tests run on the engine's rig, the queue's over real sockets on the loopback, the JDK's own server.
+
+**The lesson in the app** (`app`'s `BaliApp.start`, AN13g; BaliApp.swift's `start` and `setForeground`): one lesson half a
+run, made beside the account, over its state, in the run's own scope, so the run's end, a new `start` or its job ending, ends
+all of it: its poll, its bell, a fetch or an answer on its way, and its document, closed. None without an account. Its client
+is the lesson's own: in the app's own run, the API the engine was made over, under the app's sign-in, through
+`transport.apart()`, a queue apart from the engine's; a test's run hands `start` one over its own server, since the build's
+config is dev's. Bali's screen in front (`BaliApp.front`) starts its poll and behind stops it, told before the engine, as
+iOS's `setForeground` tells it. Its slide's deck opens in the app's one renderer (`BaliApp.renderer`, AN13f), made at the
+first start in the app's scope, never in the renderer's isolated process. The screens (AS8) read
+`running.value?.lessons?.state`: its card, its slide (a `Ready` slide's document a `Deck` to draw) and its heading; `answer`,
+`hide` and `ask` are theirs to call, and `setUnlockHeld` Emergency Unlock's control's. Its tests (`LessonAppTest`) run the
+app's start over a sign-in, a server and an outbox file of the test's own.
 
 **The router** (`outbox`'s `Screen.kt` and `Router.kt`, BaliOutbox's `Screen.swift` and BaliApp.swift's `shown`, AN10a and
 AN10b): which screen shows, a type, chosen from the run's account, enforcer and engine, the start's problem, the notes

@@ -617,14 +617,17 @@ private class SeenClock : SyncClock {
  */
 internal class Server : HttpTransport {
     class Exchange(val request: HttpRequest) {
-        private val answer = CompletableDeferred<Pair<Int, String>?>()
+        private val answer = CompletableDeferred<Pair<Int, ByteArray>?>()
         val route = "${request.method} ${request.url.path}"
         val deviceTime: String get() = Regex(""""deviceTime":"([^"]+)"""").find(request.body?.decodeToString().orEmpty())?.groupValues?.get(1).orEmpty()
 
         /** When the engine made it, by the phone's clock. */
         val at: Instant get() = Instant.parse(deviceTime)
 
-        fun reply(status: Int, body: String) {
+        fun reply(status: Int, body: String) = reply(status, body.encodeToByteArray())
+
+        /** [body] as it is, a deck's bytes from its bucket (LessonAppTest). */
+        fun reply(status: Int, body: ByteArray) {
             answer.complete(status to body)
         }
 
@@ -648,7 +651,7 @@ internal class Server : HttpTransport {
             if (closed) exchange.drop() else untaken += exchange
         }
         val (status, body) = exchange.answered() ?: throw IOException("no answer")
-        return HttpAnswer(status, emptyMap(), body.encodeToByteArray())
+        return HttpAnswer(status, emptyMap(), body)
     }
 
     /** The next request to [route], once the engine has sent it. */

@@ -434,7 +434,7 @@ class IsolatedRendererTest {
 }
 
 /** Each page's own colour, page 1 first. */
-private val MARKS = listOf(Color.RED, Color.GREEN, Color.BLUE)
+internal val MARKS = listOf(Color.RED, Color.GREEN, Color.BLUE)
 
 /** A page's four quarters' colours: top left, top right, bottom left, bottom right. */
 private val QUARTERS = listOf(Color.RED, Color.GREEN, Color.BLUE, Color.BLACK)
@@ -449,7 +449,7 @@ private val PAD =
     ).map { it.toByte() }.toByteArray()
 
 /** A deck of [pages] pages, each [width] by [height] points, [paint] drawing page n (from 1): Android's own PDF writer's. */
-private fun deck(pages: Int, width: Int = 400, height: Int = 300, paint: (Canvas, Int) -> Unit): ByteBuffer {
+internal fun deck(pages: Int, width: Int = 400, height: Int = 300, paint: (Canvas, Int) -> Unit): ByteBuffer {
     val document = PdfDocument()
     try {
         for (n in 1..pages) {
@@ -527,10 +527,10 @@ private fun rc4(key: ByteArray, data: ByteArray): ByteArray {
 private fun hex(bytes: ByteArray) = bytes.joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
 
 /** The pixel at [x], [y]. */
-private fun Bitmap.at(x: Int, y: Int): Int = getPixel(x, y)
+internal fun Bitmap.at(x: Int, y: Int): Int = getPixel(x, y)
 
 /** [actual] within a few steps of [expected] in each channel, as a page's antialiasing leaves it. */
-private fun assertColor(expected: Int, actual: Int, case: String) {
+internal fun assertColor(expected: Int, actual: Int, case: String) {
     val near = listOf(24, 16, 8, 0).all { shift -> abs((expected ushr shift and 0xFF) - (actual ushr shift and 0xFF)) <= 8 }
     assertTrue("$case: #${Integer.toHexString(actual)} for #${Integer.toHexString(expected)}", near)
 }

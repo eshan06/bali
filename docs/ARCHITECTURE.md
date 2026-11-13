@@ -1304,7 +1304,8 @@ only a real `401` signs anyone out, and no token reaches Bali's API before the 1
   once and queues the rest, so the lesson's poll and answers go through a transport of their own
   over the app's connections (`OkHttpTransport.apart`), and none ever holds an Emergency Unlock's
   send behind it (Live lesson, decision 5). The conductor's call, the owner's by the go-ahead of
-  2026-11-12 (`docs/DECISIONS.md`, 2026-11-12 and 2026-11-13).
+  2026-11-12 (`docs/DECISIONS.md`, 2026-11-12 and 2026-11-13). The lesson half that makes them is made
+  once per run, beside the account, and ends with the run (`BaliApp.start`, AN13g).
 - **A deck is parsed in a process of its own.** pdfium reads a teacher's deck and draws its page in a
   service process Android isolates, bound only while a deck is open: no permission, none of Bali's
   files, given only the deck's bytes and what to draw. A deck that breaks pdfium reaches neither the

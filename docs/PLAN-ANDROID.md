@@ -14,16 +14,16 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-13 (Central) — AN6e, Cognito's session ended after each sign-in where the phone's browser offers no
-ephemeral tab (#589; `docs/DECISIONS.md`, 2026-11-13): there, and with no Custom Tabs browser, the sign-in page's answer is
-kept while Cognito's `/logout` opens in the same browser and kind of tab, never ephemeral, and handed over, its code traded,
-only once that page comes back at the build's new sign-out URL, `com.bali.bali://auth/signout`, exactly. That page closed
-first leaves the sign-in unfinished, `SignInError.BrowserNotSignedOut`, nothing traded; Sign out is left as it is (this
-step's calls, awaiting the owner). No screen, no word. Before it, AN6d, Android's dev sign-in client in the build. Next:
-AN13g, AN9j and AN9k, AN11, AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's
-phones, on any Chrome now, signed in on dev as an account that passed the 13+ check on an iPhone (Q7); prod's Android client,
-the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that needs them (Open owner
-items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-13 (Central) — AN13g, the lesson in the app, and with it AN13 (#590; `docs/DECISIONS.md`, 2026-11-13):
+`BaliApp.start` makes the lesson half once a run beside the account, in the run's own scope, so the run's end ends all of it;
+its client is the run's API under the run's sign-in on `transport.apart()`, a queue apart from the engine's, the app's own run
+alone getting one unasked, so no test's lesson half can reach dev; Bali in front drives its poll; its decks open in the app's
+one renderer. AP3 gains the lesson's phone checks, and AN6f is a step to build (the conductor's call, awaiting the owner's
+look). No screen, no word. Before it, AN6e, Cognito's session ended after each sign-in where the phone's browser offers no
+ephemeral tab. Next: AN6f, AN9j and AN9k, AN11, AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check
+on the owner's phones, on any Chrome now, signed in on dev as an account that passed the 13+ check on an iPhone (Q7); prod's
+Android client, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that needs
+them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -149,6 +149,11 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN6d** Android's dev sign-in client in the build — ✅ (#588; DECISIONS 2026-11-13)
 - **AN6e** Cognito's session ended after each sign-in where the phone's browser offers no ephemeral tab — ✅ (#589; DECISIONS
   2026-11-13)
+- **AN6f** The sign-out page made sure, where the phone's browser offers no ephemeral tab: the code traded as the sign-in page
+  comes back and its tokens held, unsaved, until the sign-out page returns, so nothing rests on Cognito trading a code after
+  `/logout`, which AWS doesn't document; and a sign-in page closed with no answer opens the sign-out page too, since Cognito
+  may already have signed the student in (AN6e's open call) — validation: the JVM tests, and the instrumented tests on
+  `Bali_Spike_API29`, `35` and `37`, none reaching Cognito
 - **AN7a** The lock follows the engine — ✅ (#521; DECISIONS 2026-11-05)
 - **AN7b** Rule 3's report: protection off, the lock back on, the launch grace — ✅ (#522; DECISIONS
   2026-11-05)
@@ -223,8 +228,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN13e** The slide's deck, asked for once, one document at a time — ✅ (#578; DECISIONS 2026-11-12)
 - **AN13e2** The slide-deck case's flake on main's CI: the deck rig's lesson half on the test's own thread — ✅ (#584; DECISIONS 2026-11-12)
 - **AN13f** The page drawn with `PdfRenderer`, in an isolated process — ✅ (#585; DECISIONS 2026-11-12)
-- **AN13g** The lesson in the app, AN13 done (twin: BaliApp.swift's `start` and `setForeground`), after AN13f —
-  validation: the instrumented tests on `Bali_Spike_API29`, `35` and `37`
+- **AN13g** The lesson in the app, and with it AN13 — ✅ (#590; DECISIONS 2026-11-13)
 
 ## Phase 10, Android: the screens (from the approved boards)
 
