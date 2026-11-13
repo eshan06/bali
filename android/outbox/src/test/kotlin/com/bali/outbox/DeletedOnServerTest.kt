@@ -11,6 +11,7 @@ import com.bali.core.LiveLesson
 import com.bali.core.NoAnswer
 import com.bali.core.ParticipationState
 import com.bali.core.SendResult
+import com.bali.core.UnlockReason
 import com.bali.core.UpdateMeRequest
 import java.net.URI
 import kotlin.test.Test
@@ -296,6 +297,86 @@ class DeletedOnServerTest : EngineFiles() {
             signedOut(rig, routed, "the read of the truth, an unlock queued")
             assertEquals(emptyList(), rig.outbox.records())
             assertEquals(emptyMap(), keptApart(rig.outbox))
+            rig.stop()
+        }
+
+    @Test
+    fun whileTheUnlocksGoTheDrainHoldsAnother409IsTheirsAReasonPickedIsOnItsWayAndAnUnlockPressedMeanwhileGoesToo(): Unit =
+        runBlocking {
+            // Santa's round 2: the drain's hold and the guard for a 409 heard meanwhile (reviewer A's blocker, race coverage), the
+            // unlock marked on its way, and one made meanwhile sent too, read again till none is left untried (both reviewers).
+            val (rig, routed) = inLesson()
+            // Pressed on Focus, its send held for the reason: never sent yet.
+            assertNull(rig.engine.pressUnlock())
+            rig.until { it.retryAt == at(15) }
+            rig.engine.setInFront(true)
+            rig.server.next(meRoute).reply(409, deletedOnServer)
+            val first = rig.server.next(unlockRoute)
+            assertEquals("Bearer ${scoped("a1")}", first.token)
+            // A reason picked now would never go with the send already on its way.
+            assertEquals(ReasonFailure.OnItsWay, rig.engine.explain(UnlockReason.Nurse))
+            // Its hold over, the drain wakes and sends nothing meanwhile.
+            rig.clock.advance(16)
+            rig.until { it.retryAt == null }
+            assertEquals(1, rig.server.sent.count { it.route == unlockRoute })
+            // Another call's 409 meanwhile is this one's, at once, the sign-in still held for the unlocks.
+            val history = async { rig.engine.history(null) }
+            rig.server.next(historyRoute).reply(409, deletedOnServer)
+            assertEquals(SendResult.Status(409), withTimeout(patience) { history.await() }.result)
+            assertFalse(rig.keychain.isEmpty)
+            // Pressed again meanwhile: it goes too, before the sign-out.
+            val second = assertNotNull(rig.engine.emergencyUnlock())
+            first.reply(200, recordedAsNoOne)
+            val again = rig.server.next(unlockRoute)
+            assertEquals(listOf(second.eventId, "Bearer ${scoped("a1")}"), listOf(again.eventId, again.token))
+            again.reply(200, recordedAsNoOne)
+            signedOut(rig, routed, "the read of the truth, two unlocks")
+            assertEquals(emptyList(), rig.outbox.records())
+            assertEquals(emptyMap(), keptApart(rig.outbox))
+            assertEquals(2, rig.server.sent.count { it.route == unlockRoute })
+            rig.stop()
+        }
+
+    @Test
+    fun anUnlockSentFirstAndRefused401IsSentOnceMoreUnderTheAccountsRenewedTokenAndRecorded(): Unit =
+        runBlocking {
+            // Santa's round 2, reviewer A: the renewal call 7 names.
+            val (rig, routed) = inLesson()
+            val unlock = assertNotNull(rig.engine.emergencyUnlock())
+            rig.server.next(unlockRoute).reply(null)
+            rig.until { it.retryAt == at(2) }
+            rig.engine.setInFront(true)
+            rig.server.next(meRoute).reply(409, deletedOnServer)
+            rig.server.next(unlockRoute).reply(401)
+            val renewed = scoped("a1", issued = 1_000_000_100)
+            rig.server.next(tokenRoute).reply(200, grant(renewed))
+            val again = rig.server.next(unlockRoute)
+            assertEquals(listOf(unlock.eventId, "Bearer $renewed"), listOf(again.eventId, again.token))
+            again.reply(200, recordedAsNoOne)
+            signedOut(rig, routed, "the read of the truth, an unlock refused 401")
+            assertEquals(emptyMap(), keptApart(rig.outbox))
+            rig.stop()
+        }
+
+    @Test
+    fun deleteAccountPressedWhileTheUnlocksGoFinishesItsOwnWayTheSignInKeptForItsDeleteUserNeverSignedOutUnderIt(): Unit =
+        runBlocking {
+            // Santa's round 2, reviewer B: the stretch reads the deletion's guard again, so a deletion pressed meanwhile finishes.
+            val (rig, _) = inLesson()
+            assertNotNull(rig.engine.emergencyUnlock())
+            rig.server.next(unlockRoute).reply(null)
+            rig.until { it.retryAt == at(2) }
+            rig.engine.setInFront(true)
+            rig.server.next(meRoute).reply(409, deletedOnServer)
+            val first = rig.server.next(unlockRoute)
+            val deletion = rig.deleting()
+            first.reply(200, recordedAsNoOne)
+            past(rig, deleteMeRoute).reply(200, deletedAnswer)
+            val cognito = rig.server.next(deleteUserRoute)
+            assertEquals(scoped("a1"), cognito.deleteUserToken())
+            cognito.reply(200, "{}")
+            assertEquals(AccountDeletion.Deleted, deletion.answer())
+            assertTrue(rig.keychain.isEmpty)
             rig.stop()
         }
 
