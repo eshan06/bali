@@ -323,8 +323,10 @@ class SignInBrowserTest {
             }
         val signIn = SignIn(cognito, KeystoreTokenStore(kept), scope, transport)
         val call = scope.async { runCatching { signIn.signIn { context.hostedUi(it, cognito) } } }
-        // The address Chrome was sent, its state the attempt's own.
+        // The address Chrome was sent, its state the attempt's own; the answer comes once the tab covers the host, as a
+        // browser's does after the student signs in, so the host comes back to show the sign-out page where one follows.
         val state = tab().dataString!!.toUri().getQueryParameter("state")
+        covered(host())
         send("com.bali.bali://auth/callback?code=the-code&state=$state")
         // Where the browser offers no ephemeral tab, its sign-out page first, the code not traded while it's open (AN6e).
         if (leaves) {
