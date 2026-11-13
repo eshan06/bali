@@ -301,8 +301,6 @@ class HostedUiTest {
             listOf<Pair<SignInError, (HostedUi.Waiting) -> Boolean>>(
                 // The host back in front with the sign-out page still shown, or its task swiped away.
                 SignInError.BrowserNotSignedOut to { pages.ended(it.page.id, SignInError.Cancelled) },
-                // The host that opened the sign-in page leaving before it showed the sign-out page.
-                SignInError.BrowserNotSignedOut to { pages.ended(it.id, SignInError.Cancelled) },
                 SignInError.NotOpened("the sign-out page: no browser on the phone opens it") to {
                     pages.ended(it.page.id, SignInError.NotOpened("no browser on the phone opens it"))
                 },
@@ -332,6 +330,24 @@ class HostedUiTest {
         for ((why, _) in ends) {
             for (secret in listOf("bali.auth.test", "logout", "/auth/", "s1")) assertFalse("$why".contains(secret), "$why")
         }
+    }
+
+    /**
+     * Once the sign-out page is shown, the sign-in page's tab is gone by: its own late end, as an Auth Tab's close when the host
+     * comes back over it (seen on Android 17's emulator), ends nothing, and the sign-out page's return still hands the answer over.
+     */
+    @Test
+    fun theSignInPagesTabEndingLateOnceTheSignOutPageIsShownEndsNothing() {
+        val waiting = pages.start(page("s1"), cognito)
+        pages.opened(waiting.id, Tab("org.example.browser", auth = true, ephemeral = false))
+        assertTrue(pages.redirected(answer("s1")))
+        val signOut = assertNotNull(pages.page())
+        assertFalse(pages.tabEnded(waiting.id, AuthTabIntent.RESULT_CANCELED, null), "the sign-in page's tab's late close")
+        assertFalse(pages.ended(waiting.id, SignInError.Cancelled), "the sign-in page's late end")
+        assertSame(signOut, pages.page())
+        assertFalse(waiting.answer.isCompleted)
+        assertTrue(pages.tabEnded(signOut.id, AuthTabIntent.RESULT_OK, signedOut))
+        assertEquals(answer("s1"), runBlocking { waiting.answer.await() })
     }
 
     /**
