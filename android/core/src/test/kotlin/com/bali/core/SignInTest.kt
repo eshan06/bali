@@ -285,6 +285,114 @@ class SignInTest : SignIns() {
         }
 
     @Test
+    fun theCodeIsTradedAsTheSignInPageAnswersAndItsTokensAreUsedForNothingUntilTheSignOutPageComesBack() =
+        inTime {
+            // AN6f: where the sign-in page's tab left Cognito's session in the browser, the code is traded first, so its tokens are
+            // already given when /logout ends that session (AWS's sign-out endpoint: tokens given stay valid), and the sign-out page
+            // is asked for only once the trade has answered. The tokens are kept, adopted, given and told of only once that page is
+            // back; a Sign up's yes (C7-server) waits with them.
+            val endpoint = HeldEndpoint()
+            val (store, told) = MemoryStore() to Told()
+            val phone = signIn(store, endpoint, told = told)
+            val browser = SignOutPage()
+            val signing = async { phone.signIn(HostedPage.SignUp, yes = "y1", browser = browser) }
+            endpoint.received(1)
+            assertFalse(browser.asked.isCompleted, "the sign-out page asked for before the trade answered")
+            endpoint.answer(200, granted(jwt("a1"), refresh = "refresh-1"))
+            browser.asked.await()
+            assertNull(store.data)
+            assertNull(phone.accessToken())
+            assertNull(phone.account())
+            assertNull(phone.yes())
+            assertFalse(phone.checked())
+            assertEquals(Landing(signedIn = false, account = null, count = 0), phone.landings().first())
+            assertEquals(0, told.count)
+            assertFalse(signing.isCompleted)
+            browser.comeBack()
+            signing.await()
+            assertEquals(listOf(jwt("a1"), "refresh-1"), store.tokens?.let { listOf(it.access, it.refresh) })
+            assertEquals(jwt("a1"), phone.accessToken())
+            assertEquals("y1", phone.yes())
+            assertEquals(Landing(signedIn = true, account = "a1", count = 1), phone.landings().first())
+            assertEquals(1, told.count)
+            assertEquals(1, endpoint.sent)
+        }
+
+    @Test
+    fun tokensTradedForABrowserNotSignedOutAreDroppedKeptNowhereGivenToNobodyAndNobodyTold() =
+        inTime {
+            // AN6f: the sign-out page closed before Cognito sent it back, or one that couldn't open: the tokens traded are dropped and
+            // nothing changes, the sign-in unfinished (fail closed, as AN6e). Nothing is revoked: nothing else ever held them.
+            for (why in listOf(SignInError.BrowserNotSignedOut, SignInError.NotOpened("the sign-out page: no browser on the phone opens it"))) {
+                val endpoint = TransportDouble.answering(200, granted(jwt("a1"), refresh = "refresh-1"))
+                val (store, told) = MemoryStore() to Told()
+                val phone = signIn(store, endpoint, told = told)
+                val browser = SignOutPage().apply { close(why) }
+                assertEquals(why, assertFailsWith<SignInError>("$why") { phone.signIn(browser = browser) })
+                assertEquals(listOf(TOKEN_ENDPOINT), endpoint.sent.map { it.url.toString() }, "$why")
+                assertNull(store.data, "$why")
+                assertNull(phone.accessToken(), "$why")
+                assertFalse(phone.signedIn().first(), "$why")
+                assertEquals(0, told.count, "$why")
+            }
+        }
+
+    @Test
+    fun theSignOutPageIsAskedForWhetherTheTradeWorkedOrNotAndWhereBothFailTheTradesFailureIsSaid() =
+        inTime {
+            // AN6f: the session is ended either way, and the sign-in ends only once that page has. Where both fail, the trade's
+            // failure is said, the one the student's next try needs fixed: offline, its page that couldn't load and was closed too.
+            val anotherAttempts: suspend (URI) -> String = { _ -> "bali://auth/callback?code=the-code&state=another-attempt" }
+            val cases =
+                listOf(
+                    Triple(signsIn, 500 to "oops", SignInError.Unreachable),
+                    Triple(signsIn, 400 to refusal("invalid_grant"), SignInError.Refused("invalid_grant")),
+                    Triple(signsIn, 200 to granted(jwt("a1")), SignInError.Refused(null)), // no refresh token
+                    Triple(anotherAttempts, null, SignInError.Refused(null)), // never traded
+                )
+            for ((answer, reply, failure) in cases) {
+                for (signOut in listOf(null, SignInError.BrowserNotSignedOut, SignInError.NotOpened("the sign-out page: not opened"))) {
+                    val endpoint =
+                        TransportDouble {
+                            val (status, body) = reply ?: fail("$failure: nothing should reach the token endpoint")
+                            HttpAnswer(status, emptyMap(), body.encodeToByteArray())
+                        }
+                    val (store, told) = MemoryStore() to Told()
+                    val phone = signIn(store, endpoint, told = told)
+                    val browser = SignOutPage(answer)
+                    val signing = async { runCatching { phone.signIn(browser = browser) }.exceptionOrNull() }
+                    browser.asked.await()
+                    assertFalse(signing.isCompleted, "$failure, $signOut: ended before its sign-out page")
+                    if (signOut == null) browser.comeBack() else browser.close(signOut)
+                    assertEquals(failure, signing.await(), "$failure, $signOut")
+                    assertNull(store.data, "$failure, $signOut")
+                    assertNull(phone.accessToken(), "$failure, $signOut")
+                    assertEquals(0, told.count, "$failure, $signOut")
+                }
+            }
+        }
+
+    @Test
+    fun aSignInWhoseCallerIsCancelledOnceTheBrowserAnsweredGoesOnThroughTheSignOutPageItsTokensKeptAsItComesBack() =
+        inTime {
+            // The engine's pattern (AN5a) through AN6f's sign-out page: a screen cancelled once the sign-in page answered stops
+            // waiting, and the trade, the sign-out page and the keeping go on in the sign-in's scope.
+            val (store, told) = MemoryStore() to Told()
+            val phone = signIn(store, TransportDouble.answering(200, granted(jwt("a1"), refresh = "refresh-1")), told = told)
+            val browser = SignOutPage()
+            val screen = async { phone.signIn(browser = browser) }
+            browser.asked.await()
+            screen.cancelAndJoin()
+            assertNull(store.data)
+            assertEquals(0, told.count)
+            browser.comeBack()
+            eventually { told.count == 1 }
+            assertTrue(screen.isCancelled)
+            assertEquals(jwt("a1"), store.tokens?.access)
+            assertEquals(jwt("a1"), phone.accessToken())
+        }
+
+    @Test
     fun theExchangeGoesOnTheWireOverTheAppsOwnTransportItsFormAndTypeAndNoAuthorizationHeader() =
         inTime {
             // The token endpoint over the API client's OkHttp (AN3d), a local server in Cognito's place.

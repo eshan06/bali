@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The tests' own app, com.bali.bali.test: a blocked app for the cover's tests (StandIn.java, AN7e), which the
-     allow-list never holds, started by the shell in a task of its own, in split screen and picture-in-picture. -->
+     allow-list never holds, started by the shell in a task of its own, in split screen and picture-in-picture; and a
+     see-through activity for the sign-in's (Veil.java, AN6f). -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- The cover test's own call taken out of the call log on Android 10, whose shell can't (StandIn.Calls): this app's
@@ -18,6 +19,12 @@
             android:supportsPictureInPicture="true"
             android:taskAffinity="com.bali.bali.test.standin"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+        <!-- A see-through activity over the sign-in's host (Veil.java, AN6f): the host stays on screen, paused, never
+             covered. Started by the host into its own task, so the host can finish it. -->
+        <activity
+            android:name="com.bali.bali.Veil"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <!-- An emergency alert's receiver, as any app may declare one, which the allow-list holds for system apps alone;
              only Android's telephony, holding BROADCAST_SMS, may send it one. -->
         <receiver

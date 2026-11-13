@@ -9,6 +9,7 @@ import com.bali.core.SignIn
 import com.bali.core.SignInError
 import com.bali.core.TokenStore
 import java.net.URI
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,8 +19,12 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -27,8 +32,9 @@ import kotlinx.coroutines.runBlocking
  * Tab's answer is a link any app on the phone can send Bali, so one for no waiting sign-in, or for another
  * attempt, ends nothing and replaces nothing (#515's reviews); the Auth Tab's answers only the sign-in whose
  * tab it is. Where the sign-in page's tab leaves Cognito's session in the browser, its sign-out page and the
- * return that alone hands the answer over (AN6e). The tab, the activities and Android's hop are the emulator's
- * (SignInBrowserTest).
+ * return that alone signs that browser out (AN6e), shown once the answer's code is traded and after a closed
+ * sign-in page too (AN6f); and the host's resume, a close only once the browser has covered it (AN6f). The tab,
+ * the activities and Android's hop are the emulator's (SignInBrowserTest).
  */
 class HostedUiTest {
     private val pages = HostedUi()
@@ -204,21 +210,20 @@ class HostedUiTest {
         assertEquals(1, exchanged.get())
     }
 
+    /** Tabs whose sign-in leaves Cognito's session in the browser: Chrome before 136, an Auth Tab in a browser with no ephemeral tab, and no Custom Tabs browser at all, one that opens the page keeping its cookies. */
+    private val leaving = listOf(chrome124, Tab("org.example.browser", auth = true, ephemeral = false), Tab(null, auth = false, ephemeral = false))
+
+    /** Tabs that leave none: Chrome 136, then 137 and later with the Auth Tab. */
+    private val ephemeral = listOf(Tab("com.android.chrome", auth = false, ephemeral = true), Tab("com.android.chrome", auth = true, ephemeral = true))
+
     /**
-     * The owner's call (2026-11-12): where the browser offers no ephemeral tab, or no browser has Custom Tabs and one that opens the
-     * page keeps its cookies, the sign-in page's answer is kept and its sign-out page shown next, like its tab, at the sign-in's own
-     * Cognito; where the tab was ephemeral, the answer goes straight on, and there's no extra page.
+     * The owner's call (2026-11-12) in AN6f's order: where the tab left Cognito's session in the browser, the sign-in page's answer is
+     * handed over at once, no page shown while its code is traded and nothing to answer there; then, once the sign-in asks, its
+     * sign-out page, like that tab, at the sign-in's own Cognito, whose return signs the browser out. Where the tab was ephemeral,
+     * the sign-in is done at its answer, with no extra page.
      */
     @Test
-    fun theSignOutPageFollowsWhereTheBrowserOffersNoEphemeralTabOrNoneHasCustomTabsAndNeverWhereOneIsOffered() {
-        val leaving =
-            listOf(
-                chrome124, // Chrome before 136
-                Tab("org.example.browser", auth = true, ephemeral = false), // an Auth Tab in a browser with no ephemeral tab
-                Tab(null, auth = false, ephemeral = false), // no Custom Tabs browser: one that opens the page, with its own cookies
-            )
-        // Chrome 136, then 137 and later, with the Auth Tab.
-        val ephemeral = listOf(Tab("com.android.chrome", auth = false, ephemeral = true), Tab("com.android.chrome", auth = true, ephemeral = true))
+    fun theAnswerIsHandedOverAtOnceAndTheSignOutPageFollowsOnceTradedWhereTheTabLeftTheSessionNeverWhereEphemeral() {
         for (tab in leaving + ephemeral) {
             assertEquals(tab in leaving, tab.leavesSession, "$tab")
             val waiting = pages.start(page("s1"), cognito)
@@ -226,22 +231,33 @@ class HostedUiTest {
             assertNull(pages.page()?.like, "$tab")
             pages.opened(waiting.id, tab)
             assertTrue(pages.redirected(answer("s1")), "$tab")
+            assertEquals(answer("s1"), runBlocking { waiting.answer.await() }, "$tab")
             if (tab in leaving) {
+                assertNull(pages.page(), "$tab: a page shown while the code is traded")
+                assertSame(waiting, pages.waiting(), "$tab")
+                assertFalse(pages.redirected(signedOut), "$tab: a sign-out link taken while the code is traded")
+                assertFalse(pages.redirected(answer("s1")), "$tab: the answer taken twice")
+                assertFalse(waiting.signedOut.isCompleted, "$tab")
+                pages.signOut(waiting)
                 val signOut = assertNotNull(pages.page(), "$tab")
                 assertEquals(logout, signOut.url, "$tab")
                 assertSame(tab, signOut.like, "$tab")
-                assertFalse(waiting.answer.isCompleted, "$tab")
+                assertFalse(waiting.signedOut.isCompleted, "$tab")
                 assertTrue(pages.redirected(signedOut), "$tab")
             }
-            assertTrue(waiting.answer.isCompleted, "$tab handed nothing over")
-            assertEquals(answer("s1"), runBlocking { waiting.answer.await() }, "$tab")
+            assertTrue(waiting.signedOut.isCompleted, "$tab: not signed out")
+            runBlocking { waiting.signedOut.await() }
             assertNull(pages.waiting(), "$tab")
+            // Asked for again, or for an ephemeral tab's sign-in, the sign-out page opens nothing.
+            pages.signOut(waiting)
+            assertNull(pages.page(), "$tab")
         }
     }
 
     /**
      * A Custom Tab's return is a link any app can send Bali, and carries nothing of the attempt: the sign-out URL, exactly, while the
-     * sign-out page is shown, and once. With nothing waiting, or the sign-in page shown, it's dropped, and so is every near miss.
+     * sign-out page is shown, and once. With nothing waiting, the sign-in page shown or its code being traded, it's dropped, and so
+     * is every near miss.
      */
     @Test
     fun aSignOutLinkIsTakenOnlyWhileTheSignOutPageIsShownExactlyAndOnceEveryStrayOrNearMissDroppedEndingNothing() {
@@ -254,6 +270,8 @@ class HostedUiTest {
         assertSame(signIn, pages.page())
         assertFalse(waiting.answer.isCompleted)
         assertTrue(pages.redirected(answer("s1")))
+        assertFalse(pages.redirected(signedOut), "taken while the code was traded")
+        pages.signOut(waiting)
         val signOut = assertNotNull(pages.page())
         for (near in listOf(
             "com.bali.bali://another/signout", // another host
@@ -270,123 +288,300 @@ class HostedUiTest {
         )) {
             assertFalse(pages.redirected(near), near)
             assertSame(signOut, pages.page(), near)
-            assertFalse(waiting.answer.isCompleted, near)
+            assertFalse(waiting.signedOut.isCompleted, near)
         }
         assertTrue(pages.redirected(signedOut))
-        assertEquals(answer("s1"), runBlocking { waiting.answer.await() })
+        runBlocking { waiting.signedOut.await() }
         assertFalse(pages.redirected(signedOut))
     }
 
     /**
-     * The sign-out page ended without its return, each way, as its own failure, nothing handed over: its close (a page that couldn't
-     * load and was closed among them), the browser not signed out; a page that couldn't open, or that ended elsewhere, saying which
-     * page and never an address. The Auth Tab's return is the sign-out URL's alone too.
+     * The sign-out page ended without its return, each way, as its own failure of the sign-out, the answer handed over already
+     * (AN6f): its close (a page that couldn't load and was closed among them) and its host gone for good, the browser not signed out;
+     * a page that couldn't open, or that ended elsewhere, saying which page and never an address. The Auth Tab's return is the
+     * sign-out URL's alone too.
      */
     @Test
-    fun eachWayTheSignOutPageEndsWithoutItsReturnIsItsOwnFailureNothingHandedOverAndTheSignInPagesCloseStaysACancel() {
+    fun eachWayTheSignOutPageEndsWithoutItsReturnIsItsOwnFailureAndTheAnswerWasHandedOverAlready() {
         fun shown(tab: Tab = chrome124, given: Cognito? = cognito): HostedUi.Waiting {
             val waiting = pages.start(page("s1"), given)
             pages.opened(waiting.id, tab)
             assertTrue(pages.redirected(answer("s1")))
+            pages.signOut(waiting)
             return waiting
         }
 
         fun ended(waiting: HostedUi.Waiting): Throwable? =
-            runBlocking { runCatching { waiting.answer.await() }.exceptionOrNull() }.also {
+            runBlocking { runCatching { waiting.signedOut.await() }.exceptionOrNull() }.also {
+                assertEquals(answer("s1"), runBlocking { waiting.answer.await() })
                 assertNull(pages.waiting())
                 assertFalse(pages.redirected(signedOut))
             }
         val auth = Tab("org.example.browser", auth = true, ephemeral = false)
         val ends =
-            listOf<Pair<SignInError, (HostedUi.Waiting) -> Boolean>>(
-                // The host back in front with the sign-out page still shown, or its task swiped away.
-                SignInError.BrowserNotSignedOut to { pages.ended(it.page.id, SignInError.Cancelled) },
+            listOf<Pair<SignInError, (HostedUi.Page) -> Boolean>>(
+                // The host back in front once the browser covered it, its page still shown; or the host gone for good.
+                SignInError.BrowserNotSignedOut to { pages.resumed(it.id, covered = true) == null },
+                SignInError.BrowserNotSignedOut to { pages.ended(it.id, SignInError.Cancelled) },
+                SignInError.BrowserNotSignedOut to { pages.left(it.id) },
                 SignInError.NotOpened("the sign-out page: no browser on the phone opens it") to {
-                    pages.ended(it.page.id, SignInError.NotOpened("no browser on the phone opens it"))
+                    pages.ended(it.id, SignInError.NotOpened("no browser on the phone opens it"))
                 },
-                SignInError.BrowserNotSignedOut to { pages.tabEnded(it.page.id, AuthTabIntent.RESULT_CANCELED, null) },
+                SignInError.BrowserNotSignedOut to { pages.tabEnded(it.id, AuthTabIntent.RESULT_CANCELED, null) },
                 SignInError.NotOpened("the sign-out page: the Auth Tab ended with ${AuthTabIntent.RESULT_VERIFICATION_FAILED}") to {
-                    pages.tabEnded(it.page.id, AuthTabIntent.RESULT_VERIFICATION_FAILED, null)
+                    pages.tabEnded(it.id, AuthTabIntent.RESULT_VERIFICATION_FAILED, null)
                 },
-                SignInError.NotOpened("the sign-out page ended elsewhere") to { pages.tabEnded(it.page.id, AuthTabIntent.RESULT_OK, "$signedOut/more") },
+                SignInError.NotOpened("the sign-out page ended elsewhere") to { pages.tabEnded(it.id, AuthTabIntent.RESULT_OK, "$signedOut/more") },
             )
         for ((why, end) in ends) {
             val waiting = shown(auth)
-            assertTrue(end(waiting), "$why")
+            assertTrue(end(assertNotNull(pages.page())), "$why")
             assertEquals(why, ended(waiting))
         }
-        // The Auth Tab's return at the sign-out URL hands the answer over; the sign-in page's tab can't answer once it's gone by.
+        // The Auth Tab's return at the sign-out URL signs the browser out; the sign-in page's tab can't answer once it's gone by.
         val returned = shown(auth)
         assertFalse(pages.answered(returned.id, answer("s1")))
-        assertTrue(pages.tabEnded(returned.page.id, AuthTabIntent.RESULT_OK, signedOut))
-        assertEquals(answer("s1"), runBlocking { returned.answer.await() })
-        // No sign-out page to show, with no Cognito to name it: as one that couldn't open.
+        assertTrue(pages.tabEnded(assertNotNull(pages.page()).id, AuthTabIntent.RESULT_OK, signedOut))
+        assertNull(ended(returned))
+        // No sign-out page to show, with no Cognito to name it: as one that couldn't open, the answer handed over all the same.
         assertEquals(SignInError.NotOpened("the sign-out page has no address"), ended(shown(given = null)))
-        // The sign-in page closed before any answer is the student's close, as ever.
-        val closed = pages.start(page("s1"), cognito)
-        pages.opened(closed.id, chrome124)
-        assertTrue(pages.ended(closed.id, SignInError.Cancelled))
-        assertSame(SignInError.Cancelled, ended(closed))
         for ((why, _) in ends) {
             for (secret in listOf("bali.auth.test", "logout", "/auth/", "s1")) assertFalse("$why".contains(secret), "$why")
         }
     }
 
     /**
-     * Once the sign-out page is shown, the sign-in page's tab is gone by: its own late end, as an Auth Tab's close when the host
-     * comes back over it (seen on Android 17's emulator), ends nothing, and the sign-out page's return still hands the answer over.
+     * Once the sign-in page has answered, its tab is gone by: its own late end, as an Auth Tab's close when the host comes back over
+     * it (seen on Android 17's emulator), ends nothing, while the code is traded or once the sign-out page is shown, and the sign-out
+     * page's return still signs the browser out.
      */
     @Test
-    fun theSignInPagesTabEndingLateOnceTheSignOutPageIsShownEndsNothing() {
+    fun theSignInPagesTabEndingLateOnceItAnsweredEndsNothing() {
         val waiting = pages.start(page("s1"), cognito)
         pages.opened(waiting.id, Tab("org.example.browser", auth = true, ephemeral = false))
         assertTrue(pages.redirected(answer("s1")))
+        repeat(2) { step ->
+            assertFalse(pages.tabEnded(waiting.id, AuthTabIntent.RESULT_CANCELED, null), "the sign-in page's tab's late close, $step")
+            assertFalse(pages.ended(waiting.id, SignInError.Cancelled), "the sign-in page's late end, $step")
+            assertFalse(waiting.signedOut.isCompleted, "$step")
+            pages.signOut(waiting)
+        }
         val signOut = assertNotNull(pages.page())
-        assertFalse(pages.tabEnded(waiting.id, AuthTabIntent.RESULT_CANCELED, null), "the sign-in page's tab's late close")
-        assertFalse(pages.ended(waiting.id, SignInError.Cancelled), "the sign-in page's late end")
-        assertSame(signOut, pages.page())
-        assertFalse(waiting.answer.isCompleted)
         assertTrue(pages.tabEnded(signOut.id, AuthTabIntent.RESULT_OK, signedOut))
-        assertEquals(answer("s1"), runBlocking { waiting.answer.await() })
+        runBlocking { waiting.signedOut.await() }
     }
 
     /**
-     * Through the sign-in, as the app's browser hands an answer over: the code is traded only once the sign-out page came back, so
-     * a sign-in never holds tokens while Cognito's session stays in the browser, and never when that page closed first.
+     * AN6f: the student's close of the sign-in page with no answer, where its tab left Cognito's session in the browser, shows the
+     * sign-out page next, like that tab, since Cognito may have signed the student in already; the sign-in ends only once that page
+     * has, and as the student's close whether it came back, was closed too, couldn't open or lost its host. Never where the tab was
+     * ephemeral, and nothing more after a sign-in page that couldn't open.
      */
     @Test
-    fun theCodeIsTradedOnlyOnceTheSignOutPageCameBackAndNeverWhenItClosedFirst() {
-        val exchanged = AtomicInteger()
+    fun aClosedSignInPageShowsTheSignOutPageNextWhereItsTabLeftTheSessionAndTheSignInStillEndsAsTheClose() {
+        val closes =
+            listOf<Pair<String, (HostedUi.Page) -> Boolean>>(
+                "the host back over it once covered" to { pages.resumed(it.id, covered = true) != null },
+                "the Auth Tab's close" to { pages.tabEnded(it.id, AuthTabIntent.RESULT_CANCELED, null) },
+            )
+        val ends =
+            listOf<Pair<String, (HostedUi.Page) -> Boolean>>(
+                "came back" to { pages.redirected(signedOut) },
+                "closed too" to { pages.ended(it.id, SignInError.Cancelled) },
+                "couldn't open" to { pages.ended(it.id, SignInError.NotOpened("no browser on the phone opens it")) },
+                "its host gone" to { pages.left(it.id) },
+            )
+        for (tab in leaving) for ((close, closing) in closes) for ((end, ending) in ends) {
+            val waiting = pages.start(page("s1"), cognito)
+            val signIn = assertNotNull(pages.page())
+            pages.opened(waiting.id, tab)
+            assertTrue(closing(signIn), "$tab, $close, $end")
+            val signOut = assertNotNull(pages.page(), "$tab, $close, $end: no sign-out page")
+            assertEquals(logout, signOut.url, "$tab, $close, $end")
+            assertSame(tab, signOut.like, "$tab, $close, $end")
+            assertFalse(waiting.answer.isCompleted, "$tab, $close, $end: ended before its sign-out page")
+            assertTrue(ending(signOut), "$tab, $close, $end")
+            assertSame(SignInError.Cancelled, runBlocking { runCatching { waiting.answer.await() }.exceptionOrNull() }, "$tab, $close, $end")
+            assertNull(pages.waiting(), "$tab, $close, $end")
+        }
+        for (tab in ephemeral) {
+            val waiting = pages.start(page("s1"), cognito)
+            pages.opened(waiting.id, tab)
+            assertTrue(pages.ended(waiting.id, SignInError.Cancelled), "$tab")
+            assertNull(pages.waiting(), "$tab: a sign-out page after an ephemeral tab's close")
+            assertSame(SignInError.Cancelled, runBlocking { runCatching { waiting.answer.await() }.exceptionOrNull() }, "$tab")
+        }
+        for (why in listOf(SignInError.NotOpened("no browser on the phone opens it"), SignInError.NotOpened("the Auth Tab ended with 2"))) {
+            val waiting = pages.start(page("s1"), cognito)
+            pages.opened(waiting.id, chrome124)
+            assertTrue(pages.ended(waiting.id, why), "$why")
+            assertNull(pages.waiting(), "$why: a sign-out page after a sign-in page that couldn't open")
+            assertEquals(why, runBlocking { runCatching { waiting.answer.await() }.exceptionOrNull() }, "$why")
+        }
+    }
+
+    /**
+     * AN13g's finding (AN6f): the host back in front with its page still shown is the student's close only once the browser has had
+     * it off screen since it opened that page. Before that it's the host made again, or a browser not over it yet, and it opens
+     * nothing again: the sign-in waits on.
+     */
+    @Test
+    fun aHostBackInFrontBeforeTheBrowserCoveredItIsNoCloseAndOnceCoveredItIs() {
+        for (tab in listOf(chrome124, ephemeral.first())) {
+            val waiting = pages.start(page("s1"), cognito)
+            val signIn = assertNotNull(pages.resumed(null, covered = false), "$tab: the host's first page")
+            pages.opened(signIn.id, tab)
+            assertNull(pages.resumed(signIn.id, covered = false), "$tab: opened again before the browser covered the host")
+            assertSame(waiting, pages.waiting(), "$tab")
+            assertSame(signIn, pages.page(), "$tab")
+            assertFalse(waiting.answer.isCompleted, "$tab: ended before the browser covered the host")
+            val next = pages.resumed(signIn.id, covered = true)
+            if (tab.leavesSession) {
+                assertEquals(logout, assertNotNull(next, "$tab").url, "$tab")
+                assertTrue(pages.redirected(signedOut), "$tab")
+            } else {
+                assertNull(next, "$tab")
+            }
+            assertNull(pages.waiting(), "$tab")
+            assertSame(SignInError.Cancelled, runBlocking { runCatching { waiting.answer.await() }.exceptionOrNull() }, "$tab")
+        }
+    }
+
+    /**
+     * A host in front while the code is traded has nothing to open, and the sign-in waits on; it's told once the sign-out page is
+     * shown (its own [HostedUi.front], while it's resumed), and opens it then (AN6f).
+     */
+    @Test
+    fun aHostInFrontWhileTheCodeIsTradedWaitsAndIsToldOnceTheSignOutPageIsShown() {
+        val told = AtomicInteger()
+        pages.front = { told.incrementAndGet() }
+        val waiting = pages.start(page("s1"), cognito)
+        val signIn = assertNotNull(pages.resumed(null, covered = false))
+        pages.opened(signIn.id, chrome124)
+        assertTrue(pages.redirected(answer("s1")))
+        assertNull(pages.resumed(signIn.id, covered = true))
+        assertSame(waiting, pages.waiting())
+        assertEquals(0, told.get())
+        pages.signOut(waiting)
+        assertEquals(1, told.get())
+        val signOut = assertNotNull(pages.resumed(signIn.id, covered = true))
+        assertEquals(logout, signOut.url)
+        assertNull(pages.resumed(signOut.id, covered = false))
+        assertSame(waiting, pages.waiting())
+        assertNull(pages.resumed(signOut.id, covered = true))
+        assertSame(SignInError.BrowserNotSignedOut, runBlocking { runCatching { waiting.signedOut.await() }.exceptionOrNull() })
+        assertEquals(1, told.get())
+    }
+
+    /**
+     * The host gone for good (its task swiped away) with its tab's page still shown: nothing can open after it, so the sign-in ends
+     * at once as that page's close with nothing to follow: the sign-in page's as the student's close, with no sign-out page; and
+     * while the code is traded, its sign-out page never to open, the browser not signed out. A page no host of its opened ends
+     * nothing.
+     */
+    @Test
+    fun theHostGoneForGoodEndsTheSignInAtOnceAsItsPagesCloseWithNothingToFollow() {
+        val signingIn = pages.start(page("s1"), cognito)
+        pages.opened(signingIn.id, chrome124)
+        assertFalse(pages.left("another page"))
+        assertSame(signingIn, pages.waiting())
+        assertTrue(pages.left(signingIn.id))
+        assertNull(pages.waiting())
+        assertSame(SignInError.Cancelled, runBlocking { runCatching { signingIn.answer.await() }.exceptionOrNull() })
+        val trading = pages.start(page("s1"), cognito)
+        pages.opened(trading.id, chrome124)
+        assertTrue(pages.redirected(answer("s1")))
+        assertTrue(pages.left(trading.id))
+        assertNull(pages.waiting())
+        assertEquals(answer("s1"), runBlocking { trading.answer.await() })
+        assertSame(SignInError.BrowserNotSignedOut, runBlocking { runCatching { trading.signedOut.await() }.exceptionOrNull() })
+        pages.signOut(trading)
+        assertNull(pages.page(), "a sign-out page shown after its host left")
+    }
+
+    /**
+     * The app's browser over these pages lets go of its sign-in as its caller does (AN6f): a caller cancelled before the answer
+     * leaves nothing waiting, a late answer dropped; one cancelled while the sign-out page is shown lets go of it too.
+     */
+    @Test
+    fun theAppsBrowserLetsGoOfItsSignInWhenItsCallerStopsWaiting() {
+        runBlocking {
+            val shown = CompletableDeferred<Unit>()
+            val browser = pages.browser(cognito) { shown.complete(Unit) }
+            val opening = async(Dispatchers.Default) { browser.open(page("s1")) }
+            shown.await()
+            assertNotNull(pages.waiting())
+            opening.cancelAndJoin()
+            assertNull(pages.waiting())
+            assertFalse(pages.redirected(answer("s1")))
+            val again = pages.browser(cognito) {}
+            val answering = async(Dispatchers.Default) { again.open(page("s2")) }
+            val waiting = until { pages.waiting() }
+            pages.opened(waiting.id, chrome124)
+            assertTrue(pages.redirected(answer("s2")))
+            assertEquals(answer("s2"), answering.await())
+            val signingOut = async(Dispatchers.Default) { again.signedOut() }
+            until { pages.page() }
+            signingOut.cancelAndJoin()
+            assertNull(pages.waiting())
+            assertFalse(pages.redirected(signedOut))
+        }
+    }
+
+    /**
+     * Through the sign-in and the app's browser over these pages (AN6f): the code is traded as soon as the sign-in page answers, no
+     * page shown, so its tokens are given before /logout; the sign-out page is shown once the trade has answered, the host in front
+     * told; and the tokens are kept only once that page came back, never when it closed first.
+     */
+    @Test
+    fun throughTheSignInTheCodeIsTradedFirstTheSignOutPageShownOnceItIsAndTheTokensKeptOnlyAsItComesBack() {
+        val trades = CopyOnWriteArrayList<String>() // the page shown as each trade went out
         val token =
             object : HttpTransport {
                 override suspend fun send(request: HttpRequest): HttpAnswer {
-                    exchanged.incrementAndGet()
+                    trades += pages.page()?.url?.path ?: "none"
                     return HttpAnswer(200, emptyMap(), """{"access_token":"a.b.c","refresh_token":"r"}""".encodeToByteArray())
                 }
             }
 
-        fun signInEnding(end: (HostedUi.Page) -> Boolean): Throwable? =
+        fun signInEnding(end: (HostedUi.Page) -> Boolean): Pair<Throwable?, Memory> =
             runBlocking {
-                val signIn = SignIn(cognito, Memory(), CoroutineScope(Job()), token)
-                runCatching {
-                    signIn.signIn { page ->
-                        val waiting = pages.start(page, cognito)
-                        try {
-                            pages.opened(waiting.id, chrome124)
-                            assertTrue(pages.redirected("${cognito.redirectUri}?code=the-code&state=${waiting.state}"))
-                            assertEquals(0, exchanged.get(), "traded while the sign-out page was shown")
-                            assertTrue(end(assertNotNull(pages.page())))
-                            waiting.answer.await()
-                        } finally {
-                            pages.forget(waiting)
-                        }
-                    }
-                }.exceptionOrNull()
+                val store = Memory()
+                val signIn = SignIn(cognito, store, CoroutineScope(Job()), token)
+                val shown = CompletableDeferred<Unit>()
+                val told = CompletableDeferred<Unit>()
+                pages.front = { told.complete(Unit) }
+                val signing = async(Dispatchers.Default) { runCatching { signIn.signIn(browser = pages.browser(cognito) { shown.complete(Unit) }) }.exceptionOrNull() }
+                shown.await()
+                val waiting = assertNotNull(pages.waiting())
+                pages.opened(waiting.id, chrome124)
+                assertTrue(pages.redirected("${cognito.redirectUri}?code=the-code&state=${waiting.state}"))
+                told.await()
+                val signOut = assertNotNull(pages.page())
+                assertEquals(logout, signOut.url)
+                assertNull(store.load(), "kept while the sign-out page was shown")
+                assertFalse(signing.isCompleted)
+                assertTrue(end(signOut))
+                signing.await() to store
             }
-        assertSame(SignInError.BrowserNotSignedOut, signInEnding { pages.ended(it.id, SignInError.Cancelled) })
-        assertEquals(0, exchanged.get())
-        assertNull(signInEnding { pages.redirected(signedOut) })
-        assertEquals(1, exchanged.get())
+        val (closed, dropped) = signInEnding { pages.ended(it.id, SignInError.Cancelled) }
+        assertSame(SignInError.BrowserNotSignedOut, closed)
+        assertNull(dropped.load())
+        val (signedIn, kept) = signInEnding { pages.redirected(signedOut) }
+        assertNull(signedIn)
+        assertNotNull(kept.load())
+        // Each traded with no page shown: before its sign-out page opened, while the browser's session still stood.
+        assertEquals(listOf("none", "none"), trades)
+    }
+
+    /** [value]'s first answer, asked until it gives one: a point the test waits for, failing rather than hanging. */
+    private fun <T : Any> until(value: () -> T?): T {
+        val by = System.nanoTime() + 60_000_000_000L
+        while (System.nanoTime() < by) {
+            value()?.let { return it }
+            Thread.sleep(1)
+        }
+        error("never came")
     }
 
     /** The Keystore store's stand-in, in memory. */
