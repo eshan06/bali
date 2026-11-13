@@ -39,6 +39,8 @@ import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,9 +50,10 @@ import org.junit.runner.RunWith
  * Auth Tab nor ephemeral browsing, and stops at its first run (AN1), which no test goes past: a student's
  * Back closes it, nothing is accepted. What's proven is Bali's side: the tab it asks for, the answer's way
  * back through Android's hop from another app (the shell) as the text it was sent, at the build's two-slash
- * callback (AN6d), the guards on it, the student's close, and a host recreated while the tab is open. And, since
- * Chrome 124 offers no ephemeral tab, the sign-out page each answer brings (AN6e): its tab, its return, and its
- * close. A real tab and a real sign-in, on dev's Android client, are the owner's device check (📱): no test here
+ * callback (AN6d), the guards on it, the student's close, and a host recreated while the tab is open. And the
+ * sign-out page each answer brings where the browser offers no ephemeral tab (AN6e): its tab, its return and its
+ * close on Android 15's Chrome 124 and Android 10's 74; none on Android 17's Chrome 145, which offers one, with the
+ * Auth Tab. A real tab and a real sign-in, on dev's Android client, are the owner's device check (📱): no test here
  * opens the hosted UI or reaches Cognito, every tab goes to the tests' own made-up domain, and none keeps tokens
  * in the app's own store.
  */
@@ -63,6 +66,12 @@ class SignInBrowserTest {
 
     /** The sign-in's own Cognito, at the tests' made-up domain, which nothing resolves. */
     private val cognito = Cognito(URI("https://bali.auth.test"), "the-client", URI("com.bali.bali://auth/callback"), URI(SIGNED_OUT))
+
+    /**
+     * Whether the phone's browser leaves Cognito's session after a sign-in, so a sign-out page follows each answer (AN6e): Chrome 124
+     * on Android 15's emulator and 74 on Android 10's offer no ephemeral tab; Chrome 145 on Android 17's does, with the Auth Tab.
+     */
+    private val leaves = CustomTabsClient.getPackageName(context, null)?.let { !CustomTabsClient.isEphemeralBrowsingSupported(context, it) } ?: true
 
     /**
      * Where the whole sign-in keeps its tokens, sealed by the Keystore as the app's are, in a file of its own: the app's own
@@ -143,7 +152,8 @@ class SignInBrowserTest {
         val call = scope.async { runCatching { context.hostedUi(page("s1"), cognito) } }
         val tab = tab()
         // The browser Custom Tabs name: an Auth Tab where it has one, else a Custom Tab, ephemeral asked
-        // either way; Chrome 124 here has neither, so a Custom Tab that shares its cookies.
+        // either way; Chrome 124 and 74 here have neither, so a Custom Tab that shares its cookies, and
+        // Chrome 145 on Android 17 has both.
         val browser = CustomTabsClient.getPackageName(context, null)
         assertEquals(browser, tab.`package`)
         assertEquals(page("s1").toString(), tab.dataString)
@@ -185,13 +195,12 @@ class SignInBrowserTest {
             // on Android 16 and 17 at AN7c, the host back and done before the change arrived).
             until { context.resources.configuration.fontScale.takeIf { it == 1.3f } }
             send(answer("s1"))
-            // The host made again shows the sign-out page Chrome 124's answer brings (AN6e), then hands the answer over.
-            tab(2)
-            send(SIGNED_OUT)
+            // The host made again shows the sign-out page the answer brings where the browser offers no ephemeral tab (AN6e).
+            signedOutWhereLeft()
             assertEquals(answer("s1"), await(call).getOrThrow())
             assertNotSame(host, until { hosts.lastActivity?.takeIf { it !== host } })
         }
-        assertEquals(listOf(page("s1").toString(), LOGOUT), views().map { it.dataString })
+        assertEquals(listOfNotNull(page("s1").toString(), LOGOUT.takeIf { leaves }), views().map { it.dataString })
     }
 
     @Test
@@ -222,20 +231,19 @@ class SignInBrowserTest {
         // tab is open in, which would end the sign-in as the student's close.
         send(answer("s2"), "-f 0x10008000")
         send(answer("s1"))
-        // Then the sign-out page Chrome 124's answer brings, and its return (AN6e).
-        tab(2)
-        send(SIGNED_OUT)
+        signedOutWhereLeft()
         assertEquals(answer("s1"), await(call).getOrThrow())
     }
 
     /**
-     * AN6e on Chrome 124, which offers no ephemeral tab: after the answer, the sign-out page opens in the same browser and kind of
-     * tab, never ephemeral, at the sign-in's own Cognito's `/logout`, the tests' made-up domain; the answer waits for its return,
-     * a near miss dropped and starting nothing; and the return, sent as Chrome sends one, brings the host back over the tab,
-     * closing it, and hands the answer over.
+     * AN6e where the browser offers no ephemeral tab (Chrome 124 and 74 here): after the answer, the sign-out page opens in the same
+     * browser and kind of tab, never ephemeral, at the sign-in's own Cognito's `/logout`, the tests' made-up domain; the answer
+     * waits for its return, a near miss dropped and starting nothing; and the return, sent as Chrome sends one, brings the host
+     * back over the tab, closing it, and hands the answer over.
      */
     @Test
     fun afterTheAnswerTheSignOutPageOpensLikeTheSignInsTabAtTheSignInsOwnLogoutAndItsReturnHandsTheAnswerOver() {
+        assumeTrue("the browser offers an ephemeral tab", leaves)
         val call = scope.async { runCatching { context.hostedUi(page("s1"), cognito) } }
         val signIn = tab()
         val host = host()
@@ -263,6 +271,7 @@ class SignInBrowserTest {
     /** The student's Back on the sign-out page: the browser not signed out of Cognito (AN6e), nothing handed over. */
     @Test
     fun theStudentsBackOnTheSignOutPageIsTheBrowserNotSignedOutAndNothingIsHandedOver() {
+        assumeTrue("the browser offers an ephemeral tab", leaves)
         val call = scope.async { runCatching { context.hostedUi(page("s1"), cognito) } }
         tab()
         val host = host()
@@ -273,6 +282,19 @@ class SignInBrowserTest {
         shell("input keyevent 4")
         assertSame(SignInError.BrowserNotSignedOut, await(call).exceptionOrNull())
         assertEquals(2, views().size)
+    }
+
+    /** Where the browser offers an ephemeral tab (Chrome 145 here), the answer is handed over at once, with no sign-out page (AN6e). */
+    @Test
+    fun whereTheBrowserOffersAnEphemeralTabTheAnswerIsHandedOverAtOnceWithNoSignOutPage() {
+        assumeFalse("the browser offers no ephemeral tab", leaves)
+        val call = scope.async { runCatching { context.hostedUi(page("s1"), cognito) } }
+        assertTrue(tab().getBooleanExtra(CustomTabsIntent.EXTRA_ENABLE_EPHEMERAL_BROWSING, false))
+        covered(host())
+        send(answer("s1"))
+        assertEquals(answer("s1"), await(call).getOrThrow())
+        hostCameAndWent()
+        assertEquals(listOf(page("s1").toString()), views().map { it.dataString })
     }
 
     /** A sign-out link with no sign-out page shown is dropped, starting nothing, and a waiting sign-in waits on (AN6e). */
@@ -304,10 +326,12 @@ class SignInBrowserTest {
         // The address Chrome was sent, its state the attempt's own.
         val state = tab().dataString!!.toUri().getQueryParameter("state")
         send("com.bali.bali://auth/callback?code=the-code&state=$state")
-        // Chrome 124 has no ephemeral tab: its sign-out page first, the code not traded while it's open (AN6e).
-        assertEquals(LOGOUT, tab(2).dataString)
-        assertEquals(emptyList<String>(), bodies)
-        send(SIGNED_OUT)
+        // Where the browser offers no ephemeral tab, its sign-out page first, the code not traded while it's open (AN6e).
+        if (leaves) {
+            assertEquals(LOGOUT, tab(2).dataString)
+            assertEquals(emptyList<String>(), bodies)
+            send(SIGNED_OUT)
+        }
         await(call).getOrThrow()
         assertTrue(bodies.single(), bodies.single().contains("grant_type=authorization_code&client_id=the-client&code=the-code&"))
         runBlocking {
@@ -336,6 +360,13 @@ class SignInBrowserTest {
         } finally {
             instrumentation.removeMonitor(read)
         }
+    }
+
+    /** The sign-out page an answer brings where the browser offers no ephemeral tab (AN6e), seen through: its tab, then its return. */
+    private fun signedOutWhereLeft() {
+        if (!leaves) return
+        tab(2)
+        send(SIGNED_OUT)
     }
 
     /** The [nth] intent the host sent the browser, once it has: the sign-in page's first, then its sign-out page's. */
