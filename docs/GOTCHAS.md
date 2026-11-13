@@ -109,6 +109,10 @@ the clone is `C:\Users\Eshan Shah\Downloads\github\bali`. Its path has a space: 
   zero-width space, a direction override, a byte-order mark), with no error; `\\uXXXX` stays as typed, two backslashes,
   and the Bash tool's text makes `\\u` one. Write such escapes from a script that builds the backslash (Python's
   `chr(92)`), then check the file for non-ASCII characters (AN9f, 2026-11-11).
+- **Stopping a background command leaves what it started running.** TaskStop ends the Bash tool's own shell, but a script that
+  shell ran (`bash loop.sh`) goes on, and so does its `gradlew`: AN13e2's stopped test loop went on building the worktree with
+  the edits made there after the stop. Find each by its command line (`Get-CimInstance Win32_Process`, the script's name or
+  `gradle-wrapper.jar`), `Stop-Process` it, and list them again to see none is left.
 - **A Kotlin test named past about 235 characters fails its compile as "Permission denied".** A test's lambda is a class
   file named `<Class>$<test>$1.class`, and no file name can pass 255 characters (Linux says "File name too long"), so
   nothing is locked: shorten the name, under 200 to be safe (AN9g, 2026-11-11).

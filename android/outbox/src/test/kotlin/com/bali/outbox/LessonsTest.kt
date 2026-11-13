@@ -220,10 +220,10 @@ private fun EngineFiles.lessonRig(): LessonRig {
  * test ends (a reply, the clock moved, a hold let go), runs at once there up to its first wait, a reply's, a sleep's or its lock's,
  * as [Dispatchers.Unconfined] runs it, so once a call returns, whatever it sent is sent and whatever it waits on it waits on, never
  * a window of time. What another thread wakes, the deck's check above all (core's `sha256`, on [Dispatchers.Default]), runs there
- * as the test next waits, never at once with a step of the test, so a test reads what it did only after a wait: a mark, or a call
- * that takes the lesson half's lock. On Unconfined it ran on, and held the lesson half's lock on, a thread of its own (the flake
- * of 2026-11-12, staged in [SlideTest]), as iOS's AppTests never do, their `Phone` and the test both on the main actor. A run a
- * test starts in a scope of its own (`lessons.run()` in [EngineFiles.scope]) runs its own stretches there, as the app's does.
+ * as the test next waits, never at once with a step of the test, so a test reads what it did only after a wait that lets it run:
+ * a mark, or a lock-taking call once that work waits on the lock. On Unconfined it ran on, and held the lock on, a thread of its
+ * own (the flake of 2026-11-12, staged in [SlideTest]), unlike iOS's AppTests, their `Phone` and the test on the main actor. A
+ * run a test starts in a scope of its own (`lessons.run()` in [EngineFiles.scope]) runs its own stretches there, as the app's.
  */
 private suspend fun EngineFiles.deckRig(accounts: Flow<Account.State> = emptyFlow()): LessonRig {
     val (server, clock, renderer) = Triple(Server(), TestClock(), FakeRenderer())

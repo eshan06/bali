@@ -9,9 +9,9 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-12** — **AN13e2, the slide-deck case's flake on main's CI, found, staged and fixed in its rig: SlideTest's deck rig
-  keeps the lesson half on the test's own thread, so nothing of it runs at once with a step of the test (the owner's ask; the
-  conductor's call, marked, awaiting the owner's look; AN13e2, #NNN).** Test-only: Bali's own code is unchanged, and no phone met
-  it.
+  runs the lesson half's own scope on the test's own thread, so none of that scope's work runs at once with a step of the test
+  (the owner's ask; the conductor's call, marked, awaiting the owner's look; AN13e2, #NNN).** Test-only: Bali's own code is
+  unchanged, and no phone met it.
 
   **What failed:** CI's push run 43331986903 on `d9ca1c3c` (#582, a portal PR), attempt 1, "Android contract tests (JVM)":
   SlideTest's `aSlidesDeckIsAskedForOncePerSha256…` (AN13e's port of AppTests' `slideOncePerDeck`, M8) waited out its 60 s for
@@ -37,11 +37,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   Unconfined ran it, so "nothing fetched" is still checked as a call returns; what another thread wakes, the deck's hash above
   all, goes to the test's own `runBlocking` loop and runs there as the test next waits. So nothing the lesson half's own scope
   runs can run at once with a step of the test, whatever hop a later step adds, as iOS's AppTests run their `Phone` with the test,
-  both on the main actor; a test reads what such work did only after a wait, a mark or a call that takes the lesson half's lock.
-  A run a test starts in a scope of its own, as two deck tests start `lessons.run()` on the engines' Default scope, runs its own
-  stretches there, as the app's does. Not chosen: a seam for the hash's dispatcher in core's `LiveLesson` and in `Lessons`
-  (product code changed for a test, and only that one hop closed), or a wait in the rig after each read (the read's watch can wait
-  on `LiveLesson`'s own lock too, which no test sees).
+  both on the main actor. A test reads what such work did only after a wait that lets it run: a mark, or a call that takes the
+  lesson half's lock once that work is waiting on it, as the bell's stretch is in the bell's test; the deck's hash, its work not
+  yet at the lock, takes a mark (`document()`, `until`). A run a test starts in a scope of its own, as two deck tests start
+  `lessons.run()` on the engines' Default scope, runs its own stretches there, as the app's does. Not chosen: a seam for the
+  hash's dispatcher in core's `LiveLesson` and in `Lessons` (product code changed for a test, and only that one hop closed), or a
+  wait in the rig after each read (the read's watch can wait on `LiveLesson`'s own lock too, which no test sees).
 
   **The regression test, failing first** (its own commit): SlideTest's
   `aReadAnsweredWhileTheLastDecksOpenStillHoldsTheLessonHalfsLockOnAThreadOfItsOwnIsShownAsTheRigsNextReturnsSoTheSlideAskedForIsTheOneShown`,
@@ -54,8 +55,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **The same cause elsewhere:** `aDocumentOpenedForAnAskNoLongerTheLatest…`'s two held opens. Its hold says it is taken before
   the open waits on it, so with the open on the hash's Default thread the test's release could come first, and the open would
   then close its document there at once with the test's count of documents open (1 for 0). Never seen failing; the same fix
-  closes it, the open and the test now on one thread. The rest were read one by one: each other deck test, after a deck's bytes,
-  waits on a call that takes the lesson half's lock, or on the stretch's own publish with nothing after it;
+  closes it, the open and the test now on one thread. The rest were read one by one: each other deck test, once a deck's stretch
+  has published, either ends or next makes a call that takes the lesson half's lock, which waited for that stretch to let it go;
   `anotherStudentsSignInAndADeletion…` and LessonsTest's `lessonRig` tests run the lesson half on `Dispatchers.Default` by design
   and wait for marks; core's `LiveLessonTest` awaits each `deck` call's own answer; and UnlockTest's and ProtectionOffTest's
   Unconfined watchers only collect states where each is set.
@@ -65,11 +66,36 @@ a real decision? Add a dated entry at the top: what was decided and why.
   given, and with `--tests '*SlideTest*'` added.
 
   **The loops** (the scratchpad's `deckflake-loop.sh`: each run a fresh Gradle run of `:outbox:test`, `--rerun` right after it,
-  `--max-workers=2`, its log never UP-TO-DATE): LOOPS
+  `--max-workers=2`, its log never UP-TO-DATE, its tests counted from its own XML). Before the fix, on main's code, the failing
+  case's class (`--tests '*SlideTest*'`) in two loops at once: 200 runs, 0 failures (18 min 21 s and 18 min 52 s, side by side).
+  Said plainly, it never failed here: the race needs a thread stopped between a publish and its next line while the test runs
+  on, which this PC's 16 cores almost never do and CI's runner did once in 568 tests, so the staged test is the proof that
+  counts. After the fix, on the final code: the owner's `--tests '*LessonsTest*'`, 100 runs of its 16 tests, 0 failures (16 min
+  17 s); with `--tests '*SlideTest*'` added, 100 runs of 27, 0 failures (17 min 36 s). A first pair of after-fix loops, on the
+  code before santa's round-1 fix, gave 100 of 100 and 51 of 51 before it was stopped; its later runs met the review's temporary
+  edits (a stopped loop's Gradle run on Windows outlives its shell), so none of it is counted. That trap is GOTCHAS' new entry
+  under "The Windows PC": no test or check can stop it.
 
-  **The proof:** PROOF
+  **The proof:** `./gradlew assemble :app:assembleDebugAndroidTest :app:lint check` green on the final code, Android 10's API
+  check with it (Animal Sniffer over `core` and `outbox`), every JVM suite run: core's 153, outbox's 569 (CI's 568 and the new
+  case), the app's 17 and 19, none skipped. `npm run typecheck && npm run lint && npm test` green, the portal's suite whole (78
+  files). No SDK package was installed and no library added: the build downloads none (`android.builder.sdkDownload=false`), no
+  build file changed, compileSdk 36.1 and OkHttp 5.4.0 as they were. `android/app` is untouched, so no emulator ran. The one
+  change after the loops was the rig's KDoc, reworded within its own lines, so no line of code moved; the check ran after it.
 
-  **Santa's review:** SANTA
+  **Santa's review:** NICE in two rounds, two Claude Opus reviewers at max effort in each (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't). Round 1, one blocker (reviewer A), fixed: on the new rig LessonsTest's
+  `aBellLetGoAsTheRunEnds…` (#577's WARN) read the lesson right after the run's join, while the bell's stretch, handed the lock
+  by the run's end on a Default thread, now waits for the test's next wait; with the run ended before the join, which then never
+  waits, the read came first, and the test passed with the bell's guard (`if (!rung.isActive) return@alone`) deleted, twice of
+  two. Its last two assertions swap, `polling()` first: the lock is that stretch's next, so `polling()`'s wait puts the read
+  after it in every order. Tried, each edit then reverted: the guard deleted, it fails by name ("a bell let go as the run ended
+  followed a lesson after it"), with the run ended before the join and without; the guard kept, it passes. Both assertions and
+  their messages stay. Round 1's WARNs, fixed: this entry and the rig's KDoc claimed nothing of the lesson half runs at once with
+  the test, where two deck tests' `lessons.run()` runs its own stretches on the engines' Default scope (both reviewers); and the
+  placeholders (both). Round 2, 0 blockers; its WARNs, fixed: a lock-taking call waits only for work already waiting on the
+  lock, so the deck's hash, not yet at it, takes a mark (both), and this entry's headline overstated as round 1's WARN did
+  (reviewer B).
 
 - **2026-11-12** — **The app's Sign in screen is rebuilt from the sign-in redesign's board "1 · Bali's Sign in
   screen" (the owner's approval, 2026-11-12), built as drawn.** On the page, Bali, the session ring as art and "Quiet
