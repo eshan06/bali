@@ -8,6 +8,158 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-13** — **AN6f, the sign-out page made sure, where the phone's browser offers no ephemeral tab: the sign-in page's
+  answer reaches the sign-in at once and its code is traded first, the sign-out page opening once the token endpoint has
+  answered, and the tokens kept only once that page comes back; a sign-in page closed with no answer opens the sign-out page
+  too; a host made again before the browser covers it waits on; SignInBrowserTest's font-scale change undone to Bali's window
+  size too (the conductor's four calls and this step's, marked, each awaiting the owner's look; AN6f, #591).** AN6e (#589)
+  traded the code only after Cognito's `/logout` had ended the browser's session and its page had come back, which rested on
+  what AWS's pages don't say: that Cognito still trades a code whose session `/logout` has just ended. They do say that tokens
+  already given stay valid after it (below), so this step trades first. **It replaces AN6e's call 3** ("The code is traded
+  after the session ends"); AN6e's entry is left as it was. The owner said to take the recommended option on every regular
+  call, so each call here, the conductor's and this step's, is for the owner to look at.
+
+  **Where it lives:** `core`'s `SignIn.kt`: `Browser`, the browser as the sign-in uses it (`open`, the answer at once, and
+  `signedOut`, asked once the code is traded), and `SignIn.signIn` over it: the trade (`traded`), then the browser signed out,
+  then the keeping (`keepGrant`); the lambda form, iOS's shape, stays for a browser that leaves no session behind. `app`'s
+  `HostedUi.kt`: the waiting sign-in's pages (the sign-in page, none while the code is traded, then the sign-out page), its
+  answer and its sign-out as two outcomes, `browser`, `signOut`, `resumed` and `left`; `HostedUiActivity.kt`: `covered`, and the
+  host told in front to open the sign-out page (`HostedUi.front`). The readout's Sign in uses the new browser. No screen, no
+  user-facing word, no library and no SDK package.
+
+  **The conductor's calls (2026-11-13), awaiting the owner's look:**
+  1. **Trade first, keep only once the sign-out page comes back.**
+  2. **A sign-in page closed with no answer opens the sign-out page too,** where its tab leaves Cognito's session in the browser:
+     Cognito may already have signed the student in (AN6e's open call; its santa reviewer A's case).
+  3. **A sign-in host made again before the browser covers it is not the student's close** (AN13g's finding).
+  4. **SignInBrowserTest's remakes stop leaking into the next test.**
+
+  **This step's calls, each awaiting the owner's look:**
+  1. **The sign-out page opens once the token endpoint has answered,** not as the answer comes, so the trade reaches Cognito
+     before `/logout` does. AWS documents what `/logout` leaves of tokens already given, not of a code still to trade. Opened as
+     the answer comes, the two would race: the trade needs a new connection from Bali, about three round trips, while Chrome's
+     connection to the same domain is still open from the sign-in page, one, so on a mobile network's 100 ms they'd arrive at
+     Cognito about together. The cost: the host stays in front, drawing nothing, over Bali's screen while the token endpoint
+     answers (well under a second as a rule, its 15 s wait at most), and is told then to open the page. The brief had the code
+     traded "while the sign-out page is shown"; the JVM test here pins it traded before that page is asked for.
+  2. **Where both fail, the trade's failure is said** (the conductor's lean): it's the one the student's next try needs fixed.
+     Offline, the trade is `Unreachable`, whose words say to check the connection, where the closed page alone would say
+     nothing (`BrowserNotSignedOut` has no words yet, AS2's). The session is ended either way: the sign-out page opens whatever
+     the trade did, a code refused before any trade included (an answer for another attempt, or Cognito's own error), and the
+     sign-in ends only once that page has.
+  3. **A caller cancelled once the sign-in page answered goes on through the sign-out page** (AN6b's rule, the sign-in's own
+     scope): the trade, the sign-out page and the keeping go on, and the tokens are kept as that page comes back. Under AN6e, a
+     caller cancelled while that page was open kept nothing.
+  4. **The shape, and where the Kotlin differs from its twin:** `Browser` with `open(page)` and `signedOut()`, which returns once
+     the sign-out page came back, or at once where the tab left no session, and throws `BrowserNotSignedOut`, or a `NotOpened`
+     naming the sign-out page. `signIn(page, yes, browser: suspend (URI) -> String)` stays as a browser whose `signedOut`
+     returns at once, so every sign-in test in `core` and `outbox` runs as before. `Cognito.code` still checks the answer's
+     address and state, now inside the trade, and the verifier stays in the sign-in's call alone. SignIn.swift's
+     `signIn(_:yes:through:)` trades and keeps in one stretch after its ephemeral session's answer; Android keeps the tokens,
+     adopts them and tells the engine only after `Browser.signedOut`, which iOS has no twin of, its session leaving nothing.
+  5. **Call 3 as (a): back in front with its page still shown, the host reads the student's close only once the browser has had
+     it off screen since it opened that page** (`covered`, set in `onStop` unless `isChangingConfigurations`, cleared as a page
+     opens, kept across a remake as `opened` is; the rule is `HostedUi.resumed`, on the JVM). Not (b), `android:configChanges`:
+     it stops only the changes it can name, not a theme overlay's or a `recreate()`, after which a resume would still read as a
+     close, and it would take away the font-scale remake AN6c's tests make the host again with while the tab is open.
+     **The closes it can no longer see, plainly:** a browser page that never has the host off screen: a plain browser (no
+     Custom Tabs browser on the phone) opening the page in a window beside Bali's, in split screen or a freeform window, and
+     closed there; or a browser that shows nothing and is gone at once. The host then waits over Bali's screen, drawing nothing
+     and taking its touches, until the student presses Back, which ends the sign-in as their close with no sign-out page (call
+     6), or answers the page. Before AN6f such a resume ended the sign-in at once, and so did a host remade in the moment before
+     the browser covered it, a real sign-in ended for nothing (AN13g's finding).
+  6. **The host gone for good ends the sign-in at once** (its task swiped away, or Back on the host itself): no sign-out page
+     can open with no host, so the sign-in page's close is `Cancelled` with none, the sign-out page's is the browser not signed
+     out (or the close it followed), and while the code is traded the sign-out page never opens: the browser not signed out,
+     the tokens dropped.
+  7. **Call 4 by the font scale, put back to Bali's window size too.** `recreate()` can't stand in for a rotation while the tab
+     is open: on a stopped host it passes through `onResume` on Android's local relaunch (AN6c's finding), which, the browser
+     having covered the host, is the close. So `changed {}` keeps the font scale and now waits, once it's put back, for Bali's
+     configuration to have the font scale and the window's width, height and smallest width it had before. A change System UI
+     makes later still (AN13g's: its navigation bar laid out again after the font scale was back) can no longer end a sign-in
+     (call 3), and `covered()` follows the host Android made last, so it can't fail the next test either. Call 3's own test makes
+     no system-wide change: the browser's intent held, a see-through activity of the tests' own over the host (`Veil.java`), and
+     the host remade there with `recreate()`, every look at it on the main thread between Android's steps.
+
+  **Call 2, plainly:** only the student's close opens the sign-out page (a Custom Tab's, the Auth Tab's `RESULT_CANCELED`, or the
+  host back over a plain browser), and the sign-in ends as that close, `Cancelled`, nothing said, whether the page comes back, is
+  closed too or can't open; a sign-in page that couldn't open, or an Auth Tab that ended any other way, opens nothing more.
+  Offline, the student sees two pages that couldn't load, one after the other: the sign-in page, then the sign-out page.
+
+  **AWS** (read 2026-11-13, read only). [The managed login sign-out endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/logout-endpoint.html):
+  where session tracking is on, `/logout` also removes the SSO session from the server as well as clearing the browser's
+  cookie, and revokes no token made from that session: "those remain valid until they expire or are revoked". It's silent on a
+  code not yet traded. A refresh token given before `/logout` is such a token, so it still renews after it; no page says
+  otherwise. [Managing user sessions](https://docs.aws.amazon.com/cognito/latest/developerguide/managing-user-sessions.html):
+  each sign-in through an SSO session makes a token session that refers to it but is tracked on its own; revoking the SSO
+  session takes the token sessions with it only when asked to (`LINKED`); session tracking is off unless turned on, and needs
+  the Essentials or Plus plan. [The token endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/token-endpoint.html)
+  says a managed-login sign-in's tokens can always be refreshed there, and lists a revoked refresh token or a code used or
+  unknown under `invalid_grant`: silent on `/logout`. [The revocation endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/revocation-endpoint.html):
+  silent on `/logout`; revoking a refresh token can take its SSO session with it. [Refresh tokens](https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-using-the-refresh-token.html):
+  revocation and global sign-out stop one; it names `/logout` only as where to send a user afterwards to clear the cookie.
+
+  **What AN6f doesn't close, plainly:**
+  - **(b), the browser sending the sign-out page's return before it closes that tab:** only a real sign-in on a Chrome before
+    136 shows it; `docs/ANDROID-PHONE-TESTS.md`'s check there says how to read it (every such sign-in ending as
+    `BrowserNotSignedOut`). (a) is gone: the tokens are given before `/logout`.
+  - **A forged sign-out return while the sign-out page is open** (AN6e's entry): unchanged in reach, taken only while that page
+    is shown, which is now only once the code is traded. What it gets is nothing new: it ends the student's own sign-in, the
+    tokens traded for their own code kept as a real return would keep them, and the session left in the browser for its hour,
+    as AN6e said; no token reaches the forger.
+  - **The pool-wide question** (AN6e's entry): the conductor has offered the owner a separate check. Nothing is built for it.
+
+  **The tests,** failing first in their own commit (`26086878`): against main's code none compiled, each missing piece named
+  (`Browser`; `SignIn.signIn` over it; `HostedUi.Waiting.signedOut`, `HostedUi.signOut`, `resumed`, `left`, `front` and
+  `browser`; `Context.hostedUi(cognito)`), and SignInBrowserTest's new remake test, written first against main's API, failed
+  there by name on `Bali_Spike_API35`: `the host made again ended the sign-in as the student's close`. New in core's SignInTest
+  (four): the code traded as the sign-in page answers, before the sign-out page is asked for, and the tokens, a Sign up's yes
+  with them, kept, adopted, given and told of only once that page is back; dropped when it's closed or couldn't open, the trade
+  the only request; the sign-out page asked for whether the trade worked or not, and the trade's failure said where both fail;
+  a caller cancelled after the answer going on through the sign-out page. HostedUiTest, ten new or rewritten: the answer at once
+  and the sign-out page once traded, never after an ephemeral tab; a sign-out link taken only while that page is shown, not
+  while the code is traded; each way the sign-out page ends, now the sign-out's own failure; the sign-in page's late end; a
+  closed sign-in page's sign-out page after each close and each end, none after an ephemeral tab's close or a page that couldn't
+  open; call 3's rule (`resumed` before and after the browser covered the host); the host in front told; the host gone for
+  good; the app's browser letting go as its caller does; and a whole sign-in through it, traded before the sign-out page opens.
+  SignInBrowserTest: every test on the new browser; Back on the sign-in page opening the sign-out page where the browser offers
+  no ephemeral tab, none on Android 17; a host made again on screen before the browser covers it waiting on (new); the whole
+  sign-in's trade reaching the tests' server before the sign-out page opens, and so before its return is sent, nothing sealed or
+  signed in before it.
+
+  **Broken on purpose, each failing by name, then reverted:**
+  - the trade waiting for the sign-out page, as AN6e's did (signed out first, traded after): SignInTest's
+    `theCodeIsTraded…`, `the sign-out page asked for before the code was traded ==> expected: <the trade> but was: <the
+    sign-out page>`, `theSignOutPageIsAskedFor…` (`expected: <Unreachable> but was: <BrowserNotSignedOut>`) and
+    `tokensTradedForABrowserNotSignedOut…` (no trade made), and HostedUiTest's `throughTheSignIn…`, `expected: <[before the
+    sign-out page, before the sign-out page]> but was: <[after the sign-out page]>`;
+  - the tokens kept as traded, before the sign-out page comes back: SignInTest's `theCodeIsTraded…`,
+    `aSignInWhoseCallerIsCancelled…` and `tokensTradedForABrowserNotSignedOut…` (each `expected: <null>`, the store holding
+    them), HostedUiTest's `throughTheSignIn…`, `kept while the sign-out page was shown`; on `Bali_Spike_API35`,
+    SignInBrowserTest's whole sign-in, `expected null` at its sealed file;
+  - the tokens kept when the sign-out page is closed: SignInTest's `tokensTradedForABrowserNotSignedOut…`, `Expected an
+    exception … but was completed successfully`, and HostedUiTest's `throughTheSignIn…`, `expected: <BrowserNotSignedOut> but
+    was: <null>`;
+  - a closed sign-in page opening no sign-out page where its tab leaves the session: HostedUiTest's `aClosedSignInPageShows…`
+    and `aHostBackInFront…`; on API 35, SignInBrowserTest's student's Back, `never came` at the sign-out page's tab;
+  - a sign-out page opened where the browser offers an ephemeral tab (`leavesSession` as `true`): HostedUiTest's
+    `aClosedSignInPageShows…`, `a sign-out page after an ephemeral tab's close`, and `theAnswerIsHandedOver…`, `expected:
+    <false> but was: <true>`; on `Bali_Spike_API37`, SignInBrowserTest's student's Back and `whereTheBrowserOffersAnEphemeralTab…`,
+    each `Timed out waiting for 30000 ms`, held for a sign-out page that shouldn't open;
+  - a remade host's resume before the cover ending the sign-in: in `HostedUi.resumed` (`covered` ignored), HostedUiTest's
+    `aHostBackInFront…`, `opened again before the browser covered the host`, and `aHostInFront…`; on API 35,
+    SignInBrowserTest's `aHostMadeAgainOnScreen…`, `the host made again took the sign-in page as the student's close`; and in
+    the host (`covered` set by Android's stop to make it again), the same test, the same line.
+
+  **The runs,** on the final code: on the JVM, every task run again, none UP-TO-DATE: core 158 (154 at #590, four new),
+  outbox 571, the app's 28 and 31, Debug's and Release's (HostedUiTest's 15 now 20); Gradle's `assemble
+  :app:assembleDebugAndroidTest :app:lint check` green, Android 10's API check with it. SignInBrowserTest, BaliAppTest and
+  ReadoutTest, 32 tests (31 at #590: the remake test is new): on `Bali_Spike_API29` (Chrome 74) and `_API35` (Chrome 124), 31
+  passed and 1 skipped on each, the ephemeral-tab test; on `_API37` (Chrome 145), 30 passed and 2 skipped, the two that need a
+  browser with no ephemeral tab. WHOLE_SUITES After each run, `dumpsys netstats` listed no traffic for Bali's uid or its test
+  app's. Each emulator after: Bali and its test app uninstalled, AN1's spike apps kept, its font scale, Accessibility services
+  and Airplane mode as found, stopped. Nothing was added to the PC's SDK, and no library.
+
 - **2026-11-13** — **AN13g, the lesson in the app, and with it AN13: `BaliApp.start` makes the lesson half once a run beside
   the account, in the run's own scope; its client is handed to `start`, the app's own run alone getting one unasked, so no
   test's lesson half can reach dev; Bali in front drives its poll; its decks open in the app's one renderer (this step's calls,

@@ -14,16 +14,17 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-13 (Central) — AN13g, the lesson in the app, and with it AN13 (#590; `docs/DECISIONS.md`, 2026-11-13):
-`BaliApp.start` makes the lesson half once a run beside the account, in the run's own scope, so the run's end ends all of it;
-its client is the run's API under the run's sign-in on `transport.apart()`, a queue apart from the engine's, the app's own run
-alone getting one unasked, so no test's lesson half can reach dev; Bali in front drives its poll; its decks open in the app's
-one renderer. AP3 gains the lesson's phone checks, and AN6f is a step to build (the conductor's call, awaiting the owner's
-look). No screen, no word. Before it, AN6e, Cognito's session ended after each sign-in where the phone's browser offers no
-ephemeral tab. Next: AN6f, AN9j and AN9k, AN11, AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check
-on the owner's phones, on any Chrome now, signed in on dev as an account that passed the 13+ check on an iPhone (Q7); prod's
-Android client, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that needs
-them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-13 (Central) — AN6f, the sign-out page made sure, where the phone's browser offers no ephemeral tab (#591;
+`docs/DECISIONS.md`, 2026-11-13): the sign-in page's answer reaches the sign-in at once and its code is traded first, the
+sign-out page opening once the token endpoint has answered, so the tokens are given before `/logout`, as AWS documents; they're
+kept only once that page comes back, and dropped when it closed or couldn't open. A sign-in page closed with no answer opens the
+sign-out page too, still ending as the close; a host made again before the browser covers it waits on; SignInBrowserTest's
+font-scale change is undone to Bali's window size too (the conductor's calls and this step's, awaiting the owner's look). No
+screen, no word. Before it, AN13g, the lesson in the app, and with it AN13. Next: AN9j and AN9k, AN11, AN12 and Phase 10's
+screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, on any Chrome now, signed in on dev as an
+account that passed the 13+ check on an iPhone (Q7), and AN6f's checks on a Chrome before 136; prod's Android client, the
+owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that needs them (Open owner items,
+6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -149,11 +150,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN6d** Android's dev sign-in client in the build — ✅ (#588; DECISIONS 2026-11-13)
 - **AN6e** Cognito's session ended after each sign-in where the phone's browser offers no ephemeral tab — ✅ (#589; DECISIONS
   2026-11-13)
-- **AN6f** The sign-out page made sure, where the phone's browser offers no ephemeral tab: the code traded as the sign-in page
-  comes back and its tokens held, unsaved, until the sign-out page returns, so nothing rests on Cognito trading a code after
-  `/logout`, which AWS doesn't document; and a sign-in page closed with no answer opens the sign-out page too, since Cognito
-  may already have signed the student in (AN6e's open call) — validation: the JVM tests, and the instrumented tests on
-  `Bali_Spike_API29`, `35` and `37`, none reaching Cognito
+- **AN6f** The sign-out page made sure, where the phone's browser offers no ephemeral tab — ✅ (#591; DECISIONS 2026-11-13)
 - **AN7a** The lock follows the engine — ✅ (#521; DECISIONS 2026-11-05)
 - **AN7b** Rule 3's report: protection off, the lock back on, the launch grace — ✅ (#522; DECISIONS
   2026-11-05)
@@ -244,7 +241,9 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 - **AS2** 👀 Sign in and sign up: the 13+ check, the intro and Your name (twin: `SignInView`,
   `AgeView`, `IntroView`, `NameView`); AN6e's new outcome, `SignInError.BrowserNotSignedOut` (the extra page that ends
   Cognito's session in a browser with no ephemeral tab closed before Cognito sent it back, nothing changed), says nothing
-  for now, as a closed page: this step gives it words, since a page that couldn't load comes after a typed password
+  for now, as a closed page: this step gives it words, since a page that couldn't load comes after a typed password. Since
+  AN6f a failed trade's outcome is said over it (offline, `Unreachable`), and a closed sign-in page shows the extra page too,
+  still the close: offline, two pages that couldn't load
 - **AS3** 👀 The permission steps and the push prompt (twin: `ScreenTimeView`, and the prompt iOS
   asks as Home shows)
 - **AS4** 👀 Home, the tap's "hold your phone to the block" screen, Join with the consent preview,
