@@ -8,6 +8,44 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **The app's Sign in screen is rebuilt from the sign-in redesign's board "1 · Bali's Sign in
+  screen" (the owner's approval, 2026-11-12), built as drawn.** On the page, Bali, the session ring as art and "Quiet
+  until the bell."; then a white sheet from the screen's foot holding today's words in today's places, Sign up and
+  Sign in as pills. The behaviour is today's: `Phone.signIn`, the 13+ check and the intro before Sign up, the
+  ephemeral browser session and `SignInError.words` unchanged. It reaches students in the next App Store build
+  (1.0.1); merging changes nothing on the store.
+
+  **Its values, as drawn, in `Theme.swift` beside D1's:** Bali at 64/68 and its line at 26/32, both semibold
+  (`TextStyle.wordmark`, `tagline`), Bali 4 pt under the status bar where D1's screens start at 16, so its letters
+  sit where the board's do; the sheet's top corners 28 and `shadow-1`'s warm black 8 pt up and 24 soft; the pills
+  52 pt tall with a 16/20 label (`PillButtonStyle`), round at 26, a label the text size wraps growing them. The
+  ring is `SessionRingArt`, the portal's own geometry and tokens (`components/mark.tsx`, #582) drawn in a Canvas:
+  `BaliMark`'s open arc and Focus's `Ring`, with its digits, don't fit. Measured against the board's render at
+  390 × 844, every part sits within 1.5 pt of it down the screen; across, words keep iOS's font's widths.
+
+  **The policy links underlined, a dot between them**, as the board draws them (`PolicyLinks`' `underlined` and
+  `dotted`, Sign in's alone): DESIGN.md §4 named the app's colour-only links a known gap until the owner approved
+  the app's next design, and this board is Sign in's. The intro's and Me's are unchanged.
+
+  **Its intermediate states, drawn on the canvas first** (versions 13–14, a row beside Art): Signing up… and
+  Signing in…, both buttons held; a page that didn't open, said under the buttons; the largest text size; an
+  iPhone SE; and an SE at the largest size, its first screen and its end. The ring gives way: it takes what the
+  rest leaves of the screen's height, at most the board's size and never under 160 pt, so the sheet shows whole
+  on an SE or with a line under the buttons; past that the screen scrolls. At the accessibility text sizes the
+  ring steps aside and Bali and its line stop growing at the largest size short of them, Focus's countdown's rule,
+  so Sign up and Sign in stay on an SE's first screen. The largest-text boards are drawn in iOS's own font, which
+  wraps as the phone does.
+
+  **Found on the way, for the owner:** the app's text scale (`Styled`'s `@ScaledMetric` of 1) is rounded to the
+  screen's pixels, so at the largest size it is 8/3 on a 3x phone and 3 on an SE, where iOS's body text grows
+  53/17, about 3.1 (4/3 or 3/2 at the largest size short of the accessibility ones, against 23/17). Every screen
+  has it, and their large-text work (GA3, GA5) was laid out at these scales; following iOS's own would grow every
+  screen's text at the large sizes, a change for the owner's call, not made here.
+
+  **Left as they are:** the 13+ question (`AgeView`) and Delete account's screen (`DeletingView`), laid out as
+  Sign in was (the mark, a title, the way on at the bottom), keep D1's look; whether they follow Sign in's is the
+  owner's design call.
+
 - **2026-11-12** — **The portal's sign-in page is rebuilt from the sign-in redesign's board, "The portal's sign-in page"
   (the owner's approval, 2026-11-12), built as drawn.** Two panels side by side from 1024 px: green-50 with Bali, the
   session ring as art and "Quiet until the bell."; the card with today's words, its lines in today's places, Sign in a

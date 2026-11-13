@@ -108,6 +108,10 @@ struct TextStyle {
     /// D1's Focus countdown, inside its ring.
     static let countdown = TextStyle(
         size: 64, line: 68, weight: .semibold, tracking: -0.02, design: .rounded, tabular: true)
+    /// The sign-in redesign's (the owner's board, 2026-11-12): Bali over Sign in's art, and its line
+    /// under the art.
+    static let wordmark = TextStyle(size: 64, line: 68, weight: .semibold, tracking: -0.04)
+    static let tagline = TextStyle(size: 26, line: 32, weight: .semibold, tracking: -0.01)
 }
 
 extension View {
@@ -161,6 +165,30 @@ struct SecondaryButtonStyle: ButtonStyle {
                 in: .rect(cornerRadius: Theme.Radius.md))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.md).stroke(Theme.borderStrong))
+            .modifier(Dimmed(on: !enabled))
+    }
+}
+
+/// The sign-in redesign's buttons (the owner's board, 2026-11-12): D1's primary, `filled`, or its
+/// secondary, with a 1.5-pt border inside its edge, as a pill 52 pt tall — a 16/20 semibold label
+/// 24 pt in and 14 pt from its top and bottom, so a label the phone's text size wraps grows the
+/// button and never touches its edge, its corners staying 26 then; dimmed as D1's are.
+struct PillButtonStyle: ButtonStyle {
+    let filled: Bool
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 26)
+        let fill =
+            filled
+            ? (configuration.isPressed ? Theme.brandPressed : Theme.brand)
+            : (configuration.isPressed ? Theme.sunken : Theme.card)
+        configuration.label.textStyle(TextStyle(size: 16, line: 20, weight: .semibold))
+            .foregroundStyle(filled ? .white : Theme.text)
+            .padding(.horizontal, 24).padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(fill, in: shape)
+            .overlay { if !filled { shape.strokeBorder(Theme.borderStrong, lineWidth: 1.5) } }
             .modifier(Dimmed(on: !enabled))
     }
 }
@@ -254,6 +282,40 @@ struct BaliMark: View {
         .padding(size * 8 / 64)
         .frame(width: size, height: size)
         .accessibilityLabel("Bali")
+    }
+}
+
+/// The session ring as art (the sign-in redesign's, the owner, 2026-11-12), as the portal's
+/// `SessionRingArt` draws it (`apps/web/src/components/mark.tsx`): the mark's green-200 track and
+/// green-600 arc, round-capped from the top and 62 % of the way round clockwise, on a white disc in
+/// one stone-200 hairline circle. Never a countdown, and no numbers, so it never looks like a real
+/// session (the owner's ruling, 2026-11-12). Its board's geometry, 390 × 340 around (195, 170): the
+/// hairline r 164 at 1.5, the disc r 132, the ring r 118 stroked 22, the arc 460 of its 742 (the
+/// circle's 2π × 118); at the size offered, kept to that shape. Decorative, so VoiceOver skips it.
+struct SessionRingArt: View {
+    var body: some View {
+        Canvas { context, size in
+            let unit = size.width / 390
+            let centre = CGPoint(x: size.width / 2, y: size.height / 2)
+            func circle(_ radius: CGFloat) -> Path {
+                let r = radius * unit
+                return Path(
+                    ellipseIn: CGRect(x: centre.x - r, y: centre.y - r, width: 2 * r, height: 2 * r))
+            }
+            context.stroke(circle(164), with: .color(Theme.border), lineWidth: 1.5 * unit)
+            context.fill(circle(132), with: .color(Theme.card))
+            context.stroke(circle(118), with: .color(Theme.markTrack), lineWidth: 22 * unit)
+            // From the top, clockwise on screen: SwiftUI's angles turn clockwise, y running down.
+            let arc = Path {
+                $0.addArc(
+                    center: centre, radius: 118 * unit, startAngle: .degrees(-90),
+                    endAngle: .degrees(-90 + 360 * 460 / (2 * .pi * 118)), clockwise: false)
+            }
+            let round = StrokeStyle(lineWidth: 22 * unit, lineCap: .round)
+            context.stroke(arc, with: .color(Theme.arc), style: round)
+        }
+        .aspectRatio(390 / 340, contentMode: .fit)
+        .accessibilityHidden(true)
     }
 }
 

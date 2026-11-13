@@ -2316,10 +2316,12 @@ struct AppTests {
     }
 
     @Test(
-        "Sign in as the approved Sign in & sign up design draws it: its title, with no line under it (the owner's cut, 2026-11-04), then Sign up and Sign in, each a button; while a page opens its button says so and neither takes a press; a page that could not open is said under the buttons, naming its page, before the caption; and the intro's last page's button is Sign up, Signing up… and dimmed while its page opens, and still once the router has gone on from it, the page closed, so the intro held under the sheet holds still (the approved motion spec)"
+        "Sign in as the sign-in redesign's board draws it (the owner's approval, 2026-11-12): Bali, then its line, with nothing read between them — the ring is art, and VoiceOver reads nothing of it, so no number either; then the sheet's line, then Sign up and Sign in, each a button; while a page opens its button says so and neither takes a press; a page that could not open is said under the buttons, naming its page, before the caption; then the two policy links, with no dot read between them; and the intro's last page's button is Sign up, Signing up… and dimmed while its page opens, and still once the router has gone on from it, the page closed, so the intro held under the sheet holds still (the approved motion spec)"
     )
     func signInScreen() async throws {
         let title = "Sign\u{A0}up or sign\u{A0}in"
+        let (wordmark, tagline) = ("Bali", "Quiet until the bell.")
+        let caption = "Trouble signing in? Ask your teacher."
         let cases: [(String, String, String, Bool, String?)] = [
             ("signIn", "Sign up", "Sign in", false, nil),
             ("signInSigningIn", "Sign up", "Signing in…", true, nil),
@@ -2338,12 +2340,17 @@ struct AppTests {
             let read = try await elements(of: RootView(phone: phone), once: title)
             let labels = read.map { $0.label ?? "" }
             let order =
-                [title, up, inside] + (failure.map { [$0] } ?? [])
-                + ["Trouble signing in? Ask your teacher."]
+                [wordmark, tagline, title, up, inside] + (failure.map { [$0] } ?? [])
+                + [caption, "Privacy policy", "Terms"]
             let at = order.compactMap { labels.firstIndex(of: $0) }
             #expect(at.count == order.count && at == at.sorted(), "\(name): \(labels)")
-            #expect(
-                Array(labels.drop { $0 != title }.prefix(2)) == [title, up], "\(name): \(labels)")
+            let together = [(wordmark, [tagline]), (title, [up]), (caption, ["Privacy policy", "Terms"])]
+            for (first, next) in together {
+                #expect(
+                    Array(labels.drop { $0 != first }.prefix(next.count + 1)) == [first] + next,
+                    "\(name): \(labels)")
+            }
+            #expect(!labels.joined().contains { $0.isNumber }, "\(name): \(labels)")
             for button in [up, inside] {
                 let traits = try #require(read.first { $0.label == button }, "\(name)").traits
                 #expect(traits.contains(.button), "\(name): \(button)")
@@ -2358,6 +2365,83 @@ struct AppTests {
             let read = try await elements(of: IntroView(phone: phone, page: page), once: label)
             let button = try #require(read.first { $0.label == label }, "\(name)")
             #expect(button.traits.contains(.notEnabled) == busy, "\(name), page \(page)")
+        }
+    }
+
+    @Test(
+        "Sign in on the iPhone SE, the iPhone 17 Pro and this phone itself, its home indicator real, as its intermediate-state boards draw it (the sign-in redesign's SignIn boards, drawn first): Sign up and Sign in on the first screen at every text size, a page opening or one that couldn't open said too; at the default size the whole page on it, the ring giving way, and the ring drawn up to the largest size short of the accessibility ones, never at them, where it steps aside; every line within what the page scrolls through, so a page the text outgrows scrolls rather than cut one; never a pixel wider than the phone, nor anything VoiceOver reads past its sides"
+    )
+    func signInFits() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        // An SE's and a 17 Pro's room under their status bars, with no home indicator; and this
+        // phone's own screen, its safe area and any home indicator real, so the sheet's foot is
+        // read from it.
+        let phones = [CGSize(width: 375, height: 667 - 20), CGSize(width: 402, height: 874 - 62 - 34), nil]
+        /// The ring's green-200 track, which nothing else on Sign in draws.
+        func track(_ pixel: [Int]) -> Bool {
+            zip(pixel, [0xBC, 0xDC, 0xCA]).allSatisfy { abs($0 - $1) <= 4 }
+        }
+        for name in ["signIn", "signInSigningUp", "signInNotOpened"] {
+            for size in [DynamicTypeSize.large, .xxxLarge, .accessibility1, .accessibility5] {
+                for frame in phones {
+                    let phone = Phone(fixture: try #require(PreviewFixtures.all[name]))
+                    let hosting = UIHostingController(
+                        rootView: RootView(phone: phone).environment(\.dynamicTypeSize, size))
+                    if frame != nil { hosting.safeAreaRegions = [] }
+                    let window = UIWindow(windowScene: scene)
+                    window.frame = frame.map { CGRect(origin: .zero, size: $0) } ?? scene.screen.bounds
+                    window.rootViewController = hosting
+                    window.isHidden = false
+                    defer { window.isHidden = true }
+                    window.layoutIfNeeded()
+                    let screen = window.bounds.size
+                    let at = "\(name), \(size), \(frame.map { "\($0)" } ?? "this phone \(screen)")"
+                    var read: [NSObject] = []
+                    try await until {
+                        read = (try? voiceOver(in: window)) ?? []
+                        return read.contains { $0.accessibilityLabel == "Sign\u{A0}up or sign\u{A0}in" }
+                    }
+                    window.layoutIfNeeded()
+                    let scroll = try #require(scrollViews(in: window).first, "\(at)")
+                    let inset = scroll.adjustedContentInset
+                    #expect(scroll.contentSize.width <= screen.width + 0.5, "\(at): \(scroll.contentSize)")
+                    if size == .large {
+                        let room = scroll.bounds.height - inset.top - inset.bottom
+                        #expect(scroll.contentSize.height <= room + 0.5, "\(at)")
+                    }
+                    // Every line in what the page scrolls through, its room under the home
+                    // indicator included, none past its end. Whether the SE's page outgrows the
+                    // screen at the largest size is the host's to say: iOS rounds the text's scale
+                    // to the screen's pixels, 3 there on a 2x phone, 8/3 on a 3x.
+                    let foot = scroll.contentSize.height + inset.bottom
+                    let end = scroll.convert(CGPoint(x: 0, y: foot), to: window).y
+                    let last = read.map(\.accessibilityFrame.maxY).max() ?? 0
+                    #expect(last <= end + 0.5, "\(at): \(last) past \(end)")
+                    for button in ["Sign up", "Signing up…", "Sign in"] {
+                        guard let shown = read.first(where: { $0.accessibilityLabel == button }) else {
+                            continue
+                        }
+                        let bottom = screen.height - inset.bottom
+                        #expect(shown.accessibilityFrame.maxY <= bottom + 0.5, "\(at): \(button)")
+                    }
+                    #expect(read.filter { $0.accessibilityTraits.contains(.button) }.count == 2, "\(at)")
+                    let outside = read.filter {
+                        $0.accessibilityFrame.minX < -0.5 || $0.accessibilityFrame.maxX > screen.width + 0.5
+                    }
+                    #expect(outside.isEmpty, "\(at): \(outside.map { $0.accessibilityLabel ?? "" })")
+                    // The ring's rule is the text size's alone, whatever the sheet holds: drawn on
+                    // the plain screen only, its track at least 10 pt wide, so a point in every 3
+                    // finds it (CI's simulator draws slowly).
+                    guard name == "signIn" else { continue }
+                    let image = try #require(drawn(window).flatMap(UIImage.init(data:)), "\(at)")
+                    let pixel = try pixels(of: image)
+                    let (width, height) = (Int(image.size.width), Int(image.size.height))
+                    let ring = stride(from: 0, to: height, by: 3).contains { y in
+                        stride(from: 0, to: width, by: 3).contains { track(pixel($0, y)) }
+                    }
+                    #expect(ring == !size.isAccessibilitySize, "\(at)")
+                }
+            }
         }
     }
 
@@ -3636,7 +3720,7 @@ struct AppTests {
     }
 
     @Test(
-        "The portal's privacy policy and terms are linked (C2b) from the intro, Sign in and Me — read from each screen's type, as `historyLazy` reads History's — each link's row a 44-pt target; on the intro, drawn under its button on the last page alone, and read by VoiceOver there alone, as links, in a strip kept at least that row tall on the first page too, so the button never moves; and each opens this build's portal's own page, `/privacy` and `/terms`"
+        "The portal's privacy policy and terms are linked (C2b) from the intro, Sign in and Me — read from each screen's type, as `historyLazy` reads History's — each link's row a 44-pt target; on the intro, drawn under its button on the last page alone, and read by VoiceOver there alone, as links, in a strip kept at least that row tall on the first page too, so the button never moves; and each opens this build's portal's own page, `/privacy` and `/terms`; Sign in's underlined, as the sign-in redesign's board draws them"
     )
     func policyLinks() throws {
         let portal = try #require(PolicyLinks.portal)
@@ -3665,6 +3749,19 @@ struct AppTests {
         func brand(_ pixel: [Int]) -> Bool {
             zip(pixel, [0x24, 0x5A, 0x43]).allSatisfy { abs($0 - $1) <= 24 }
         }
+        // Sign in's links underlined (the sign-in redesign; DESIGN.md §4): more of the brand's ink
+        // in their row than in the intro's, the same two words and its dot the tertiary ink.
+        func ink(_ links: PolicyLinks) throws -> Int {
+            let renderer = ImageRenderer(content: links.frame(width: 390).background(Theme.card))
+            renderer.scale = 1
+            let image = try #require(renderer.uiImage)
+            let pixel = try pixels(of: image)
+            return (0..<Int(image.size.height)).reduce(0) { count, y in
+                count + (0..<Int(image.size.width)).filter { brand(pixel($0, y)) }.count
+            }
+        }
+        let (underlined, plain) = (try ink(PolicyLinks(underlined: true, dotted: true)), try ink(PolicyLinks()))
+        #expect(underlined > plain, "\(underlined) brand pixels, \(plain) without the underline")
         let intro = Phone(fixture: try #require(PreviewFixtures.all["intro"]))
         for (page, linked) in [(IntroView.pages.lowerBound, false), (IntroView.pages.upperBound, true)] {
             let window = UIWindow(windowScene: scene)
@@ -3770,7 +3867,7 @@ struct AppTests {
     }
 
     @Test(
-        "A dimmed primary — disabled, or busy with its words changed — is dimmed as one layer, as the boards draw it (GA5; IOS-008; DESIGN.md §4): its fill and its white label each at 60 % over the page, never the label dimmed again over its own dimmed fill, which drew Signing up… and Saving… at 2.1:1; Delete account's red the same"
+        "A dimmed primary — disabled, or busy with its words changed — is dimmed as one layer, as the boards draw it (GA5; IOS-008; DESIGN.md §4): its fill and its white label each at 60 % over the page, never the label dimmed again over its own dimmed fill, which drew Signing up… and Saving… at 2.1:1; Delete account's red the same, and Sign in's filled pill, where Signing up… shows now (the sign-in redesign)"
     )
     func dimmedAsDrawn() throws {
         /// 60 % of `hex` over the page, as the boards' `opacity: 0.6` draws it.
@@ -3784,11 +3881,11 @@ struct AppTests {
         func near(_ found: [Int], _ wanted: [Int]) -> Bool {
             zip(found, wanted).allSatisfy { abs($0 - $1) <= 3 }
         }
-        for (destructive, fill) in [(false, 0x245A43), (true, 0xA93D31)] {
-            // A button 200 × 56 on the page, 10 from its edges; its label large, so its strokes
+        func check(_ style: some ButtonStyle, fill: Int, _ name: String) throws {
+            // A button 200 pt wide on the page, 10 from its edges; its label large, so its strokes
             // hold whole pixels.
             let renderer = ImageRenderer(
-                content: Button("Continue") {}.buttonStyle(PrimaryButtonStyle(destructive: destructive))
+                content: Button("Continue") {}.buttonStyle(style)
                     .disabled(true).frame(width: 200).padding(10).background(Theme.page)
                     .environment(\.dynamicTypeSize, .accessibility1))
             renderer.scale = 1
@@ -3796,7 +3893,7 @@ struct AppTests {
             let (pixel, height) = (try pixels(of: image), Int(image.size.height))
             // The fill beside the label, and the label at its lightest.
             let beside = Array(pixel(20, height / 2).prefix(3))
-            #expect(near(beside, dimmed(fill)), "destructive \(destructive): \(beside)")
+            #expect(near(beside, dimmed(fill)), "\(name): \(beside)")
             var label: [Int] = [0, 0, 0]
             for x in 10..<210 {
                 for y in 10..<(height - 10) {
@@ -3804,8 +3901,11 @@ struct AppTests {
                     if found.reduce(0, +) > label.reduce(0, +) { label = found }
                 }
             }
-            #expect(near(label, dimmed(0xFFFFFF)), "destructive \(destructive): \(label)")
+            #expect(near(label, dimmed(0xFFFFFF)), "\(name): \(label)")
         }
+        try check(PrimaryButtonStyle(), fill: 0x245A43, "primary")
+        try check(PrimaryButtonStyle(destructive: true), fill: 0xA93D31, "destructive")
+        try check(PillButtonStyle(filled: true), fill: 0x245A43, "Sign in's pill")
     }
 
     @Test(
