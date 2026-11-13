@@ -330,8 +330,8 @@ class SignInBrowserTest {
         if (leaves) {
             assertEquals(LOGOUT, tab(2).dataString)
             assertEquals(emptyList<String>(), bodies)
-            send(SIGNED_OUT)
         }
+        signedOutWhereLeft()
         await(call).getOrThrow()
         assertTrue(bodies.single(), bodies.single().contains("grant_type=authorization_code&client_id=the-client&code=the-code&"))
         runBlocking {
@@ -362,11 +362,18 @@ class SignInBrowserTest {
         }
     }
 
-    /** The sign-out page an answer brings where the browser offers no ephemeral tab (AN6e), seen through: its tab, then its return. */
+    /**
+     * The sign-out page an answer brings where the browser offers no ephemeral tab (AN6e), seen through as a browser would: its tab,
+     * its return once the tab covers the host, then the host back and gone. Sent sooner on Android 10's emulator, the return came as
+     * Chrome's first run was still opening through its `IntentDispatcher`, whose window then covered the host brought back, so it
+     * outlived the test, and the next test's start of the host reached it as the runner finished it, opening no tab.
+     */
     private fun signedOutWhereLeft() {
         if (!leaves) return
         tab(2)
+        covered(host())
         send(SIGNED_OUT)
+        hostCameAndWent()
     }
 
     /** The [nth] intent the host sent the browser, once it has: the sign-in page's first, then its sign-out page's. */
