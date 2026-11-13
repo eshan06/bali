@@ -295,7 +295,7 @@ One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
   - **C2-drafts** The owner's drafts, for Apple's external beta review (the owner, 2026-10-24) — ✅ (#460): `docs/legal/privacy-policy.md` and `terms-of-use.md`, from General Legal's CC0 templates, every fact filled; the lawyer's questions at each file's end (DECISIONS 2026-10-24). The lawyer's review is not needed before the Vanderbilt pilot (the owner, 2026-11-03)
   - **C2-text** The drafts' words on `/privacy` and `/terms` — ✅ (#461; DECISIONS 2026-10-24)
 - **S8** 🔧 Least-privilege database roles (Phase 6): the owner's decision (Open owner items, 1)
-- **C3d** Deleted sign-ins refused on the server — ✅ (#558; DECISIONS 2026-11-11); a case's CI flake, the test's, fixed (#585; DECISIONS 2026-11-12)
+- **C3d** Deleted sign-ins refused on the server — ✅ (#558; DECISIONS 2026-11-11); its case's CI flake fixed (#585; DECISIONS 2026-11-12)
 - **C4c** AN9h's iPhone twin: one account's token for Delete account and the 13+ check (the owner, 2026-11-10: "Close it now"), the Mac's; DECISIONS 2026-11-10, "For C4c"; AN9e's two iOS gaps (DECISIONS 2026-11-11)
 - **D2k** ⏸ The shield's new look (Phase 3): waits for a design the owner approves in Claude Design
 - **The push's app half** — ✅ (#456; DECISIONS 2026-10-24); N6's end-to-end check passed on prod (2026-11-08); left, runbook 7's step 4, dev's `APNS_*` variables, the owner's

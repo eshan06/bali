@@ -267,12 +267,13 @@ describe('a deleted account’s Cognito sign-in (2026-10-09)', () => {
     const { student } = await seedClassroom(db, 'twice-at-once');
     pool.set('Google_4014', student.cognitoId);
     const deletion = hold('AdminDeleteUser');
-
-    expect((await deleteMe(student.cognitoId, 'Google_4014')).json<DeleteMeResponse>()).toEqual({
-      outcome: 'deleted',
-    });
     const retried = new Date(at.getTime() + 1_000);
+
+    // Let go whatever fails here, so a failing case never leaves the first try held.
     try {
+      expect((await deleteMe(student.cognitoId, 'Google_4014')).json<DeleteMeResponse>()).toEqual({
+        outcome: 'deleted',
+      });
       await deletion.made;
       now = retried;
       expect((await deleteMe(student.cognitoId, 'Google_4014')).json<DeleteMeResponse>()).toEqual({

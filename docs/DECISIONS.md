@@ -46,8 +46,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   checks the retry's own try found the sign-in gone. The other order is a case of its own, the regression test below, whose last
   lines say what C3d leaves there: the row queued for the retry's own try, due a minute after the claim and not tried a
   millisecond before, then finished by that try (`gone`), AdminDeleteUser called once in all. The C3d rule is unchanged, and no
-  assertion was loosened: the original's three hold in both cases, and the regression test's queue is empty once the try the
-  design gives the retry has run. `finishCognitoDeletion`'s comment now says when that try is due, which the case was written
+  assertion of the case was loosened: its three hold in both orders. Said plainly, though, what is expected in that other order
+  changed: once both requests' passes are done, the row is queued for the retry's own try, where the case on main wanted none,
+  and the queue is empty only once that try has run, a minute later (santa's reviewer A). That is C3d's design, and it is what
+  this call puts to the owner. `finishCognitoDeletion`'s comment now says when that try is due, which the case was written
   without. Not chosen: the retry's try at once. While the first try is at Cognito it would find the user still there and delete
   it a second time, two tries on one row at once, which the kept backoff stops (tried: the regression test then fails,
   AdminDeleteUser called twice); after that try, it would take a pass trying again after a finish it skipped, product code for a
