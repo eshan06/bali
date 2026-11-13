@@ -306,8 +306,9 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
    the sign-out URL `com.bali.bali://auth/signout`, SRP and refresh only, Bali's style), its id then on
    prod's `AUTH_AUDIENCE`, or the API refuses Android's tokens with a `401`, and in the release build
    (AP). ✅ **The cookie call** (the owner, 2026-11-12): where the phone's browser offers no ephemeral tab
-   (Chrome before 136), Bali ends Cognito's session after each sign-in, one more page for the student
-   (AN6e; DECISIONS 2026-11-05, 2026-11-13).
+   (Chrome before 136), Bali will end Cognito's session after each sign-in, one more page for the student
+   (AN6e). Until AN6e lands, a sign-in there shares the browser's cookies, as AN6c left it, now through dev's
+   client: the phone checks sign in only on Chrome 136 or later (DECISIONS 2026-11-05, 2026-11-13).
 
 ## How to update this file
 

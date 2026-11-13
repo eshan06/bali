@@ -1771,7 +1771,8 @@ opened. Each page's text layer is its VoiceOver label (a page with none says whi
 is). Android renders with `PdfRenderer` in an isolated process, the deck handed over from memory (an
 anonymous memory file from Android 11; on Android 10 a file in a deck folder of its own in
 `no_backup/`, deleted as it opens; the owner's ruling, 2026-11-12), and a page's text is TalkBack's
-label from Android 15, which slide it is before (the conductor's call, awaiting the owner).
+label from Android 15, which slide it is before (the conductor's call, the owner's by the go-ahead of
+2026-11-12).
 
 **9. Apple and privacy.** Answers are Bali's own data, not Family Controls data. The owner's
 App Review question on §3.3.3(P) (ISSUES #3; case 102994872143, sent 2026-10-13) asks about

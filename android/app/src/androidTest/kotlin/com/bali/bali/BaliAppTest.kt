@@ -108,6 +108,8 @@ class BaliAppTest {
             assertTrue(context.getDatabasePath(OUTBOX_FILE).exists())
             app.begin()
             val run = checkNotNull(app.running.value)
+            // Made over the app's own sign-in, whose account it runs.
+            assertSame(app.overSignIn, run.engine)
             until { checkNotNull(run.account).state.value.takeIf { it.signedIn == false } }
             // The truth read, as Bali in front reads it: never sent, for want of a token, so waiting on sign-in.
             run.engine.setInFront(true)

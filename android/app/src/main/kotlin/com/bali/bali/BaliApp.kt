@@ -178,8 +178,13 @@ class BaliApp : Application() {
      * build's over no token; none: Release's (Q2). The build sets every value since AN6d, so a test gives it none.
      */
     internal suspend fun made(config: AppConfig? = this.config): SyncEngine? =
-        config?.let { set -> signIn?.let { SyncEngine.make(outboxFile, set.api, it, scope, transport) } }
+        config?.let { set -> signIn?.let { SyncEngine.make(outboxFile, set.api, it, scope, transport).also { engine -> overSignIn = engine } } }
             ?: ThisBuild.unsigned(getString(R.string.BALI_API_URL), transport, scope) { outboxFile }
+
+    /** The engine [made] last made over [signIn]: the Debug readout signs in through [signIn] only while it's the run's. */
+    @Volatile
+    internal var overSignIn: SyncEngine? = null
+        private set
 
     /**
      * Runs [engine], and an enforcer over [lock], in [scope], the app's (a test's own in the instrumented

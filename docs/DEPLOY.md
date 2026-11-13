@@ -243,8 +243,8 @@ above):
   8252's one-slash `com.bali.bali:/auth/callback` ("Syntax of return URL is not
   valid", 2026-11-12). iOS's stays `bali://auth/callback`.
 - **Allowed sign-out URLs:** `com.bali.bali://auth/signout`: where the phone's
-  browser offers no ephemeral tab, Bali ends Cognito's session after each sign-in
-  (AN6e; `docs/DECISIONS.md`, 2026-11-13).
+  browser offers no ephemeral tab, Bali will end Cognito's session after each
+  sign-in (AN6e, to build; `docs/DECISIONS.md`, 2026-11-13).
 - **Identity providers:** Cognito user pool. **OAuth grant types:** Authorization
   code grant only (the app sends PKCE, S256).
 - **OpenID Connect scopes:** `openid`, `email`, `profile` and

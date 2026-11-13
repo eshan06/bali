@@ -148,7 +148,10 @@ From the same research, on both phones unless a line says otherwise.
 What the emulator couldn't show (`docs/DECISIONS.md`, 2026-11-05, AN6c): its Chrome 124 has neither
 the Auth Tab nor ephemeral tabs, and stops at its first run. Once the owner has made Android's dev
 client and its id is in the build (`docs/DEPLOY.md`, "The phone's sign-in"), and a screen or AN7's
-readout starts a sign-in, on both phones, each with its browser and that browser's version noted:
+readout starts a sign-in, on both phones, each with its browser and that browser's version noted.
+Until AN6e lands, sign in only where the phone's Chrome is 136 or later: an older one shares its
+cookies with the tab, so Cognito's session stays there for another app to use (`docs/DECISIONS.md`,
+2026-11-13).
 
 - **Sign up, then sign in**, through the hosted UI: which tab opens (an Auth Tab on Chrome 137 and
   later), and Bali signed in after.
