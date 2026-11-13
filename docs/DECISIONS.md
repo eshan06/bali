@@ -8,6 +8,67 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-12** — **AN13e2, the slide-deck case's flake on main's CI, found, staged and fixed in its rig: SlideTest's deck rig
+  keeps the lesson half on the test's own thread, so nothing of it runs at once with a step of the test (the owner's ask; the
+  conductor's call, marked, awaiting the owner's look; AN13e2, #NNN).** Test-only: Bali's own code is unchanged, and no phone met
+  it.
+
+  **What failed:** CI's push run 43331986903 on `d9ca1c3c` (#582, a portal PR), attempt 1, "Android contract tests (JVM)":
+  SlideTest's `aSlidesDeckIsAskedForOncePerSha256…` (AN13e's port of AppTests' `slideOncePerDeck`, M8) waited out its 60 s for
+  "the lesson half never reached the state waited for"; its re-run and its PR run passed. The wait that never came is the
+  case's fourth `rig.document()`, "the first again: from LiveLesson's memory".
+
+  **The root cause, plainly:** the deck rig ran the lesson half on `Dispatchers.Unconfined`, on the promise that whatever the test
+  starts or wakes runs at once on the test's thread, so a step is over as it returns. The deck's check broke it: core's `sha256`
+  hashes a deck on `Dispatchers.Default`, and Unconfined then ran the rest of the fetch on that Default thread, the renderer's
+  open and the lesson half's stretch that keeps the document and publishes it ready, under the lesson half's lock. In the case,
+  the test, woken by the second deck's publish, went on while that thread still held the lock (a thread stopped between two
+  lines, as a loaded runner stops one) and answered the teacher's next read: the read's watch found the lock taken and waited, so
+  `rig.next` returned with the second deck still shown, and the test asked for that slide. Once the thread let the lock go, the
+  read showed the first deck, loading, and the ask, for a slide no longer shown, was dropped as stale, as it should be. Nothing
+  asked for the deck shown, so its document never came.
+
+  **What a phone would have seen: nothing.** The race is the rig's. A screen asks at each change of what shows (AS8's, as
+  SlideView.swift's `.task(id:)`), so a stale ask is followed by the right one, and the lesson half's rules hold in every order
+  the race can take. Every assertion of the case stands as it was.
+
+  **The fix (the conductor's call, awaiting the owner's look), in the rig alone:** `deckRig` runs the lesson half on the test's
+  own thread (`TestsThread`, a dispatcher in `LessonsTest.kt`): what the test starts or wakes still runs at once there, as
+  Unconfined ran it, so "nothing fetched" is still checked as a call returns; what another thread wakes, the deck's hash above
+  all, goes to the test's own `runBlocking` loop and runs there as the test next waits. So no stretch of the lesson half runs at
+  once with a step of the test, whatever hop a later step adds, as iOS's AppTests run their `Phone` with the test, both on the
+  main actor. Not chosen: a seam for the hash's dispatcher in core's `LiveLesson` and in `Lessons` (product code changed for a
+  test, and only that one hop closed), or a wait in the rig after each read (the read's watch can wait on `LiveLesson`'s own lock
+  too, which no test sees).
+
+  **The regression test, failing first** (its own commit): SlideTest's
+  `aReadAnsweredWhileTheLastDecksOpenStillHoldsTheLessonHalfsLockOnAThreadOfItsOwnIsShownAsTheRigsNextReturnsSoTheSlideAskedForIsTheOneShown`,
+  the case's steps to its failing wait, staged with no window of time: the second deck's bytes answered on a thread of the test's
+  own, so its stretch can't run on the test's thread unless the rig puts it there, and that stretch held inside the lock
+  (FakeRenderer's new `holdKeep`: the first read of the document's pages, made under the lock, held on any thread but the test's)
+  until the test has answered the next read and read the slide. Before the fix it failed three runs of three at that wait, with
+  CI's own message, "the lesson half never reached the state waited for", after its 60 s; after it, it passes in 10 ms.
+
+  **The same cause elsewhere:** `aDocumentOpenedForAnAskNoLongerTheLatest…`'s two held opens. Its hold says it is taken before
+  the open waits on it, so with the open on the hash's Default thread the test's release could come first, and the open would
+  then close its document there at once with the test's count of documents open (1 for 0). Never seen failing; the same fix
+  closes it, the open and the test now on one thread. The rest were read one by one: each other deck test, after a deck's bytes,
+  waits on a call that takes the lesson half's lock, or on the stretch's own publish with nothing after it;
+  `anotherStudentsSignInAndADeletion…` and LessonsTest's `lessonRig` tests run the lesson half on `Dispatchers.Default` by design
+  and wait for marks; core's `LiveLessonTest` awaits each `deck` call's own answer; and UnlockTest's and ProtectionOffTest's
+  Unconfined watchers only collect states where each is set.
+
+  **For the owner, the filter:** Gradle's `--tests` matches class names, so `./gradlew :outbox:test --tests '*LessonsTest*'` runs
+  the class LessonsTest and never SlideTest, the failing case's class, though both live in `LessonsTest.kt`. The loops ran it as
+  given, and with `--tests '*SlideTest*'` added.
+
+  **The loops** (the scratchpad's `deckflake-loop.sh`: each run a fresh Gradle run of `:outbox:test`, `--rerun` right after it,
+  `--max-workers=2`, its log never UP-TO-DATE): LOOPS
+
+  **The proof:** PROOF
+
+  **Santa's review:** SANTA
+
 - **2026-11-12** — **The app's Sign in screen is rebuilt from the sign-in redesign's board "1 · Bali's Sign in
   screen" (the owner's approval, 2026-11-12), built as drawn.** On the page, Bali, the session ring as art and "Quiet
   until the bell."; then a white sheet from the screen's foot holding today's words in today's places, Sign up and

@@ -10,6 +10,27 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+_Last updated: 2026-11-12 (Central) — The app's Sign in rebuilt from the approved sign-in redesign:
+Bali, the session ring as art and its line over a white sheet, Sign up and Sign in pills, its
+intermediate states drawn first (#583; DECISIONS 2026-11-12), students' in 1.0.1. Before it, the
+portal's sign-in page (#582). Next: the owner's switch of prod's domain, the release call and
+disabling the review account (Open owner items); a session builds the retire-a-block command; the
+owner the sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02);
+AN11–AN13; AN1's part 2 on the owner's phones; the audit's polish waits._
+
+`docs/PLAN-ANDROID.md`'s, replaced by AN13e2's on 2026-11-12: _Last updated: 2026-11-12 (Central) — AN13e, the slide's deck, asked for once, one document at a time (#578; `docs/DECISIONS.md`,
+2026-11-12), the fifth of AN13's seven steps: `Lessons.kt`'s deck half, BaliApp.swift's `Phone`'s, and `Slide.kt`: the slide the
+lesson shows, its deck loading, failed or ready; asked for by a screen alone, once per `sha256`, never while on its way nor on a
+page turn, Try again once more after it came; one document open at a time, closed once the slide's deck changes, at the bell, a
+change of who is signed in, a deletion and the run's end; a page past the document's pages, or a document lost after it opened,
+failed; the slide's two lines, iOS's; and the seam the app's renderer fills (`Renderer`). Two of #577's WARNs closed: a bell let
+go follows nothing, and Bali's screen in front twice runs one poll. Nothing kept, no screen. The owner answered Q2 and Q3
+(DECISIONS 2026-11-12). Before it, AN13d, the lesson followed. Next: AN13f, the page drawn, then AN13g; AN11, AN12 and Phase
+10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, signed in on dev as an account that passed
+the 13+ check on an iPhone (Q7); Android's Cognito clients, the owner's (Open owner items, 8); Android 17's SDK platform is on the
+PC (the owner's OK, 2026-11-12), compileSdk 37 with today's AndroidX and OkHttp 5.5 coming in the step that needs them (Open
+owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 _Last updated: 2026-11-12 (Central) — The portal's sign-in page rebuilt from the approved sign-in
 redesign: two panels, the session ring as art, Sign in a pill, its intermediate states drawn first
 (#582; DECISIONS 2026-11-12). Before it, Cognito's sign-in pages on its managed login (#581).
