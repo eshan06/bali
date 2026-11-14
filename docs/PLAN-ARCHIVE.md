@@ -10,6 +10,23 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN-ANDROID.md`'s, replaced by AN11a's on 2026-11-13: _Last updated: 2026-11-13 (Central) — AP2b, the help page names Android's lock beside Screen Time (#597; `docs/DECISIONS.md`,
+2026-11-13): its list of what a teacher sees says "…or Screen Time off (or Bali's lock off)", while the privacy policy's section 2
+keeps the iPhone's line until AP4, the owner's and the lawyer's; the help page's other iPhone-only lines wait for the owner's words,
+drafted there (Open owner items, 10). Before it, AN9k, a student's notes kept off the phone's storage once a deletion's request
+went out. Next: AN11, then AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, on
+any Chrome now, signed in on dev as an account that passed the 13+ check on an iPhone (Q7), and AN6f's checks on a Chrome before
+136; prod's Android client, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that
+needs them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
+`docs/PLAN.md`'s, replaced by AN11a's on 2026-11-13: _Last updated: 2026-11-13 (Central) — the help page names Android's lock beside Screen Time, the
+privacy policy's line left to the owner and the lawyer (AP2b, #597; DECISIONS 2026-11-13). Before
+it, CI fails any PR carrying an invisible or text-direction character (S12, #596). Next: the owner's
+switch of prod's domain, the release call and disabling the review account (Open owner items); a
+session builds the retire-a-block command; the owner the sitting's findings' calls; GA5's known
+limit, the owner's call (DECISIONS 2026-11-02); AN11, AN12; AN1's part 2 on the owner's phones;
+the audit's polish waits._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AP2b's on 2026-11-13: _Last updated: 2026-11-13 (Central) — AN9k, a student's notes kept off the phone's storage once a deletion's request went out
 (#593; `docs/DECISIONS.md`, 2026-11-13): Delete account's stop writes them back only where no `DELETE /v1/me` of the run went out
 unproved, `409 teacher_has_classes` the one proof; after any other, nothing puts them back on the storage for the run, the screens
@@ -2568,6 +2585,11 @@ The test-only PR for the three tests that failed only there ✅ (#376): two pass
 boot test's SIGINT-then-SIGTERM case is skipped there alone (Windows has no POSIX signals); CI's
 runs unchanged, and `npm test` passes whole on the PC.
 
+**In flight, a finished line as PLAN.md said it until AN11a (2026-11-13, #598; moved for its word cap):**
+- **Three fixes, each the conductor's call, awaiting the owner** ✅: `next` 15.5.28 (#435;
+  DECISIONS 2026-10-22), `zod` 4.6.6 (#444; DECISIONS 2026-10-23) and the database pool's guard
+  (#439; DECISIONS 2026-10-22); their full lines in `docs/PLAN-ARCHIVE.md`.
+
 ## Phases: the full table and the finished step lists (as of 2026-10-13)
 
 | Phase | What | Status |
@@ -3110,6 +3132,25 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 Android's finished detail, moved here word for word (`docs/PLAN-ANDROID.md`, How to update this
 file).
+
+AN11's line, as it read when the conductor split it into AN11a and AN11b and AN11a was done (2026-11-13; `docs/DECISIONS.md`,
+2026-11-13): AN11a built all of it but the FCM sender, which AN11b's line carries on, with the Firebase setup.
+
+- **AN11** The API's push (on this PC, the owner, 2026-11-12; twin: `apps/api/src/push/apns.ts`): an FCM sender beside APNs,
+  under the same rules (after the Start commits, the same words, no personal data, a token reported
+  gone deleted); an additive field on the push-token endpoint, `PUT` and `DELETE`, naming the
+  token's service, absent meaning APNs, so every shipped iPhone calls it as today; under it, each
+  service's own token format (an FCM token, mixed case with `:`, `-` and `_`, kept as sent, never
+  lower-cased as an APNs token is), what `environment` means for an FCM token, and each sender
+  sending to, and deleting, only its own service's tokens; the privacy paths (the deletion, the
+  disposal, the retention run, the export) holding FCM's tokens as they hold APNs's; the fixtures
+  and `openapi.json` regenerated; integration tests for the happy path, authz, validation and
+  replay. 🔧 Dev's ✅ (2026-11-12, the conductor on the owner's ask): the Firebase project "Bali Dev"
+  (`bali-dev-58473`, the Spark plan, Analytics off), its Android app `com.bali.bali`, "Bali Android (dev)",
+  with no SHA-1; FCM's HTTP v1 API on and the legacy API off; the send-only service account
+  `bali-fcm-sender-dev@bali-dev-58473.iam.gserviceaccount.com`, its one role Firebase Cloud Messaging API
+  Admin, its key on Railway dev as `FCM_SERVICE_ACCOUNT_JSON`, the name AN11 reads (the API ignores it until
+  then). Prod's, the owner's — validation: `npm run typecheck && npm run lint && npm test`, `npm run demo`
 
 AP2b's line, as it read when it was done (2026-11-13; `docs/DECISIONS.md`, 2026-11-13).
 
