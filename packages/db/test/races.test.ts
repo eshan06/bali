@@ -5091,6 +5091,55 @@ describe.runIf(REAL_PG)('device tokens registered under contention (real Postgre
     expect(await tokensOf(mover.id)).toEqual([held[0]]);
     expect(await tokensOf(owner.id)).toEqual([...held.slice(1), fresh].sort());
   }, 30_000);
+
+  it('two students at the cap each taking the other’s oldest token at once, staged: both registered, no deadlock, each keeping PUSH_TOKENS_PER_STUDENT (AN11a2)', async () => {
+    const [x, y] = [await student('cap-cross-x'), await student('cap-cross-y')];
+    const xs = Array.from({ length: PUSH_TOKENS_PER_STUDENT }, token);
+    const ys = Array.from({ length: PUSH_TOKENS_PER_STUDENT }, token);
+    await hold(x.id, xs);
+    await hold(y.id, ys);
+    // A holder sits on x's oldest token. y's register, taking it, parks there first; then x's,
+    // taking y's oldest and letting its own oldest go, parks behind it. Locking each register's
+    // rows in one order before it writes, the second waits for the first; written first and
+    // let go after, each would wait on the row the other just moved.
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked!: () => void;
+    const sitting = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const holder = db.transaction(async (tx) => {
+      await tx.select().from(deviceTokens).where(eq(deviceTokens.token, xs[0]!)).for('update');
+      locked();
+      await released;
+    });
+    await sitting;
+    const take = (userId: string, t: string) =>
+      registerPushToken(db, { userId, token: t, environment: 'sandbox', eventId: newUuidV7() });
+    const yTakes = take(y.id, xs[0]!);
+    let xTakes: ReturnType<typeof take> | undefined;
+    let unstaged: Error | null = null;
+    try {
+      await waitForBlockedBackend(5_000, 1);
+      xTakes = take(x.id, ys[0]!);
+      await waitForBlockedBackend(5_000, 2);
+    } catch (err) {
+      unstaged = err instanceof Error ? err : new Error(String(err));
+    } finally {
+      release();
+    }
+    await holder;
+    const settled = await Promise.allSettled([yTakes, xTakes ?? Promise.resolve(undefined)]);
+    if (unstaged !== null) throw unstaged;
+    expect(settled).toEqual([
+      { status: 'fulfilled', value: { outcome: 'registered', environment: 'sandbox' } },
+      { status: 'fulfilled', value: { outcome: 'registered', environment: 'sandbox' } },
+    ]);
+    expect(await tokensOf(x.id)).toEqual([...xs.slice(1), ys[0]].sort());
+    expect(await tokensOf(y.id)).toEqual([...ys.slice(1), xs[0]].sort());
+  }, 30_000);
 });
 
 describe.runIf(REAL_PG)('the 13+ yes beside a deletion (real Postgres, C7-server)', () => {
