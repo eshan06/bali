@@ -107,8 +107,10 @@ never stored here, no screen can ever show it.
 - `device_tokens` — one row per student phone's push token (2026-10-06, N3), keyed by the token so
   one phone has one current owner: its service, APNs for an iPhone or FCM for an Android phone
   (AN11a, 2026-11-13), whose formats never meet, so no token is both; and the environment its token
-  was issued for (an FCM token's is `production`). Really deleted when removed or reported gone;
-  personal data, in every privacy path ("Push: a doorbell for students").
+  was issued for (an FCM token's is `production`). At most five a student (AN11a2, 2026-11-13; one
+  holding more before keeps them until its next register that writes). Really deleted when
+  removed, reported gone or let go past those five; personal data, in every privacy path ("Push: a
+  doorbell for students").
 - `age_checks` — one row per account that confirmed it is 13 or older (C7-server, 2026-10-08):
   the request's `event_id` and when the server recorded it, never a birth date or an age, and none
   for an answer under 13, which the phone never sends. Never unset: it goes only with the account
@@ -915,7 +917,15 @@ waits for the Start learns of it only at the phone's next 30 s read or return to
   never one an APNs token could be, so a token is one service's and the token stays the key;
   its environment is `production`, since FCM has no sandbox and the Firebase project the API
   sends through decides where a token works. Each row names its service, and FCM's tokens go
-  through every privacy path above as APNs's do.
+  through every privacy path above as APNs's do. *Amended 2026-11-13 (AN11a2):* a student holds at
+  most five tokens, both services together, so no account piles up rows and a Start rings at most
+  five of a student's phones. A register that would make a sixth lets go of the student's oldest,
+  by when each was last registered and then by token, in its own transaction under a lock per
+  student, its rows locked in token order before it writes, so no commit leaves more and two
+  registers that each take the other's token wait in turn; its answer is unchanged, and a replay
+  lets nothing go. A student holding more from before this keeps them until its next register that
+  writes. A phone whose token went gets no alert until its app registers again at its next launch:
+  a doorbell missed, never the truth.
 - **Not on the pilot's critical path.** It never delays C2 or the external TestFlight steps.
   The app's half (registering, the `aps-environment` entitlement, the Time Sensitive
   capability, the words) is the Mac session's.

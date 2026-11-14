@@ -8,7 +8,7 @@ import {
   type CognitoSignIn,
   queueCognitoDeletion,
 } from '../src/cognito-deletions.js';
-import { registerPushToken } from '../src/device-tokens.js';
+import { PUSH_TOKENS_PER_STUDENT, registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
 import { createBlock, createClass } from '../src/management.js';
 import {
@@ -4989,6 +4989,156 @@ describe.runIf(REAL_PG)('device tokens registered under contention (real Postgre
         eventId: newerId,
       });
     }
+  }, 30_000);
+
+  /** `tokens` registered one after another as `userId`'s. */
+  async function hold(userId: string, tokens: string[]): Promise<void> {
+    for (const t of tokens) {
+      await registerPushToken(db, {
+        userId,
+        token: t,
+        environment: 'sandbox',
+        eventId: newUuidV7(),
+      });
+    }
+  }
+  const tokensOf = async (userId: string) =>
+    (
+      await db
+        .select({ token: deviceTokens.token })
+        .from(deviceTokens)
+        .where(eq(deviceTokens.userId, userId))
+        .orderBy(asc(deviceTokens.token))
+    ).map((row) => row.token);
+
+  it('two new registers at once for a student at the cap, staged on its oldest token: it keeps PUSH_TOKENS_PER_STUDENT, the two oldest let go (AN11a2)', async () => {
+    for (let round = 0; round < 3; round += 1) {
+      const s = await student(`cap-${round}`);
+      const held = Array.from({ length: PUSH_TOKENS_PER_STUDENT }, token);
+      await hold(s.id, held);
+      // A holder sits on the oldest token's row, so the register that lets it go parks there.
+      // Under the student's lock the other register parks behind that one, and counts after it;
+      // with none, it parks on the same row, having counted without the first one's token.
+      let release!: () => void;
+      const released = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let locked!: () => void;
+      const sitting = new Promise<void>((resolve) => {
+        locked = resolve;
+      });
+      const holder = db.transaction(async (tx) => {
+        await tx.select().from(deviceTokens).where(eq(deviceTokens.token, held[0]!)).for('update');
+        locked();
+        await released;
+      });
+      await sitting;
+      const fresh = [token(), token()];
+      const both = Promise.all(
+        fresh.map((t) =>
+          registerPushToken(db, {
+            userId: s.id,
+            token: t,
+            environment: 'sandbox',
+            eventId: newUuidV7(),
+          }),
+        ),
+      );
+      let unstaged: Error | null = null;
+      try {
+        await waitForBlockedBackend(5_000, 2);
+      } catch (err) {
+        unstaged = err instanceof Error ? err : new Error(String(err));
+      } finally {
+        release();
+      }
+      await holder;
+      const results = await both;
+      if (unstaged !== null) throw unstaged;
+      expect(results, `round ${round}`).toEqual([
+        { outcome: 'registered', environment: 'sandbox' },
+        { outcome: 'registered', environment: 'sandbox' },
+      ]);
+      expect(await tokensOf(s.id), `round ${round}`).toEqual([...held.slice(2), ...fresh].sort());
+    }
+  }, 30_000);
+
+  it('a token moving to another account while its owner registers past the cap: the mover keeps it, the owner PUSH_TOKENS_PER_STUDENT (AN11a2)', async () => {
+    const [owner, mover] = [await student('cap-owner'), await student('cap-mover')];
+    const held = Array.from({ length: PUSH_TOKENS_PER_STUDENT }, token);
+    await hold(owner.id, held);
+    const fresh = token();
+    // The mover's register of the owner's oldest token, written and not yet committed while the
+    // owner's register past the cap goes to let that same token go.
+    const settled = await behindCommit(
+      (tx) =>
+        tx
+          .update(deviceTokens)
+          .set({ userId: mover.id, eventId: newUuidV7(), updatedAt: sql`now()` })
+          .where(eq(deviceTokens.token, held[0]!)),
+      () =>
+        registerPushToken(db, {
+          userId: owner.id,
+          token: fresh,
+          environment: 'sandbox',
+          eventId: newUuidV7(),
+        }),
+    );
+    expect(settled).toEqual({
+      status: 'fulfilled',
+      value: { outcome: 'registered', environment: 'sandbox' },
+    });
+    expect(await tokensOf(mover.id)).toEqual([held[0]]);
+    expect(await tokensOf(owner.id)).toEqual([...held.slice(1), fresh].sort());
+  }, 30_000);
+
+  it('two students at the cap each taking the other’s oldest token at once, staged: both registered, no deadlock, each keeping PUSH_TOKENS_PER_STUDENT (AN11a2)', async () => {
+    const [x, y] = [await student('cap-cross-x'), await student('cap-cross-y')];
+    const xs = Array.from({ length: PUSH_TOKENS_PER_STUDENT }, token);
+    const ys = Array.from({ length: PUSH_TOKENS_PER_STUDENT }, token);
+    await hold(x.id, xs);
+    await hold(y.id, ys);
+    // A holder sits on x's oldest token. y's register, taking it, parks there first; then x's,
+    // taking y's oldest and letting its own oldest go, parks behind it. Locking each register's
+    // rows in one order before it writes, the second waits for the first; written first and
+    // let go after, each would wait on the row the other just moved.
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked!: () => void;
+    const sitting = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const holder = db.transaction(async (tx) => {
+      await tx.select().from(deviceTokens).where(eq(deviceTokens.token, xs[0]!)).for('update');
+      locked();
+      await released;
+    });
+    await sitting;
+    const take = (userId: string, t: string) =>
+      registerPushToken(db, { userId, token: t, environment: 'sandbox', eventId: newUuidV7() });
+    const yTakes = take(y.id, xs[0]!);
+    let xTakes: ReturnType<typeof take> | undefined;
+    let unstaged: Error | null = null;
+    try {
+      await waitForBlockedBackend(5_000, 1);
+      xTakes = take(x.id, ys[0]!);
+      await waitForBlockedBackend(5_000, 2);
+    } catch (err) {
+      unstaged = err instanceof Error ? err : new Error(String(err));
+    } finally {
+      release();
+    }
+    await holder;
+    const settled = await Promise.allSettled([yTakes, xTakes ?? Promise.resolve(undefined)]);
+    if (unstaged !== null) throw unstaged;
+    expect(settled).toEqual([
+      { status: 'fulfilled', value: { outcome: 'registered', environment: 'sandbox' } },
+      { status: 'fulfilled', value: { outcome: 'registered', environment: 'sandbox' } },
+    ]);
+    expect(await tokensOf(x.id)).toEqual([...xs.slice(1), ys[0]].sort());
+    expect(await tokensOf(y.id)).toEqual([...ys.slice(1), xs[0]].sort());
   }, 30_000);
 });
 

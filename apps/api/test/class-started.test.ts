@@ -3,6 +3,7 @@ import {
   deviceTokens,
   enrollments,
   newUuidV7,
+  PUSH_TOKENS_PER_STUDENT,
   registerPushToken,
   users,
 } from '@bali/db';
@@ -306,5 +307,15 @@ describe('the "class started" push', () => {
       .where(eq(deviceTokens.userId, room.student.id))
       .orderBy(deviceTokens.token);
     expect(left.map((row) => [row.token, row.service])).toEqual([[fcm, 'fcm']]);
+  });
+
+  it('rings at most PUSH_TOKENS_PER_STUDENT tokens of a student, its newest: the older were let go at their registers (AN11a2)', async () => {
+    const envs = Array.from({ length: PUSH_TOKENS_PER_STUDENT + 2 }, () => 'sandbox' as const);
+    const room = await classroom('an11a2-cap', envs);
+    await tap(room.student.cognitoId, room.block.tagId);
+    expect((await start(room.teacher.cognitoId, room.klass.id)).armedConverted).toBe(1);
+    await settle();
+
+    expect(sent.map(tokenIn).sort()).toEqual(room.tokens.slice(2).map((t) => t.token));
   });
 });
