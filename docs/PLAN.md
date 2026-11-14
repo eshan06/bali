@@ -8,9 +8,9 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-13 (Central) — CI fails any PR carrying an invisible or text-direction
-character, in the required gate (S12, #596; DECISIONS 2026-11-13). Before it, Android keeps a
-student's notes off its storage once a deletion's request went out (AN9k, #593). Next: the owner's
+_Last updated: 2026-11-13 (Central) — the help page names Android's lock beside Screen Time, the
+privacy policy's line left to the owner and the lawyer (AP2b, #597; DECISIONS 2026-11-13). Before
+it, CI fails any PR carrying an invisible or text-direction character (S12, #596). Next: the owner's
 switch of prod's domain, the release call and disabling the review account (Open owner items); a
 session builds the retire-a-block command; the owner the sitting's findings' calls; GA5's known
 limit, the owner's call (DECISIONS 2026-11-02); AN11, AN12; AN1's part 2 on the owner's phones;
@@ -45,9 +45,6 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
 - **The conductor on the Windows PC (the owner, 2026-10-14):** an always-on PC runs the conductor,
   one worker at a time, and builds the portal's UI steps from PV7 on, screenshotted in a preview tab
   the owner signs in; its traps are `docs/GOTCHAS.md`'s "The Windows PC" (DECISIONS 2026-10-14).
-  The test-only PR for the three tests that failed only there ✅ (#376): two pass there now, and the
-  boot test's SIGINT-then-SIGTERM case is skipped there alone (Windows has no POSIX signals); CI's
-  runs unchanged, and `npm test` passes whole on the PC.
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
   keeps D1's look, Sign in the sign-in redesign's (#583), until the owner approves a new one (its
   redesign rolled back, 2026-10-06). The
@@ -68,8 +65,8 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   Delete account's screen follow it, and the app's text scale at the large sizes, the owner's calls.
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md`;
   AN1's part 2 on a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱),
-  before launch; AN2–AN10's and AN13's code ✅ (#488–#593), signing in on dev since AN6d;
-  AN11, AN12 next. Not on the pilot's critical path.
+  before launch; AN2–AN10's and AN13's code ✅ (#488–#593), signing in on dev since AN6d; AP2b
+  ✅ (#597), the help page; AN11, AN12 next. Not on the pilot's critical path.
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
   (#434; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file
   (`docs/WEB.md`, Testing the portal), `try-again.test.tsx` the pattern. Each UI step from now on
@@ -373,7 +370,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
     review; a forgotten password is reset through AWS.
   - App Review may ask for a tap the reviewer can try (§4's options B and C), about students' names
     on Present (guideline 1.2), or about a teacher's deletion by email (DECISIONS 2026-11-07).
-- Android's five still open (the phones, the Play account, the timing, the SDK's Android 11 or 12 image; 🔧 prod's Cognito client): `docs/PLAN-ANDROID.md`, Open owner items.
+- Android's six still open (the phones, the Play account, the timing, the SDK's Android 11 or 12 image, the help page's iPhone-only lines; 🔧 prod's Cognito client): `docs/PLAN-ANDROID.md`, Open owner items.
 - 🔧 Sentry: confirm monitor `api-sweep`'s `production` environment is active and alerting (dev checks in to the same slug, #239's review; runbook 6, step 2).
 - #165 the Me page: D2j's redesign was rolled back (2026-10-06), so a better Me waits for a design the owner approves; the issue, closed by #266, is the owner's to reopen.
 - #130 App Store readiness.
