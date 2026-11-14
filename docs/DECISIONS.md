@@ -12,7 +12,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `.github/scripts/invisible-characters.py`, run in "CI changes" before its docs-only decision, so "Typecheck · lint · unit
   tests", the check `protect-main` requires, fails with it on every PR and every push to main, docs-only ones too, with no
   ruleset change; main's ten such characters, all in tests, now written as escapes (the owner's call of 2026-11-12; the four
-  calls the conductor left and this step's, marked, each awaiting the owner's look; S12, #NNN).**
+  calls the conductor left and this step's, marked, each awaiting the owner's look; S12, #596).**
 
   **The owner's call** (the go-ahead of 2026-11-12, call 3, recorded on 2026-11-13): "A CI check fails any PR with invisible or
   text-direction characters in source files, added to a check that's already required: S12, a session's step, for every
@@ -128,8 +128,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   annotations, since the runner reads a command after leading spaces (B: each line now after a bar); `python3 -I`, and a
   listing of no file failing (B); the scan's messages now say an `ALLOWED` entry is the owner's call (B); GOTCHAS kept its
   non-ASCII check and says what the scan passes (A); the hint's docstring for code points past U+FFFF (A); this entry's calls
-  all marked awaiting the owner's look (A); and the fixtures' coming conflict written down (B; call 5). Left: keying `ALLOWED`
-  by character (B), above; and this entry's PR number, filled once the PR had one (A).
+  all marked awaiting the owner's look (A); the fixtures' coming conflict written down (B; call 5); and this entry's PR
+  number, a placeholder in round 1, #596 once the PR had one (A). Left: keying `ALLOWED` by character (B), above.
 
   **The proof:** `python -I .github/scripts/invisible-characters.test.py` 15 of 15 and the scan on the whole tree (959 text
   files, 9 binary skipped, nothing found) on this PC's Python 3.12, which CI's `python3` matches; `npm run typecheck && npm

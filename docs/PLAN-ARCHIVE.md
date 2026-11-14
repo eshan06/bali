@@ -2540,7 +2540,7 @@ Vanderbilt pilot's first class.
   frees a closed app's phone; the 16 hours and PostHog's `planned_minutes` count the minutes picked.
   No new app build.
 
-**Still open in earlier phases, S12's line as PLAN.md said it until S12 (2026-11-13, #NNN):**
+**Still open in earlier phases, S12's line as PLAN.md said it until S12 (2026-11-13, #596):**
 - **S12** A CI scan that fails any PR with invisible or text-direction characters in source files, added to a check that's already required (the owner, 2026-11-12; DECISIONS 2026-11-13)
 
 ## Phases: the full table and the finished step lists (as of 2026-10-13)
