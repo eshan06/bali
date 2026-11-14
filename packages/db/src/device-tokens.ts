@@ -1,5 +1,5 @@
 import type { PushEnvironment, PushService } from '@bali/shared';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 
 import { deviceTokens, users } from './schema.js';
 import { isUniqueViolation } from './sql-errors.js';
@@ -12,12 +12,21 @@ import type { Database } from './types.js';
  * they never touch `participations` or `events`, and the token's row is its
  * own record. A call that names no service is APNs's, as the column is.
  *
- * Each takes the caller's row FOR SHARE first, so a role change (a redeem, T1b)
- * or a deletion (C3, which deletes the account's tokens) runs wholly before or
- * after it, and is judged in the same transaction as the write.
+ * Each takes the caller's row FOR SHARE, so a role change (a redeem, T1b) or a
+ * deletion (C3, which deletes the account's tokens) runs wholly before or
+ * after it, and is judged in the same transaction as the write; a register
+ * takes the student's own lock before it (`lockStudentPushTokens`, AN11a2).
  */
 
 type UserRow = typeof users.$inferSelect;
+
+/**
+ * The most push tokens one student holds, both services together (AN11a2): a
+ * phone's, a few its reinstalls left behind until a send reports them gone,
+ * and a second phone's. A register past it lets the oldest go, so no account
+ * piles up rows and a Start rings no more than these of a student's.
+ */
+export const PUSH_TOKENS_PER_STUDENT = 5;
 
 export type RegisterPushTokenResult =
   | { outcome: 'registered' | 'replay'; environment: PushEnvironment }
@@ -46,6 +55,10 @@ interface RegisterPushTokenInput {
  * answered as a replay, with the token's environment now. A removal deletes
  * the row and keeps no eventId, so a stale register after it registers again
  * (DECISIONS, N4).
+ *
+ * At most `PUSH_TOKENS_PER_STUDENT` a student (AN11a2): a register that writes
+ * lets go of the student's oldest tokens past it, in its own transaction, so
+ * no commit leaves more; a replay writes nothing and lets nothing go.
  */
 export async function registerPushToken(
   db: Database,
@@ -67,7 +80,12 @@ function registerOnce(
   input: RegisterPushTokenInput,
 ): Promise<RegisterPushTokenResult> {
   return db.transaction(async (tx): Promise<RegisterPushTokenResult> => {
+    await lockStudentPushTokens(tx, input.userId);
     const user = await lockUser(tx, input.userId);
+    // A replay is matched on the token and the account alone, never the service.
+    // Safe only because the two services' formats never meet (the route's check
+    // and the `device_tokens_token_format` CHECK): no token is both, so the row
+    // an eventId wrote is of the one service that token can be.
     const [held] = await tx
       .select()
       .from(deviceTokens)
@@ -97,7 +115,10 @@ function registerOnce(
         setWhere: sql`${deviceTokens.eventId} < excluded.event_id`,
       })
       .returning({ token: deviceTokens.token });
-    if (written.length > 0) return { outcome: 'registered', environment: input.environment };
+    if (written.length > 0) {
+      await letGoPastCap(tx, user.id, input.token);
+      return { outcome: 'registered', environment: input.environment };
+    }
     // A newer register holds the row: this one is older, a replay of the truth now.
     const [now] = await tx
       .select({ environment: deviceTokens.environment })
@@ -196,6 +217,41 @@ export async function deleteGonePushToken(db: Database, target: PushTarget): Pro
     )
     .returning({ token: deviceTokens.token });
   return gone.length > 0;
+}
+
+/**
+ * One student's registers one at a time (AN11a2), each taking it first: each
+ * then counts the student's tokens with the one before it committed, so two at
+ * once can't both keep a token the cap had room for one of. A transaction
+ * advisory lock on a hash of the student's id, as the engine's
+ * `lockStudentTaps`, released at commit; a collision only makes two students'
+ * registers wait on each other. A removal, a gone token and the privacy paths
+ * only ever lower a count, so they take none.
+ */
+async function lockStudentPushTokens(tx: Database, userId: string): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`push-tokens:${userId}`}, 0))`,
+  );
+}
+
+/**
+ * Let the student's oldest tokens go past the cap (AN11a2), oldest by
+ * `updated_at` and then by token, so the order is fixed: every one of theirs
+ * but `kept`, the token just registered, and the newest
+ * `PUSH_TOKENS_PER_STUDENT - 1` others. A token another account registered
+ * meanwhile is that account's and stays: the delete reads the owner again on
+ * the row it locks.
+ */
+async function letGoPastCap(tx: Database, userId: string, kept: string): Promise<void> {
+  const others = tx
+    .select({ token: deviceTokens.token })
+    .from(deviceTokens)
+    .where(and(eq(deviceTokens.userId, userId), ne(deviceTokens.token, kept)))
+    .orderBy(desc(deviceTokens.updatedAt), desc(deviceTokens.token))
+    .offset(PUSH_TOKENS_PER_STUDENT - 1);
+  await tx
+    .delete(deviceTokens)
+    .where(and(eq(deviceTokens.userId, userId), inArray(deviceTokens.token, others)));
 }
 
 /** The caller's row, held FOR SHARE to the end of `tx`. */

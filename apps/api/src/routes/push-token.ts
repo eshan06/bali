@@ -66,7 +66,9 @@ const notAStudent = () => ApiError.forbidden('only a student registers a device 
  * environment it was issued for (N3; ARCHITECTURE, "Push: a doorbell for
  * students"), or, naming the service `fcm`, its FCM token, whose environment
  * is `production` (AN11a). One phone, one current owner: a token another
- * account holds moves to the caller. Idempotent on `eventId`
+ * account holds moves to the caller. At most `PUSH_TOKENS_PER_STUDENT` a
+ * student, both services together: a register past it lets the student's
+ * oldest go, its answer unchanged (AN11a2). Idempotent on `eventId`
  * (`registerPushToken`), and later wins by its UUIDv7 order: a register older
  * than the row's answers `replay` with the token's environment now, which can
  * mean another account's newer register holds the token (N4).
