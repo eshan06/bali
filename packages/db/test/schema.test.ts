@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import { and, asc, eq, gt, sql } from 'drizzle-orm';
 import { validate, version } from 'uuid';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -8,6 +10,7 @@ import type { Database } from '../src/types.js';
 import {
   blocks,
   classes,
+  deviceTokens,
   enrollments,
   events,
   participations,
@@ -384,5 +387,88 @@ describe('foreign keys', () => {
       db.delete(schools).where(eq(schools.id, school.id)),
       /violates foreign key constraint/,
     );
+  });
+});
+
+describe('device tokens: each service its own format, one token one key (AN11a)', () => {
+  const student = async (tag: string) =>
+    one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `an11a-${tag}-${newUuidV7()}`, role: 'student' })
+        .returning(),
+    );
+  /** An APNs token as stored: lower-case hex. */
+  const hex = () => newUuidV7().replace(/-/g, '').repeat(2);
+  /** An FCM token, shaped as FCM's are: mixed case, `:`, `-` and `_`. */
+  const fcm = () => `fAb${randomBytes(8).toString('base64url')}:APA91b-${randomBytes(90).toString('base64url')}_`;
+  const row = (userId: string, token: string, more: Record<string, unknown> = {}) => ({
+    token,
+    userId,
+    environment: 'production' as const,
+    eventId: newUuidV7(),
+    ...more,
+  });
+  const tokenRow = async (token: string) =>
+    one(await db.select().from(deviceTokens).where(eq(deviceTokens.token, token)));
+
+  it('keeps an FCM token as written, case and all, and reads a row naming no service as APNs’s', async () => {
+    const s = await student('kept');
+    const token = fcm();
+    await db.insert(deviceTokens).values(row(s.id, token, { service: 'fcm' }));
+    expect(await tokenRow(token)).toMatchObject({ token, service: 'fcm', environment: 'production' });
+    // Written as before AN11a, naming no service: the column's default, APNs's.
+    const apns = hex();
+    await db.execute(
+      sql`insert into device_tokens (token, user_id, environment, event_id)
+        values (${apns}, ${s.id}, 'sandbox', ${newUuidV7()})`,
+    );
+    expect(await tokenRow(apns)).toMatchObject({ service: 'apns', environment: 'sandbox' });
+  });
+
+  it('holds the longest FCM token the API reads as the table’s key', async () => {
+    const s = await student('longest');
+    // Random, so nothing compresses it: the key holds it as it is.
+    const token = randomBytes(1536).toString('base64url');
+    expect(token).toHaveLength(2048);
+    await db.insert(deviceTokens).values(row(s.id, token, { service: 'fcm' }));
+    expect((await tokenRow(token)).service).toBe('fcm');
+  });
+
+  it('refuses a token its service has not, an environment FCM has not, and a service there is not', async () => {
+    const s = await student('refused');
+    const refused = (token: string, more: Record<string, unknown>, reason: RegExp) =>
+      expectRefused(db.insert(deviceTokens).values(row(s.id, token, more)), reason);
+    const format = /device_tokens_token_format/;
+    // An FCM-shaped token marked APNs's, and every token an APNs token could be marked FCM's.
+    await refused(fcm(), { service: 'apns' }, format);
+    await refused(hex(), { service: 'fcm' }, format);
+    await refused(hex().toUpperCase(), { service: 'fcm' }, format);
+    await refused(`${fcm()}.x`, { service: 'fcm' }, format);
+    await refused('', { service: 'fcm' }, format);
+    await refused('A'.repeat(2049), { service: 'fcm' }, format);
+    await refused(fcm(), { service: 'fcm', environment: 'sandbox' }, /device_tokens_environment/);
+    await refused(hex(), { service: 'gcm' }, /device_tokens_service/);
+    expect(await db.select().from(deviceTokens).where(eq(deviceTokens.userId, s.id))).toEqual([]);
+  });
+
+  it('lets no token be both services’: an APNs token and an FCM token can’t be equal, so a token keys one row', async () => {
+    const s = await student('one-key');
+    const apns = hex();
+    await db.insert(deviceTokens).values(row(s.id, apns));
+    // The same token marked the other service's is refused by its format, before the key.
+    await expectRefused(
+      db.insert(deviceTokens).values(row(s.id, apns, { service: 'fcm' })),
+      /device_tokens_token_format/,
+    );
+    const token = fcm();
+    await db.insert(deviceTokens).values(row(s.id, token, { service: 'fcm' }));
+    await expectRefused(
+      db.insert(deviceTokens).values(row(s.id, token, { service: 'apns' })),
+      /device_tokens_token_format/,
+    );
+    expect(await tokenRow(apns)).toMatchObject({ service: 'apns' });
+    expect(await tokenRow(token)).toMatchObject({ service: 'fcm' });
+    expect(await db.$count(deviceTokens, eq(deviceTokens.userId, s.id))).toBe(2);
   });
 });

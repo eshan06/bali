@@ -4966,6 +4966,30 @@ describe.runIf(REAL_PG)('device tokens registered under contention (real Postgre
       expect(row, `round ${round}`).toMatchObject({ userId: b.id, eventId: newerId });
     }
   }, 30_000);
+
+  it('an older and a newer register of one FCM token at once, from two accounts: the newer always holds it, as sent (AN11a)', async () => {
+    for (let round = 0; round < 10; round += 1) {
+      const [a, b] = [await student(`fcm-old-${round}`), await student(`fcm-new-${round}`)];
+      // Mixed case, with `:`, `-` and `_`, as FCM's are: kept as sent, never lower-cased.
+      const shared = `fAb${token().slice(0, 11)}:APA91b-${token()}_Q`;
+      const olderId = newUuidV7();
+      const newerId = newUuidV7();
+      const fcm = { service: 'fcm', token: shared, environment: 'production' } as const;
+      const [older, newer] = await Promise.all([
+        registerPushToken(db, { userId: a.id, ...fcm, eventId: olderId }),
+        registerPushToken(db, { userId: b.id, ...fcm, eventId: newerId }),
+      ]);
+      expect(newer, `round ${round}`).toEqual({ outcome: 'registered', environment: 'production' });
+      expect(['registered', 'replay'], `round ${round}`).toContain(older.outcome);
+      const row = one(await db.select().from(deviceTokens).where(eq(deviceTokens.token, shared)));
+      expect(row, `round ${round}`).toMatchObject({
+        token: shared,
+        userId: b.id,
+        service: 'fcm',
+        eventId: newerId,
+      });
+    }
+  }, 30_000);
 });
 
 describe.runIf(REAL_PG)('the 13+ yes beside a deletion (real Postgres, C7-server)', () => {

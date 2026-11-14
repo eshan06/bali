@@ -378,6 +378,43 @@ describe('applyRetention (C6b)', () => {
     ]);
   });
 
+  it('deletes the FCM tokens of each person it de-identifies, as their APNs tokens, and a continuing one keeps theirs (AN11a)', async () => {
+    const s = await seed('c6b-fcm');
+    const fcm = (who: string) => `fAb${who}:APA91b-${newUuidV7().replace(/-/g, '_')}Q`;
+    const tokens = { ana: fcm('ana'), ben: fcm('ben'), dan: fcm('dan') };
+    for (const [userId, token] of [
+      [s.ana.id, tokens.ana],
+      [s.ben.id, tokens.ben],
+      [s.dan.id, tokens.dan],
+    ] as const) {
+      await registerPushToken(db, {
+        userId,
+        service: 'fcm',
+        token,
+        environment: 'production',
+        eventId: newUuidV7(),
+      });
+    }
+    const services = async (userId: string) =>
+      (await tokensOf(userId)).map((t) => t.service).sort();
+    // Each one's APNs token from the seed, and the FCM token beside it.
+    expect(await services(s.ana.id)).toEqual(['apns', 'fcm']);
+
+    await applyRetention(db, {
+      schoolId: s.school.id,
+      at: LATER(),
+      confirmName: s.school.name,
+      issuer: POOL,
+    });
+
+    // Ana, de-identified, keeps none; Ben, kept named, and Dan, elsewhere, keep both.
+    expect(await tokensOf(s.ana.id)).toEqual([]);
+    expect(await services(s.ben.id)).toEqual(['apns', 'fcm']);
+    expect(await services(s.dan.id)).toEqual(['apns', 'fcm']);
+    const bens = await tokensOf(s.ben.id);
+    expect(bens.find((t) => t.service === 'fcm')?.token).toBe(tokens.ben);
+  });
+
   it('queues the sign-in of each person it de-identifies for the API to delete, once, and none of anyone kept (2026-10-28)', async () => {
     const s = await seed('c6b-sign-ins');
     const everyone = [s.rivera, s.old, s.ana, s.ben, s.cara, s.dan, s.eve].map((p) => p.cognitoId);
