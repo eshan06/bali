@@ -80,7 +80,7 @@ function registerOnce(
   input: RegisterPushTokenInput,
 ): Promise<RegisterPushTokenResult> {
   return db.transaction(async (tx): Promise<RegisterPushTokenResult> => {
-    await lockStudentPushTokens(tx, input.eventId);
+    await lockStudentPushTokens(tx, input.userId);
     const user = await lockUser(tx, input.userId);
     // A replay is matched on the token and the account alone, never the service.
     // Safe only because the two services' formats never meet (the route's check
@@ -119,7 +119,9 @@ function registerOnce(
     if (written.length > 0) {
       if (pastCap.length > 0) {
         // Still theirs only: a token another account took before the lock stays that account's.
-        await tx.delete(deviceTokens).where(inArray(deviceTokens.token, pastCap));
+        await tx
+          .delete(deviceTokens)
+          .where(and(eq(deviceTokens.userId, user.id), inArray(deviceTokens.token, pastCap)));
       }
       return { outcome: 'registered', environment: input.environment };
     }
@@ -261,7 +263,8 @@ async function lockPastCap(tx: Database, userId: string, token: string): Promise
     .select({ token: deviceTokens.token })
     .from(deviceTokens)
     .where(inArray(deviceTokens.token, [token, ...pastCap]))
-    .orderBy(asc(deviceTokens.token));
+    .orderBy(asc(deviceTokens.token))
+    .for('update');
   return pastCap;
 }
 
