@@ -45,16 +45,28 @@ a real decision? Add a dated entry at the top: what was decided and why.
   order). A student holding more than five from before this step goes down to five at its next register that writes, its own
   oldest let go (this step's call, awaiting the owner's look); no migration deletes rows.
 
-  **The lock** (this step's call, awaiting the owner's look): a register first takes a transaction advisory lock on a hash of
-  the student's id (`lockStudentPushTokens`), as the engine's `lockStudentTaps` does for taps, released at commit. One
-  student's registers then run one after another, each counting the student's tokens with the one before it committed. With
-  none, two at once each count the committed rows and their own, both let the same oldest token go, and the student keeps six.
-  No single statement holds it: each reads a snapshot without the other's uncommitted row. Weighed and refused: a stronger lock
-  on the student's own row (`FOR NO KEY UPDATE` where it is `FOR SHARE`), which would also make every other reader of that row
-  wait out a register, where the advisory lock serialises only the registers. A collision of two students' hashes only makes
-  their registers wait on each other. A removal, a token reported gone and the privacy paths only ever lower a count, so they
-  take none. A token another account takes while the eviction runs stays that account's: the delete reads the owner again on
-  the row it locks.
+  **The locks** (this step's calls, awaiting the owner's look):
+  - **The count:** a register first takes a transaction advisory lock on a hash of the student's id
+    (`lockStudentPushTokens`), as the engine's `lockStudentTaps` does for taps, released at commit. One student's registers
+    then run one after another, each counting the student's tokens with the one before it committed. With none, two at once
+    each count the committed rows and their own, both let the same oldest token go, and the student keeps six. No single
+    statement holds it: each reads a snapshot without the other's uncommitted row. Weighed and refused: a stronger lock on the
+    student's own row (`FOR NO KEY UPDATE` where it is `FOR SHARE`), which would also make every other reader of that row wait
+    out a register, where the advisory lock serialises only the registers. A collision of two students' hashes only makes their
+    registers wait on each other. A removal, a token reported gone and the privacy paths only ever lower a count, so they take
+    none.
+  - **The rows:** before it writes, a register locks the token's row and the student's tokens it would put past the cap, in one
+    statement and in token order (`lockPastCap`), and lets those go once it has written, only those still the student's: a
+    token another account took before the lock stays that account's. Every register locks rows this one way, so two never wait
+    on each other in a cycle. Santa's round 1 found the deadlock the first shape had (both reviewers): written first and let go
+    after, two students at the cap each taking the other's oldest token at once each held the row it had moved and waited on
+    the row the other had moved, and Postgres refused one after its one-second deadlock check, a `500`. Honestly, that needs a
+    phone moving each way between two accounts at once, ruled impossible for the pilot; but an attacker with two free accounts
+    could repeat it, each round holding pool connections for that second while the accounts' other registers queued behind
+    their locks, so it was fixed, not dropped.
+  - **Known, as with a student's taps:** a burst of one student's registers waits its turn, each holding a pooled connection
+    meanwhile, so the account budget's full burst of 120 holds the pool for those registers' time, under a second, at most once
+    a minute (santa's round 1, left as it is: the budget bounds it, as it bounds `lockStudentTaps`).
 
   **How a phone whose token was let go fails, honestly:** it gets no "class started" alert until its app registers again at
   its next launch. Nothing tells the phone, and nothing has to: the push is a doorbell, never the truth (ARCHITECTURE, "Push: a
@@ -78,19 +90,20 @@ a real decision? Add a dated entry at the top: what was decided and why.
   was; a register again refreshes the token, lets nothing go, and the next new token lets the next oldest go instead; a replay
   lets nothing go, the same `eventId` or an older register of a token that moved on; a token moved from another account counts
   against the caller and leaves that account one fewer; both services' tokens count together, an APNs register letting an FCM
-  token go and the other way round; a Start rings at most five of a student's tokens, its newest. On real Postgres: two new
-  registers at once for a student at the cap, staged on its oldest token's row (the race rule, 2026-10-06), keep five, the two
-  oldest gone; and a token moving to another account while its owner registers past the cap stays the mover's. Five failed
-  before the fix, all but the replay's, which held there because nothing was ever let go.
+  token go and the other way round; a Start rings at most five of a student's tokens, its newest. On real Postgres, each staged
+  on a held row (the race rule, 2026-10-06): two new registers at once for a student at the cap keep five, the two oldest gone;
+  a token moving to another account while its owner registers past the cap stays the mover's; and two students at the cap each
+  taking the other's oldest token at once are both registered, with no deadlock (santa's finding, its test committed before its
+  fix). Five failed before the fix, all but the replay's, which held there because nothing was ever let go.
 
   **The breaks,** each made on purpose, run and reverted:
-  - No cap (the eviction never called): 5 fail, first "lets the oldest go when a register would make one more, each answer
-    as it always was".
+  - No cap (the delete skipped): 5 fail, first "lets the oldest go when a register would make one more, each answer as it
+    always was".
   - The newest let go instead of the oldest (the order flipped): the same 5 fail.
-  - A replay letting a token go (the eviction run whatever the register wrote): "lets nothing go on a replay: the same
-    eventId again, or an older register of a token that moved on" fails, four kept.
-  - The race unguarded (no advisory lock), on CI's real-Postgres lane: RACE_RESULT
-  - The delete without its owner check, on the same run: MOVE_RESULT
+  - A replay letting a token go (the delete run whatever the register wrote): "lets nothing go on a replay: the same eventId
+    again, or an older register of a token that moved on" fails, four kept.
+  - On CI's real-Postgres lane, in one run: the race unguarded (no advisory lock), RACE_RESULT; the delete without its owner
+    check, MOVE_RESULT; and the rows read with no lock, the first shape, CROSS_RESULT.
 
   **For AN11b:** nothing changes for the FCM sender. `pushTargetsOf(db, 'fcm', ids)` reads at most five tokens a student, both
   services together, and a token FCM reports gone goes through `deleteGonePushToken` as before.

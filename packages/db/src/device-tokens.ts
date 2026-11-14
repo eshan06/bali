@@ -1,5 +1,5 @@
 import type { PushEnvironment, PushService } from '@bali/shared';
-import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
 
 import { deviceTokens, users } from './schema.js';
 import { isUniqueViolation } from './sql-errors.js';
@@ -105,6 +105,7 @@ function registerOnce(
       environment: input.environment,
       eventId: input.eventId,
     };
+    const pastCap = await lockPastCap(tx, user.id, input.token);
     const written = await tx
       .insert(deviceTokens)
       .values({ token: input.token, ...row })
@@ -116,7 +117,12 @@ function registerOnce(
       })
       .returning({ token: deviceTokens.token });
     if (written.length > 0) {
-      await letGoPastCap(tx, user.id, input.token);
+      if (pastCap.length > 0) {
+        // Still theirs only: a token another account took before the lock stays that account's.
+        await tx
+          .delete(deviceTokens)
+          .where(and(eq(deviceTokens.userId, user.id), inArray(deviceTokens.token, pastCap)));
+      }
       return { outcome: 'registered', environment: input.environment };
     }
     // A newer register holds the row: this one is older, a replay of the truth now.
@@ -235,23 +241,29 @@ async function lockStudentPushTokens(tx: Database, userId: string): Promise<void
 }
 
 /**
- * Let the student's oldest tokens go past the cap (AN11a2), oldest by
- * `updated_at` and then by token, so the order is fixed: every one of theirs
- * but `kept`, the token just registered, and the newest
- * `PUSH_TOKENS_PER_STUDENT - 1` others. A token another account registered
- * meanwhile is that account's and stays: the delete reads the owner again on
- * the row it locks.
+ * Lock `token`'s row, if it has one, and every token of the student's that a
+ * register of it would put past the cap (AN11a2), in one statement and in
+ * token order, before the register writes; returns the latter, for it to let
+ * go once it has written. Past the cap is every token of theirs but `token`
+ * and the newest `PUSH_TOKENS_PER_STUDENT - 1` others, oldest by `updated_at`
+ * and then by token, so the order is fixed. Every register takes its row locks
+ * this one way, so two that each take a token of the other's never wait on
+ * each other in a cycle: the second waits for the first, and no deadlock.
  */
-async function letGoPastCap(tx: Database, userId: string, kept: string): Promise<void> {
+async function lockPastCap(tx: Database, userId: string, token: string): Promise<string[]> {
   const others = tx
     .select({ token: deviceTokens.token })
     .from(deviceTokens)
-    .where(and(eq(deviceTokens.userId, userId), ne(deviceTokens.token, kept)))
+    .where(and(eq(deviceTokens.userId, userId), ne(deviceTokens.token, token)))
     .orderBy(desc(deviceTokens.updatedAt), desc(deviceTokens.token))
     .offset(PUSH_TOKENS_PER_STUDENT - 1);
-  await tx
-    .delete(deviceTokens)
-    .where(and(eq(deviceTokens.userId, userId), inArray(deviceTokens.token, others)));
+  const locked = await tx
+    .select({ token: deviceTokens.token })
+    .from(deviceTokens)
+    .where(or(eq(deviceTokens.token, token), inArray(deviceTokens.token, others)))
+    .orderBy(asc(deviceTokens.token))
+    .for('update');
+  return locked.map((row) => row.token).filter((held) => held !== token);
 }
 
 /** The caller's row, held FOR SHARE to the end of `tx`. */
