@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Self-test for invisible-characters.py (S12), each case in a repository made for it: every
 character the scan must flag fails, named, at its line and column, a byte-order mark at a file's
-start too; the escape written as text, the characters it leaves alone, a binary file, a clean tree
-and an allowed file pass; a file it can't read, one that isn't UTF-8 and a folder git can't list
-fail. CI runs it before the scan, so a scan that stops finding fails instead of passing.
+start too, and the emoji selector outside an emoji; the escape written as text, the characters it
+leaves alone, a binary file, a clean tree and an allowed file pass; a NUL in UTF-8 text is flagged;
+a file it can't read, one that isn't UTF-8 or is UTF-16, a folder git can't list and a repository
+with nothing tracked fail. CI runs it before the scan, so a scan that stops finding fails instead
+of passing.
 
     python3 .github/scripts/invisible-characters.test.py
 
 Every character it plants is made at run time from its code point, by chr(): one typed into this
 file would be the very thing the scan is for.
 """
+import codecs
 import contextlib
 import importlib.util
 import io
@@ -31,11 +34,12 @@ BACKSLASH = chr(92)
 # What the scan must flag (docs/DECISIONS.md, 2026-11-13), as first and last code points: typed
 # here on their own, never read from the script, so a range it drops fails this test.
 MUST_FLAG = [
-    # Unicode's default-ignorable characters, drawn as nothing, but the variation selectors.
+    # Unicode's default-ignorable characters, drawn as nothing, but U+FE0F, the emoji selector,
+    # which has its own test: flagged only outside an emoji.
     (0x00AD, 0x00AD), (0x034F, 0x034F), (0x061C, 0x061C), (0x115F, 0x1160), (0x17B4, 0x17B5),
     (0x180B, 0x180F), (0x200B, 0x200F), (0x202A, 0x202E), (0x2060, 0x206F), (0x3164, 0x3164),
-    (0xFEFF, 0xFEFF), (0xFFA0, 0xFFA0), (0xFFF0, 0xFFF8), (0x1BCA0, 0x1BCA3), (0x1D173, 0x1D17A),
-    (0xE0000, 0xE00FF), (0xE01F0, 0xE0FFF),
+    (0xFE00, 0xFE0E), (0xFEFF, 0xFEFF), (0xFFA0, 0xFFA0), (0xFFF0, 0xFFF8), (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A), (0xE0000, 0xE0FFF),
     # Every space but the plain one, and the line and paragraph separators.
     (0x00A0, 0x00A0), (0x1680, 0x1680), (0x2000, 0x200A), (0x202F, 0x202F), (0x205F, 0x205F),
     (0x3000, 0x3000), (0x2028, 0x2029),
@@ -55,9 +59,9 @@ def flagged(out):
 
 
 def said(out):
-    """What the scan printed, for a failure's message: cut short, and indented, so CI's log runs
-    none of its workflow commands."""
-    return "\n" + "\n".join("    " + line for line in out[:4000].splitlines())
+    """What the scan printed, for a failure's message: cut short, each line after a bar, so CI's
+    log runs none of its workflow commands (the runner reads one after leading spaces too)."""
+    return "\n" + "\n".join("| " + line for line in out[:4000].splitlines())
 
 
 class Scan(unittest.TestCase):
@@ -103,7 +107,8 @@ class Scan(unittest.TestCase):
         names = {found[place] for place in found}
         for name in ("zero width space", "zero width joiner", "right-to-left override",
                      "left-to-right isolate", "arabic letter mark", "zero width no-break space",
-                     "soft hyphen", "hangul filler", "no-break space", "narrow no-break space",
+                     "soft hyphen", "hangul filler", "variation selector-1", "variation selector-17",
+                     "no-break space", "narrow no-break space",
                      "line separator", "tag latin capital letter a", "cancel tag",
                      "control character", "unassigned character"):
             self.assertIn(name, names)
@@ -130,11 +135,11 @@ class Scan(unittest.TestCase):
         self.assertIn("Scanned 4 tracked text file(s), 0 binary file(s) skipped", out)
 
     def test_what_it_leaves_alone_passes(self):
-        # Each flagged range's neighbours, the variation selectors emoji need, and two symbols
+        # Each flagged range's neighbours (the emoji selector has its own test), and two symbols
         # drawn blank that main's display-name rules use on purpose (the braille blank, the null
         # notehead).
         beside = {first - 1 for first, _ in MUST_FLAG} | {last + 1 for _, last in MUST_FLAG}
-        left = sorted(beside - FLAGS - {-1, 0x0A}) + [0xFE00, 0xFE0E, 0xFE0F, 0xE0100, 0xE01EF, 0x2800, 0x1D159]
+        left = sorted(beside - FLAGS - {-1, 0x0A, 0xFE0F}) + [0x2800, 0x1D159]
         self.assertIn(0x0D, left)
         text = "".join(f"a{chr(code)}b\n" for code in left)
         # Emoji the docs use, a keycap digit, letters past ASCII, a tab and Windows' line ends.
@@ -145,6 +150,23 @@ class Scan(unittest.TestCase):
         self.assertEqual(code, 0, said(out))
         self.assertNotIn("::error", out)
 
+    def test_the_emoji_selector_fails_outside_an_emoji(self):
+        vs16, keycap = chr(0xFE0F), chr(0x20E3)
+        # Where it shapes an emoji: after a character past ASCII that isn't a selector, and in a
+        # keycap (a digit, # or *, the selector, then U+20E3).
+        self.track("emoji.md", f"{chr(0x2696)}{vs16} {chr(0x21A9)}{vs16} {chr(0x2764)}{vs16}\n"
+                               f"1{vs16}{keycap} #{vs16}{keycap} *{vs16}{keycap}\n")
+        # Anywhere else: after a letter, where it makes a name that looks like another; at a line's
+        # start; after a space; after another selector, a run that can carry hidden text; and after
+        # a digit with no keycap mark.
+        self.track("names.ts", f"const isTeacher{vs16} = 1;\n{vs16}x\na {vs16}\n"
+                               f"{chr(0x2696)}{vs16}{vs16}\n7{vs16}.\n")
+        code, out = self.run_scan()
+        self.assertEqual(code, 1, said(out))
+        self.assertEqual(flagged(out), {place: "variation selector-16" for place in (
+            "names.ts:1:16 U+FE0F", "names.ts:2:1 U+FE0F", "names.ts:3:3 U+FE0F", "names.ts:4:3 U+FE0F",
+            "names.ts:5:2 U+FE0F")})
+
     def test_a_binary_file_passes(self):
         planted = "".join(chr(code) for code in (0x200B, 0x202E, 0xFEFF, 0x00A0, 0x001B)).encode("utf-8")
         self.track("icon.png", b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR" + planted)
@@ -152,12 +174,30 @@ class Scan(unittest.TestCase):
         self.assertEqual(code, 0, said(out))
         self.assertIn("Scanned 0 tracked text file(s), 1 binary file(s) skipped", out)
 
-    def test_binary_is_a_nul_in_the_first_8000_bytes_as_git_reads_it(self):
-        self.track("last.bin", b"a" * 7999 + b"\x00" + chr(0x200B).encode("utf-8"))
-        self.track("past.txt", b"a" * 8000 + b"\x00\n")
+    def test_binary_is_a_nul_in_the_first_8000_bytes_of_a_file_that_isnt_utf8(self):
+        # A NUL at the 8,000th byte, git's test, in bytes that aren't UTF-8: binary, skipped.
+        self.track("blob.bin", b"\xff" + b"a" * 7998 + b"\x00" + chr(0x200B).encode("utf-8"))
+        # A NUL in UTF-8 text is text: the NUL is flagged, and so is what follows it. (Not nul.ts:
+        # Windows keeps that name for a device.)
+        self.track("zero.ts", b"export const s = 'a\x00b" + chr(0x202E).encode("utf-8") + b"';\n")
+        # A NUL past the 8,000th byte isn't git's binary: bytes that aren't UTF-8 fail as such.
+        self.track("late.bin", b"\xff" + b"a" * 7999 + b"\x00")
         code, out = self.run_scan()
-        self.assertEqual(code, 1, said(out))
-        self.assertEqual(flagged(out), {"past.txt:1:8001 U+0000": "control character"})
+        self.assertEqual(code, 2, said(out))
+        self.assertEqual(flagged(out), {"zero.ts:1:20 U+0000": "control character",
+                                        "zero.ts:1:22 U+202E": "right-to-left override"})
+        self.assertRegex(out, r"(?m)^::error file=late\.bin,line=1,col=1::late\.bin isn't UTF-8 from here")
+        self.assertNotIn("blob.bin", out)
+
+    def test_a_utf16_or_utf32_file_fails(self):
+        self.track("le.txt", codecs.BOM_UTF16_LE + "Windows PowerShell 5.1 writes this\n".encode("utf-16-le"))
+        self.track("be.txt", codecs.BOM_UTF16_BE + "and this\n".encode("utf-16-be"))
+        self.track("wide.txt", codecs.BOM_UTF32_BE + "and this\n".encode("utf-32-be"))
+        code, out = self.run_scan()
+        self.assertEqual(code, 2, said(out))
+        for name in ("le", "be", "wide"):
+            self.assertRegex(out, rf"(?m)^::error file={name}\.txt,line=1,col=1::{name}\.txt is UTF-16 or "
+                                  "UTF-32 by its byte-order mark, so the scan can't read its characters")
 
     def test_a_clean_tree_passes(self):
         self.track("README.md", f"# A repo\n\nPlain words, caf{chr(0xE9)}, and a phone {chr(0x1F4F1)}.\n")
@@ -199,6 +239,11 @@ class Scan(unittest.TestCase):
             code, out = self.run_scan(root=folder)
         self.assertEqual(code, 2, said(out))
         self.assertRegex(out, r"(?m)^::error::git couldn't list the files to scan \(.+\), so nothing was scanned\.$")
+
+    def test_a_repository_git_lists_no_file_in_fails(self):
+        code, out = self.run_scan()
+        self.assertEqual(code, 2, said(out))
+        self.assertRegex(out, r"(?m)^::error::git lists no file here, so nothing was scanned\.$")
 
     def test_run_from_a_folder_it_scans_the_whole_repository(self):
         self.track("top.txt", f"a{chr(0x202E)}\n")

@@ -107,9 +107,10 @@ the clone is `C:\Users\Eshan Shah\Downloads\github\bali`. Its path has a space: 
 - **Claude Code's Write and Edit tools turn a typed `\uXXXX` escape into its character.** A Kotlin, Swift or
   TypeScript escape lands in the file as the character itself, an invisible one too, with no error; `\\uXXXX` stays as
   typed, two backslashes, and the Bash tool's text makes `\\u` one. Write such escapes from a script that builds the
-  backslash (Python's `chr(92)`). CI's "CI changes" now fails a PR that carries an invisible or text-direction character,
-  each named where it stands (S12): run `.github/scripts/invisible-characters.py` with Python 3 before you push (AN9f,
-  2026-11-11).
+  backslash (Python's `chr(92)`), then check the file for non-ASCII characters (AN9f, 2026-11-11). CI's "CI changes" now
+  fails a PR that carries an invisible or text-direction character, each named where it stands (S12; run
+  `.github/scripts/invisible-characters.py` with Python 3 before you push), but it passes a visible character an escape
+  turned into, the braille blank U+2800 and the null notehead U+1D159: the non-ASCII check still matters.
 - **Stopping a background command leaves what it started running.** TaskStop ends the Bash tool's own shell, but a script that
   shell ran (`bash loop.sh`) goes on, and so does its `gradlew`: AN13e2's stopped test loop went on building the worktree with
   the edits made there after the stop. Find each by its command line (`Get-CimInstance Win32_Process`, the script's name or
