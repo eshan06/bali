@@ -14,16 +14,14 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-13 (Central) — AN9k, a student's notes kept off the phone's storage once a deletion's request went out
-(#593; `docs/DECISIONS.md`, 2026-11-13): Delete account's stop writes them back only where no `DELETE /v1/me` of the run went out
-unproved, `409 teacher_has_classes` the one proof; after any other, nothing puts them back on the storage for the run, the screens
-reading them from memory, so a relaunch finds none; AN9j's forget is written through (the conductor's calls and this step's,
-awaiting the owner's look). No screen, no word. AN9j's kept unlock copies stay for the pilot (the owner, 2026-11-13). Before it,
-AN9j, `409 account_deleted` read as signed out. Next: AN11, then AN12 and Phase 10's screens, in the conductor's order; AN7f and
-AN8's 📱 check on the owner's phones, on any Chrome now, signed in on dev as an account that passed the 13+ check on an iPhone
-(Q7), and AN6f's checks on a Chrome before 136; prod's Android client, the owner's (Open owner items, 8); compileSdk 37 with
-today's AndroidX and OkHttp 5.5 in the step that needs them (Open owner items, 6); AN1's part 2 once the owner has the phones.
-Not on the pilot's critical path._
+_Last updated: 2026-11-13 (Central) — AP2b, the help page names Android's lock beside Screen Time (#597; `docs/DECISIONS.md`,
+2026-11-13): its list of what a teacher sees says "…or Screen Time off (or Bali's lock off)", while the privacy policy's section 2
+keeps the iPhone's line until AP4, the owner's and the lawyer's; the help page's other iPhone-only lines wait for the owner's words,
+drafted there (Open owner items, 10). Before it, AN9k, a student's notes kept off the phone's storage once a deletion's request
+went out. Next: AN11, then AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, on
+any Chrome now, signed in on dev as an account that passed the 13+ check on an iPhone (Q7), and AN6f's checks on a Chrome before
+136; prod's Android client, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that
+needs them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -260,10 +258,7 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
 - **AP2** 🔧 The Play Console: the account (Open owner items, 2), the app record and Play App
   Signing; and a workflow that uploads to the internal track (twin: `testflight.yml`), which refuses a build that carries
   dev's values (#588's Claude Review)
-- **AP2b** The help page names Android's lock beside Screen Time, "or Bali's lock off" where it says "or Screen Time
-  off", before the first Android build reaches a student (the owner, 2026-11-12): a portal step, its words through
-  `no-ai-slop` and DESIGN.md's voice; the privacy policy's line is the owner's and the lawyer's (AP4) — validation:
-  `npm run typecheck && npm run lint && npm test`
+- **AP2b** The help page names Android's lock beside Screen Time — ✅ (#597; DECISIONS 2026-11-13)
 - **AP3** 📱 The device test gate (twin: B5 and B6): a Pixel and a Samsung through the whole loop on
   dev, and every gap in ISSUES #6 checked again on both, as its line says, before launch (the owner,
   2026-11-04; `docs/ANDROID-PHONE-TESTS.md`)
@@ -307,6 +302,10 @@ rules); `docs/DESIGN.md` read first, its Android section from AS0; every user-fa
    that page stops at Cognito's own sign-in page, and every such sign-in is left unfinished.
 9. ✅ **AN9j's kept Emergency Unlock copies** (the `kept:<id>` rows): they stay on the phone for the adult pilot (the owner,
    2026-11-13: "Yes, keep it"; DECISIONS 2026-11-13). Before the first K-12 school, the owner decides again.
+10. **The help page's other iPhone-only lines** (AP2b; DECISIONS 2026-11-13): its opening, Tap in, Calls and emergencies,
+    Turning it off and Run a class speak of the iPhone alone, and What Bali never sees holds less on Android. Their Android
+    words are the owner's, drafted in AP2b's entry; recommended before the first Android build reaches a student, as the
+    focus status's were.
 
 ## How to update this file
 

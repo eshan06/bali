@@ -8,6 +8,100 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-13** — **AP2b, the help page names Android's lock beside Screen Time: its list of what a teacher sees says "Your
+  focus status: focused, unlocked, or Screen Time off (or Bali's lock off)", while the privacy policy's section 2 keeps the
+  iPhone's line word for word until the owner and the lawyer word it (AP4); the help page's other iPhone-only lines stay as
+  they are, drafted below for the owner (the owner's call of 2026-11-12; this step's calls, marked, each awaiting the owner's
+  look; AP2b, #597).**
+
+  **The owner's call** (the go-ahead of 2026-11-12, call 6, recorded on 2026-11-13): "The help page names Android's lock
+  beside Screen Time ("or Bali's lock off", where it says "or Screen Time off") before the first Android build reaches a
+  student: AP2b, a portal step. The privacy policy's line is left to the owner and the lawyer." It answers AN10h's note for
+  the owner ("For the owner (the portal's help page)", 2026-11-12).
+
+  **The words** (this step's call, awaiting the owner's look): "Your focus status: focused, unlocked, or Screen Time off (or
+  Bali's lock off)". The owner's phrase whole, beside the iPhone's, and no other word of the line changed. Each app's word is
+  as its own list has it: "Screen Time off" is `ConsentCard`'s (JoinView.swift), "Bali's lock off" `ConsentList`'s
+  (Consent.kt), with the straight apostrophe every line of the list uses. Why the brackets: it is one status, protection
+  off, that each phone names its own way, so the brackets add Android's name for it and leave the line's list of three
+  states as it was, as the page's other asides add theirs ("(bathroom, nurse or other)", "(they turned Screen Time off on
+  their phone)"). Run on, "…, or Screen Time off or Bali's lock off", it reads as a list of four with two "or"s.
+  no-ai-slop's Edit job weighed both against its `eval.md`: the brackets pass, the run-on fails its read aloud. It names
+  neither phone: a platform's name there is a word beyond the call.
+
+  **The one line where the two pages differ, and how the rest is held** (this step's call, awaiting the owner's look): one
+  list stays in `teacher-sees.ts`, the iPhone's (`TEACHER_SEES`), which the privacy policy shows, and the help page's is
+  built from it (`TEACHER_SEES_BOTH_APPS`): the same lines, the focus status with Android's word beside it. So the help
+  page and the privacy policy differ in that one line until AP4: the owner's call amends #130's "the three never say
+  different things" (C2-text, 2026-10-24) for that line alone, and every other line is still the one copy. Held by:
+  - `support.test.ts`, the guard that reads the apps' own sources: the shared list is the iPhone's word for word, as
+    before, and the help page's list is the iPhone's with Android's word beside Screen Time, each app's focus status
+    pinned as its source writes it, so a change to either app's word fails here. It reads `ConsentList.WHOLE` from
+    Consent.kt as it reads `ConsentCard` from JoinView.swift (this step's call, awaiting the owner's look; its entry in
+    `source-text-tests.test.ts`' guards says so, the list unchanged). `npm test` runs on every PR but a docs-only one, so
+    an Android PR that changes Android's word fails it too.
+  - `policy-pages.test.tsx`, the pages driven in jsdom: the privacy policy's section 2 shows `TEACHER_SEES` and
+    `TEACHER_NEVER_SEES`, its focus status pinned word for word; the help page's focus status is the line above; and every
+    other line of both the help page's lists is the privacy policy's, in the same order.
+
+  **The board:** SupportPage on [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4) (PV1's, built
+  in PV15) draws this list, its first line "…or Screen Time off". The line changes on the owner's call of 2026-11-12; the
+  page's look doesn't. Nothing was drawn or published. Screenshots of the For students card, light, at 1440 and 375 px, the
+  line wrapping in its grey box as its neighbours do, no sideways scroll.
+
+  **The help page's other iPhone-only lines, unchanged: their Android words wait for the owner.** Drafted with no-ai-slop
+  in DESIGN.md's voice, from Android's own words; none built:
+  1. The opening: "Bali keeps your iPhone out of the way during class. You tap your phone on your teacher's Bali block, …"
+     Draft: "Bali keeps your phone out of the way during class. You tap it on your teacher's Bali block, …"
+  2. Tap in: "When class starts, hold your iPhone to your teacher's Bali block." Draft: "When class starts, hold your phone
+     to your teacher's Bali block." Its Waiting promise is Android's word for word already.
+  3. Calls and emergencies: "Calls, FaceTime, Messages and Emergency SOS keep working the whole time." Draft: "On an
+     iPhone, calls, FaceTime, Messages and Emergency SOS keep working the whole time. On Android, calls, texts and
+     emergency calls do." (Android's intro line, the Words board's.)
+  4. Turning it off: "You approve Screen Time for Bali on your own iPhone, and you can turn it off in Settings any time. If
+     you do during class, your teacher sees Screen Time off." Draft, added after it: "On Android, you turn on Bali's lock
+     in Accessibility settings, and you can turn it off there any time. If you do during class, your teacher sees that
+     it's off."
+  5. Run a class, for teachers: "…whose protection is off (they turned Screen Time off on their phone)." Draft: "…(they
+     turned Screen Time off on their iPhone, or Bali's lock off on Android)."
+
+  And one that names no phone but holds less on Android, a privacy line, so the owner's: What Bali never sees, "Bali
+  doesn't know which apps you have: it quiets every app it can, so there's no list to read." Android's lock reads which
+  app is in front, to decide whether to cover it, and keeps and sends none of it (ARCHITECTURE, "Android app structure",
+  decision 2). Draft: "On an iPhone, Bali doesn't know which apps you have: it quiets every app it can, so there's no list
+  to read. On Android, Bali's lock checks which app is open, only to cover it, and never keeps or sends that." The
+  privacy policy's own iPhone lines (its short version, what it covers, Apple's line) are AP4's.
+
+  **Tests first:** committed alone (`test(web)`), failing: the help page's focus status ("…Screen Time off" received) and
+  the guard (the help page's list not built yet). The privacy policy's pin and the shared lines passed, as they must before
+  and after.
+
+  **Broken on purpose, each reverted, each failing by name:**
+  - The privacy policy's line changed with the help page's: "keeps the iPhone's focus status word for word…", the policy
+    saying "…(or Bali's lock off)", and the guard's "what a teacher sees, word for word". The session's safety check
+    refused a temporary edit of `/privacy`'s page, so this one ran in throwaway copies of the two test files that handed
+    the privacy policy the help page's list through `vi.mock`, then were deleted: no privacy file was touched.
+  - The help page's line left as today: in the page, "says the focus status in both apps' words…"; in the list
+    (`TEACHER_SEES_BOTH_APPS` left as the iPhone's), that test and the guard's "its focus status names Android's lock
+    beside Screen Time…".
+  - Another shared line changed on the help page alone ("If you leave the class"): "says every other line as the privacy
+    policy does, in the same order".
+
+  **The proof:** `npm run typecheck && npm run lint && npm test` green, the portal's suite whole; Prettier on the changed
+  files; the S12 scan, nothing found; `plan-words.sh` counted as CI counts. The size: 26 changed lines not counting tests
+  and Markdown, 108 in the test files.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, taken: the rewritten help page test no
+  longer counted For students' lists, so a third list would pass (both; `expect(help).toHaveLength(2)` now, which a third
+  list fails, tried and reverted); and `policy-pages.test.tsx`'s header still said the help page's lists are the
+  policy's own (both). Left, outside this step's lane: `ConsentCard.sees`' comment in JoinView.swift, "The portal's help
+  page says the same, word for word" (B), the Mac's; and note 9 for the lawyer in `docs/legal/privacy-policy.md`, which
+  says the policy's lists are the help page's too, "so those three can't say different things" (both), AP4's, the
+  owner's and the lawyer's. The design check: web-design-guidelines found one WARN, left: "Screen Time", a brand name,
+  now breaks across lines at 1440 px, and a no-break space would change the apps' own string, which the guard holds word
+  for word. no-ai-slop's Detect job over the new line found nothing.
+
 - **2026-11-13** — **S12, a scan that fails CI on an invisible or text-direction character in any file git tracks:
   `.github/scripts/invisible-characters.py`, run in "CI changes" before its docs-only decision, so "Typecheck · lint · unit
   tests", the check `protect-main` requires, fails with it on every PR and every push to main, docs-only ones too, with no

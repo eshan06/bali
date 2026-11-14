@@ -78,7 +78,7 @@ const STILL_READING = [
 /**
  * Tests whose reads guard other files, never their own component's shape: try-again's scan, which
  * fails on a Try again drawn by hand anywhere in the portal; and the help page's, which renders its
- * page and reads only the app's Swift sources, holding the teacher-sees lists and the Waiting
- * screen's promise to the app's words (C2-text).
+ * page and reads only the apps' Swift and Kotlin sources, holding the teacher-sees lists (C2-text),
+ * the help page's focus status (AP2b) and the Waiting screen's promise to the apps' words.
  */
 const GUARDS = ['app/support/support.test.ts', 'components/try-again.test.tsx'];

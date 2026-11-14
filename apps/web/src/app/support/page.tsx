@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import { CARD_ALONE } from '@/components/card';
 import { LockupBar } from '@/components/mark';
-import { TEACHER_NEVER_SEES, TEACHER_SEES } from '@/components/teacher-sees';
+import { TEACHER_NEVER_SEES, TEACHER_SEES_BOTH_APPS } from '@/components/teacher-sees';
 import { QUIET_LINK, TEXT_LINK, TextLink } from '@/components/text-link';
 
 /*
@@ -12,7 +12,8 @@ import { QUIET_LINK, TEXT_LINK, TextLink } from '@/components/text-link';
  * state. It renders per request like every page (the root layout's `dynamic`), for the CSP nonce.
  * The teacher-sees lists are the student app's own (`ConsentCard`, ios/Bali/UI/JoinView.swift),
  * word for word, kept in `teacher-sees.ts` with the privacy policy's; if the app's lists change,
- * they change with them. Drawn as PV1 draws it in v2's
+ * they change with them. Their one difference from the policy's: the focus status names Android's
+ * lock beside Screen Time (AP2b, the owner's call of 2026-11-12). Drawn as PV1 draws it in v2's
  * look (SupportPage; built in PV15), its words unchanged: under the white bar with Bali, one
  * column 860 px wide at most, each section a card.
  */
@@ -133,7 +134,7 @@ export default function SupportPage() {
                 What your teacher sees
               </h3>
               <ul className="mt-2.5 flex flex-col gap-1.5 text-text-secondary">
-                {TEACHER_SEES.map((line) => (
+                {TEACHER_SEES_BOTH_APPS.map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>

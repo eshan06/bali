@@ -18,7 +18,8 @@ import TermsPage, { metadata as termsMetadata } from './terms/page';
  * 2026-10-24 under each title and its date, who runs Bali (Bali Focus Inc. since 2026-11-11, in the
  * opening and the terms' California notice), every section in the draft's order, the sections the
  * owner named at the outline's ids, the privacy draft's table as a list, its section 2's lists the
- * app's and the help page's own (#130), the owner's two later lines (section 1's clock set ahead,
+ * iPhone app's own, and the help page's but for its focus status (#130; AP2b), the owner's two
+ * later lines (section 1's clock set ahead,
  * section 6's records at another school), PostHog named wherever its counts change what a line says
  * (A4) and no line keeping a teacher's ID there once their counts go (A6), no email domain and no
  * TestFlight, since the app comes from the App Store (2026-11-07), Contact's mailto and the
@@ -434,18 +435,33 @@ describe('the privacy policy names PostHog, which Bali’s server sends its coun
   });
 });
 
+/** Each list in a part of the page, as the lines a reader meets in it. */
+const listsIn = (part: HTMLElement) =>
+  within(part)
+    .getAllByRole('list')
+    .map((list) =>
+      within(list)
+        .getAllByRole('listitem')
+        .map((line) => line.textContent),
+    );
+
+/** The privacy policy's section 2: what a teacher sees, then what they never see. */
+const policyLists = () => {
+  render(<PrivacyPage />);
+  return listsIn(screen.getByRole('region', { name: '2. What your teacher sees' }));
+};
+
+/** The help page's two lists, under For students. */
+const helpLists = () => {
+  render(<SupportPage />);
+  return listsIn(screen.getByRole('region', { name: 'For students' }));
+};
+
 describe('the privacy policy’s section 2, what your teacher sees, says what the app says (#130)', () => {
-  it('lists what a teacher sees, then what they never see, as the app and the help page list them', () => {
+  it('lists what a teacher sees, then what they never see, as the iPhone app lists them', () => {
     render(<PrivacyPage />);
     const sees = screen.getByRole('region', { name: '2. What your teacher sees' });
-    const lists = within(sees)
-      .getAllByRole('list')
-      .map((list) =>
-        within(list)
-          .getAllByRole('listitem')
-          .map((line) => line.textContent),
-      );
-    expect(lists).toEqual([TEACHER_SEES, TEACHER_NEVER_SEES]);
+    expect(listsIn(sees)).toEqual([TEACHER_SEES, TEACHER_NEVER_SEES]);
     const never = within(sees).getAllByRole('list')[1]?.previousElementSibling;
     expect(never?.textContent).toBe('Your teacher never sees:');
     expect(never?.querySelector('strong')?.textContent).toBe('never');
@@ -453,16 +469,27 @@ describe('the privacy policy’s section 2, what your teacher sees, says what th
     expect(sees.textContent).not.toMatch(/answer totals/);
   });
 
-  it('shows the help page the same two lists', () => {
-    render(<SupportPage />);
-    const help = within(screen.getByRole('region', { name: 'For students' }))
-      .getAllByRole('list')
-      .map((list) =>
-        within(list)
-          .getAllByRole('listitem')
-          .map((line) => line.textContent),
-      );
-    expect(help).toEqual([TEACHER_SEES, TEACHER_NEVER_SEES]);
+  it('keeps the iPhone’s focus status word for word: naming Android’s lock there is the owner’s and the lawyer’s (AP4)', () => {
+    expect(policyLists()[0]?.[0]).toBe('Your focus status: focused, unlocked, or Screen Time off');
+  });
+});
+
+describe('the help page’s lists of what a teacher sees name Android’s lock beside Screen Time (AP2b, the owner’s call of 2026-11-12)', () => {
+  it('says the focus status in both apps’ words, the iPhone’s Screen Time and Android’s Bali’s lock', () => {
+    expect(helpLists()[0]?.[0]).toBe(
+      "Your focus status: focused, unlocked, or Screen Time off (or Bali's lock off)",
+    );
+  });
+
+  it('says every other line as the privacy policy does, in the same order', () => {
+    const [policySees, policyNever] = policyLists();
+    cleanup();
+    const help = helpLists();
+    expect(help).toHaveLength(2);
+    const [helpSees, helpNever] = help;
+    expect(helpSees).toHaveLength(TEACHER_SEES.length);
+    expect(helpSees?.slice(1)).toEqual(policySees?.slice(1));
+    expect(helpNever).toEqual(policyNever);
   });
 });
 
