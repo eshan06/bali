@@ -1,0 +1,6 @@
+ALTER TABLE "device_tokens" DROP CONSTRAINT "device_tokens_token_hex";--> statement-breakpoint
+ALTER TABLE "device_tokens" DROP CONSTRAINT "device_tokens_environment";--> statement-breakpoint
+ALTER TABLE "device_tokens" ADD COLUMN "service" text DEFAULT 'apns' NOT NULL;--> statement-breakpoint
+ALTER TABLE "device_tokens" ADD CONSTRAINT "device_tokens_service" CHECK ("device_tokens"."service" IN ('apns', 'fcm'));--> statement-breakpoint
+ALTER TABLE "device_tokens" ADD CONSTRAINT "device_tokens_token_format" CHECK (CASE "device_tokens"."service" WHEN 'fcm' THEN "device_tokens"."token" ~ '^[A-Za-z0-9:_-]+$' AND char_length("device_tokens"."token") <= 2048 AND "device_tokens"."token" !~ '^[0-9a-fA-F]{64,200}$' ELSE "device_tokens"."token" ~ '^[0-9a-f]{64,200}$' END);--> statement-breakpoint
+ALTER TABLE "device_tokens" ADD CONSTRAINT "device_tokens_environment" CHECK (CASE "device_tokens"."service" WHEN 'fcm' THEN "device_tokens"."environment" = 'production' ELSE "device_tokens"."environment" IN ('sandbox', 'production') END);

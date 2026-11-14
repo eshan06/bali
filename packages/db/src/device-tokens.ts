@@ -1,4 +1,4 @@
-import type { PushEnvironment } from '@bali/shared';
+import type { PushEnvironment, PushService } from '@bali/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import { deviceTokens, users } from './schema.js';
@@ -6,10 +6,11 @@ import { isUniqueViolation } from './sql-errors.js';
 import type { Database } from './types.js';
 
 /*
- * A student's phone's APNs device token (N3; ARCHITECTURE, "Push: a doorbell
- * for students"): registered and removed by the student. Like management.ts
- * and schools.ts these sit beside the transition engine: they never touch
- * `participations` or `events`, and the token's row is its own record.
+ * A student's phone's push token (N3; ARCHITECTURE, "Push: a doorbell for
+ * students"), APNs's or FCM's (AN11a): registered and removed by the student.
+ * Like management.ts and schools.ts these sit beside the transition engine:
+ * they never touch `participations` or `events`, and the token's row is its
+ * own record. A call that names no service is APNs's, as the column is.
  *
  * Each takes the caller's row FOR SHARE first, so a role change (a redeem, T1b)
  * or a deletion (C3, which deletes the account's tokens) runs wholly before or
@@ -22,12 +23,21 @@ export type RegisterPushTokenResult =
   | { outcome: 'registered' | 'replay'; environment: PushEnvironment }
   | { outcome: 'event_id_conflict' | 'not_a_student' | 'account_deleted' };
 
+interface RegisterPushTokenInput {
+  userId: string;
+  token: string;
+  service?: PushService;
+  environment: PushEnvironment;
+  eventId: string;
+}
+
 /**
- * Register `token` as the student `userId`'s, issued for `environment`: one
- * phone, one current owner, so a token another account holds moves to this
- * one. Idempotent on `eventId`: the row that eventId wrote, still as it wrote
- * it, is a replay, written again by nothing; an eventId another token's or
- * another account's row holds is `event_id_conflict`.
+ * Register `token`, of `service` (APNs's if none), as the student `userId`'s,
+ * issued for `environment`: one phone, one current owner, so a token another
+ * account holds moves to this one. Idempotent on `eventId`: the row that
+ * eventId wrote, still as it wrote it, is a replay, written again by nothing;
+ * an eventId another token's or another account's row holds is
+ * `event_id_conflict`.
  *
  * Later wins, by the eventIds' UUIDv7 order (the phone's own, as a quiz answer
  * replaces an earlier one): a register rewrites the token's row only when its
@@ -39,7 +49,7 @@ export type RegisterPushTokenResult =
  */
 export async function registerPushToken(
   db: Database,
-  input: { userId: string; token: string; environment: PushEnvironment; eventId: string },
+  input: RegisterPushTokenInput,
 ): Promise<RegisterPushTokenResult> {
   try {
     return await registerOnce(db, input);
@@ -54,7 +64,7 @@ export async function registerPushToken(
 
 function registerOnce(
   db: Database,
-  input: { userId: string; token: string; environment: PushEnvironment; eventId: string },
+  input: RegisterPushTokenInput,
 ): Promise<RegisterPushTokenResult> {
   return db.transaction(async (tx): Promise<RegisterPushTokenResult> => {
     const user = await lockUser(tx, input.userId);
@@ -70,7 +80,13 @@ function registerOnce(
     if (user.removedAt !== null) return { outcome: 'account_deleted' };
     if (user.role !== 'student') return { outcome: 'not_a_student' };
 
-    const row = { userId: user.id, environment: input.environment, eventId: input.eventId };
+    // A token is one service's (the formats never meet), so its row keeps its service.
+    const row = {
+      userId: user.id,
+      service: input.service ?? 'apns',
+      environment: input.environment,
+      eventId: input.eventId,
+    };
     const written = await tx
       .insert(deviceTokens)
       .values({ token: input.token, ...row })
@@ -97,15 +113,15 @@ export type RemovePushTokenResult = {
 };
 
 /**
- * Remove `token` from the student `userId`, if it is theirs: 'removed', or
- * 'not_registered' when they hold no such token — a removal's retry, or a
- * token that moved to another account, which is never touched. The row goes
- * for good, so a retry re-reads the truth: not theirs. An eventId a register
- * holds is `event_id_conflict`, nothing removed.
+ * Remove `token`, of `service` (APNs's if none), from the student `userId`, if
+ * it is theirs: 'removed', or 'not_registered' when they hold no such token — a
+ * removal's retry, or a token that moved to another account, which is never
+ * touched. The row goes for good, so a retry re-reads the truth: not theirs. An
+ * eventId a register holds is `event_id_conflict`, nothing removed.
  */
 export function removePushToken(
   db: Database,
-  input: { userId: string; token: string; eventId: string },
+  input: { userId: string; token: string; service?: PushService; eventId: string },
 ): Promise<RemovePushTokenResult> {
   return db.transaction(async (tx): Promise<RemovePushTokenResult> => {
     const user = await lockUser(tx, input.userId);
@@ -118,7 +134,13 @@ export function removePushToken(
 
     const removed = await tx
       .delete(deviceTokens)
-      .where(and(eq(deviceTokens.token, input.token), eq(deviceTokens.userId, user.id)))
+      .where(
+        and(
+          eq(deviceTokens.token, input.token),
+          eq(deviceTokens.userId, user.id),
+          eq(deviceTokens.service, input.service ?? 'apns'),
+        ),
+      )
       .returning({ token: deviceTokens.token });
     return { outcome: removed.length > 0 ? 'removed' : 'not_registered' };
   });
@@ -127,30 +149,39 @@ export function removePushToken(
 export interface PushTarget {
   token: string;
   userId: string;
+  service: PushService;
   environment: PushEnvironment;
   /** The register that wrote the row as read: a gone token's deletion names it (N5). */
   eventId: string;
 }
 
-/** Every registered token of these students — the "class started" push's addressees (N5). */
-export function pushTargetsOf(db: Database, userIds: readonly string[]): Promise<PushTarget[]> {
+/**
+ * Every token of `service` these students hold — a sender's addressees for the
+ * "class started" push (N5): each sender reads its own service's tokens only (AN11a).
+ */
+export function pushTargetsOf(
+  db: Database,
+  service: PushService,
+  userIds: readonly string[],
+): Promise<PushTarget[]> {
   if (userIds.length === 0) return Promise.resolve([]);
   return db
     .select({
       token: deviceTokens.token,
       userId: deviceTokens.userId,
+      service: deviceTokens.service,
       environment: deviceTokens.environment,
       eventId: deviceTokens.eventId,
     })
     .from(deviceTokens)
-    .where(inArray(deviceTokens.userId, [...userIds]));
+    .where(and(eq(deviceTokens.service, service), inArray(deviceTokens.userId, [...userIds])));
 }
 
 /**
- * Delete a token APNs reported gone (N5) — only the row as it was read: still
- * this student's, still written by the same register. A token that moved to
- * another account, or was registered again since, is left alone (N4's order).
- * Returns whether a row went.
+ * Delete a token its service reported gone (N5) — only the row as it was read:
+ * still that service's, still this student's, still written by the same
+ * register. A token that moved to another account, or was registered again
+ * since, is left alone (N4's order). Returns whether a row went.
  */
 export async function deleteGonePushToken(db: Database, target: PushTarget): Promise<boolean> {
   const gone = await db
@@ -158,6 +189,7 @@ export async function deleteGonePushToken(db: Database, target: PushTarget): Pro
     .where(
       and(
         eq(deviceTokens.token, target.token),
+        eq(deviceTokens.service, target.service),
         eq(deviceTokens.userId, target.userId),
         eq(deviceTokens.eventId, target.eventId),
       ),

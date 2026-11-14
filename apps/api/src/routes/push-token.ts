@@ -1,5 +1,6 @@
 import { type Database, findUserByCognitoId, registerPushToken, removePushToken } from '@bali/db';
 import {
+  FCM_TOKEN_MAX_LENGTH,
   PUSH_ENVIRONMENTS,
   PUSH_TOKEN_MAX_LENGTH,
   type RegisterPushTokenResponse,
@@ -13,32 +14,62 @@ import { accountOf } from '../auth/student.js';
 import { ApiError, parseRequest } from '../errors.js';
 import { refusal } from './errors.js';
 
+/** What an APNs token is: hex, as the phone writes its bytes, 64 digits today (32 bytes). */
+const APNS_TOKEN = `[0-9a-fA-F]{64,${PUSH_TOKEN_MAX_LENGTH}}`;
 /**
- * An APNs device token: hex, as the phone writes its bytes, 64 digits today
- * (32 bytes) and never past `PUSH_TOKEN_MAX_LENGTH`; stored lower-case, so one
- * token has one key whatever case a phone writes it in.
+ * An APNs device token, never past `PUSH_TOKEN_MAX_LENGTH`; stored lower-case,
+ * so one token has one key whatever case a phone writes it in.
  */
-const Token = z
+const ApnsToken = z
   .string()
-  .regex(new RegExp(`^[0-9a-fA-F]{64,${PUSH_TOKEN_MAX_LENGTH}}$`), 'is not a device token')
+  .regex(new RegExp(`^${APNS_TOKEN}$`), 'is not a device token')
   .toLowerCase();
-const RegisterBody = z.object({
-  token: Token,
-  environment: z.enum(PUSH_ENVIRONMENTS),
-  eventId: z.string().uuid(),
-});
-const RemoveBody = z.object({ token: Token, eventId: z.string().uuid() });
+/**
+ * An FCM token (AN11a): letters, digits, `:`, `-` and `_`, kept as sent, since
+ * FCM's tell case apart; never past `FCM_TOKEN_MAX_LENGTH`, and never what an
+ * APNs token could be, so a token is one service's and keys one row.
+ */
+const FcmToken = z
+  .string()
+  .regex(
+    new RegExp(`^(?!${APNS_TOKEN}$)[A-Za-z0-9:_-]{1,${FCM_TOKEN_MAX_LENGTH}}$`),
+    'is not an FCM token',
+  );
+const eventId = z.string().uuid();
+// No service is APNs's, as every shipped iPhone sends it: today's body, its refusals unchanged.
+const apns = { service: z.literal('apns').optional(), token: ApnsToken };
+const fcm = { service: z.literal('fcm'), token: FcmToken };
+/** A service no branch names is its own refusal; anything else keeps zod's words. */
+const unknownService = {
+  error: (issue: { code?: string }) =>
+    issue.code === 'invalid_union' ? 'is not a push service' : undefined,
+};
+const RegisterBody = z.discriminatedUnion(
+  'service',
+  [
+    z.object({ ...apns, environment: z.enum(PUSH_ENVIRONMENTS), eventId }),
+    // FCM has one endpoint and no sandbox: the Firebase project decides where a token works.
+    z.object({ ...fcm, environment: z.literal('production'), eventId }),
+  ],
+  unknownService,
+);
+const RemoveBody = z.discriminatedUnion(
+  'service',
+  [z.object({ ...apns, eventId }), z.object({ ...fcm, eventId })],
+  unknownService,
+);
 
 const notAStudent = () => ApiError.forbidden('only a student registers a device for notifications');
 
 /**
  * PUT /v1/me/push-token — a student registers its phone's APNs token, with the
  * environment it was issued for (N3; ARCHITECTURE, "Push: a doorbell for
- * students"). One phone, one current owner: a token another account holds
- * moves to the caller. Idempotent on `eventId` (`registerPushToken`), and
- * later wins by its UUIDv7 order: a register older than the row's answers
- * `replay` with the token's environment now, which can mean another account's
- * newer register holds the token (N4).
+ * students"), or, naming the service `fcm`, its FCM token, whose environment
+ * is `production` (AN11a). One phone, one current owner: a token another
+ * account holds moves to the caller. Idempotent on `eventId`
+ * (`registerPushToken`), and later wins by its UUIDv7 order: a register older
+ * than the row's answers `replay` with the token's environment now, which can
+ * mean another account's newer register holds the token (N4).
  *
  * DELETE /v1/me/push-token — the student removes it: `removed`, or
  * `not_registered` when the caller holds no such token (a retry, or it moved

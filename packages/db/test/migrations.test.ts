@@ -194,12 +194,8 @@ async function stagedOnPostgres(url: string, tag: string): Promise<Staged> {
 }
 
 const REAL_PG = process.env.TEST_DATABASE_URL;
-const lanes: [string, (tag: string) => Promise<Staged>][] = [
-  ['PGlite', stagedOnPglite],
-  ...(REAL_PG
-    ? [['real Postgres', (tag: string) => stagedOnPostgres(REAL_PG, tag)] as const]
-    : []),
-];
+const lanes: [string, (tag: string) => Promise<Staged>][] = [['PGlite', stagedOnPglite]];
+if (REAL_PG) lanes.push(['real Postgres', (tag) => stagedOnPostgres(REAL_PG, tag)]);
 
 /** Why `write` was refused: every message down its causes, or '' when it was not. */
 async function refusal(write: Promise<unknown>): Promise<string> {
@@ -260,7 +256,9 @@ describe.each(lanes)('migration 0031 on %s: the push token’s service (AN11a)',
       expect(kept).toMatchObject({ token: fcm, service: 'fcm' });
       const format = /device_tokens_token_format/;
       const hex = newUuidV7().replace(/-/g, '').repeat(2);
-      expect(await refusal(db.insert(deviceTokens).values(row(fcmToken(), 'apns')))).toMatch(format);
+      expect(await refusal(db.insert(deviceTokens).values(row(fcmToken(), 'apns')))).toMatch(
+        format,
+      );
       expect(await refusal(db.insert(deviceTokens).values(row(hex, 'fcm')))).toMatch(format);
     } finally {
       await staged.close();

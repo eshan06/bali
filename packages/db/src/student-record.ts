@@ -110,8 +110,9 @@ export async function exportStudentRecord(db: Database, who: string, now: Date =
         .from(teacherInvites)
         .where(eq(teacherInvites.redeemedBy, id))
         .orderBy(asc(teacherInvites.redeemedAt), asc(teacherInvites.id));
-      // Their phones' APNs tokens (N4), whole: a row keyed to them, the device
-      // address included — it opens nothing without Bali's own APNs key.
+      // Their phones' tokens (N4), APNs's and FCM's (AN11a), whole, each with its
+      // service: a row keyed to them, the device address included — it opens
+      // nothing without Bali's own APNs key or FCM service account.
       const tokens = await tx
         .select()
         .from(deviceTokens)

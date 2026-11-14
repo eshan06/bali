@@ -6,11 +6,12 @@ import type { ApnsClient, ApnsResult } from './apns.js';
 
 /*
  * The "class started" doorbell (N5; ARCHITECTURE, "Push: a doorbell for
- * students"): after a Start commits, one visible alert to each token of the
- * students whose waiting tap that Start converted. Never the truth — the
+ * students"): after a Start commits, one visible alert to each APNs token of
+ * the students whose waiting tap that Start converted. Never the truth — the
  * phone, opened, reads it from the API — so a send is fired and forgotten:
  * it never fails or delays the Start, and its failures are only logged,
- * never with the token.
+ * never with the token. It reads, rings and deletes APNs's tokens only: an
+ * FCM token sent to APNs would come back gone and be deleted (AN11a).
  */
 
 /** How long a "has started" is worth delivering: later, it is no longer true. */
@@ -88,7 +89,7 @@ export function classStartedNotifier(
   return (started) => {
     if (started.studentIds.length === 0) return;
     const sending = (async () => {
-      const targets = await pushTargetsOf(db, started.studentIds);
+      const targets = await pushTargetsOf(db, 'apns', started.studentIds);
       await Promise.all(targets.map((target) => sendTo(target, started)));
     })()
       .catch((err: unknown) => {

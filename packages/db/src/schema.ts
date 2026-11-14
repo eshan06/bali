@@ -5,6 +5,7 @@ import type {
   ParticipationEndedReason,
   ParticipationState,
   PushEnvironment,
+  PushService,
   UserRole,
 } from '@bali/shared';
 import { sql } from 'drizzle-orm';
@@ -402,21 +403,25 @@ export const teacherInvites = pgTable(
 );
 
 /*
- * Device tokens (N3; ARCHITECTURE, "Push: a doorbell for students"): a student's phone's APNs
- * token, so a Start can ring the students it converts (N5). Keyed by the token, so one phone has
- * one current owner: registered from another account, the row moves to it. Written beside the
- * transition engine (`device-tokens.ts`), never inside it. Personal data, and the one table whose
- * rows are really deleted: a removed or gone token is no record of anything, and nothing
- * references it.
+ * Device tokens (N3; ARCHITECTURE, "Push: a doorbell for students"): a student's phone's push
+ * token, APNs's or, since AN11a, FCM's, so a Start can ring the students it converts (N5). Keyed
+ * by the token, so one phone has one current owner: registered from another account, the row
+ * moves to it. The two services' formats never meet, so a token is one service's and keys one row
+ * across both. Written beside the transition engine (`device-tokens.ts`), never inside it.
+ * Personal data, and the one table whose rows are really deleted: a removed or gone token is no
+ * record of anything, and nothing references it.
  */
 export const deviceTokens = pgTable(
   'device_tokens',
   {
-    /** The token APNs gave the phone, in lower-case hex. */
+    /** APNs's in lower-case hex; FCM's as FCM gave it, case and all. */
     token: text('token').primaryKey(),
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id),
+    /** Its service: every row before AN11a, and a write naming none, APNs's. */
+    service: text('service').$type<PushService>().notNull().default('apns'),
+    /** APNs's environment; an FCM token's is `production`, the one FCM has. */
     environment: text('environment').$type<PushEnvironment>().notNull(),
     /** The eventId of the register that wrote the row as it is: a replay finds its own here. */
     eventId: uuid('event_id').notNull().unique(),
@@ -426,8 +431,17 @@ export const deviceTokens = pgTable(
   (t) => [
     // A Start reads a student's tokens (N5); a deletion removes them (N4).
     index('device_tokens_user_idx').on(t.userId),
-    check('device_tokens_token_hex', sql`${t.token} ~ '^[0-9a-f]{64,200}$'`),
-    check('device_tokens_environment', sql`${t.environment} IN ('sandbox', 'production')`),
+    check('device_tokens_service', sql`${t.service} IN ('apns', 'fcm')`),
+    // FCM's: its characters, at most FCM_TOKEN_MAX_LENGTH, and never what an APNs token could
+    // be, in either case. A regex's bound stops at 255 in Postgres, so the length is counted.
+    check(
+      'device_tokens_token_format',
+      sql`CASE ${t.service} WHEN 'fcm' THEN ${t.token} ~ '^[A-Za-z0-9:_-]+$' AND char_length(${t.token}) <= 2048 AND ${t.token} !~ '^[0-9a-fA-F]{64,200}$' ELSE ${t.token} ~ '^[0-9a-f]{64,200}$' END`,
+    ),
+    check(
+      'device_tokens_environment',
+      sql`CASE ${t.service} WHEN 'fcm' THEN ${t.environment} = 'production' ELSE ${t.environment} IN ('sandbox', 'production') END`,
+    ),
   ],
 );
 

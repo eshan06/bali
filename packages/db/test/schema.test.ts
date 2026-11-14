@@ -401,7 +401,8 @@ describe('device tokens: each service its own format, one token one key (AN11a)'
   /** An APNs token as stored: lower-case hex. */
   const hex = () => newUuidV7().replace(/-/g, '').repeat(2);
   /** An FCM token, shaped as FCM's are: mixed case, `:`, `-` and `_`. */
-  const fcm = () => `fAb${randomBytes(8).toString('base64url')}:APA91b-${randomBytes(90).toString('base64url')}_`;
+  const fcm = () =>
+    `fAb${randomBytes(8).toString('base64url')}:APA91b-${randomBytes(90).toString('base64url')}_`;
   const row = (userId: string, token: string, more: Record<string, unknown> = {}) => ({
     token,
     userId,
@@ -416,7 +417,11 @@ describe('device tokens: each service its own format, one token one key (AN11a)'
     const s = await student('kept');
     const token = fcm();
     await db.insert(deviceTokens).values(row(s.id, token, { service: 'fcm' }));
-    expect(await tokenRow(token)).toMatchObject({ token, service: 'fcm', environment: 'production' });
+    expect(await tokenRow(token)).toMatchObject({
+      token,
+      service: 'fcm',
+      environment: 'production',
+    });
     // Written as before AN11a, naming no service: the column's default, APNs's.
     const apns = hex();
     await db.execute(

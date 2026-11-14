@@ -302,7 +302,10 @@ describe('no service named: APNs’s, as every shipped iPhone sends it (AN11a)',
       environment: 'production',
       eventId: newUuidV7(),
     });
-    expect(res).toEqual({ status: 200, body: { outcome: 'registered', environment: 'production' } });
+    expect(res).toEqual({
+      status: 200,
+      body: { outcome: 'registered', environment: 'production' },
+    });
     expect(await rowOf(named)).toMatchObject({ service: 'apns', environment: 'production' });
     const removal = { service: 'apns', token: named.toUpperCase(), eventId: newUuidV7() };
     expect((await remove(sub, removal)).body).toEqual({ outcome: 'removed' });
@@ -323,7 +326,10 @@ describe('an FCM token: PUT and DELETE naming the service fcm (AN11a)', () => {
     const token = newFcmToken();
     const eventId = newUuidV7();
     const res = await register(sub, fcm(token, eventId));
-    expect(res).toEqual({ status: 200, body: { outcome: 'registered', environment: 'production' } });
+    expect(res).toEqual({
+      status: 200,
+      body: { outcome: 'registered', environment: 'production' },
+    });
     expect(await rowOf(token)).toMatchObject({
       userId: (await userOf(sub)).id,
       service: 'fcm',
