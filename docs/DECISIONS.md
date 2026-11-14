@@ -55,15 +55,20 @@ a real decision? Add a dated entry at the top: what was decided and why.
     out a register, where the advisory lock serialises only the registers. A collision of two students' hashes only makes their
     registers wait on each other. A removal, a token reported gone and the privacy paths only ever lower a count, so they take
     none.
-  - **The rows:** before it writes, a register locks the token's row and the student's tokens it would put past the cap, in one
-    statement and in token order (`lockPastCap`), and lets those go once it has written, only those still the student's: a
-    token another account took before the lock stays that account's. Every register locks rows this one way, so two never wait
-    on each other in a cycle. Santa's round 1 found the deadlock the first shape had (both reviewers): written first and let go
-    after, two students at the cap each taking the other's oldest token at once each held the row it had moved and waited on
-    the row the other had moved, and Postgres refused one after its one-second deadlock check, a `500`. Honestly, that needs a
-    phone moving each way between two accounts at once, ruled impossible for the pilot; but an attacker with two free accounts
-    could repeat it, each round holding pool connections for that second while the accounts' other registers queued behind
-    their locks, so it was fixed, not dropped.
+  - **The rows:** before it writes, a register reads the student's tokens it would put past the cap (through
+    `device_tokens_user_idx`), then locks them with the token's own row in one statement, by primary key and in token order
+    (`lockPastCap`), and lets them go once it has written, only those still the student's: a token another account took before
+    the lock stays that account's. Every register locks rows this one way, so two that each take the other's token wait in
+    turn. Santa's round 1 found the deadlock the first shape had (both reviewers): written first and let go after, two students
+    at the cap each taking the other's oldest token at once each held the row it had moved and waited on the row the other had
+    moved, and Postgres refused one after its one-second deadlock check, a `500`. Honestly, that needs a phone moving each way
+    between two accounts at once, ruled impossible for the pilot; but an attacker with two free accounts could repeat it, each
+    round holding pool connections for that second while the accounts' other registers queued behind their locks, so it was
+    fixed, not dropped. Santa's round 2: the first lock read the whole table (an `OR` with a sub-select takes no index), now two
+    index reads; and one gap is left, a token no row held at this register's lock that another register writes before this one
+    does, which needs several accounts timed to one round trip, so no one repeats it: Postgres refuses one of them after a
+    second, a `500` its phone sends again at its next launch. No test pins the token order alone: in one table two statements
+    read rows in the same order almost always, and the order makes it so whatever plan each gets.
   - **Known, as with a student's taps:** a burst of one student's registers waits its turn, each holding a pooled connection
     meanwhile, so the account budget's full burst of 120 holds the pool for those registers' time, under a second, at most once
     a minute (santa's round 1, left as it is: the budget bounds it, as it bounds `lockStudentTaps`).

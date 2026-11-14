@@ -1,5 +1,5 @@
 import type { PushEnvironment, PushService } from '@bali/shared';
-import { and, asc, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 
 import { deviceTokens, users } from './schema.js';
 import { isUniqueViolation } from './sql-errors.js';
@@ -241,29 +241,31 @@ async function lockStudentPushTokens(tx: Database, userId: string): Promise<void
 }
 
 /**
- * Lock `token`'s row, if it has one, and every token of the student's that a
- * register of it would put past the cap (AN11a2), in one statement and in
- * token order, before the register writes; returns the latter, for it to let
- * go once it has written. Past the cap is every token of theirs but `token`
- * and the newest `PUSH_TOKENS_PER_STUDENT - 1` others, oldest by `updated_at`
- * and then by token, so the order is fixed. Every register takes its row locks
- * this one way, so two that each take a token of the other's never wait on
- * each other in a cycle: the second waits for the first, and no deadlock.
+ * The student's tokens that a register of `token` would put past the cap
+ * (AN11a2), read, then locked with `token`'s own row, if it has one, in one
+ * statement and in token order, before the register writes; it lets them go
+ * once it has written. Past the cap is every token of theirs but `token` and
+ * the newest `PUSH_TOKENS_PER_STUDENT - 1` others, oldest by `updated_at` and
+ * then by token, so the order is fixed. Every register locks its rows this one
+ * way, so two that each take a token of the other's don't wait on each other
+ * in a cycle: the second waits for the first.
  */
 async function lockPastCap(tx: Database, userId: string, token: string): Promise<string[]> {
-  const others = tx
+  const pastCap = (
+    await tx
+      .select({ token: deviceTokens.token })
+      .from(deviceTokens)
+      .where(and(eq(deviceTokens.userId, userId), ne(deviceTokens.token, token)))
+      .orderBy(desc(deviceTokens.updatedAt), desc(deviceTokens.token))
+      .offset(PUSH_TOKENS_PER_STUDENT - 1)
+  ).map((row) => row.token);
+  await tx
     .select({ token: deviceTokens.token })
     .from(deviceTokens)
-    .where(and(eq(deviceTokens.userId, userId), ne(deviceTokens.token, token)))
-    .orderBy(desc(deviceTokens.updatedAt), desc(deviceTokens.token))
-    .offset(PUSH_TOKENS_PER_STUDENT - 1);
-  const locked = await tx
-    .select({ token: deviceTokens.token })
-    .from(deviceTokens)
-    .where(or(eq(deviceTokens.token, token), inArray(deviceTokens.token, others)))
+    .where(inArray(deviceTokens.token, [token, ...pastCap]))
     .orderBy(asc(deviceTokens.token))
     .for('update');
-  return locked.map((row) => row.token).filter((held) => held !== token);
+  return pastCap;
 }
 
 /** The caller's row, held FOR SHARE to the end of `tx`. */
