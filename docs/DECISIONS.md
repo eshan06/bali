@@ -91,7 +91,16 @@ a real decision? Add a dated entry at the top: what was decided and why.
   files; the S12 scan, nothing found; `plan-words.sh` counted as CI counts. The size: 26 changed lines not counting tests
   and Markdown, 108 in the test files.
 
-  **Santa's review:** [filled after the review].
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, taken: the rewritten help page test no
+  longer counted For students' lists, so a third list would pass (both; `expect(help).toHaveLength(2)` now, which a third
+  list fails, tried and reverted); and `policy-pages.test.tsx`'s header still said the help page's lists are the
+  policy's own (both). Left, outside this step's lane: `ConsentCard.sees`' comment in JoinView.swift, "The portal's help
+  page says the same, word for word" (B), the Mac's; and note 9 for the lawyer in `docs/legal/privacy-policy.md`, which
+  says the policy's lists are the help page's too, "so those three can't say different things" (both), AP4's, the
+  owner's and the lawyer's. The design check: web-design-guidelines found one WARN, left: "Screen Time", a brand name,
+  now breaks across lines at 1440 px, and a no-break space would change the apps' own string, which the guard holds word
+  for word. no-ai-slop's Detect job over the new line found nothing.
 
 - **2026-11-13** — **S12, a scan that fails CI on an invisible or text-direction character in any file git tracks:
   `.github/scripts/invisible-characters.py`, run in "CI changes" before its docs-only decision, so "Typecheck · lint · unit
