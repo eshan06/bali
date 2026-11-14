@@ -5044,11 +5044,11 @@ describe.runIf(REAL_PG)('device tokens registered under contention (real Postgre
           }),
         ),
       );
-      let unstaged: unknown = null;
+      let unstaged: Error | null = null;
       try {
         await waitForBlockedBackend(5_000, 2);
       } catch (err) {
-        unstaged = err;
+        unstaged = err instanceof Error ? err : new Error(String(err));
       } finally {
         release();
       }
