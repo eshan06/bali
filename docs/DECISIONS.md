@@ -8,6 +8,93 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-13** — **AN11a2, a cap on how many push tokens one student holds: at most five, APNs's and FCM's together; a
+  register that would make a sixth lets go of the student's oldest, by `updated_at` and then by token, in its own transaction
+  under a lock per student, so no commit leaves more; `PUT /v1/me/push-token` answers as it always did (the conductor's three
+  calls and this step's, each awaiting the owner's look; AN11a2, #NNN).**
+
+  **The hole** (found by AN11a's worker and Claude Review on #598): any signed-in student could call `PUT /v1/me/push-token`
+  again and again with made-up tokens, and nothing capped how many rows they kept; only the per-account budget, 120 requests a
+  minute (L1), slowed it. That is about 170,000 rows a day from one account, an FCM row up to 2,048 characters since AN11a,
+  about ten times an APNs row. And each Start rings every token of each student it converts, so one student's pile slowed the
+  push for the whole class. It was open for APNs's tokens since N3; FCM's made it larger. Fixed now, under the owner's standing
+  order on a security hole with a concrete exploit.
+
+  **The conductor's calls** (2026-11-13; awaiting the owner's look):
+  1. **Per student, both services together, the oldest let go:** no refusal, so a real phone's register never fails.
+  2. **Five,** unless the code or the docs gave a reason for another number. They gave none (below).
+  3. **Its name, AN11a2,** after AN10c2's, in PLAN-ANDROID beside AN11a, which found it; server-wide, APNs's and FCM's.
+
+  **Why five:** each app registers its token once a launch (the iPhone after its first read; Android's the same, AN12), and a
+  register of a token the student holds refreshes its row instead of adding one. So a row is added only by a new token: a
+  reinstall or a restore, a new phone, FCM's own refresh, or a phone changing hands. A token that stopped working goes when a
+  send reports it gone (N5b), and a sign-out removes the phone's. An honest student holds one phone's token, a few left behind
+  until a Start rings them, and maybe a second phone's: five holds all of it, and a Start rings at most five of a student's.
+
+  **The order they go in:** oldest `updated_at` first, the last time each was registered, then by token, so the order is fixed
+  (a unique key, as #594 and #595 order). A phone that opens Bali refreshes its own row at each launch, so the token let go is
+  the one registered longest ago, a phone gone quiet. The register's own token always stays: the eviction keeps it and the
+  newest four others, so `registered` is true at the commit, whatever two transactions' clocks say. Every write counts:
+  - a new token;
+  - a token moving from another account (one phone, one current owner): the caller's count goes up and may let its oldest go;
+    the other account holds one fewer and loses nothing else;
+  - a register again of a token the caller holds: it refreshes the row and lets nothing go, since the student holds five at
+    most already.
+
+  A replay writes nothing and lets nothing go: the same `eventId` again, or an older register that a newer one overtook (N4's
+  order). A student holding more than five from before this step goes down to five at its next register that writes, its own
+  oldest let go (this step's call, awaiting the owner's look); no migration deletes rows.
+
+  **The lock** (this step's call, awaiting the owner's look): a register first takes a transaction advisory lock on a hash of
+  the student's id (`lockStudentPushTokens`), as the engine's `lockStudentTaps` does for taps, released at commit. One
+  student's registers then run one after another, each counting the student's tokens with the one before it committed. With
+  none, two at once each count the committed rows and their own, both let the same oldest token go, and the student keeps six.
+  No single statement holds it: each reads a snapshot without the other's uncommitted row. Weighed and refused: a stronger lock
+  on the student's own row (`FOR NO KEY UPDATE` where it is `FOR SHARE`), which would also make every other reader of that row
+  wait out a register, where the advisory lock serialises only the registers. A collision of two students' hashes only makes
+  their registers wait on each other. A removal, a token reported gone and the privacy paths only ever lower a count, so they
+  take none. A token another account takes while the eviction runs stays that account's: the delete reads the owner again on
+  the row it locks.
+
+  **How a phone whose token was let go fails, honestly:** it gets no "class started" alert until its app registers again at
+  its next launch. Nothing tells the phone, and nothing has to: the push is a doorbell, never the truth (ARCHITECTURE, "Push: a
+  doorbell for students"); the phone's 30 s read and its return to the front still find the Start, and opening Bali reads the
+  truth. Its token goes only once five others of the student's were registered since that phone last launched Bali, which an
+  honest student's phones don't do.
+
+  **What the caller sees doesn't change:** `PUT`'s answers, outcomes and refusals are byte for byte today's (additive-only
+  `/v1`); a register past the cap answers `registered`, as before. No field, fixture or migration changes:
+  `device_tokens_user_idx` already finds a student's tokens.
+
+  **Nothing is logged** (this step's call, awaiting the owner's look): no line says a token went, so none can hold one, and
+  the request log is as it was.
+
+  **The replay's comment** (Claude Review's other WARN on #598): `registerOnce` matches a replay on the token and the account
+  alone, never the service. A comment there now says it is safe only because the two services' formats never meet: the route's
+  check and the `device_tokens_token_format` CHECK.
+
+  **The tests,** failing first (commits `test(db)` and `test(api)`, run against `main`'s code with only the constant added,
+  since they import it): through the route and in the table, six registers leave five, the oldest gone, every answer as it
+  was; a register again refreshes the token, lets nothing go, and the next new token lets the next oldest go instead; a replay
+  lets nothing go, the same `eventId` or an older register of a token that moved on; a token moved from another account counts
+  against the caller and leaves that account one fewer; both services' tokens count together, an APNs register letting an FCM
+  token go and the other way round; a Start rings at most five of a student's tokens, its newest. On real Postgres: two new
+  registers at once for a student at the cap, staged on its oldest token's row (the race rule, 2026-10-06), keep five, the two
+  oldest gone; and a token moving to another account while its owner registers past the cap stays the mover's. Five failed
+  before the fix, all but the replay's, which held there because nothing was ever let go.
+
+  **The breaks,** each made on purpose, run and reverted:
+  - No cap (the eviction never called): 5 fail, first "lets the oldest go when a register would make one more, each answer
+    as it always was".
+  - The newest let go instead of the oldest (the order flipped): the same 5 fail.
+  - A replay letting a token go (the eviction run whatever the register wrote): "lets nothing go on a replay: the same
+    eventId again, or an older register of a token that moved on" fails, four kept.
+  - The race unguarded (no advisory lock), on CI's real-Postgres lane: RACE_RESULT
+  - The delete without its owner check, on the same run: MOVE_RESULT
+
+  **For AN11b:** nothing changes for the FCM sender. `pushTargetsOf(db, 'fcm', ids)` reads at most five tokens a student, both
+  services together, and a token FCM reports gone goes through `deleteGonePushToken` as before.
+
 - **2026-11-13** — **AN11a, the push token's service in the API and the database: `PUT` and `DELETE /v1/me/push-token` take an
   optional `service`, `apns` or `fcm`, absent meaning `apns`, so every shipped iPhone calls them as today; an FCM token is kept as
   sent, 1 to 2,048 characters of letters, digits, `:`, `-` and `_`, never one an APNs token could be, its environment

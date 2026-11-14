@@ -8,13 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-13 (Central) — the API takes an Android phone's FCM token beside an
-iPhone's APNs token, `service` naming which, and its APNs sender rings APNs's alone (AN11a, #598;
-DECISIONS 2026-11-13). Before it, the help page names Android's lock (AP2b, #597). Next: the owner's
-switch of prod's domain, the release call and disabling the review account (Open owner items); a
-session builds the retire-a-block command; the owner the sitting's findings' calls; GA5's known
-limit, the owner's call (DECISIONS 2026-11-02); AN11b, AN12; AN1's part 2 on the owner's phones;
-the audit's polish waits._
+_Last updated: 2026-11-13 (Central) — a student holds at most five push tokens, APNs's and FCM's
+together, a register past them letting the oldest go (AN11a2, #NNN; DECISIONS 2026-11-13). Before
+it, the API takes an Android phone's FCM token (AN11a, #598). Next: the owner's switch of prod's
+domain, the release call and disabling the review account (Open owner items); a session builds the
+retire-a-block command; the owner the sitting's findings' calls; GA5's known limit, the owner's call
+(DECISIONS 2026-11-02); AN11b, AN12; AN1's part 2 on the owner's phones; the audit's polish waits._
 
 ## Now
 
