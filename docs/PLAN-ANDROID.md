@@ -14,7 +14,7 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-13 (Central) — AN11a2, a cap on how many push tokens one student holds, server-wide (#NNN;
+_Last updated: 2026-11-13 (Central) — AN11a2, a cap on how many push tokens one student holds, server-wide (#599;
 `docs/DECISIONS.md`, 2026-11-13): at most five a student, APNs's and FCM's together; a register that would make a sixth lets go
 of the student's oldest, by when each was last registered, in its own transaction under a lock per student, so no account piles
 up rows and a Start rings at most five of a student's phones; `PUT`'s answers unchanged (the conductor's calls and this step's,
@@ -190,7 +190,7 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN10g** The words of Me, Leave, Sign out, Delete account and the 13+ stop — ✅ (#572; DECISIONS 2026-11-12)
 - **AN10h** History's words and the consent list — ✅ (#573; DECISIONS 2026-11-12)
 - **AN11a** The push token's service in the API and the database — ✅ (#598; DECISIONS 2026-11-13)
-- **AN11a2** A cap on how many push tokens one student holds, server-wide (APNs's and FCM's), the hole AN11a found — ✅ (#NNN;
+- **AN11a2** A cap on how many push tokens one student holds, server-wide (APNs's and FCM's), the hole AN11a found — ✅ (#599;
   DECISIONS 2026-11-13)
 - **AN11b** The FCM sender, AN11's second half (on this PC, the owner, 2026-11-12; twin: `apps/api/src/push/apns.ts`): an FCM
   sender beside APNs, under the same rules (after the Start commits, the same words, no personal data, a token reported gone

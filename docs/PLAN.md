@@ -9,7 +9,7 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
 _Last updated: 2026-11-13 (Central) — a student holds at most five push tokens, APNs's and FCM's
-together, a register past them letting the oldest go (AN11a2, #NNN; DECISIONS 2026-11-13). Before
+together, a register past them letting the oldest go (AN11a2, #599; DECISIONS 2026-11-13). Before
 it, the API takes an Android phone's FCM token (AN11a, #598). Next: the owner's switch of prod's
 domain, the release call and disabling the review account (Open owner items); a session builds the
 retire-a-block command; the owner the sitting's findings' calls; GA5's known limit, the owner's call

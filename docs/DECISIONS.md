@@ -11,7 +11,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 - **2026-11-13** — **AN11a2, a cap on how many push tokens one student holds: at most five, APNs's and FCM's together; a
   register that would make a sixth lets go of the student's oldest, by `updated_at` and then by token, in its own transaction
   under a lock per student, so no commit leaves more; `PUT /v1/me/push-token` answers as it always did (the conductor's three
-  calls and this step's, each awaiting the owner's look; AN11a2, #NNN).**
+  calls and this step's, each awaiting the owner's look; AN11a2, #599).**
 
   **The hole** (found by AN11a's worker and Claude Review on #598): any signed-in student could call `PUT /v1/me/push-token`
   again and again with made-up tokens, and nothing capped how many rows they kept; only the per-account budget, 120 requests a
@@ -107,8 +107,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - The newest let go instead of the oldest (the order flipped): the same 5 fail.
   - A replay letting a token go (the delete run whatever the register wrote): "lets nothing go on a replay: the same eventId
     again, or an older register of a token that moved on" fails, four kept.
-  - On CI's real-Postgres lane, in one run: the race unguarded (no advisory lock), RACE_RESULT; the delete without its owner
-    check, MOVE_RESULT; and the rows read with no lock, the first shape, CROSS_RESULT.
+  - On CI's real-Postgres lane, in one run (#599's first), the three staged tests failed and nothing else did:
+    - the race unguarded (the student lock keyed per register): "two new registers at once for a student at the cap, staged on
+      its oldest token…", six kept;
+    - the delete without its owner check: "a token moving to another account while its owner registers past the cap…", the
+      mover's token deleted;
+    - the rows read with no lock (the lock statement's `FOR UPDATE` dropped, the first shape): "two students at the cap each
+      taking the other's oldest token at once, staged…", one register refused, `deadlock detected` (40P01).
 
   **For AN11b:** nothing changes for the FCM sender. `pushTargetsOf(db, 'fcm', ids)` reads at most five tokens a student, both
   services together, and a token FCM reports gone goes through `deleteGonePushToken` as before.
