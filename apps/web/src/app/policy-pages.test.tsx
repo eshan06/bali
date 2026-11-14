@@ -18,7 +18,8 @@ import TermsPage, { metadata as termsMetadata } from './terms/page';
  * 2026-10-24 under each title and its date, who runs Bali (Bali Focus Inc. since 2026-11-11, in the
  * opening and the terms' California notice), every section in the draft's order, the sections the
  * owner named at the outline's ids, the privacy draft's table as a list, its section 2's lists the
- * app's and the help page's own (#130), the owner's two later lines (section 1's clock set ahead,
+ * iPhone app's own, and the help page's but for its focus status (#130; AP2b), the owner's two
+ * later lines (section 1's clock set ahead,
  * section 6's records at another school), PostHog named wherever its counts change what a line says
  * (A4) and no line keeping a teacher's ID there once their counts go (A6), no email domain and no
  * TestFlight, since the app comes from the App Store (2026-11-07), Contact's mailto and the
@@ -483,7 +484,9 @@ describe('the help page’s lists of what a teacher sees name Android’s lock b
   it('says every other line as the privacy policy does, in the same order', () => {
     const [policySees, policyNever] = policyLists();
     cleanup();
-    const [helpSees, helpNever] = helpLists();
+    const help = helpLists();
+    expect(help).toHaveLength(2);
+    const [helpSees, helpNever] = help;
     expect(helpSees).toHaveLength(TEACHER_SEES.length);
     expect(helpSees?.slice(1)).toEqual(policySees?.slice(1));
     expect(helpNever).toEqual(policyNever);
