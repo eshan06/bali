@@ -8,6 +8,134 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-13** — **S12, a scan that fails CI on an invisible or text-direction character in any file git tracks:
+  `.github/scripts/invisible-characters.py`, run in "CI changes" before its docs-only decision, so "Typecheck · lint · unit
+  tests", the check `protect-main` requires, fails with it on every PR and every push to main, docs-only ones too, with no
+  ruleset change; main's ten such characters, all in tests, now written as escapes (the owner's call of 2026-11-12; the four
+  calls the conductor left and this step's, marked, each awaiting the owner's look; S12, #596).**
+
+  **The owner's call** (the go-ahead of 2026-11-12, call 3, recorded on 2026-11-13): "A CI check fails any PR with invisible or
+  text-direction characters in source files, added to a check that's already required: S12, a session's step, for every
+  session's PRs (the Write tool's escape trap, GOTCHAS)." The trap: Claude Code's Write and Edit tools turn a typed backslash-u
+  escape into its character, an invisible one too, with no error (GOTCHAS; AN9f, 2026-11-11). Until now each worker scanned its
+  own diff by hand. The scan doesn't stop the tools making one; it stops one reaching main.
+
+  **What it flags** (`FLAGGED`, first and last code points, 4,253 in all, and the emoji selector outside an emoji; the test
+  holds its own copy, so a range dropped from the script fails it):
+  - **Unicode's default-ignorable characters, the ones Unicode says draw as nothing:** all the conductor listed (the zero-width
+    space, non-joiner and joiner, U+200B to U+200D; the word joiner and the invisible operators, U+2060 to U+2064; U+FEFF
+    anywhere, a byte-order mark at a file's start included, named so; the text-direction marks and controls, U+200E, U+200F,
+    U+061C, U+202A to U+202E and U+2066 to U+2069; the soft hyphen U+00AD; the Mongolian vowel separator U+180E; the tags,
+    U+E0000 to U+E007F), and the rest of that property: the combining grapheme joiner U+034F, the Hangul fillers U+115F,
+    U+1160, U+3164 and U+FFA0, the Khmer inherent vowels U+17B4 and U+17B5, the Mongolian free variation selectors U+180B to
+    U+180D and U+180F, U+2065 and U+206A to U+206F, the variation selectors U+FE00 to U+FE0E and U+E0100 to U+E01EF, U+FFF0
+    to U+FFF8, the shorthand format controls U+1BCA0 to U+1BCA3, the musical beam and phrase controls U+1D173 to U+1D17A, and
+    plane 14 up to U+E0FFF. U+FE0F, the emoji selector, only outside an emoji (call 3).
+  - **Every space but the plain one:** U+00A0, U+1680, U+2000 to U+200A, U+202F, U+205F and U+3000.
+  - **The line and paragraph separators,** U+2028 and U+2029.
+  - **The control characters but tab, line feed and carriage return:** U+0000 to U+0008, U+000B, U+000C, U+000E to U+001F and
+    U+007F to U+009F.
+
+  **The four the conductor left to decide, each awaiting the owner's look:**
+  1. **U+00A0, the no-break space: in.** It passes for a space in an editor and a diff, and code treats it as something else (a
+     split on a space misses it). The repo already writes every one it means as an escape, 46 places on main (the portal's chip
+     and grid dots, the slides' sizes, Swift's "Sign up or sign in", `&nbsp;` on `/terms`); main's four literal ones were all in
+     tests mirroring those escapes, likely the trap's work. No user-facing string held one.
+  2. **U+2028 and U+2029: in.** Invisible line breaks: JavaScript ends a line of code at each, so a `//` comment stops there and
+     what follows runs while an editor shows it inside the comment. None on main. The API refuses both in a name already
+     (`UNPRINTABLE`).
+  3. **The variation selectors: in, but U+FE0F where it shapes an emoji.** A run of them draws as nothing and can carry hidden
+     text, a byte a selector (U+FE00 to U+FE0F and the supplement U+E0100 to U+E01EF give 256 values); and each is a valid
+     character in a TypeScript, Kotlin or Swift name, so a name with one after it looks exactly like the name without. U+FE0F,
+     the emoji selector, is part of emoji the docs use 38 times (the scales marking a lawyer's step, and a return arrow, in
+     PLAN, PLAN-ANDROID, PLAN-ARCHIVE, DECISIONS and APP-STORE) and of the keycap digit in Android's `JoinTest.kt`: it passes
+     right after a character past ASCII that isn't a selector itself, and in a keycap (a digit, `#` or `*`, the selector, then
+     U+20E3), and fails anywhere else, after a letter, at a line's start, after another selector. Main holds no other
+     selector. (Round 1 left every selector out, "hiding nothing": santa's reviewers both showed that reason wrong.)
+  4. **U+200D in emoji:** flagged everywhere, as the conductor listed it. No shipped string or doc on main uses an emoji that
+     needs it (main holds no U+200D at all). One that needs a joined emoji later writes it as escapes in code, or picks a
+     one-character emoji in a doc.
+
+  **This step's calls, each awaiting the owner's look:**
+  1. **More than the conductor's list:** the rest of default-ignorable, every space but the plain one, and the controls. Each
+     draws nothing or passes for a space, as the listed ones do, and main held none of them, so they cost nothing today; the
+     controls are the trap's other likely work, a Kotlin escape for an escape character or a bell landing as the character.
+  2. **Two symbols drawn blank stay out: the braille blank U+2800 and the musical null notehead U+1D159.** Neither is a format
+     character, and main uses U+2800 on purpose, 11 times: `tidyDisplayName`'s blank class in `packages/shared/src/index.ts`,
+     written as the character, pinned by that line's text in both phones' tests (`MeTests.swift`, `MeTest.kt`), its tests in
+     `apps/api` and `packages/shared`, and two examples in DECISIONS and PLAN-ARCHIVE. Flagging it means writing each as an
+     escape, the phones' pins included: a small step of its own, recommended if the owner wants it.
+  3. **A file that isn't UTF-8 fails** as one that can't be read does (exit 2, its line and column named), since its characters
+     can't be told; none on main.
+  4. **Binary is git's own test, a NUL in a file's first 8,000 bytes (as `git grep -I` reads a file no attribute marks), in
+     bytes that aren't UTF-8 either:** 9 files today, the fonts, the icons and the Gradle jar, none of them UTF-8. So a NUL in
+     UTF-8 text, which the trap could make from an escape, is flagged rather than hiding the whole file, and a UTF-16 or UTF-32
+     file (what Windows PowerShell 5.1's `>` writes) fails by its byte-order mark. Every other file git tracks is read whole
+     from the working tree, docs included; a run from a folder scans the whole repository, and a listing of no file fails. CI
+     runs it with `python3 -I`, so no file beside the scripts stands in for Python's own modules.
+  5. **A conflict to come, none today:** the contract fixtures and `contracts/openapi.json` are written by `JSON.stringify`,
+     which writes U+00A0, U+2028, U+2029, the text-direction controls and U+007F to U+009F as the characters themselves, and
+     CI fails a fixture edited by hand. The first API answer carrying one would need those two writers to escape the flagged
+     characters (the same JSON value), or an `ALLOWED` entry, by the owner's call.
+
+  **The allowlist:** `ALLOWED` in the script, a path as git lists it and why; that file isn't scanned, and the log says so.
+  Empty, and meant to stay so: an entry is the owner's call, which the scan's messages say, and since it lives in the script,
+  adding one is a CI change. A whole file, as the brief drew it: one allowed for one character would pass another added later
+  (keying it by path and character is the owner's call, should an entry ever come).
+
+  **Where it runs, and why there:** two steps at the top of ci.yml's "CI changes", its self-test, then the scan, before the
+  docs-only decision. That job runs on every PR, docs-only ones too, and on every push to main, and "Typecheck · lint · unit
+  tests" fails whenever it didn't succeed. So the scan is required with no new check and no ruleset change. A failed scan leaves
+  no docs-only answer, so the test jobs run, as for any failed decision, and the gate fails with them. "Plan doc" runs on every
+  PR too but isn't required.
+
+  **Main's first scan** (at `99cacd0b`, #595): ten characters, all in tests, each in a string literal, each now written as its
+  escape in text, the same string at run time, no assertion changed:
+  - `apps/api/test/questions.test.ts`, line 256 (U+200B, "a prompt that draws nothing"), lines 257 and 914 (U+202E, "a prompt
+    with a bidi override");
+  - `apps/api/test/decks.test.ts`, line 213 (U+202E, a deck's title);
+  - `packages/shared/src/index.test.ts`, line 61 (U+00A0, a blank run in a name) and line 66 (U+200C twice, the Persian name the
+    joiners rule keeps);
+  - `apps/web/src/components/student-lesson.test.tsx`, lines 778, 800 and 817 (U+00A0, the chip's "Silent" and "Unknown" dots,
+    written as `your-phone.test.ts` already writes them).
+
+  None in a doc, a user-facing string or a source file.
+
+  **The tests** (`invisible-characters.test.py`, 15, each in a repository made for it, every character made at run time by
+  `chr()`): every always-flagged code point planted in one file fails at its line and column with its name, and the fix said
+  with it (its escape as text, Swift's too, or delete it); a byte-order mark at a file's start fails as one; the emoji
+  selector passes in emoji and keycaps and fails after a letter, at a line's start, after a space, after another selector and
+  after a digit with no keycap mark; the escape written as text passes (TypeScript, Kotlin, Swift, Markdown); what it leaves
+  alone passes (each flagged range's neighbours, U+2800, U+1D159, emoji, letters past ASCII, a tab and CRLF line ends); a
+  binary file holding those bytes passes; a NUL at the 8,000th byte of bytes that aren't UTF-8 is binary, at the 8,001st it
+  isn't, and those bytes fail as not UTF-8, while a NUL in UTF-8 text is flagged; a clean tree passes; an allowed file passes
+  and the same character in another file fails; a tracked file that's gone, one that isn't UTF-8, a UTF-16 or UTF-32 one, a
+  folder git can't list and a repository with nothing tracked each fail; and a run from a folder scans the whole repository.
+  The first twelve were committed first, failing (the scan wasn't there); santa's five failed against round 1's scan, each by
+  name, before its fix.
+
+  **Broken on purpose, on the final code, in scratch copies:** U+200B to U+200F dropped from `FLAGGED`: three tests fail,
+  naming each character missed and its place (`docs/planted.md:588:1 U+200B`, `…:589:2 U+200C` and on); the emoji selector
+  never flagged: its test; binary by a NUL alone, round 1's rule: the NUL and UTF-16 tests; UTF-16 not caught, and an empty
+  listing passing: each its own test. On a scratch branch, never pushed, a right-to-left override, a pop-directional-formatting
+  and a zero-width space planted in `docs/ISSUES.md`, a docs-only change: the self-test passed and the scan failed, exit 1,
+  naming each with its line, column and name.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so
+  context isolation holds and model diversity doesn't): 0 blockers. Their WARNs, taken: the variation selectors' reason was
+  wrong (both: a run hides text, one after a letter makes a look-alike name; call 3 now); a NUL let a whole UTF-8 file pass as
+  binary (both: call 4 now), and a UTF-16 file passed silently (B); the self-test's failure output, indented, would still run as
+  annotations, since the runner reads a command after leading spaces (B: each line now after a bar); `python3 -I`, and a
+  listing of no file failing (B); the scan's messages now say an `ALLOWED` entry is the owner's call (B); GOTCHAS kept its
+  non-ASCII check and says what the scan passes (A); the hint's docstring for code points past U+FFFF (A); this entry's calls
+  all marked awaiting the owner's look (A); the fixtures' coming conflict written down (B; call 5); and this entry's PR
+  number, a placeholder in round 1, #596 once the PR had one (A). Left: keying `ALLOWED` by character (B), above.
+
+  **The proof:** `python -I .github/scripts/invisible-characters.test.py` 15 of 15 and the scan on the whole tree (959 text
+  files, 9 binary skipped, nothing found) on this PC's Python 3.12, which CI's `python3` matches; `npm run typecheck && npm
+  run lint && npm test` green, the portal's suite whole; Prettier on the changed files; `plan-words.sh` 7,972 words of 8,000,
+  counted as CI counts.
+
 - **2026-11-13** — **AN9j's kept Emergency Unlock copies stay on the phone for the adult pilot, as built (the owner, 2026-11-13;
   recorded by AN9k, #593).** The conductor asked: "Keep a deleted student's unsent unlock copy on their phone for the pilot?" The
   owner answered: "Yes, keep it." It settles, for the pilot, AN9j's item on where a kept Emergency Unlock stays and what it holds

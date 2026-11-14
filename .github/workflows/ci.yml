@@ -46,6 +46,15 @@ jobs:
         with:
           # Two deep: the PR's base is HEAD^1, as in static's API-snapshot step.
           fetch-depth: 2
+      # S12: no file git tracks holds an invisible or text-direction character (the script says
+      # which, docs/DECISIONS.md why, 2026-11-13). Here, before the decision, so every PR and every
+      # push to main runs it, docs-only ones too, and "Typecheck · lint · unit tests", the check
+      # protect-main requires, fails with this job. Its self-test first, so a scan that stops
+      # finding fails instead of passing. -I: no file beside the scripts stands in for Python's
+      # own modules.
+      - run: python3 -I .github/scripts/invisible-characters.test.py
+      - name: No invisible or text-direction characters
+        run: python3 -I .github/scripts/invisible-characters.py
       - id: diff
         env:
           EVENT: ${{ github.event_name }}
@@ -70,8 +79,9 @@ jobs:
   # side, the unit tests alone taking about as long as the rest together;
   # it passes only when both did, or when both were skipped on a docs-only
   # PR. always(), so it runs and fails on a half failed, cancelled or skipped
-  # for any other reason, and on a docs-only decision that failed: a gate
-  # skipped by its `if` would count as passed.
+  # for any other reason, and when "CI changes" failed, its scan for invisible
+  # characters (S12) or its docs-only decision: a gate skipped by its `if`
+  # would count as passed.
   check:
     name: Typecheck · lint · unit tests
     needs: [changes, static, unit]

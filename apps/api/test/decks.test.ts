@@ -210,7 +210,7 @@ describe('POST /v1/decks', () => {
       { title: ' ' },
       { title: 'x'.repeat(DECK_TITLE_MAX_LENGTH + 1) },
       { title: 'Cells\npart 2' },
-      { title: 'Cells‮' },
+      { title: 'Cells\u202e' },
       { eventId: randomUUID() },
     ]) {
       const res = await create(token, adding(wrong));

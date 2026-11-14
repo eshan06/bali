@@ -253,8 +253,8 @@ describe('POST /v1/sessions/:id/questions', () => {
   it.each([
     ['a blank prompt', { prompt: ' \n ' }],
     ['a prompt of 501 characters', { prompt: 'x'.repeat(501) }],
-    ['a prompt that draws nothing', { prompt: '​' }],
-    ['a prompt with a bidi override', { prompt: 'Which ‮?' }],
+    ['a prompt that draws nothing', { prompt: '\u200b' }],
+    ['a prompt with a bidi override', { prompt: 'Which \u202e?' }],
     ['a prompt with a tab', { prompt: 'Which\t?' }],
     ['one option', { options: ['a'], correctOption: 0 }],
     ['seven options', { options: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] }],
@@ -911,7 +911,7 @@ describe('a teacher’s saved questions (L3b)', () => {
   it.each([
     ['a blank prompt', { prompt: ' \n ' }],
     ['a prompt of 501 characters', { prompt: 'x'.repeat(501) }],
-    ['a prompt with a bidi override', { prompt: 'Which ‮?' }],
+    ['a prompt with a bidi override', { prompt: 'Which \u202e?' }],
     ['one option', { options: ['a'], correctOption: 0 }],
     ['seven options', { options: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] }],
     ['an option with a line break', { options: ['a', 'b\nc'] }],

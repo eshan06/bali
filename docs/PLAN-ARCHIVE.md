@@ -10,6 +10,13 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN.md`'s, replaced by S12's on 2026-11-13: _Last updated: 2026-11-13 (Central) — Android keeps a student's notes off its storage once a deletion's
+request went out (AN9k, #593; DECISIONS 2026-11-13). Before it, `409 account_deleted` signs Android
+out (AN9j, #592). Next: the owner's switch of prod's domain, the release call and
+disabling the review account (Open owner items); a session builds the retire-a-block command and S12;
+the owner the sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02);
+AN11, AN12; AN1's part 2 on the owner's phones; the audit's polish waits._
+
 `docs/PLAN-ANDROID.md`'s, replaced by AN9k's on 2026-11-13: _Last updated: 2026-11-13 (Central) — AN9j, `409 account_deleted` read as signed out (#592; `docs/DECISIONS.md`, 2026-11-13):
 Bali's server's answer to any call, heard where every answer comes, ends that account's sign-in as Sign out does, with no
 DeleteUser; its Emergency Unlocks sent first under its own token, the rest of its queue let go; a phone in a lesson off its lock at once. Only for
@@ -2532,6 +2539,9 @@ Vanderbilt pilot's first class.
   DECISIONS 2026-11-08): a Start's end and an extend's go up to the next whole minute, where iOS
   frees a closed app's phone; the 16 hours and PostHog's `planned_minutes` count the minutes picked.
   No new app build.
+
+**Still open in earlier phases, S12's line as PLAN.md said it until S12 (2026-11-13, #596):**
+- **S12** A CI scan that fails any PR with invisible or text-direction characters in source files, added to a check that's already required (the owner, 2026-11-12; DECISIONS 2026-11-13)
 
 ## Phases: the full table and the finished step lists (as of 2026-10-13)
 
