@@ -555,6 +555,47 @@ describe('deleteAccount (C3)', () => {
     expect(await tokensOf(ana.id)).toEqual([]);
   });
 
+  it('deletes its phones’ FCM tokens as it deletes their APNs tokens, and leaves a classmate’s (AN11a)', async () => {
+    const { ana, ben } = await seed('c3-fcm-tokens');
+    const fcm = (n: number) => `fAb${n}x:APA91b-${newUuidV7().replace(/-/g, '_')}Q`;
+    const held = { ana: [fcm(1), fcm(2)], ben: [fcm(3)] };
+    for (const [student, tokens] of [
+      [ana, held.ana],
+      [ben, held.ben],
+    ] as const) {
+      for (const token of tokens) {
+        await registerPushToken(db, {
+          userId: student.id,
+          service: 'fcm',
+          token,
+          environment: 'production',
+          eventId: newUuidV7(),
+        });
+      }
+    }
+    // An APNs token beside them, as a student who moved from an iPhone holds.
+    await registerPushToken(db, {
+      userId: ana.id,
+      token: newUuidV7().replace(/-/g, '').repeat(2),
+      environment: 'sandbox',
+      eventId: newUuidV7(),
+    });
+    const tokensOf = async (userId: string) =>
+      (
+        await db
+          .select()
+          .from(deviceTokens)
+          .where(eq(deviceTokens.userId, userId))
+          .orderBy(deviceTokens.token)
+      ).map((r) => [r.token, r.service]);
+    expect(await tokensOf(ana.id)).toHaveLength(3);
+
+    await deleteAccount(db, { userId: ana.id, eventId: newUuidV7(), at: new Date() });
+
+    expect(await tokensOf(ana.id)).toEqual([]);
+    expect(await tokensOf(ben.id)).toEqual([[held.ben[0], 'fcm']]);
+  });
+
   it('deletes its 13+ yes, and leaves a classmate’s (C7-server)', async () => {
     const { ana, ben } = await seed('c3-age');
     for (const student of [ana, ben]) {

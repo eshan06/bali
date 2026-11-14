@@ -1584,21 +1584,52 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "token": {
-                    "type": "string",
-                    "pattern": "^[0-9a-fA-F]{64,200}$"
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "service": {
+                        "type": "string",
+                        "const": "apns"
+                      },
+                      "token": {
+                        "type": "string",
+                        "pattern": "^[0-9a-fA-F]{64,200}$"
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      }
+                    },
+                    "required": [
+                      "token",
+                      "eventId"
+                    ]
                   },
-                  "eventId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  {
+                    "type": "object",
+                    "properties": {
+                      "service": {
+                        "type": "string",
+                        "const": "fcm"
+                      },
+                      "token": {
+                        "type": "string",
+                        "pattern": "^(?![0-9a-fA-F]{64,200}$)[A-Za-z0-9:_-]{1,2048}$"
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      }
+                    },
+                    "required": [
+                      "service",
+                      "token",
+                      "eventId"
+                    ]
                   }
-                },
-                "required": [
-                  "token",
-                  "eventId"
                 ]
               }
             }
@@ -1639,29 +1670,65 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "token": {
-                    "type": "string",
-                    "pattern": "^[0-9a-fA-F]{64,200}$"
-                  },
-                  "environment": {
-                    "type": "string",
-                    "enum": [
-                      "sandbox",
-                      "production"
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "service": {
+                        "type": "string",
+                        "const": "apns"
+                      },
+                      "token": {
+                        "type": "string",
+                        "pattern": "^[0-9a-fA-F]{64,200}$"
+                      },
+                      "environment": {
+                        "type": "string",
+                        "enum": [
+                          "sandbox",
+                          "production"
+                        ]
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      }
+                    },
+                    "required": [
+                      "token",
+                      "environment",
+                      "eventId"
                     ]
                   },
-                  "eventId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  {
+                    "type": "object",
+                    "properties": {
+                      "service": {
+                        "type": "string",
+                        "const": "fcm"
+                      },
+                      "token": {
+                        "type": "string",
+                        "pattern": "^(?![0-9a-fA-F]{64,200}$)[A-Za-z0-9:_-]{1,2048}$"
+                      },
+                      "environment": {
+                        "type": "string",
+                        "const": "production"
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      }
+                    },
+                    "required": [
+                      "service",
+                      "token",
+                      "environment",
+                      "eventId"
+                    ]
                   }
-                },
-                "required": [
-                  "token",
-                  "environment",
-                  "eventId"
                 ]
               }
             }

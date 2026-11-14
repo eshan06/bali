@@ -558,6 +558,38 @@ describe('disposeSchool (C6a)', () => {
     expect(ordered((await rowsOf(other)).events)).toEqual(theirs);
   });
 
+  it('deletes its people’s FCM tokens as it deletes their APNs tokens, and leaves another school’s (AN11a)', async () => {
+    const s = await seed('c6a-fcm');
+    const other = await seed('c6a-fcm-other');
+    await pastBell(s.lesson.id);
+    const fcm = (who: string) => `fAb${who}:APA91b-${newUuidV7().replace(/-/g, '_')}Q`;
+    const tokens = { ana: fcm('ana'), ben: fcm('ben'), theirs: fcm('theirs') };
+    for (const [userId, token] of [
+      [s.ana.id, tokens.ana],
+      [s.ben.id, tokens.ben],
+      [other.ana.id, tokens.theirs],
+    ] as const) {
+      await registerPushToken(db, {
+        userId,
+        service: 'fcm',
+        token,
+        environment: 'production',
+        eventId: newUuidV7(),
+      });
+    }
+    const services = async (seeded: typeof s) =>
+      (await rowsOf(seeded)).tokens.map((t) => t.service).sort();
+    // Each student's APNs token from the seed, and the FCM token beside it.
+    expect(await services(s)).toEqual(['apns', 'apns', 'fcm', 'fcm']);
+    const before = await rowsOf(other);
+
+    await disposeSchool(db, { schoolId: s.school.id, at: new Date(), confirmName: s.school.name });
+
+    expect((await rowsOf(s)).tokens).toEqual([]);
+    expect(await rowsOf(other)).toEqual(before);
+    expect(before.tokens.find((t) => t.token === tokens.theirs)?.service).toBe('fcm');
+  });
+
   it('logs it as one school_disposed event of ids and counts, naming no one', async () => {
     const s = await seed('c6a-log');
     await pastBell(s.lesson.id);

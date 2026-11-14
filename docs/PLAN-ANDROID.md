@@ -14,14 +14,16 @@ structure", decided at AN1b (2026-11-04).
   disagrees.
 - **Under 6,000 words,** held by the plan check (`plan-words.sh`), as it holds PLAN.md under 8,000.
 
-_Last updated: 2026-11-13 (Central) — AP2b, the help page names Android's lock beside Screen Time (#597; `docs/DECISIONS.md`,
-2026-11-13): its list of what a teacher sees says "…or Screen Time off (or Bali's lock off)", while the privacy policy's section 2
-keeps the iPhone's line until AP4, the owner's and the lawyer's; the help page's other iPhone-only lines wait for the owner's words,
-drafted there (Open owner items, 10). Before it, AN9k, a student's notes kept off the phone's storage once a deletion's request
-went out. Next: AN11, then AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, on
-any Chrome now, signed in on dev as an account that passed the 13+ check on an iPhone (Q7), and AN6f's checks on a Chrome before
-136; prod's Android client, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that
-needs them (Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+_Last updated: 2026-11-13 (Central) — AN11a, the push token's service in the API and the database (#598; `docs/DECISIONS.md`,
+2026-11-13): `PUT` and `DELETE /v1/me/push-token` take an optional `service`, `apns` or `fcm`, absent meaning APNs, so every
+shipped iPhone calls them as today; an FCM token kept as sent, never one an APNs token could be, its environment `production`;
+migration 0031 marks every token before it APNs's; the APNs sender reads, rings and deletes APNs's tokens only, and the privacy
+paths hold FCM's (the conductor's calls and this step's, awaiting the owner's look). No FCM fixture until AN12. Before it, AP2b, the
+help page names Android's lock beside Screen Time. Next: AN11b, the FCM sender, then AN12 and Phase 10's screens, in the
+conductor's order; AN7f and AN8's 📱 check on the owner's phones, on any Chrome now, signed in on dev as an account that passed the
+13+ check on an iPhone (Q7), and AN6f's checks on a Chrome before 136; prod's Android client, the owner's (Open owner items, 8);
+compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that needs them (Open owner items, 6); AN1's part 2 once the owner
+has the phones. Not on the pilot's critical path._
 
 **The legend:** 👀 the owner looks at screenshots · 📱 needs the owner's Android phone · 🔧 the
 owner in a console · ⚖️ the lawyer.
@@ -188,20 +190,16 @@ screen, as BaliOutbox's rules run on Linux; `contracts/` holds both apps to the 
 - **AN10f** Unlocked's, Protection off's and Session over's words — ✅ (#571; DECISIONS 2026-11-12)
 - **AN10g** The words of Me, Leave, Sign out, Delete account and the 13+ stop — ✅ (#572; DECISIONS 2026-11-12)
 - **AN10h** History's words and the consent list — ✅ (#573; DECISIONS 2026-11-12)
-- **AN11** The API's push (on this PC, the owner, 2026-11-12; twin: `apps/api/src/push/apns.ts`): an FCM sender beside APNs,
-  under the same rules (after the Start commits, the same words, no personal data, a token reported
-  gone deleted); an additive field on the push-token endpoint, `PUT` and `DELETE`, naming the
-  token's service, absent meaning APNs, so every shipped iPhone calls it as today; under it, each
-  service's own token format (an FCM token, mixed case with `:`, `-` and `_`, kept as sent, never
-  lower-cased as an APNs token is), what `environment` means for an FCM token, and each sender
-  sending to, and deleting, only its own service's tokens; the privacy paths (the deletion, the
-  disposal, the retention run, the export) holding FCM's tokens as they hold APNs's; the fixtures
-  and `openapi.json` regenerated; integration tests for the happy path, authz, validation and
-  replay. 🔧 Dev's ✅ (2026-11-12, the conductor on the owner's ask): the Firebase project "Bali Dev"
+- **AN11a** The push token's service in the API and the database — ✅ (#598; DECISIONS 2026-11-13)
+- **AN11b** The FCM sender, AN11's second half (on this PC, the owner, 2026-11-12; twin: `apps/api/src/push/apns.ts`): an FCM
+  sender beside APNs, under the same rules (after the Start commits, the same words, no personal data, a token reported gone
+  deleted): its sign-in to Google with the service account, its send and its "gone", sending to, and deleting, only FCM's
+  tokens (AN11a's `pushTargetsOf(db, 'fcm', …)`; what it must know, AN11a's DECISIONS entry, "For AN11b"); integration tests
+  for each. 🔧 Dev's ✅ (2026-11-12, the conductor on the owner's ask): the Firebase project "Bali Dev"
   (`bali-dev-58473`, the Spark plan, Analytics off), its Android app `com.bali.bali`, "Bali Android (dev)",
   with no SHA-1; FCM's HTTP v1 API on and the legacy API off; the send-only service account
   `bali-fcm-sender-dev@bali-dev-58473.iam.gserviceaccount.com`, its one role Firebase Cloud Messaging API
-  Admin, its key on Railway dev as `FCM_SERVICE_ACCOUNT_JSON`, the name AN11 reads (the API ignores it until
+  Admin, its key on Railway dev as `FCM_SERVICE_ACCOUNT_JSON`, the name AN11b reads (the API ignores it until
   then). Prod's, the owner's — validation: `npm run typecheck && npm run lint && npm test`, `npm run demo`
 - **AN12** The app's push (twin: the push's app half, #456): the FCM token registered at each launch,
   never for a teacher's account (`SyncState.teacher`; #541), and removed at Sign out; Android's notification permission (Android 13 and later) asked once,

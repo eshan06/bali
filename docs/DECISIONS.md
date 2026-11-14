@@ -8,6 +8,114 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-13** — **AN11a, the push token's service in the API and the database: `PUT` and `DELETE /v1/me/push-token` take an
+  optional `service`, `apns` or `fcm`, absent meaning `apns`, so every shipped iPhone calls them as today; an FCM token is kept as
+  sent, 1 to 2,048 characters of letters, digits, `:`, `-` and `_`, never one an APNs token could be, its environment
+  `production`; migration 0031 adds the column, every row before it APNs's; the APNs sender reads, rings and deletes APNs's tokens
+  only; the deletion, the disposal, the retention run and the export hold FCM's tokens as they hold APNs's (the conductor's four
+  calls and this step's, each awaiting the owner's look; AN11a, #598).**
+
+  **The conductor's calls** (2026-11-13, under the owner's standing order to take the recommended option; awaiting the owner's
+  look):
+  1. **AN11 splits in two:** AN11a, this, the token's service end to end and the APNs sender narrowed to APNs's tokens; AN11b, the
+     FCM sender, its sign-in to Google with the service account, its send and its "gone", under the APNs sender's rules. Each fits
+     a PR. PLAN-ANDROID carries the split.
+  2. **No new dependency** in AN11a.
+  3. **No secret:** nothing in AN11a reads `FCM_SERVICE_ACCOUNT_JSON`, Railway's variables or Firebase's console, and no test holds
+     a real key.
+  4. **No app change:** the iPhone keeps calling with no field; Android's app sends `fcm` in AN12.
+
+  **The field** (this step's call, awaiting the owner's look): `service`, on both `PUT` and `DELETE`, its values `PUSH_SERVICES`
+  in `@bali/shared`, `apns` and `fcm`, beside `PUSH_ENVIRONMENTS`. Absent is `apns`, and so is `apns` named; any other value is
+  `400`, "is not a push service". A request with no field is parsed as before: its answers and its refusals are byte for byte
+  today's (today's tests and fixtures pass unchanged), and no answer's shape changes. The body is zod's union on `service`, an
+  absent field reading as `apns`, so `contracts/openapi.json` lists both shapes, each with its token's pattern, and the
+  additive-only check finds every field it promised, `service` added. The column keeps `apns` as its default too, so a write
+  that names no service, the old build's while a deploy switches over, lands as APNs's.
+
+  **Each service's token format** (this step's calls, awaiting the owner's look):
+  - **APNs's,** as N3 made it: hex in either case, 64 to `PUSH_TOKEN_MAX_LENGTH` (200) digits, stored lower-case.
+  - **FCM's:** letters, digits, `:`, `-` and `_`, 1 to `FCM_TOKEN_MAX_LENGTH` (2,048) characters, kept exactly as sent and never
+    lower-cased: FCM's tokens tell case apart, so a removal matches the case it was registered in. A token whose characters
+    don't fit is `400`, as a bad APNs token is.
+  - **The bound, 2,048:** Firebase documents none. Its pages, read 2026-11-13, say to store a token exactly as the app received
+    it, never truncated or added to ("FCM Error Codes", INVALID_ARGUMENT), give no length ("Best practices for FCM registration
+    token management"), and mark `message.token` deprecated for `message.fid`, the field taking a Firebase installation ID
+    "during the transition period" (the HTTP v1 reference, `projects.messages`). A registration token runs about 150 to 165
+    characters today (developers' reports, not Firebase's) and an FID 22 (the installations page's example). So the bound is
+    Bali's: far above any token seen, and below the 2,704 bytes Postgres's b-tree takes for one key, so the longest token the API
+    reads is one the table's key can hold (a test stores a random 2,048-character one on both lanes). A random token of 4,096,
+    or of 2,700, is refused there ("index row size … exceeds btree version 4 maximum 2704").
+  - **Never what an APNs token could be:** 64 to 200 hex digits, in either case, are refused as FCM's, so no token is both
+    services', the token stays the one key, and one phone keeps one current owner across both. No real FCM token is one: a
+    registration token holds a `:`, an FID is 22 characters. A required `:` was weighed and refused: an FID has none, and FCM's
+    `token` takes FIDs now.
+
+  **What `environment` means for an FCM token** (this step's call, awaiting the owner's look): FCM has one endpoint and no
+  sandbox; the Firebase project the API sends through decides where a token works (dev's "Bali Dev", prod's to come), and that
+  is the deploy's, not the token's. So an FCM register must send `environment`, as an APNs one does, and it may say only
+  `production`, the one FCM has; `sandbox`, any other value or none is `400`. The answer says `production`, read from the row,
+  and the column holds `production` for an FCM row, a CHECK keeping it there. Weighed and refused: leaving it out for FCM, which
+  makes a shipped request field optional and could leave the answer's `environment` empty, a change to a shipped `/v1` field.
+
+  **The migration,** 0031 from `drizzle-kit generate`: `device_tokens.service`, text, `NOT NULL DEFAULT 'apns'`, so every row
+  before it is APNs's with none rewritten (Postgres keeps the default once, for the rows already there). The token's and the
+  environment's CHECKs become per service, dropped and added in the migration's one transaction: `device_tokens_token_format`
+  (APNs's lower-case hex, 64 to 200; FCM's characters, at most 2,048, never 64 to 200 hex digits; a Postgres regex's bound
+  stops at 255, so FCM's length is counted) and `device_tokens_environment` (FCM's `production`, APNs's `sandbox` or
+  `production`), with `device_tokens_service` (`apns` or `fcm`). The migration guard passes it with no label: a column added,
+  constraints dropped and added, nothing deleted, rewritten or retyped. The token stays the primary key.
+
+  **The senders' split:** the APNs sender reads, rings and deletes APNs's tokens only. `pushTargetsOf(db, service, ids)` reads
+  one service's tokens and the "class started" notifier asks for `apns`'s; `deleteGonePushToken` deletes only the row as read,
+  its service included. An FCM token sent to APNs would come back `BadDeviceToken`, so gone, and be deleted: a student holding
+  both kinds is rung on the APNs one, and an APNs "gone" deletes that one alone. A removal deletes only the named service's row.
+
+  **The privacy paths** hold FCM's tokens as APNs's, with no change of code: the deletion (C3), the disposal (C6a) and the
+  retention run (C6b) delete a person's tokens by the account, whatever the service, and the export (C5) lists every row
+  whole, `service` included. A test each, with an FCM token.
+
+  **No FCM contract fixture yet** (this step's call, awaiting the owner's look): `npm run fixtures` regenerated the fixtures, which
+  came out unchanged, and `openapi.json`, which gained `service`. A fixture's request is each phone's contract: Android's
+  `ContractFixtureTest` and BaliCore's `ContractFixtureTests` read every fixture's request back whole through their own request
+  types, and neither has `service`, so an FCM register's fixture would fail both. AN12, which gives `core`'s requests `service`,
+  adds the FCM fixtures, and BaliCore's side must be settled in the same PR: its push-token requests gain an optional `service`
+  the iPhone never sends, or its test reads only the requests the iPhone sends. Both phones' contract tests pass unchanged here.
+
+  **The tests,** failing first (commits `test(db)` and `test(api)`, the failures in the PR): for FCM through the route, the
+  register and its answer, the replay, the move to another account, the removal as sent and its retry, another case removing
+  nothing, a removal of a token not the caller's, a teacher's `403` and no sign-in's `401` both ways, the longest token, and each
+  `400` (a character outside the set, a space, too long, empty, an APNs token's shape in either case, an unknown service or one
+  in capitals, `sandbox`, `staging`, none); no field read as APNs's, `apns` named the same; the table on both lanes (FCM's case
+  kept, a row naming no service APNs's, the longest token as the key, each CHECK refusing, no token both services'); migration
+  0031 on PGlite and on real Postgres; the APNs sender beside an FCM token; each privacy path; the FCM register race on real
+  Postgres, N4's mirrored; and no log line holding an FCM token. `npm test` passes whole on this PC, and `npm run demo`.
+
+  **The breaks,** each made on purpose, run, and reverted:
+  - An FCM token lower-cased (the route's `.toLowerCase()`): 8 fail, first "registers it as the caller's, kept as sent, never
+    lower-cased, its environment production".
+  - The APNs sender reading an FCM token (`pushTargetsOf` unfiltered): "rings only the APNs token of a student holding an FCM one
+    too, and its gone deletes only that token (AN11a)" fails, the FCM token sent and deleted.
+  - A register with no field read as FCM's (the optional literal moved to `fcm`): 16 fail, every one of today's APNs tests and
+    "reads a register naming no service as APNs's, and one naming apns the same".
+  - The export leaving FCM's tokens out: "lists their phones' FCM tokens beside their APNs tokens, each with its service, and no
+    one else's (AN11a)" fails.
+  - Delete account leaving FCM's tokens behind: "deletes its phones' FCM tokens as it deletes their APNs tokens, and leaves a
+    classmate's (AN11a)" fails.
+
+  **For AN11b, the FCM sender:**
+  - Read `pushTargetsOf(db, 'fcm', ids)` and delete through `deleteGonePushToken`, beside the APNs sender, never in its place;
+    a student with both kinds gets one alert on each. The same rules: after the Start commits, never inside it; the same words;
+    no personal data; fired and forgotten, drained at shutdown; off, with one boot line, when its key is unset; no log line with a
+    token or the key.
+  - FCM's HTTP v1 send, `projects/{project}/messages:send`, takes `message.token`, marked deprecated for `message.fid` and taking
+    either during Firebase's transition: AN11a's format takes both (an FID is 22 characters of the same alphabet), so which one
+    the app registers is AN12's and AN11b's call, with no change here.
+  - Gone: Firebase's pages call `UNREGISTERED` (404) a token to delete, and `INVALID_ARGUMENT` (400) one only when the payload is
+    surely valid. `SENDER_ID_MISMATCH` (403) is a token of another Firebase project, dev's on prod's API: APNs's twin,
+    `BadDeviceToken` from the wrong host, is deleted today (N5b), and AN11b decides whether this one is.
+  - Its environment is always `production`, so a sender never reads it to pick a host, as the APNs sender does.
+
 - **2026-11-13** — **AP2b, the help page names Android's lock beside Screen Time: its list of what a teacher sees says "Your
   focus status: focused, unlocked, or Screen Time off (or Bali's lock off)", while the privacy policy's section 2 keeps the
   iPhone's line word for word until the owner and the lawyer word it (AP4); the help page's other iPhone-only lines stay as

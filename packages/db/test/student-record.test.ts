@@ -243,6 +243,35 @@ describe('exportStudentRecord (C5)', () => {
     expect(text).not.toContain('bathroom');
   });
 
+  it('lists their phones’ FCM tokens beside their APNs tokens, each with its service, and no one else’s (AN11a)', async () => {
+    const { ana, ben, tokens } = await seed('c5-fcm');
+    const fcm = (who: string) => `fAb${who}:APA91b-${newUuidV7().replace(/-/g, '_')}Q`;
+    const theirs = { ana: fcm('ana'), ben: fcm('ben') };
+    for (const [student, token] of [
+      [ana, theirs.ana],
+      [ben, theirs.ben],
+    ] as const) {
+      await registerPushToken(db, {
+        userId: student.id,
+        service: 'fcm',
+        token,
+        environment: 'production',
+        eventId: newUuidV7(),
+      });
+    }
+    const record = await exported(ana.id);
+    const listed = record.deviceTokens.map((t) => ({ token: t.token, service: t.service }));
+    expect(listed.sort((a, b) => a.service.localeCompare(b.service))).toEqual([
+      { token: tokens.ana, service: 'apns' },
+      { token: theirs.ana, service: 'fcm' },
+    ]);
+    expect(record.deviceTokens.find((t) => t.service === 'fcm')).toMatchObject({
+      userId: ana.id,
+      environment: 'production',
+    });
+    expect(JSON.stringify(record)).not.toContain(theirs.ben);
+  });
+
   it('carries when the student’s lesson ended, which its end records under no one (#219)', async () => {
     const { ana, session } = await seed('c5-ended');
     await extendSession(db, { sessionId: session.id, durationMinutes: 5, at: new Date() });

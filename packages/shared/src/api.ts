@@ -194,20 +194,38 @@ export interface RecordAgeCheckRequest {
 }
 
 // PUT /v1/me/push-token — a student registers its phone's APNs device token
-// (N3; ARCHITECTURE, "Push: a doorbell for students"). One phone, one current
-// owner: a token another account registered moves to the caller. Students only
-// (a teacher is `403`). DELETE /v1/me/push-token removes it again.
-/** The APNs environment a token was issued for: `sandbox` (Debug builds) or `production`. */
+// (N3; ARCHITECTURE, "Push: a doorbell for students"), or, naming the service
+// `fcm`, an Android phone's FCM token (AN11a). One phone, one current owner: a
+// token another account registered moves to the caller. Students only (a
+// teacher is `403`). DELETE /v1/me/push-token removes it again.
+/**
+ * The APNs environment a token was issued for: `sandbox` (Debug builds) or `production`. An FCM
+ * token's is `production`, the one FCM has (AN11a).
+ */
 export const PUSH_ENVIRONMENTS = ['sandbox', 'production'] as const;
 export type PushEnvironment = (typeof PUSH_ENVIRONMENTS)[number];
-/** The longest device token the API reads, in hex digits: APNs's are 64 today. */
+/**
+ * The service a token is for (AN11a): `apns`, an iPhone's, or `fcm`, an Android phone's. A request
+ * that names none is APNs's, as every shipped iPhone's is.
+ */
+export const PUSH_SERVICES = ['apns', 'fcm'] as const;
+export type PushService = (typeof PUSH_SERVICES)[number];
+/** The longest APNs token the API reads, in hex digits: APNs's are 64 today. */
 export const PUSH_TOKEN_MAX_LENGTH = 200;
+/** The longest FCM token the API reads: Firebase documents none (DECISIONS, AN11a). */
+export const FCM_TOKEN_MAX_LENGTH = 2048;
 export interface RegisterPushTokenRequest {
-  /** The token APNs gave the phone, in hex (either case; stored lower-case). */
+  /**
+   * The token the phone was given: APNs's in hex (either case; stored lower-case), or FCM's,
+   * kept as sent.
+   */
   token: string;
+  /** An FCM token's is `production`. */
   environment: PushEnvironment;
   /** Client idempotency key (rule 4). */
   eventId: string;
+  /** Whose token it is; absent, `apns` (AN11a). */
+  service?: PushService;
 }
 /** Every outcome `PUT /v1/me/push-token` answers with (`RegisterPushTokenResponse.outcome`). */
 export const REGISTER_PUSH_TOKEN_OUTCOMES = ['registered', 'replay'] as const;
@@ -228,6 +246,8 @@ export interface RemovePushTokenRequest {
   token: string;
   /** Client idempotency key (rule 4). */
   eventId: string;
+  /** Whose token it is; absent, `apns` (AN11a). */
+  service?: PushService;
 }
 /** Every outcome `DELETE /v1/me/push-token` answers with (`RemovePushTokenResponse.outcome`). */
 export const REMOVE_PUSH_TOKEN_OUTCOMES = ['removed', 'not_registered'] as const;

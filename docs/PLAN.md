@@ -8,12 +8,12 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-13 (Central) — the help page names Android's lock beside Screen Time, the
-privacy policy's line left to the owner and the lawyer (AP2b, #597; DECISIONS 2026-11-13). Before
-it, CI fails any PR carrying an invisible or text-direction character (S12, #596). Next: the owner's
+_Last updated: 2026-11-13 (Central) — the API takes an Android phone's FCM token beside an
+iPhone's APNs token, `service` naming which, and its APNs sender rings APNs's alone (AN11a, #598;
+DECISIONS 2026-11-13). Before it, the help page names Android's lock (AP2b, #597). Next: the owner's
 switch of prod's domain, the release call and disabling the review account (Open owner items); a
 session builds the retire-a-block command; the owner the sitting's findings' calls; GA5's known
-limit, the owner's call (DECISIONS 2026-11-02); AN11, AN12; AN1's part 2 on the owner's phones;
+limit, the owner's call (DECISIONS 2026-11-02); AN11b, AN12; AN1's part 2 on the owner's phones;
 the audit's polish waits._
 
 ## Now
@@ -66,7 +66,8 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
 - **Android (the owner, 2026-11-02)**: Phases 8–11, the steps in `docs/PLAN-ANDROID.md`;
   AN1's part 2 on a Pixel and a Samsung, with its battery test, waits for the owner's phones (📱),
   before launch; AN2–AN10's and AN13's code ✅ (#488–#593), signing in on dev since AN6d; AP2b
-  ✅ (#597), the help page; AN11, AN12 next. Not on the pilot's critical path.
+  ✅ (#597), the help page; AN11a ✅ (#598), the push token's service; AN11b, AN12 next. Not on the
+  pilot's critical path.
 - **The portal's tests drive the page (the owner, 2026-10-22: "Yes, go gradually")**: the setup ✅
   (#434; DECISIONS 2026-10-22), jsdom and Testing Library, dev only, opted into per file
   (`docs/WEB.md`, Testing the portal), `try-again.test.tsx` the pattern. Each UI step from now on
@@ -99,9 +100,6 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   its line meanwhile (the conductor's call: it goes, as Register block's); the saves' 10 s (the
   conductor's call), a class's create's too since it carries an `eventId` (2026-10-23); and the
   sign-in's token exchange, which has none (not touched).
-- **Three fixes, each the conductor's call, awaiting the owner** ✅: `next` 15.5.28 (#435;
-  DECISIONS 2026-10-22), `zod` 4.6.6 (#444; DECISIONS 2026-10-23) and the database pool's guard
-  (#439; DECISIONS 2026-10-22); their full lines in `docs/PLAN-ARCHIVE.md`.
 
 - **The "class started" push (N1–N6, decided 2026-10-06):** a visible alert to the students
   whose waiting tap a Start converts; a doorbell, never the truth. N1 (the docs), N2 (CI) and N3 (the
@@ -110,7 +108,8 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   wait, approved 2026-10-23), the prompt right after onboarding's Screen Time step (the owner,
   2026-10-24). Runbook 7 is done on prod, and build 11 carries the app half (the owner, 2026-10-24,
   as #458 records). N6's end-to-end check passed on prod at the sitting (Part 6, 2026-11-08): the
-  alert named only the class, and prod's log showed no APNs refusal. Left: dev's step 4.
+  alert named only the class, and prod's log showed no APNs refusal. Left: dev's step 4. Android's
+  FCM tokens are taken since AN11a (#598); their sender is AN11b.
 
 - **Deleted accounts' Cognito sign-ins (C3-cognito, 2026-10-09):** the server queues and deletes
   them; until the owner's runbook 9 sets each environment's key, dev and prod only queue (the
@@ -186,7 +185,7 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 | 6 | Security and compliance; gates Phase 5's student-facing steps | ✅ cloud steps done; open: C2 (⚖️ the lawyer's words), S8 (the owner's decision) |
 | 7 | Live lesson: questions and PDF slides in a running session, followed on the phone and the web | building (Phase 7 steps) |
 | 8 | Android: the lock, the candidates measured on the emulators, then (a) on a Pixel and a Samsung (iOS's Phase 0) | building: AN1's part 2 📱 waits for the phones, before launch |
-| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | building: AN2–AN10's and AN13's code ✅ (2026-11-13); AN11, AN12 next |
+| 9 | Android: the engine, BaliCore's and BaliOutbox's twin, no screens | building: AN2–AN10's, AN11a's and AN13's code ✅ (2026-11-13); AN11b, AN12 next |
 | 10 | Android: the screens, from the approved boards | AS0's canvas approved ✅ (2026-11-04); AS1–AS8 build from it |
 | 11 | Android: on Play, its testing tracks, device gate and exit check | planned |
 

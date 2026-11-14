@@ -104,6 +104,11 @@ never stored here, no screen can ever show it.
 - `teacher_invites` — one row per invite code the owner mints for a school (Phase 4, T1a):
   the code's hash, never the code, its expiry 14 days on, and the one account that redeemed
   it, once (T1b) — after which the row is never changed or deleted.
+- `device_tokens` — one row per student phone's push token (2026-10-06, N3), keyed by the token so
+  one phone has one current owner: its service, APNs for an iPhone or FCM for an Android phone
+  (AN11a, 2026-11-13), whose formats never meet, so no token is both; and the environment its token
+  was issued for (an FCM token's is `production`). Really deleted when removed or reported gone;
+  personal data, in every privacy path ("Push: a doorbell for students").
 - `age_checks` — one row per account that confirmed it is 13 or older (C7-server, 2026-10-08):
   the request's `event_id` and when the server recorded it, never a birth date or an age, and none
   for an answer under 13, which the phone never sends. Never unset: it goes only with the account
@@ -893,7 +898,9 @@ waits for the Start learns of it only at the phone's next 30 s read or return to
   `apns-collapse-id` per session. A Start replay re-reads and sends nothing. A send failure
   never fails or delays the Start; it is logged without the token. A token APNs reports gone
   (`410`, or `BadDeviceToken`) is deleted. With the APNs configuration unset the sender is
-  off, as Sentry is.
+  off, as Sentry is. *Amended 2026-11-13 (AN11a):* each sender reads, sends to and deletes
+  only its own service's tokens, the APNs sender APNs's and FCM's sender (AN11b, Android app
+  structure, decision 6) FCM's, so a token is never sent to a service that would call it gone.
 - **Device tokens.** An additive `/v1` endpoint lets a student register and remove its APNs
   token with its APNs environment (`sandbox` for Debug builds, `production` for TestFlight
   and the App Store), idempotent on a client-minted UUIDv7 `eventId`. A new table keyed by
@@ -901,7 +908,14 @@ waits for the Start learns of it only at the phone's next 30 s read or return to
   (C3), a school's disposal (C6a) and the retention run (C6b); placed by C5's export and the
   schema tests that place every foreign key to `users`; never logged. The app asks to send the
   alert with iOS's own prompt, once, right after onboarding's Screen Time step, never on Waiting
-  nor over a session's screens (the owner, 2026-10-24).
+  nor over a session's screens (the owner, 2026-10-24). *Amended 2026-11-13 (AN11a):* the
+  endpoint takes an Android phone's FCM token too, named by an additive field, `service`
+  (`apns` or `fcm`; absent, `apns`, so every shipped iPhone calls it as before). An FCM token is
+  kept as sent, case and all, up to 2,048 characters of letters, digits, `:`, `-` and `_`, and
+  never one an APNs token could be, so a token is one service's and the token stays the key;
+  its environment is `production`, since FCM has no sandbox and the Firebase project the API
+  sends through decides where a token works. Each row names its service, and FCM's tokens go
+  through every privacy path above as APNs's do.
 - **Not on the pilot's critical path.** It never delays C2 or the external TestFlight steps.
   The app's half (registering, the `aps-environment` entitlement, the Time Sensitive
   capability, the words) is the Mac session's.
@@ -1252,8 +1266,8 @@ it, never in a screen.
 
 **6. Push through FCM, the server's second sender.** The same doorbell ("Push: a doorbell for
 students"): the same words, only the students a Start converts, sent after the Start commits, never
-the truth. An additive field on the push-token endpoint names the service a token is for; a request
-without it is APNs's, so every shipped iPhone calls it as today. FCM's tokens are personal data like
+the truth. An additive field on the push-token endpoint, `service` (AN11a), names the service a token
+is for; a request without it is APNs's, so every shipped iPhone calls it as today. FCM's tokens are personal data like
 APNs's, in the same privacy paths, and Google becomes a processor the privacy policy names before
 the first Android build reaches a student.
 

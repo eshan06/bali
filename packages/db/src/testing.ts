@@ -156,9 +156,10 @@ async function withAdmin<T>(baseUrl: string, fn: (sql: Sql) => Promise<T>): Prom
  * CREATE DATABASE, retrying the transient collision that parallel Vitest workers
  * provoke: two CREATE DATABASE statements briefly holding the template database
  * at once raise 55006 ("source database is being accessed by other users"). It
- * clears on its own, so a short backoff is all it needs.
+ * clears on its own, so a short backoff is all it needs. Exported for a test
+ * that migrates a database part of the way (migrations.test.ts).
  */
-async function createDatabase(sql: Sql, name: string): Promise<void> {
+export async function createDatabase(sql: Sql, name: string): Promise<void> {
   for (let attempt = 0; ; attempt += 1) {
     try {
       await sql.unsafe(`CREATE DATABASE "${name}"`);
