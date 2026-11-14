@@ -1,11 +1,12 @@
 import { type Database, deviceTokens, newUuidV7, registerPushToken, users } from '@bali/db';
-import type {
-  ApiErrorBody,
-  RegisterPushTokenResponse,
-  RemovePushTokenResponse,
+import {
+  type ApiErrorBody,
+  FCM_TOKEN_MAX_LENGTH,
+  type RegisterPushTokenResponse,
+  type RemovePushTokenResponse,
 } from '@bali/shared';
 import { eq } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { type AuthedApp, makeAuthedApp } from './helpers/app.js';
@@ -13,7 +14,8 @@ import { makeTestDb } from './helpers/db.js';
 
 /*
  * PUT and DELETE /v1/me/push-token (N3): a student registers and removes its
- * phone's APNs token, idempotent on its eventId. Each test makes its own
+ * phone's APNs token, idempotent on its eventId — or, naming the service
+ * `fcm`, an Android phone's FCM token (AN11a). Each test makes its own
  * accounts and tokens, so they share one database. Who may call each, against
  * every caller: authorization-matrix.test.ts; that no log line holds a token:
  * log-redaction.test.ts.
@@ -38,6 +40,9 @@ let made = 0;
 const fresh = (who: string) => `n3-${who}-${(made += 1)}`;
 /** A token no phone has registered yet: 64 hex digits. */
 const newToken = () => randomUUID().replace(/-/g, '').repeat(2);
+/** An FCM token no phone has registered yet, shaped as FCM's are: mixed case, `:`, `-` and `_`. */
+const newFcmToken = () =>
+  `fAb${randomBytes(8).toString('base64url')}:APA91b-${randomBytes(100).toString('base64url')}_Q`;
 
 /** Either route's answer: an outcome (and a register's environment), or the error shape. */
 type Answer = {
@@ -280,5 +285,191 @@ describe('DELETE /v1/me/push-token', () => {
       change === undefined ? undefined : { token: newToken(), eventId: newUuidV7(), ...change };
     const res = await remove(fresh('mo'), payload as object);
     expect(res.status).toBe(400);
+  });
+});
+
+describe('no service named: APNs’s, as every shipped iPhone sends it (AN11a)', () => {
+  it('reads a register naming no service as APNs’s, and one naming apns the same', async () => {
+    const sub = fresh('nia');
+    const silent = newToken();
+    await register(sub, { token: silent, environment: 'sandbox', eventId: newUuidV7() });
+    expect(await rowOf(silent)).toMatchObject({ service: 'apns', environment: 'sandbox' });
+
+    const named = newToken();
+    const res = await register(sub, {
+      service: 'apns',
+      token: named.toUpperCase(),
+      environment: 'production',
+      eventId: newUuidV7(),
+    });
+    expect(res).toEqual({ status: 200, body: { outcome: 'registered', environment: 'production' } });
+    expect(await rowOf(named)).toMatchObject({ service: 'apns', environment: 'production' });
+    const removal = { service: 'apns', token: named.toUpperCase(), eventId: newUuidV7() };
+    expect((await remove(sub, removal)).body).toEqual({ outcome: 'removed' });
+  });
+});
+
+describe('an FCM token: PUT and DELETE naming the service fcm (AN11a)', () => {
+  /** A register of `token` as FCM's, under a fresh eventId unless one is given. */
+  const fcm = (token: string, eventId = newUuidV7()) => ({
+    service: 'fcm',
+    token,
+    environment: 'production',
+    eventId,
+  });
+
+  it('registers it as the caller’s, kept as sent, never lower-cased, its environment production', async () => {
+    const sub = fresh('fia');
+    const token = newFcmToken();
+    const eventId = newUuidV7();
+    const res = await register(sub, fcm(token, eventId));
+    expect(res).toEqual({ status: 200, body: { outcome: 'registered', environment: 'production' } });
+    expect(await rowOf(token)).toMatchObject({
+      userId: (await userOf(sub)).id,
+      service: 'fcm',
+      environment: 'production',
+      eventId,
+    });
+    // FCM's tokens tell case apart: lower-cased, it would be another phone's.
+    expect(await rowOf(token.toLowerCase())).toBeUndefined();
+  });
+
+  it('answers a replay with the token now, and writes nothing again', async () => {
+    const sub = fresh('gia');
+    const token = newFcmToken();
+    const sent = fcm(token);
+    await register(sub, sent);
+    const before = await rowOf(token);
+    expect(await register(sub, sent)).toEqual({
+      status: 200,
+      body: { outcome: 'replay', environment: 'production' },
+    });
+    expect(await rowOf(token)).toEqual(before);
+  });
+
+  it('moves a token another account registered to the caller: one phone, one owner', async () => {
+    const first = fresh('hugo');
+    const second = fresh('iris');
+    const token = newFcmToken();
+    await register(first, fcm(token));
+    expect((await register(second, fcm(token))).body.outcome).toBe('registered');
+    expect((await rowOf(token))?.userId).toBe((await userOf(second)).id);
+    // The first account no longer holds it: its removal touches nothing.
+    const gone = await remove(first, { service: 'fcm', token, eventId: newUuidV7() });
+    expect(gone.body).toEqual({ outcome: 'not_registered' });
+    expect((await rowOf(token))?.userId).toBe((await userOf(second)).id);
+  });
+
+  it('removes the caller’s token as sent, case and all, and its retry answers not_registered', async () => {
+    const sub = fresh('jade');
+    const token = newFcmToken();
+    await register(sub, fcm(token));
+    // Another case is another token: nothing of the caller's is removed.
+    const lower = { service: 'fcm', token: token.toLowerCase(), eventId: newUuidV7() };
+    expect((await remove(sub, lower)).body).toEqual({ outcome: 'not_registered' });
+    expect(await rowOf(token)).toBeDefined();
+
+    const removal = { service: 'fcm', token, eventId: newUuidV7() };
+    expect(await remove(sub, removal)).toEqual({ status: 200, body: { outcome: 'removed' } });
+    expect(await rowOf(token)).toBeUndefined();
+    expect(await remove(sub, removal)).toEqual({
+      status: 200,
+      body: { outcome: 'not_registered' },
+    });
+  });
+
+  it('never removes another account’s token', async () => {
+    const owner = fresh('kai');
+    const token = newFcmToken();
+    await register(owner, fcm(token));
+    const res = await remove(fresh('lou'), { service: 'fcm', token, eventId: newUuidV7() });
+    expect(res.body).toEqual({ outcome: 'not_registered' });
+    expect((await rowOf(token))?.userId).toBe((await userOf(owner)).id);
+  });
+
+  it('refuses a teacher, 403, and a call with no bearer token, 401, both ways', async () => {
+    const sub = fresh('teacher');
+    await db.insert(users).values({ cognitoId: sub, role: 'teacher' });
+    const token = newFcmToken();
+    const put = await register(sub, fcm(token));
+    expect(put.status).toBe(403);
+    expect(put.body.error?.code).toBe('forbidden');
+    const removal = { service: 'fcm', token, eventId: newUuidV7() };
+    expect((await remove(sub, removal)).status).toBe(403);
+    expect((await register(null, fcm(token))).status).toBe(401);
+    expect((await remove(null, removal)).status).toBe(401);
+    expect(await rowOf(token)).toBeUndefined();
+  });
+
+  it('takes the longest FCM token the API reads', async () => {
+    const sub = fresh('max');
+    const token = randomBytes((FCM_TOKEN_MAX_LENGTH / 4) * 3).toString('base64url');
+    expect(token).toHaveLength(FCM_TOKEN_MAX_LENGTH);
+    expect((await register(sub, fcm(token))).body.outcome).toBe('registered');
+    expect((await rowOf(token))?.service).toBe('fcm');
+  });
+
+  it.each([
+    ['a token with a character FCM’s have not', { token: 'fAb:APA91b.x' }],
+    ['a token with a space', { token: 'fAb:APA91b x' }],
+    ['a token too long', { token: 'A'.repeat(FCM_TOKEN_MAX_LENGTH + 1) }],
+    ['an empty token', { token: '' }],
+    ['a token an APNs token could be', { token: 'ab'.repeat(32) }],
+    ['a token an APNs token could be, in capitals', { token: 'AB'.repeat(32) }],
+    ['a service the API has not', { service: 'gcm' }],
+    ['a service in capitals', { service: 'FCM' }],
+    ['the sandbox, which FCM has not', { environment: 'sandbox' }],
+    ['no environment', { environment: undefined }],
+    ['an environment FCM has not', { environment: 'staging' }],
+  ])('refuses a register with %s: 400, nothing written', async (_, change) => {
+    const token = newFcmToken();
+    const res = await register(fresh('wes'), { ...fcm(token), ...change });
+    expect(res.status).toBe(400);
+    expect(res.body.error?.code).toBe('bad_input');
+    // The refusal names the field, never echoes its value.
+    const sent = 'token' in change && change.token ? change.token : token;
+    expect(JSON.stringify(res.body)).not.toContain(sent);
+    expect(await rowOf(token)).toBeUndefined();
+    if ('token' in change) expect(await rowOf(change.token)).toBeUndefined();
+  });
+
+  it.each([
+    ['a token with a character FCM’s have not', { token: 'fAb:APA91b/x' }],
+    ['a token an APNs token could be', { token: 'cd'.repeat(32) }],
+    ['a service the API has not', { service: 'gcm' }],
+  ])('refuses a removal with %s: 400, nothing removed', async (_, change) => {
+    const sub = fresh('xia');
+    const token = newFcmToken();
+    await register(sub, fcm(token));
+    const res = await remove(sub, { service: 'fcm', token, eventId: newUuidV7(), ...change });
+    expect(res.status).toBe(400);
+    expect(res.body.error?.code).toBe('bad_input');
+    expect(await rowOf(token)).toBeDefined();
+  });
+
+  it('refuses an APNs token named FCM’s, and an FCM token sent as APNs’s: one token, one service', async () => {
+    const sub = fresh('yan');
+    const apns = newToken();
+    const token = newFcmToken();
+    expect((await register(sub, fcm(apns))).status).toBe(400);
+    const asApns = await register(sub, { token, environment: 'production', eventId: newUuidV7() });
+    expect(asApns.status).toBe(400);
+    expect(await rowOf(apns)).toBeUndefined();
+    expect(await rowOf(token)).toBeUndefined();
+  });
+
+  it('answers an FCM register that reached an account deleted on its way: 409 account_deleted', async () => {
+    const sub = fresh('zed');
+    await register(sub, fcm(newFcmToken()));
+    const user = await userOf(sub);
+    await db.update(users).set({ removedAt: new Date() }).where(eq(users.id, user.id));
+    const result = await registerPushToken(db, {
+      userId: user.id,
+      service: 'fcm',
+      token: newFcmToken(),
+      environment: 'production',
+      eventId: newUuidV7(),
+    });
+    expect(result).toEqual({ outcome: 'account_deleted' });
   });
 });

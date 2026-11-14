@@ -214,6 +214,26 @@ describe('a device token', () => {
     expect(logged()).not.toContain(token);
   });
 
+  it('never reaches a log line as an FCM token either (AN11a)', async () => {
+    lines.length = 0;
+    const fcm = 'fAb3xQ9:APA91bH-Kq_' + 'Zt7'.repeat(40);
+    const authorization = `Bearer ${await issuer.sign({ sub: 'an11a-log-redaction' })}`;
+    const send = (method: 'PUT' | 'DELETE', payload: object) =>
+      tokenApp.inject({ method, url: '/v1/me/push-token', headers: { authorization }, payload });
+    const named = { service: 'fcm', token: fcm };
+    const registered = await send('PUT', {
+      ...named,
+      environment: 'production',
+      eventId: randomUUID(),
+    });
+    expect(registered.statusCode).toBe(200);
+    const refused = await send('PUT', { ...named, environment: 'sandbox', eventId: randomUUID() });
+    expect(refused.statusCode).toBe(400);
+    expect((await send('DELETE', { ...named, eventId: randomUUID() })).statusCode).toBe(200);
+    expect(logged()).toContain('"url":"/v1/me/push-token"');
+    expect(logged()).not.toContain(fcm);
+  });
+
   it('is cut from a database failure that names it', async () => {
     const [user] = await db
       .insert(users)

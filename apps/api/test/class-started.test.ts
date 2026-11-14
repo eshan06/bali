@@ -7,8 +7,9 @@ import {
   users,
 } from '@bali/db';
 import type { PushEnvironment, StartSessionResponse } from '@bali/shared';
+import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { Writable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -280,5 +281,30 @@ describe('the "class started" push', () => {
     expect((await start(room.teacher.cognitoId, room.klass.id)).armedConverted).toBe(1);
     await settle();
     expect(sent).toEqual([]);
+  });
+
+  it('rings only the APNs token of a student holding an FCM one too, and its gone deletes only that token (AN11a)', async () => {
+    const room = await classroom('an11a-both');
+    const fcm = `fAb${randomBytes(8).toString('base64url')}:APA91b-${randomBytes(100).toString('base64url')}`;
+    await registerPushToken(db, {
+      userId: room.student.id,
+      service: 'fcm',
+      token: fcm,
+      environment: 'production',
+      eventId: newUuidV7(),
+    });
+    // APNs calls every token it is sent gone: only what it was sent may go.
+    answer = () => Promise.resolve({ status: 400, reason: 'BadDeviceToken' });
+    await tap(room.student.cognitoId, room.block.tagId);
+    expect((await start(room.teacher.cognitoId, room.klass.id)).armedConverted).toBe(1);
+    await settle();
+
+    expect(sent.map(tokenIn)).toEqual([room.tokens[0]!.token]);
+    const left = await db
+      .select()
+      .from(deviceTokens)
+      .where(eq(deviceTokens.userId, room.student.id))
+      .orderBy(deviceTokens.token);
+    expect(left.map((row) => [row.token, row.service])).toEqual([[fcm, 'fcm']]);
   });
 });
