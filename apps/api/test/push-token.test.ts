@@ -1,11 +1,18 @@
-import { type Database, deviceTokens, newUuidV7, registerPushToken, users } from '@bali/db';
+import {
+  type Database,
+  deviceTokens,
+  newUuidV7,
+  PUSH_TOKENS_PER_STUDENT,
+  registerPushToken,
+  users,
+} from '@bali/db';
 import {
   type ApiErrorBody,
   FCM_TOKEN_MAX_LENGTH,
   type RegisterPushTokenResponse,
   type RemovePushTokenResponse,
 } from '@bali/shared';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -477,5 +484,139 @@ describe('an FCM token: PUT and DELETE naming the service fcm (AN11a)', () => {
       eventId: newUuidV7(),
     });
     expect(result).toEqual({ outcome: 'account_deleted' });
+  });
+});
+
+describe('at most PUSH_TOKENS_PER_STUDENT tokens a student, both services together, the oldest let go (AN11a2)', () => {
+  /**
+   * Tokens in the order they are made, so a tie on `updated_at` (PGlite's clock counts whole
+   * milliseconds) falls the way the registers went: the oldest is let go by `updated_at`, then
+   * by token.
+   */
+  let order = 0;
+  const nth = () => (order += 1).toString().padStart(8, '0');
+  const apnsToken = () => `${nth()}${randomBytes(28).toString('hex')}`;
+  const fcmToken = () => `${nth()}:APA91b-${randomBytes(30).toString('base64url')}`;
+  const apns = (token: string, environment = 'sandbox') => ({
+    token,
+    environment,
+    eventId: newUuidV7(),
+  });
+  const fcm = (token: string) => ({
+    service: 'fcm',
+    token,
+    environment: 'production',
+    eventId: newUuidV7(),
+  });
+  /** The account's tokens, in token order: the order they were made. */
+  const tokensOf = async (sub: string) =>
+    (
+      await db
+        .select({ token: deviceTokens.token })
+        .from(deviceTokens)
+        .where(eq(deviceTokens.userId, (await userOf(sub)).id))
+        .orderBy(asc(deviceTokens.token))
+    ).map((row) => row.token);
+  /** `count` new APNs tokens, registered one after another as `sub`'s. */
+  async function holding(sub: string, count = PUSH_TOKENS_PER_STUDENT) {
+    const tokens = Array.from({ length: count }, apnsToken);
+    for (const token of tokens) {
+      expect((await register(sub, apns(token))).body.outcome).toBe('registered');
+    }
+    return tokens;
+  }
+
+  it('lets the oldest go when a register would make one more, each answer as it always was', async () => {
+    const sub = fresh('cap');
+    const tokens = Array.from({ length: PUSH_TOKENS_PER_STUDENT + 1 }, apnsToken);
+    for (const token of tokens) {
+      expect(await register(sub, apns(token))).toEqual({
+        status: 200,
+        body: { outcome: 'registered', environment: 'sandbox' },
+      });
+    }
+    expect(await tokensOf(sub)).toEqual(tokens.slice(1));
+    expect(await rowOf(tokens[0]!)).toBeUndefined();
+  });
+
+  it('refreshes a token the student holds when it is registered again, and lets nothing go', async () => {
+    const sub = fresh('cap-again');
+    const tokens = await holding(sub);
+    const [oldest] = tokens as [string];
+    const eventId = newUuidV7();
+    const again = await register(sub, { token: oldest, environment: 'production', eventId });
+    expect(again).toEqual({
+      status: 200,
+      body: { outcome: 'registered', environment: 'production' },
+    });
+    expect(await tokensOf(sub)).toEqual(tokens);
+    expect(await rowOf(oldest)).toMatchObject({ environment: 'production', eventId });
+    // Refreshed, it is the newest: the next new token lets the next oldest go instead.
+    const next = apnsToken();
+    await register(sub, apns(next));
+    expect(await tokensOf(sub)).toEqual([oldest, ...tokens.slice(2), next]);
+  });
+
+  it('lets nothing go on a replay: the same eventId again, or an older register of a token that moved on', async () => {
+    const sub = fresh('cap-replay');
+    const other = fresh('cap-replay-other');
+    const tokens = Array.from({ length: PUSH_TOKENS_PER_STUDENT }, apnsToken);
+    const sent = tokens.map((token) => apns(token));
+    for (const body of sent) await register(sub, body);
+    expect(await register(sub, sent.at(-1)!)).toEqual({
+      status: 200,
+      body: { outcome: 'replay', environment: 'sandbox' },
+    });
+    expect(await tokensOf(sub)).toEqual(tokens);
+
+    // The oldest changes hands, and a new token takes its place: the student at the cap again.
+    await register(other, apns(tokens[0]!, 'production'));
+    const next = apnsToken();
+    await register(sub, apns(next));
+    const atCap = [...tokens.slice(1), next];
+    expect(await tokensOf(sub)).toEqual(atCap);
+    // That token's first register, retried: older than the other account's, a replay of the truth.
+    expect(await register(sub, sent[0]!)).toEqual({
+      status: 200,
+      body: { outcome: 'replay', environment: 'production' },
+    });
+    expect(await tokensOf(sub)).toEqual(atCap);
+    expect(await tokensOf(other)).toEqual([tokens[0]]);
+  });
+
+  it('counts a token moved from another account against the caller, and leaves that account one fewer', async () => {
+    const sub = fresh('cap-mover');
+    const other = fresh('cap-moved');
+    const theirs = await holding(other, 2);
+    const mine = await holding(sub);
+    expect(await register(sub, apns(theirs[1]!))).toEqual({
+      status: 200,
+      body: { outcome: 'registered', environment: 'sandbox' },
+    });
+    expect(await tokensOf(sub)).toEqual([theirs[1], ...mine.slice(1)]);
+    expect(await tokensOf(other)).toEqual([theirs[0]]);
+  });
+
+  it('counts both services’ tokens together, letting the oldest go whichever its service', async () => {
+    const sub = fresh('cap-both');
+    const first = fcmToken();
+    await register(sub, fcm(first));
+    const held = await holding(sub, PUSH_TOKENS_PER_STUDENT - 1);
+    // An APNs register past the cap lets the FCM token go…
+    const nextApns = apnsToken();
+    expect((await register(sub, apns(nextApns))).body).toEqual({
+      outcome: 'registered',
+      environment: 'sandbox',
+    });
+    expect(await tokensOf(sub)).toEqual([...held, nextApns]);
+    expect(await rowOf(first)).toBeUndefined();
+    // …and an FCM register past it, the oldest APNs token.
+    const nextFcm = fcmToken();
+    expect((await register(sub, fcm(nextFcm))).body).toEqual({
+      outcome: 'registered',
+      environment: 'production',
+    });
+    expect(await tokensOf(sub)).toEqual([...held.slice(1), nextApns, nextFcm]);
+    expect(await rowOf(nextFcm)).toMatchObject({ service: 'fcm' });
   });
 });
