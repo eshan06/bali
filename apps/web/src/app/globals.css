@@ -554,4 +554,15 @@
   --text-page-title-phone--letter-spacing: -0.01em;
 }
 
+/* A tile's name in the room (LO5; lock.css's `.tile .nm`), and on a phone (under 760 px): sizes the
+   scale lacks, pinned in tokens.test.ts with the lock-only look's others. */
+@theme {
+  --text-room-name: 14.5px;
+  --text-room-name--line-height: 19px;
+  --text-room-name--font-weight: 600;
+  --text-room-name-phone: 14px;
+  --text-room-name-phone--line-height: 19px;
+  --text-room-name-phone--font-weight: 600;
+}
+
 /* End of lane B */

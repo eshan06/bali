@@ -55,9 +55,21 @@ export function useClock(endsAt: string | null): number {
 /**
  * The session's ring: the time left as a green arc from the top, on its track. ClassLive's is 44 px,
  * r 19.5, stroked 5; ClassPresent's one size up, 64 px, r 28.5, stroked 7; the student's live card
- * and their home with no class 46 px, r 20.5, stroked 5 (StudentHome, StudentHomeEmpty).
+ * and their home with no class 46 px, r 20.5, stroked 5 (StudentHome, StudentHomeEmpty). A class's
+ * page in the lock-only look draws it 48 px, scaled to 44 on a phone (`className`; ClassLive,
+ * PhoneLive).
  */
-export function Ring({ share, box, stroke }: { share: number; box: number; stroke: number }) {
+export function Ring({
+  share,
+  box,
+  stroke,
+  className = '',
+}: {
+  share: number;
+  box: number;
+  stroke: number;
+  className?: string;
+}) {
   const c = box / 2;
   const r = c - stroke / 2;
   const around = 2 * Math.PI * r;
@@ -67,7 +79,7 @@ export function Ring({ share, box, stroke }: { share: number; box: number; strok
       height={box}
       viewBox={`0 0 ${box} ${box}`}
       aria-hidden="true"
-      className="shrink-0"
+      className={`shrink-0 ${className}`.trim()}
     >
       <circle cx={c} cy={c} r={r} fill="none" strokeWidth={stroke} className="stroke-arc-track" />
       {share > 0 ? (
@@ -265,6 +277,67 @@ export function LiveHeader({
       ) : null}
       <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0 max-sm:basis-full">
         {children}
+      </div>
+    </header>
+  );
+}
+
+/**
+ * A class's header while a session runs, in the lock-only look (LO5; ClassLive, PhoneLive): the
+ * ring, the name over when it ends and the join code, then the time left on this computer's clock
+ * to the server's bell over "left", and the controls (`children`). Until the bell is known the clock
+ * says … and "Ends" waits (LiveTopStates). On a phone, under 760 px, the ring 44 px and the name
+ * one size down, the clock and the controls on a line of their own, the clock at its start.
+ * Present keeps v2's header (`LiveHeader`) until LO9.
+ */
+export function LiveHead({
+  name,
+  joinCode,
+  startedAt,
+  endsAt,
+  children,
+}: {
+  name: string;
+  joinCode: string;
+  startedAt: string | null;
+  endsAt: string | null;
+  children: ReactNode;
+}) {
+  const now = useClock(endsAt);
+  const share = startedAt && endsAt ? shareLeft(startedAt, endsAt, now) : 0;
+  return (
+    <header className="flex flex-wrap items-center gap-x-6 gap-y-4">
+      <div className="flex min-w-0 flex-[1_1_300px] items-center gap-4">
+        <Ring share={share} box={48} stroke={5} className="max-[760px]:size-11" />
+        <div className="flex min-w-0 flex-col gap-1">
+          <h1 className="text-page-title text-balance wrap-anywhere max-[760px]:text-page-title-phone">
+            {name}
+          </h1>
+          <p className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-meta text-text-secondary">
+            {endsAt ? (
+              <span>
+                Ends <time dateTime={endsAt}>{bellTime(endsAt)}</time>
+              </span>
+            ) : null}
+            <span>
+              Join code{' '}
+              <span translate="no" className="font-mono font-medium text-text-primary">
+                {joinCode}
+              </span>
+            </span>
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 max-[760px]:w-full max-[760px]:justify-between">
+        <p className="flex flex-col items-end max-[760px]:items-start">
+          <span
+            className={`text-home-countdown tabular-nums ${endsAt ? '' : 'text-text-tertiary'}`}
+          >
+            {endsAt ? timeLeft(Date.parse(endsAt) - now) : '…'}
+          </span>
+          <span className="text-countdown-sub text-text-tertiary">left</span>
+        </p>
+        <div className="flex flex-wrap items-center gap-2">{children}</div>
       </div>
     </header>
   );

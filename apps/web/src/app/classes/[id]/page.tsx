@@ -15,31 +15,20 @@ import {
 import { Check, CircleAlert, Presentation } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import {
-  type ComponentProps,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-} from 'react';
+import { type ComponentProps, useCallback, useEffect, useId, useRef, useState } from 'react';
 
-import { AskPanel, NEW_DRAFT, PickPanel } from '@/components/ask-panel';
 import { Button, LockButton, QUIET } from '@/components/button';
 import { WELL } from '@/components/card';
 import { useCount, useCountOpened } from '@/components/count';
-import { DecksPanel } from '@/components/decks-panel';
 import { Input } from '@/components/field';
 import { DIALOG, JoinCode } from '@/components/join-code';
-import { LiveGrid, type StateCounts } from '@/components/live-grid';
-import { LiveCounts, LiveHeader, Ring } from '@/components/live-header';
+import { LiveGrid, Oops, type StateCounts } from '@/components/live-grid';
+import { LiveCounts, LiveHead, LiveHeader, Ring } from '@/components/live-header';
 import { PresentQuestion } from '@/components/present-question';
 import { PresentSlide } from '@/components/present-slide';
-import { isOpen, QuestionCard, useLiveQuestion } from '@/components/question-card';
+import { useLiveQuestion } from '@/components/question-card';
 import { endedToday, RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
-import { SlideCard } from '@/components/slide-card';
 import { land, TryAgain } from '@/components/try-again';
 import { type ApiClient, SAVE_TIMEOUT_MS } from '@/lib/api-client';
 import { getAccessToken } from '@/lib/auth';
@@ -52,7 +41,7 @@ import {
   SESSION_ALREADY_RUNNING,
 } from '@/lib/errors';
 import { lessonsOn } from '@/lib/lessons';
-import { failureOf, type QuestionDraft } from '@/lib/live-question';
+import { failureOf } from '@/lib/live-question';
 import { latestEnded, readEvents, recapGroups } from '@/lib/recap';
 import { reportPath } from '@/lib/reports';
 import {
@@ -92,6 +81,13 @@ const PRESENT_PAGE = 'relative flex min-h-dvh flex-col gap-5.5 px-4 pt-9 pb-10 s
 const TRACK = 'inline-flex flex-wrap gap-1 self-start rounded-sm bg-border-default p-1';
 const SEGMENT =
   'relative inline-flex h-8.5 cursor-pointer items-center gap-1.5 rounded-item px-3 text-segment max-[760px]:px-2.5 whitespace-nowrap text-text-secondary transition-colors select-none [&:not(:has(:checked))]:hover:bg-border-strong has-checked:bg-surface-card has-checked:text-text-primary has-checked:shadow-1 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring';
+
+/**
+ * The live header's buttons on a phone (PhoneLive's `.btn-sm`), under 760 px: 34 px tall, 12 px in,
+ * a 13.5/18 label, their hit area 44 px tall, as `LockButton`'s small.
+ */
+const SMALL_ON_PHONE =
+  'max-[760px]:h-8.5 max-[760px]:px-3 max-[760px]:text-button-sm max-[760px]:after:absolute max-[760px]:after:inset-x-0 max-[760px]:after:-inset-y-1.25';
 
 /** A well before class (ClassPage's `.ready`): 24 px in, 20 on a phone, its parts on one row as they fit. */
 const READY = `${WELL} flex flex-wrap items-center justify-between gap-x-8 gap-y-5 p-6 max-[760px]:p-5`;
@@ -172,33 +168,6 @@ function LockField({
           {help}
         </p>
       ) : null}
-    </div>
-  );
-}
-
-/**
- * A line that something didn't load (HomeStates' `.oops`), between hairlines, with Try again; held
- * while `held` says a read of it is on its way.
- */
-function Oops({
-  children,
-  onRetry,
-  held = false,
-  then,
-}: {
-  children: ReactNode;
-  onRetry: () => unknown;
-  held?: boolean;
-  then: readonly string[];
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-y border-border-default py-4">
-      <TryAgain onRetry={onRetry} held={held} then={then}>
-        <p role="alert" className="flex min-w-0 items-center gap-2 text-body">
-          <CircleAlert size={18} aria-hidden="true" className="shrink-0" />
-          {children}
-        </p>
-      </TryAgain>
     </div>
   );
 }
@@ -412,24 +381,18 @@ export default function ClassDetailPage() {
   const endCancel = useRef<HTMLButtonElement>(null);
   const endAsked = useRef(false);
   const [endSaid, setEndSaid] = useState<string | null>(null);
-  // The live question (L7): its card over the grid, and asking one in the side panel, where a
-  // student's panel shows: one of the teacher's questions picked (L7b, part 2; LessonAsk), or one
-  // written there (LessonWrite), what is written kept until it is asked or cancelled. A new session
-  // starts with neither. With lessons off (LO1) neither hook follows the session, so nothing of a
-  // lesson is read, its card is gone, and Present always shows the room.
+  // The live question (L7) and the slide (M6), in Present alone with lessons on: the class page is
+  // rebuilt from the lock-only canvas, which draws no lesson piece, so it shows none whichever way
+  // the switch is set (ARCHITECTURE, Web portal, decision 8; LO5), and Present keeps v2's until
+  // LO9. Out of Present, or with lessons off (LO1), neither hook follows the session, so nothing of a
+  // lesson is read that nothing shows.
   const lessons = lessonsOn();
   const live = klass !== null && grid !== null && !grid.over;
-  const { lesson, onEvent, ask, opening, forgetAsk, snapshot, reread } = useLiveQuestion(
-    live && lessons ? grid.id : null,
-  );
+  const following = live && lessons && present ? grid.id : null;
+  const { lesson, onEvent, snapshot, reread } = useLiveQuestion(following);
   // What the session shows (M6, part 2b): from the question's read of the session, the stream and
-  // this tab's own changes, its card in the question card's place while no question shows, the
-  // question first (the conductor's call, 2026-10-16), the slide card back after Done.
-  const { slides, onEvent: onSlideEvent } = useSlide(
-    live && lessons ? grid.id : null,
-    snapshot,
-    reread,
-  );
+  // this tab's own changes, the question first (the conductor's call, 2026-10-16).
+  const { slides, onEvent: onSlideEvent } = useSlide(following, snapshot, reread);
   const onLessonEvent = useCallback(
     (e: FeedEvent) => {
       onEvent(e);
@@ -437,58 +400,16 @@ export default function ClassDetailPage() {
     },
     [onEvent, onSlideEvent],
   );
-  // The side panel, one at a time: asking a question (L7-1b), or picking a deck to show (M6, part
-  // 2c; LessonDecks).
-  const [side, setSide] = useState<'ask' | 'decks' | null>(null);
-  const [writing, setWriting] = useState(false);
-  const [draft, setDraft] = useState<QuestionDraft>(NEW_DRAFT);
-  useEffect(() => {
-    setSide(null);
-    setWriting(false);
-    setDraft(NEW_DRAFT);
-  }, [grid?.id]);
   // A session shown, by an answer or a read: a Start lost before it is settled, the session its
   // own or another's.
   useEffect(() => {
     lostStart.current = null;
   }, [grid?.id]);
-  // Never in Present: asking lists the teacher's questions with their correct answers (the owner,
-  // 2026-10-15), and what is written in it; the decks are the teacher's to pick, not the room's.
-  const panel = present ? null : side;
   // In Present the question shows in the live grid's place (L7, part 2; PresentQuestion,
   // PresentAnswer), its totals the room's alone, else the slide the session shows (M6, part 2d;
   // PresentSlide): the question first (the conductor's call, 2026-10-16). The grid stays
   // underneath, its stream with it.
   const projected = present && (lesson.question !== null || slides.slide !== null);
-  // Back to the button that opened it (Show slides, or Ask a question, on whichever card shows);
-  // the question, when one shows (opened meanwhile, from another tab).
-  const closePanel = () => {
-    setSide(null);
-    (
-      document.getElementById(`${id}-${side === 'decks' ? 'show' : 'ask'}`) ??
-      document.getElementById(`${id}-ask`) ??
-      document.getElementById(`${id}-q`)
-    )?.focus();
-  };
-  // Asked: the panel goes, and focus to the question in the card; the decks' panel, opened while the
-  // ask was on its way, stays, focus with it (santa's review).
-  const sideNow = useRef(side);
-  useEffect(() => {
-    sideNow.current = side;
-  }, [side]);
-  const asked = () => {
-    if (sideNow.current === 'decks') return;
-    setSide(null);
-    window.requestAnimationFrame(() => document.getElementById(`${id}-q`)?.focus());
-  };
-  // Shown: the panel goes, and focus to the slide card's title; to the question, when one shows
-  // first.
-  const shown = () => {
-    setSide(null);
-    window.requestAnimationFrame(() =>
-      (document.getElementById(`${id}-slides`) ?? document.getElementById(`${id}-q`))?.focus(),
-    );
-  };
 
   // Each read's turn, the class's and the roster's: only the newest one's answer is drawn, so a
   // slow read never says its failure over one read since, two Try agains for one failure (under the
@@ -774,52 +695,93 @@ export default function ClassDetailPage() {
     });
   }
 
-  // Present, the projector the class can see (DESIGN.md §5): beside the live grid's counts, small
-  // and hidden on a phone, which never drives a projector (PV1; `beside`), and in Present's header,
-  // after the bell too; none on the page after the bell, as ClassEnded draws it. Pressed, the
-  // Button's sunken fill and `text-primary` edge, never colour alone; its icon the same both ways,
-  // as ClassPresent draws it. Present's Done sends focus to it (`${id}-present`).
-  const presentToggle = (beside = false, className = '') => (
+  // Present, the projector the class can see (DESIGN.md §5): at the end of the live header's
+  // controls (ClassLive), hidden on a phone, which never drives a projector (PhoneLive), and in
+  // Present's header in v2's look, after the bell too; none on the page after the bell. Pressed, its
+  // grey fill and `text-primary` edge, never colour alone; its icon the same both ways, as
+  // ClassPresent draws it. Present's Done sends focus to it (`${id}-present`).
+  const togglePresent = () => {
+    rememberPresent(classId, !present);
+    toggled.current = true;
+    setPresent(!present);
+  };
+  const presentToggle = (className = '') => (
     <Button
       ref={toggle}
       id={`${id}-present`}
       variant="secondary"
-      size={beside ? 'sm' : 'md'}
       aria-pressed={present}
-      onClick={() => {
-        rememberPresent(classId, !present);
-        toggled.current = true;
-        setPresent(!present);
-      }}
-      className={beside ? 'ml-auto max-sm:hidden' : className}
+      onClick={togglePresent}
+      className={className}
     >
       <Presentation size={16} aria-hidden="true" />
       Present
     </Button>
   );
 
+  // +5 and +10, and End session: v2's in Present's header; on the class page the lock-only look's
+  // (ClassLive), +5 and +10 joined as one pair, End set apart, each small on a phone (PhoneLive).
+  const addTimeOf = (add: number) => () => addTime(extendAttemptFor(unanswered.current, add));
   const extend = EXTEND_PRESETS.map((add) => (
     <Button
       key={add}
       variant="secondary"
-      onClick={() => addTime(extendAttemptFor(unanswered.current, add))}
+      onClick={addTimeOf(add)}
       aria-disabled={busy !== null}
       className="tabular-nums"
     >
       +{add} min
     </Button>
   ));
-  const end = (className = '') => (
+  const end = (
     <Button
       ref={endButton}
       variant="secondary"
       aria-haspopup="dialog"
       onClick={askEnd}
       aria-disabled={busy !== null}
-      className={className}
+      className="ml-2"
     >
       End session
     </Button>
+  );
+  const controls = (
+    <>
+      <div className="inline-flex">
+        {EXTEND_PRESETS.map((add, i) => (
+          <LockButton
+            key={add}
+            variant="secondary"
+            onClick={addTimeOf(add)}
+            aria-disabled={busy !== null}
+            className={`tabular-nums focus-visible:z-1 ${i === 0 ? 'rounded-r-none' : '-ml-px rounded-l-none'} ${SMALL_ON_PHONE}`}
+          >
+            +{add} min
+          </LockButton>
+        ))}
+      </div>
+      <LockButton
+        ref={endButton}
+        variant="secondary"
+        aria-haspopup="dialog"
+        onClick={askEnd}
+        aria-disabled={busy !== null}
+        className={SMALL_ON_PHONE}
+      >
+        End session
+      </LockButton>
+      <LockButton
+        ref={toggle}
+        id={`${id}-present`}
+        variant="secondary"
+        aria-pressed={present}
+        onClick={togglePresent}
+        className="max-[760px]:hidden"
+      >
+        <Presentation size={16} aria-hidden="true" />
+        Present
+      </LockButton>
+    </>
   );
   // End session's confirm (GA1AClassLive, GA1APresent, GA1AStates; on a phone GA6EndPhone): v2's
   // dialog, New code's, the same on the class page and in Present, where the room sees it, saying
@@ -903,98 +865,102 @@ export default function ClassDetailPage() {
         </TryAgain>
       </div>
     );
-  // What is said under the controls: a failed extend with Try again, sending the same one again,
-  // held as every control is until Bali answers; then focus on the class's name (ClassRetryStates).
+  // What is said under the controls: an extend refused, or one that failed with Try again, sending
+  // the same one again, held as every control is until Bali answers, then focus on the class's
+  // name; or a note on the session shown (ClassRetryStates; on the class page LiveTopStates).
+  const resend = () => {
+    const again = unanswered.current;
+    if (again) addTime(again, true);
+  };
   const saidLine = said && (
     <p role={said.kind === 'note' ? 'status' : 'alert'} className="text-body">
       {said.message}
     </p>
   );
 
-  // While a session runs (PV7; in Present, PV9): one tree in both views, each part in its place
-  // whether Present is on or off, so the grid never restarts or reconnects as it turns on.
+  // While a session runs: one tree in both views, each part in its place whether Present is on or
+  // off, so the grid never restarts or reconnects as it turns on. On the class page (LO5; ClassLive,
+  // LiveTopStates, PhoneLive): the header, what is said under it, then over a hairline the count,
+  // Check on and the room, the grid's own (`LiveGrid`), its parts 40 px apart, 32 on a phone. In
+  // Present (PV9; ClassPresent), v2's until LO9: its header, its counts over the grid, and the
+  // question or the slide in the tiles' place with lessons on.
   return klass !== null && grid !== null && !grid.over ? (
-    <div className={present ? PRESENT_PAGE : 'relative flex flex-col gap-5.5'}>
-      {/* ClassLive's header, End set apart from adding time, and no New code, which it doesn't
-          draw; ClassPresent's in Present, +5, +10 and End kept there beside Present. */}
-      <LiveHeader
-        name={klass.name}
-        joinCode={klass.joinCode}
-        counts={counts}
-        startedAt={grid.startedAt}
-        endsAt={grid.endsAt}
-        present={present}
-      >
-        {extend}
-        {end('ml-2')}
-        {present ? presentToggle(false, 'ml-2') : null}
-      </LiveHeader>
+    <div className={present ? PRESENT_PAGE : 'flex flex-col gap-10 max-[760px]:gap-8'}>
+      {/* No New code, which neither header draws; in Present +5, +10 and End kept beside Present. */}
+      {present ? (
+        <LiveHeader
+          name={klass.name}
+          joinCode={klass.joinCode}
+          counts={counts}
+          startedAt={grid.startedAt}
+          endsAt={grid.endsAt}
+          present
+        >
+          {extend}
+          {end}
+          {presentToggle('ml-2')}
+        </LiveHeader>
+      ) : (
+        <LiveHead
+          name={klass.name}
+          joinCode={klass.joinCode}
+          startedAt={grid.startedAt}
+          endsAt={grid.endsAt}
+        >
+          {controls}
+        </LiveHead>
+      )}
 
-      {/* A roster's failure waits for the page that shows one, after the bell. */}
-      {cantLoad(error)}
+      {/* A read again of the class that failed; a roster's waits for the page that shows one,
+          after the bell. */}
+      {error === null ? null : present ? (
+        cantLoad(error)
+      ) : (
+        <Oops onRetry={load} held={classReading}>
+          Couldn&apos;t load this class. {error}
+        </Oops>
+      )}
 
       {/* Said right under the controls, where they are. */}
-      {said ? (
+      {said === null ? null : !present ? (
+        said.kind === 'note' ? (
+          <p
+            role="status"
+            className="border-y border-border-default py-3 text-body text-text-secondary"
+          >
+            {said.message}
+          </p>
+        ) : (
+          <Oops onRetry={said.kind === 'failed' ? resend : undefined} held={busy !== null}>
+            {said.message}
+          </Oops>
+        )
+      ) : (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
           {said.kind === 'failed' ? (
-            <TryAgain
-              onRetry={() => {
-                const again = unanswered.current;
-                if (again) addTime(again, true);
-              }}
-              held={busy !== null}
-              then={[]}
-            >
+            <TryAgain onRetry={resend} held={busy !== null} then={[]}>
               {saidLine}
             </TryAgain>
           ) : (
             saidLine
           )}
         </div>
-      ) : null}
-      {/* The rest of the page, so Present's slide fills what the screen leaves under the header. */}
+      )}
+      {/* The rest of the page: on the class page over a hairline; in Present it fills what the
+          screen leaves under the header, for the slide. */}
       <section
-        aria-label={projected ? undefined : 'Live grid'}
-        className="flex flex-1 flex-col gap-5.5"
+        aria-label={present && !projected ? 'Live grid' : undefined}
+        className={present ? 'flex flex-1 flex-col gap-5.5' : 'border-t border-border-default pt-8'}
       >
-        {/* The counts and Present over the grid (ClassLive); in Present the counts alone, and
-            none while the question or the slide shows in the grid's place (PresentQuestion,
-            PresentSlide). */}
-        {projected ? null : (
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
-            {counts ? <LiveCounts counts={counts} present={present} /> : null}
-            {present ? null : presentToggle(true)}
-          </div>
-        )}
-        {/* The live question between the counts and the grid (LessonClass), never in Present, nor
-            with lessons off; the slide shown in its place while no question shows (LessonSlide). */}
-        {present || !lessons ? null : lesson.question === null && slides.slide !== null ? (
-          <SlideCard
-            id={id}
-            lesson={slides}
-            slide={slides.slide}
-            asking={panel === 'ask'}
-            onAsk={() => setSide('ask')}
-          />
-        ) : (
-          <QuestionCard
-            id={id}
-            lesson={lesson}
-            endsAt={grid.endsAt}
-            asking={panel === 'ask'}
-            onAsk={() => setSide('ask')}
-            showing={panel === 'decks'}
-            onShow={() => setSide('decks')}
-          />
-        )}
+        {/* Present's counts over the grid (ClassPresent), none while the question or the slide
+            shows in the grid's place (PresentQuestion, PresentSlide). */}
+        {present && !projected && counts ? <LiveCounts counts={counts} present /> : null}
         <LiveGrid
           sessionId={grid.id}
           onEnded={onEnded}
           onSession={onSession}
           onCounts={onCounts}
           onEvent={onLessonEvent}
-          asking={panel !== null}
-          onStudentPanel={() => setSide(null)}
           present={present}
           livePage
           tiles={!projected}
@@ -1008,42 +974,6 @@ export default function ClassDetailPage() {
       </section>
       {/* End session's confirm, shown only while open, as a modal over the page. */}
       {endConfirm}
-      {panel === 'decks' ? (
-        <DecksPanel id={`${id}-panel`} lesson={slides} onShown={shown} onClose={closePanel} />
-      ) : null}
-      {panel === 'ask' && !writing ? (
-        <PickPanel
-          id={`${id}-panel`}
-          openNow={isOpen(lesson)}
-          opening={opening}
-          onAsk={ask}
-          onAsked={asked}
-          onWrite={() => setWriting(true)}
-          onClose={closePanel}
-        />
-      ) : null}
-      {panel === 'ask' && writing ? (
-        <AskPanel
-          id={`${id}-panel`}
-          draft={draft}
-          onDraft={setDraft}
-          openNow={isOpen(lesson)}
-          opening={opening}
-          onAsk={ask}
-          onAsked={() => {
-            setWriting(false);
-            setDraft(NEW_DRAFT);
-            asked();
-          }}
-          onCancel={() => {
-            setWriting(false);
-            setDraft(NEW_DRAFT);
-            forgetAsk();
-            closePanel();
-          }}
-          onClose={closePanel}
-        />
-      ) : null}
     </div>
   ) : klass !== null && present ? (
     // After the bell in Present (PresentEnded, as PV1 approved): the header, its ring whole, and

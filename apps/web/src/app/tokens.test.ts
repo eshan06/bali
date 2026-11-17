@@ -167,6 +167,9 @@ const LOCK_SIZES: Record<string, [string, string, number, string?]> = {
   'panel-title': ['19px', '26px', 600],
   // A page's title on a phone (LO4).
   'page-title-phone': ['23px', '29px', 600, '-0.01em'],
+  // A tile's name in the room, and on a phone (LO5).
+  'room-name': ['14.5px', '19px', 600],
+  'room-name-phone': ['14px', '19px', 600],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
