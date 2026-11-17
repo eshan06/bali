@@ -44,6 +44,17 @@ export const CANT_REACH = "Couldn't reach Bali. Check your connection, then try 
 /** A 5xx or a timeout on the register (P3): the API's own message is written for a log. */
 export const CANT_REGISTER = "Bali couldn't register the block just now. Try again.";
 
+/** A 5xx or a timeout on a block's removal (LO11): Try again sends it again under its own id. */
+export const CANT_REMOVE_BLOCK = "Bali couldn't remove the block just now. Try again.";
+
+/**
+ * A block's removal refused with no reason of its own (LO11; `DELETE /v1/blocks/{id}`'s `403` and
+ * `404`): the block isn't the account's signed in now, or Bali has no record of it, and nothing was
+ * removed. A reload reads the blocks as Bali holds them for that account (RemoveBlockStates).
+ */
+export const BLOCK_NOT_REMOVED =
+  "Bali couldn't remove this block. Reload the page to see your blocks.";
+
 /**
  * A create with no words of its own to say (D2e): a 5xx, a timeout, or a refusal with no reason,
  * whose message is written for a log. The class may have been made before the answer was lost, and

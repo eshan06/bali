@@ -1,20 +1,29 @@
 // @vitest-environment jsdom
 import type { BlockDetail } from '@bali/shared';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type ApiClient, createApiClient } from '@/lib/api-client';
-import { BLOCK_TAKEN, CANT_REACH, NOT_A_BLOCK_ID } from '@/lib/errors';
+import {
+  BLOCK_NOT_REMOVED,
+  BLOCK_TAKEN,
+  CANT_REACH,
+  CANT_REMOVE_BLOCK,
+  NOT_A_BLOCK_ID,
+} from '@/lib/errors';
 
 import { Blocks } from './blocks';
+import { DIALOG_LOCK } from './card';
 import { CountContext } from './count';
 
 /*
  * Your block (LO3; Main, HomeIdle, ClassFlows' "Your block, none yet", its other moments on
- * HomeMoments), as a teacher meets it (the owner's decision of 2026-10-22: the portal's tests drive
- * the page). Bali's answers come from a stand-in `fetch` under the portal's own client, each held
- * until the test gives it.
+ * HomeMoments), and since LO11 a lost block's Remove (ClassFlows' "Remove a lost block", its
+ * in-between states on RemoveBlockStates), as a teacher meets it (the owner's decision of
+ * 2026-10-22: the portal's tests drive the page). Bali's answers come from a stand-in `fetch` under
+ * the portal's own client, each held until the test gives it; jsdom has no `showModal` or `close`,
+ * nor the browser's Escape on a modal: the stand-ins below do what the browser does, no more.
  */
 
 const bali = vi.hoisted(() => {
@@ -39,6 +48,38 @@ const bali = vi.hoisted(() => {
 
 vi.mock('@/lib/use-api', () => ({ useApi: () => bali.client }));
 vi.mock('@/lib/monitoring', () => ({ captureApiFailure: vi.fn() }));
+
+/** The browser's Escape on an open modal: `cancel`, then closed unless that was prevented. */
+function escape(e: KeyboardEvent) {
+  const open = document.querySelector<HTMLDialogElement>('dialog[open]');
+  if (e.key !== 'Escape' || !open) return;
+  const cancel = new Event('cancel', { cancelable: true });
+  open.dispatchEvent(cancel);
+  if (!cancel.defaultPrevented) open.close();
+}
+const showModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal');
+const close = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+    this.setAttribute('open', '');
+  };
+  HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+    if (!this.open) return;
+    this.removeAttribute('open');
+    this.dispatchEvent(new Event('close'));
+  };
+  document.addEventListener('keydown', escape);
+});
+afterAll(() => {
+  document.removeEventListener('keydown', escape);
+  for (const [name, was] of [
+    ['showModal', showModal],
+    ['close', close],
+  ] as const) {
+    if (was) Object.defineProperty(HTMLDialogElement.prototype, name, was);
+    else delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>)[name];
+  }
+});
 
 beforeEach(() => {
   bali.client = createApiClient({
@@ -76,6 +117,18 @@ async function answer(status: number | 'none', body?: unknown) {
   });
   return call;
 }
+
+/** The request `key` on its way, answered as `answer` answers the next one. */
+async function answerTo(key: string, status: number | 'none', body?: unknown) {
+  const at = bali.calls.findIndex((c) => c.key === key);
+  if (at === -1) throw new Error(`no ${key} on its way`);
+  bali.calls.unshift(...bali.calls.splice(at, 1));
+  return answer(status, body);
+}
+
+/** The line a status says it in, found by its words. */
+const statusSaying = (words: string) =>
+  screen.getAllByRole('status').find((s) => s.textContent === words);
 
 /** Your block on its page, its list read with `blocks`, the count it sends kept. */
 async function opened(blocks: BlockDetail[]) {
@@ -133,7 +186,7 @@ describe('Your block, none yet (ClassFlows)', () => {
     expect(field()).toHaveProperty('readOnly', true);
     const sent = await answer(201, NEW_BLOCK);
     expect(sent).toMatchObject({ key: 'POST /v1/blocks', body: { tagId: 'QW4N8HJR2D' } });
-    expect(screen.getByRole('status').textContent).toBe('QW4N8HJR2D is registered to you.');
+    expect(statusSaying('QW4N8HJR2D is registered to you.')).toBeDefined();
     expect(screen.getByText('QW4N8HJR2D').getAttribute('translate')).toBe('no');
     expect(screen.queryByText('No block registered yet.')).toBeNull();
     expect(field()).toHaveProperty('value', '');
@@ -165,7 +218,7 @@ describe('Your block, none yet (ClassFlows)', () => {
     await user.click(button('Try again'));
     const again = await answer(201, NEW_BLOCK);
     expect(again.body).toEqual({ tagId: 'QW4N8HJR2D' });
-    expect(screen.getByRole('status').textContent).toBe('QW4N8HJR2D is registered to you.');
+    expect(statusSaying('QW4N8HJR2D is registered to you.')).toBeDefined();
   });
 });
 
@@ -207,9 +260,7 @@ describe('Your block, with one (Main, HomeIdle; HomeMoments)', () => {
     await user.click(button('Register another block'));
     await user.type(field(), 'T7XK2M9QPF{Enter}');
     await answer(201, BLOCK);
-    expect(screen.getByRole('status').textContent).toBe(
-      'T7XK2M9QPF was already registered to you.',
-    );
+    expect(statusSaying('T7XK2M9QPF was already registered to you.')).toBeDefined();
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
   });
 });
@@ -233,5 +284,257 @@ describe('Your block, its list not read (HomeMoments)', () => {
       await new Promise((resolve) => setTimeout(resolve, 40));
     });
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Your block' }));
+  });
+});
+
+describe('Remove a lost block (LO11; ClassFlows, RemoveBlockStates)', () => {
+  const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  const confirm = () => screen.getByRole('dialog');
+  const inConfirm = (name: string) => within(confirm()).getByRole('button', { name });
+  const remove = (tagId: string) => button(`Remove block ${tagId}`);
+  /** The removal on its way, answered `outcome` with the block it removed. */
+  const removed = (block: BlockDetail, outcome: 'removed' | 'replay' = 'removed') =>
+    answerTo(`DELETE /v1/blocks/${block.id}`, 200, { outcome, block });
+  /** The line under the list, said once a block is removed: mounted while empty, never the form's. */
+  const goneLine = () => screen.getAllByRole('status').find((s) => s.closest('form') === null);
+  /** Chrome's second Escape with no click between: a `cancel` that can't be held, then closed. */
+  const chromeCloses = () =>
+    act(async () => {
+      const dialog = confirm() as HTMLDialogElement;
+      dialog.dispatchEvent(new Event('cancel'));
+      dialog.close();
+      await Promise.resolve();
+    });
+
+  it('ends each block’s row on Remove, named for its block, with one block as with two', async () => {
+    await opened([BLOCK]);
+    const row = screen.getByRole('listitem');
+    expect(row.textContent).toMatch(/^T7XK2M9QPFRegistered .*Remove$/);
+    expect(remove('T7XK2M9QPF').textContent).toBe('Remove');
+    expect(remove('T7XK2M9QPF').getAttribute('aria-haspopup')).toBe('dialog');
+    expect(within(row).getByRole('button')).toBe(remove('T7XK2M9QPF'));
+    // The confirm is there closed: only showModal opens it, so the page behind is inert.
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(goneLine()?.textContent).toBe('');
+    cleanup();
+    bali.calls.length = 0;
+    await opened([BLOCK, NEW_BLOCK]);
+    expect(remove('T7XK2M9QPF')).toBeDefined();
+    expect(remove('QW4N8HJR2D')).toBeDefined();
+  });
+
+  it('asks first, naming the block, Cancel focused; Cancel and Escape close it, focus back on its Remove, nothing sent', async () => {
+    const { user } = await opened([BLOCK, NEW_BLOCK]);
+    await user.click(remove('T7XK2M9QPF'));
+    expect(confirm().className).toBe(DIALOG_LOCK);
+    expect(screen.getByRole('dialog', { name: 'Remove block T7XK2M9QPF?' })).toBe(confirm());
+    expect(
+      screen.getByRole('dialog', { description: "Students can't tap in with it after this." }),
+    ).toBe(confirm());
+    expect(within(confirm()).getByRole('heading').className).toBe('text-panel-title');
+    expect(confirm().textContent).toBe(
+      "Remove block T7XK2M9QPF?Students can't tap in with it after this.CancelRemove block",
+    );
+    expect(within(confirm()).getByText('T7XK2M9QPF').getAttribute('translate')).toBe('no');
+    expect(document.activeElement).toBe(inConfirm('Cancel'));
+
+    await user.click(inConfirm('Cancel'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(remove('T7XK2M9QPF'));
+    await user.click(remove('QW4N8HJR2D'));
+    expect(screen.getByRole('dialog', { name: 'Remove block QW4N8HJR2D?' })).toBeDefined();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(remove('QW4N8HJR2D'));
+    expect(bali.calls).toEqual([]);
+  });
+
+  it('removes it: Removing…, Cancel and Escape held; then the row goes, said under the list, focus on the next block’s Remove', async () => {
+    const { user, count } = await opened([BLOCK, NEW_BLOCK]);
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    expect(inConfirm('Removing…').getAttribute('aria-busy')).toBe('true');
+    expect(inConfirm('Cancel').getAttribute('aria-disabled')).toBe('true');
+    await user.click(inConfirm('Cancel'));
+    await user.keyboard('{Escape}');
+    expect(confirm()).toBeDefined();
+
+    const sent = await removed(BLOCK);
+    expect(sent.body).toEqual({ eventId: expect.stringMatching(UUID_V7) as string });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText('T7XK2M9QPF')).toBeNull();
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: 'Your block' })).toBeDefined();
+    expect(goneLine()?.textContent).toBe('T7XK2M9QPF is no longer registered to you.');
+    expect(document.activeElement).toBe(remove('QW4N8HJR2D'));
+    // Nothing else sent: no read again, and no count (PORTAL_EVENTS names no removal).
+    expect(bali.calls).toEqual([]);
+    expect(count).not.toHaveBeenCalled();
+  });
+
+  it('removes the last one: none yet with the field, the line under it, focus on the title', async () => {
+    const { user } = await opened([BLOCK]);
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    await removed(BLOCK);
+    expect(screen.getByText('No block registered yet.')).toBeDefined();
+    expect(goneLine()?.textContent).toBe('T7XK2M9QPF is no longer registered to you.');
+    expect(field()).toHaveProperty('value', '');
+    expect(screen.queryByRole('button', { name: 'Register another block' })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Your block' }));
+  });
+
+  it('says one removed already, from another tab, the same way, focus on the block before when the last row goes', async () => {
+    const { user } = await opened([BLOCK, NEW_BLOCK]);
+    await user.click(remove('QW4N8HJR2D'));
+    await user.click(inConfirm('Remove block'));
+    await removed(NEW_BLOCK, 'replay');
+    expect(screen.queryByText('QW4N8HJR2D')).toBeNull();
+    expect(goneLine()?.textContent).toBe('QW4N8HJR2D is no longer registered to you.');
+    expect(document.activeElement).toBe(remove('T7XK2M9QPF'));
+  });
+
+  it('sends a removal once however often it is pressed while Bali hasn’t answered', async () => {
+    const { user } = await opened([BLOCK]);
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    await user.click(inConfirm('Removing…'));
+    await user.keyboard('{Enter}');
+    expect(bali.calls.map((c) => c.key)).toEqual(['DELETE /v1/blocks/b1']);
+  });
+
+  it('says an answer that never came in the dialog; Try again sends the same removal again, under its id', async () => {
+    const { user } = await opened([BLOCK]);
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    const first = await answer('none');
+    expect(within(confirm()).getByRole('alert').textContent).toBe(CANT_REACH);
+    expect(screen.getByText('T7XK2M9QPF', { ignore: 'dialog *' })).toBeDefined();
+    await user.click(inConfirm('Try again'));
+    expect(inConfirm('Removing…')).toBeDefined();
+    expect(within(confirm()).queryByRole('alert')).toBeNull();
+    // Bali's own failure, said the same way.
+    const second = await answer(500, { error: { code: 'internal', message: 'internal error' } });
+    expect(within(confirm()).getByRole('alert').textContent).toBe(CANT_REMOVE_BLOCK);
+    await user.click(inConfirm('Try again'));
+    const third = await removed(BLOCK, 'replay');
+    expect([second.body, third.body]).toEqual([first.body, first.body]);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(goneLine()?.textContent).toBe('T7XK2M9QPF is no longer registered to you.');
+  });
+
+  it('says a refusal in the dialog, Remove block kept, which sends it anew under a fresh id', async () => {
+    const { user } = await opened([BLOCK]);
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    const first = await answer(403, { error: { code: 'forbidden', message: 'not your block' } });
+    expect(within(confirm()).getByRole('alert').textContent).toBe(BLOCK_NOT_REMOVED);
+    expect(within(confirm()).queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(screen.getByText('T7XK2M9QPF', { ignore: 'dialog *' })).toBeDefined();
+    await user.click(inConfirm('Remove block'));
+    const second = await removed(BLOCK);
+    expect(second.body).not.toEqual(first.body);
+    expect(screen.queryByText('T7XK2M9QPF')).toBeNull();
+  });
+
+  it('closed on an answer that never came, reads the blocks again: one removed after all leaves the list, said', async () => {
+    const { user } = await opened([BLOCK, NEW_BLOCK]);
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    await answer('none');
+    await user.click(inConfirm('Cancel'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(remove('T7XK2M9QPF'));
+    expect(bali.calls.map((c) => c.key)).toEqual(['GET /v1/blocks']);
+    await answer(200, { blocks: [NEW_BLOCK] });
+    expect(screen.queryByText('T7XK2M9QPF')).toBeNull();
+    expect(goneLine()?.textContent).toBe('T7XK2M9QPF is no longer registered to you.');
+    expect(document.activeElement).toBe(remove('QW4N8HJR2D'));
+  });
+
+  it('closed on an answer that never came, keeps a block Bali still holds, and its next Remove goes under the lost id', async () => {
+    const { user } = await opened([BLOCK]);
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    const lost = await answer('none');
+    await user.keyboard('{Escape}');
+    await answer(200, { blocks: [BLOCK] });
+    expect(screen.getByText('T7XK2M9QPF')).toBeDefined();
+    expect(goneLine()?.textContent).toBe('');
+    expect(document.activeElement).toBe(remove('T7XK2M9QPF'));
+    await user.click(remove('T7XK2M9QPF'));
+    expect(within(confirm()).queryByRole('alert')).toBeNull();
+    await user.click(inConfirm('Remove block'));
+    const again = await removed(BLOCK, 'replay');
+    expect(again.body).toEqual(lost.body);
+  });
+
+  it('closed by Chrome’s second Escape while Removing…, opens again to say a failure', async () => {
+    const { user } = await opened([BLOCK]);
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    await chromeCloses();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(remove('T7XK2M9QPF'));
+    // Held until Bali answers: another confirm can't open over this removal.
+    expect(remove('T7XK2M9QPF').getAttribute('aria-disabled')).toBe('true');
+    await user.click(remove('T7XK2M9QPF'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await answer('none');
+    expect(within(confirm()).getByRole('alert').textContent).toBe(CANT_REACH);
+    expect(inConfirm('Try again')).toBeDefined();
+    expect(remove('T7XK2M9QPF').getAttribute('aria-disabled')).toBe('false');
+  });
+
+  it('closed by Chrome’s second Escape while Removing…, a removal that lands takes the row, focus on the next', async () => {
+    const { user } = await opened([BLOCK, NEW_BLOCK]);
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    await chromeCloses();
+    await removed(BLOCK);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText('T7XK2M9QPF')).toBeNull();
+    expect(goneLine()?.textContent).toBe('T7XK2M9QPF is no longer registered to you.');
+    expect(document.activeElement).toBe(remove('QW4N8HJR2D'));
+  });
+
+  it('never brings a removed block back with a register answered after the removal', async () => {
+    const { user } = await opened([BLOCK]);
+    await user.click(button('Register another block'));
+    await user.type(field(), 'QW4N8HJR2D{Enter}');
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    await removed(BLOCK);
+    await answerTo('POST /v1/blocks', 201, NEW_BLOCK);
+    expect(screen.queryByText('T7XK2M9QPF')).toBeNull();
+    expect(screen.getAllByRole('listitem').map((li) => li.firstChild?.textContent)).toEqual([
+      'QW4N8HJR2D',
+    ]);
+  });
+
+  it('takes back a line saying a block is registered once that block is removed, and keeps another’s', async () => {
+    const { user } = await opened([BLOCK]);
+    await user.click(button('Register another block'));
+    await user.type(field(), 'QW4N8HJR2D{Enter}');
+    await answer(201, NEW_BLOCK);
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    await removed(BLOCK);
+    expect(statusSaying('QW4N8HJR2D is registered to you.')).toBeDefined();
+    await user.click(remove('QW4N8HJR2D'));
+    await user.click(inConfirm('Remove block'));
+    await removed(NEW_BLOCK);
+    expect(screen.queryByText('QW4N8HJR2D is registered to you.')).toBeNull();
+    expect(goneLine()?.textContent).toBe('QW4N8HJR2D is no longer registered to you.');
+  });
+
+  it('keeps the line under the list until the section’s next action', async () => {
+    const { user } = await opened([BLOCK, NEW_BLOCK]);
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    await removed(BLOCK);
+    expect(goneLine()?.textContent).toBe('T7XK2M9QPF is no longer registered to you.');
+    await user.click(button('Register another block'));
+    expect(goneLine()?.textContent).toBe('');
   });
 });

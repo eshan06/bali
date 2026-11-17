@@ -696,7 +696,11 @@ counts them and its average as words beside a bar, in a ledger that scrolls
 sideways under 760 px, every cell on one line; its states as HomeStates and
 ReportsMoments draw them (drawn on the canvas first, the CSV's columns too). LO8
 added `share` (56/56, semibold, −0.035em: the share, at every width), in lane
-A's block.
+A's block. Since LO11 (2026-11-17) each row of Your blocks ends on Remove,
+ClassFlows' Remove a lost block, under the code where the row is full, as in
+Home's column: a confirm naming the block, Cancel focused, Remove block in the
+primary green, never red; a block removed is said under the list; its in-between
+states as RemoveBlockStates draws them (drawn on the canvas first).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the

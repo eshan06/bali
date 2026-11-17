@@ -2699,6 +2699,17 @@ W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407,
    already promises a daily and a weekly backup (the owner, 2026-11-05: "we will have those backups
    before we go live").
 
+**In flight, the push's finished line as PLAN.md said it until LO11 (2026-11-17, #PR-TBD; moved for its word cap):**
+- **The "class started" push (N1–N6, decided 2026-10-06)** ✅: the backend half (N4–N6) and the
+  app half (#456; DECISIONS 2026-10-24), N6's end-to-end check passed on prod at the sitting
+  (2026-11-08); left, dev's step 4 (Open owner items), and Android's sender, AN11b. Its line in
+  full: `docs/PLAN-ARCHIVE.md`.
+
+**Still open in earlier phases, three finished lines as PLAN.md held them until LO11 (2026-11-17, #PR-TBD; moved for its word cap):**
+- **C3d** Deleted sign-ins refused on the server — ✅ (#558; DECISIONS 2026-11-11); its case's CI flake fixed (#586; DECISIONS 2026-11-12)
+- **S12** A CI scan that fails any PR with invisible or text-direction characters — ✅ (#596; DECISIONS 2026-11-13)
+- **The push's app half** — ✅ (#456; DECISIONS 2026-10-24); N6's end-to-end check passed on prod (2026-11-08); left, runbook 7's step 4, dev's `APNS_*` variables, the owner's
+
 ## Phases: the full table and the finished step lists (as of 2026-10-13)
 
 | Phase | What | Status |
@@ -2945,6 +2956,61 @@ Slice 3 — students on the web (added 2026-10-10; ARCHITECTURE, "Live lesson", 
 - **W3** 👀 The student's home to v2's canvas (StudentHome, StudentHomeEmpty, StudentStates' W3 lines; after W2), in the teacher's layout, its menu holding Your classes and Help: the student's classes (the one in class now with "Open the lesson"; none yet, with a teacher's link to the invite page); the sign-in page's and the invite page's words for students landed in PV15 (#388); `/` sends a student who said 13+ in the app (`homeFor`'s `student`, the shell's `home`) to StudentHome, which PV15 left to W3: until then they keep the invite card without its line for students (`app/page.tsx`), and a signed-in student sees no classes though the sign-in page says students sign in to see theirs (no student uses the web before the pilot); the privacy policy names the student pages; after PV15 (M0 ✅; the canvas approved 2026-10-12) — validation: `/santa-loop` with `web-design-guidelines` and `no-ai-slop`, screenshots for the owner — ✅ (2026-10-15, #392) to StudentHome, StudentHomeEmpty and StudentStates' "The classes didn't load" at 1440 and 390 px: the shell gives a student who said 13+ the side menu with Your classes and Help (`components/shell.tsx`) and `/` their home (`components/student-home.tsx`): each class in session on the live card (the 46 px ring, the share of the session left; its teacher and "in class now"; the time left to the bell, and the bell), the rest under Other classes, with none in session no label, none yet the empty card and "Setting up a teacher account? Enter your invite code", the invite page now also at `/invite` (`app/invite/page.tsx`, the Invite board's page, without the line for students for one who passed); a class leaves its card at its bell by this computer's clock and the page reads the account again then (`homeClasses`, `nextBell`); a read that fails while the home is held, "Bali couldn't load your classes." with Try again; `/v1/me`'s `liveSession.startedAt` for the ring (additive: the route, `@bali/shared`, the fixture, BaliCore's optional `LiveSession.startedAt`); the colour `live-edge`. Open the lesson and the phone's chip went to W4's line; the privacy policy's item stays the owner's. Tests: `apps/web/src/components/student-home.test.ts`, `shell.test.ts`, `app/home.test.ts`, `lib/student-web.test.ts`, `app/tokens.test.ts`; `apps/api/test/me.test.ts`, `contract-fixtures.test.ts`. Why: `docs/DECISIONS.md` (2026-10-15, W3)
 - **W4** 👀 The lesson page to v2's canvas (StudentLesson, StudentNotIn, StudentClosed, StudentWaiting, StudentEnded, StudentPhoneStates, StudentStates' W4 lines, StudentZoom at 720 px; after L7 and W3; its intermediate states drawn first, StudentNoSlide and StudentCardStates, canvas version 49), in three PRs, part 1 split in two (the conductor, 2026-10-15: about 600 lines). **Part 1a, the lesson page** — ✅ (#406; DECISIONS 2026-10-15): `/lessons/<class>/<session>`, Your classes marked in the menu, the class head with its ring from `/v1/me`'s `liveSession.startedAt` (W3) and the class page's countdown, nothing shared yet, class over (its time when the page can vouch for it), Loading…, the lesson that didn't load, not in this class and "Can't reach Bali"; no link leads to it until part 2. **Part 1b, the question card** — ✅ (#407; DECISIONS 2026-10-15): answer, change until the close, an answer on its way, didn't send, too late (the card closed at once), the closed marks with the revealed answer, never red, and the privacy line; two states drawn first (version 53); checked on dev with one student answering from the web and then the phone through the API, the same on a real iPhone the owner's once the app's card (L8) can answer (📱). **Part 2**, next: the phone's chip and line (`phoneChip`'s kinds in the canvas's words, the unknown chip in the grid's Unknown look, the "as of" time beside the chip, passed so Silent's minutes freeze while Bali can't be reached, #333; the Unlocked line's bell from `/v1/me`'s `liveSession.endsAt`), 200% zoom (one column under 1024 px, the question first), and the student's home's live card's last row, which W3 left (StudentHome): Open the lesson, to this page, and the phone's chip from the lesson's read, never a one-time `/v1/me` (decision 13: never greener than the grid); the home reads the account as it opens and at each bell (W3), so a class that starts, or ends early, while it is open shows at the next read, which Open the lesson may want sooner (when its tab comes back into view, say) — validation: `/santa-loop` with the UI skills, screenshots, one student answering from the web and then the phone; #334 (a timeout on the portal's polls) ✅ (#403; DECISIONS 2026-10-15) — **Part 2** ✅ (2026-10-15, #408) to StudentLesson's and StudentNotIn's heads, StudentPhoneStates, StudentHome's live card and StudentZoom at 720 px, and StudentChipStates, drawn first (version 54): the student's own phone at the head's end (`components/your-phone.tsx`), in the grid's tint, icon and edge and the app's words, Checking… before Bali first answers, "as of" the last good read while reads fail, Silent's minutes stopped then (`phoneChip`), and the grid's Unknown for a state the page has no chip for; its line under the head (StudentPhoneStates' words, the Unlocked one's bell the account's), none for Focused or Unknown; the phone's line, then "Can't reach Bali", then the lesson; the home's live card ending on Open the lesson and the chip from the lesson's own read (`followLesson`), the account read again once that read says the session is over or refuses it (`lessonGone`) and as the tab comes back into view; an answer's send fails as no answer after 10 s (`ApiClient.post`'s `limitMs`, `ANSWER_TIMEOUT_MS`; #407's review), said as didn't send; on a phone the chip takes a line of its own. Tests: `apps/web/src/components/your-phone.test.ts`, `student-lesson.test.ts`, `student-home.test.ts`, `lib/student-web.test.ts`, `lib/api-client.test.ts`. Why: `docs/DECISIONS.md` (2026-10-15, W4's part 2)
 - **W5** 👀 Slides on the student web to v2's canvas (StudentLesson's slide, its full-screen view as PV1 draws it; after M3, M6 and W4): PDF.js as M6 configures it, the `sha256` check, the download's `no-store`, the text layer for screen readers, full screen — validation: CSP tests, a tampered deck refused, `/santa-loop`, screenshots — ✅ (2026-10-16, #419) to StudentLesson's, StudentNotIn's and StudentClosed's slide, StudentZoom at 720 px and PV1's StudentSlideFull, and StudentSlideAlone, StudentSlideStates and StudentSlidePhone, drawn first (canvas version 63): the slide the teacher shows on the lesson page (`components/student-slide.tsx`), "Slide 4 of 12" said as it turns and Full screen over the page, drawn by the presenter's `SlideFrame` in a student look; the question card first in the page's order, beside the slide from 1024 px and over it narrower, the slide alone at the width it has beside a card; the deck through the student's own download and the presenter's `loadDeck` (`no-store`, the SHA-256 check before PDF.js), loaded and closed by `useShownDeck` (`lib/use-slide.ts`, `useSlide`'s load moved there, one copy for both pages); the lines in a student's words where the teacher's name their own upload; the text layer as the slide's label (decision 8; PDF.js's `TextLayer` weighed); Full screen a native modal with the page itself full screen where the browser allows it (`enterFullscreen`, `leaveFullscreen`), left by Exit full screen or Esc, closed by itself once a question is asked, the slides stop or the class is over (`fullEnds`), focus then on Full screen, the question or the class's name; the Permissions-Policy left without `fullscreen=()`. Checked on dev as Ana, a tampered deck refused before PDF.js. Tests: `apps/web/src/components/student-slide.test.ts`, `student-lesson.test.ts`, `slide-card.test.ts`, `lib/student-web.test.ts`, `use-slide.test.ts`, `use-slide-hook.test.ts`, `csp.test.ts`. Why: `docs/DECISIONS.md` (2026-10-16, W5)
+
+The finished steps' lines as PLAN.md held them until LO11 (2026-11-17, #PR-TBD; moved for its word cap), with the settled design questions:
+
+Slice 1 — live questions:
+- **L0** The plan (docs) — ✅ (#230; DECISIONS 2026-10-05)
+- **L1** Database and engine: questions and answers — ✅ (#310; no DECISIONS entry of its own)
+- **L2** Privacy plumbing for answers and questions — ✅ (#311; DECISIONS 2026-10-11)
+- **L3** Teacher API — ✅ as L3a and L3r
+- **L3a** Open and close — ✅ (#312; DECISIONS 2026-10-11)
+- **L3r** Results through one guarded count, `questionCounts` (for L3c, L7c) — ✅ (#314, amended by #341; DECISIONS 2026-10-12)
+- **L3b** Saved questions — ✅ as L3b1 and L3b2
+- **L3b1** Their data, engine and privacy paths — ✅ (#316; DECISIONS 2026-10-11)
+- **L3b2** Their routes (for L7b) — ✅ (#318; DECISIONS 2026-10-11)
+- **L3c** A session's questions for its report (for L7c) — ✅ (#391; DECISIONS 2026-10-15)
+- **L4** Student API — ✅ as L4a and L4b
+- **L4a** The poll and the answer — ✅ (#320; DECISIONS 2026-10-11)
+- **L4b** The demo's question and the load gate's polling classes — ✅ (#321; DECISIONS 2026-10-11)
+- **L5** BaliCore's poll and answer, `LiveLesson` (for L8) — ✅ (#330; DECISIONS 2026-10-12)
+- **L6** Portal logic, `lib/live-question.ts` (for L7) — ✅ (#332; DECISIONS 2026-10-12)
+- **L7** 👀 Portal UI to v2's canvas: the class page's question and Present's — ✅ as L7-1a (#389), L7-1b (#390), L7-2 (#402) and L7-3, Close and Done on Present, Done in every window of the browser (#405); DECISIONS 2026-10-15
+- **L7b** 👀 Portal saved questions to v2's canvas — ✅ as part 1a (#393), part 1b (#394), part 1c (#395) and part 2, the panel's drafts (#411); DECISIONS 2026-10-15, 2026-10-16
+- **L7c** 👀 A session's Questions to v2's canvas — ✅ (#412; DECISIONS 2026-10-16)
+- **L8** 👀📱 iOS answer card to the app canvas — ✅ as L8a (#443), L8b (#448, #450) and L8c (#451); DECISIONS 2026-10-23; its 📱 device check passed on prod (2026-11-08) but for the battery's half hour (`ios/README.md`'s sitting, Part 2, step 6), not run
+
+Slice 2 — slides:
+- **M0** 🔧 The owner: an S3 bucket per environment — ✅ (2026-10-12; DECISIONS 2026-10-12)
+- **M1** The storage interface, `DeckStorage` — ✅ (#308; DECISIONS 2026-10-10)
+- **M2** Deck endpoints — ✅ as M2a and M2b
+- **M2a** The table and the teacher's routes — ✅ (#323; DECISIONS 2026-10-11)
+- **M2b** The check — ✅ as M2b1 and M2b2
+- **M2b1** Complete and the check — ✅ (#324; DECISIONS 2026-10-11)
+- **M2b2** The 5-minute rule and the deck sweep — ✅ (#325; DECISIONS 2026-10-11)
+- **M3** Slide state — ✅ as M3a and M3b
+- **M3a** The slide change — ✅ (#327; DECISIONS 2026-10-12)
+- **M3b** The poll's slide and a deck's download (for M6) — ✅ (#328; DECISIONS 2026-10-12)
+- **M4** Decks in the privacy paths — ✅ (#329; DECISIONS 2026-10-12)
+- **M5** 👀 The slides page and upload — ✅ as M5a (#396), M5b part 1 (#397) and M5b part 2 (#400); DECISIONS 2026-10-15
+- **M6** 👀 Portal presenter to v2's canvas — ✅ as part 1 (#413), 2a (#414), 2b-1 (#415), 2b-2 (#416), 2c (#417) and 2d (#418); DECISIONS 2026-10-16; the panel line back (#457; DECISIONS 2026-10-24)
+- **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
+- **M8** 👀📱 iOS slide view to the app canvas — ✅ (#452; DECISIONS 2026-10-24); its 📱 device check passed on prod (2026-11-08) but for a tap on a deck's link (no deck had one) and a second iPhone (`ios/README.md`'s sitting, Part 3), not run
+- **M8b** 👀📱 The slide on Unlocked, Screen Time off and Home, and the question card on the Screen Time ask — ✅ (#454; DECISIONS 2026-10-24); its 📱 device check passed with M8's (2026-11-08)
+- **M9** Load and demo with a deck — ✅ (#335; DECISIONS 2026-10-12)
+
+Slice 3 — students on the web:
+- **W1** The phone's state in the presentation read — ✅ (#322; DECISIONS 2026-10-11)
+- **W2** Portal student logic, `lib/student-web.ts` (for W3, W4) — ✅ (#333; DECISIONS 2026-10-12)
+- **W3** 👀 The student's home to v2's canvas — ✅ (#392; DECISIONS 2026-10-15); left for the owner: the privacy policy names the student pages (C2's words, the lawyer's)
+- **W4** 👀 The lesson page to v2's canvas — ✅ as part 1a (#406), part 1b (#407) and part 2 (#408); DECISIONS 2026-10-15; left for the owner: the same check with a real iPhone once the app's card (L8) can answer (📱)
+- **W4 follow-up** 👀 The home's chip says Bali can't be reached before its lesson's first read answers, an answer that landed after 10 s is in once a read shows it, and the home reads the account every 30 s while in view with no class in session (the owner, 2026-10-16) — ✅ (#409; DECISIONS 2026-10-15, 2026-10-16)
+- **W5** 👀 Slides on the student web to v2's canvas — ✅ (#419; DECISIONS 2026-10-16)
+
+**The open design questions are settled** (the owner, 2026-10-10, each as recommended;
+ARCHITECTURE's "Live lesson", "Settled"): `event_id` refused both ways (L1, L3b), the guard
+wherever counts are read (L3, L7c), the portal's `sha256` check (M6, W5), the PDF check in its
+own worker (M2), and a load gate of several classes on phones and laptops (L4, M9).
 
 ### Push: class started (N steps; one PR each; 📱 = needs the owner's iPhone, 🔧 = the owner in a console)
 
