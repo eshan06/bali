@@ -556,7 +556,7 @@ describe('a live well’s rarer moments (LiveWellView; HomeMoments)', () => {
     expect(screen.queryByRole('heading', { level: 3 })).toBeNull();
   });
 
-  it('lists the board’s three states alone, Unlocked, Silent and Not here, a silence of another length its own row; protection off, Left and Unknown wait for the owner’s approval', () => {
+  it('lists Check on’s rarer rows in the unlocks’, protection off’s, Silent’s, Not here’s, then Left’s order, a silence of another length its own row', () => {
     const at = new Date(NOW);
     const rows = checkOn(
       fromSnapshot(
@@ -593,13 +593,16 @@ describe('a live well’s rarer moments (LiveWellView; HomeMoments)', () => {
     );
     expect(rows.map((r) => [r.words, ...r.students.map((s) => s.displayName)])).toEqual([
       ['Unlocked', 'Ethan'],
+      ['Left · unlocked', 'Mateo'],
+      ['Protection off', 'Amara'],
       ['Silent · 5 min', 'Tomás', 'Noor'],
       ['Silent · 9 min', 'Wei'],
       ['Not here', 'Zuri'],
+      ['Left', 'Caleb'],
     ]);
   });
 
-  it('never says everyone’s focused while one isn’t, a student in a state with no row counted all the same', () => {
+  it('names a student in a rarer state alone, never saying everyone’s focused while one isn’t', () => {
     well(
       grid({
         students: fromSnapshot(
@@ -609,24 +612,10 @@ describe('a live well’s rarer moments (LiveWellView; HomeMoments)', () => {
     );
     expect(screen.getByText('of 2 focused').previousElementSibling?.textContent).toBe('1');
     expect(screen.queryByText("Everyone's focused.")).toBeNull();
-    expect(screen.queryByRole('heading', { level: 3 })).toBeNull();
-    cleanup();
-    well(
-      grid({
-        students: fromSnapshot(
-          snapshot([
-            student('Amara', { state: 'protection_off' }),
-            student('Ethan', {
-              state: 'unlocked',
-              unlock: { eventId: 'v1', reason: null, recordedAs: null, occurredAt: iso(NOW - MIN) },
-            }),
-          ]),
-        ),
-      }),
-    );
     expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('Check on 1');
-    expect(screen.getByRole('link', { name: 'Ethan' })).toBeDefined();
-    expect(screen.queryByText('Amara')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Amara' }).closest('li')?.textContent).toBe(
+      'Protection offAmara',
+    );
   });
 
   it('keeps a Silent row the same row as its minutes turn, so a name focused in it keeps focus', () => {

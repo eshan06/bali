@@ -55,12 +55,20 @@ export function nextTurn(now: number): number {
 }
 
 /**
- * Check on's rows, in order: the states the approved boards draw there (Main, LiveStates), Unlocked,
- * Silent and Not here. A student in another state (protection off, left, one this tab can't name)
- * has no row until the owner approves HomeMoments' drawing of them (CLAUDE.md: anything new shown
- * about a student waits for the owner); the count above still counts them as not focused.
+ * Check on's rows in order: the unlocks first, then protection off, Silent, Not here, Left, Unknown.
+ * The boards draw Unlocked, Silent and Not here; the rest are HomeMoments', the owner's approval of
+ * 2026-11-17 (DECISIONS).
  */
-const CHECK_ORDER: readonly GridDisplay[] = ['unlocked', 'silent', 'absent'];
+const CHECK_ORDER: readonly GridDisplay[] = [
+  'unlocked',
+  'left_unprotected',
+  'protection_off',
+  'left_protection_off',
+  'silent',
+  'absent',
+  'ended',
+  'unknown',
+];
 
 /** A row of Check on: a state in its tile's words ("Silent · 5 min"), and who is in it. */
 export interface CheckRow {
@@ -70,15 +78,16 @@ export interface CheckRow {
 }
 
 /**
- * Who to check on (Main; LiveStates): the students the grid shows in a state Check on draws
- * (`CHECK_ORDER`), a row per state in its tile's words, Silent's with its minutes so two silent for
- * different times get a row each; in `CHECK_ORDER`, each row's students in the grid's order.
+ * Who to check on (Main; LiveStates, HomeMoments): everyone the grid shows who isn't focused, the
+ * count the board draws (28 − 24 = 4), a row per state in its tile's words, Silent's with its minutes
+ * so two silent for different times get a row each; in `CHECK_ORDER`, each row's students in the
+ * grid's order.
  */
 export function checkOn(students: Students, now: Date): CheckRow[] {
   const rows = new Map<string, CheckRow>();
   for (const s of Object.values(students)) {
     const display = gridDisplay(s, now);
-    if (!CHECK_ORDER.includes(display)) continue;
+    if (display === 'focused') continue;
     const { label } = CHIP[display];
     const words = display === 'silent' ? `${label} · ${silentNote(s, now)}` : label;
     const row = rows.get(words) ?? { display, words, students: [] };
@@ -93,26 +102,24 @@ export function checkOn(students: Students, now: Date): CheckRow[] {
 /**
  * Check on (Main; LiveStates, HomeMoments): "Check on 4" over its rows, each the state's chip and
  * who is in it, each name a link to them on the class's page; while the live feed is down, the rows
- * faded and the names plain, as they were at the last update. Everyone focused says so in one line,
- * and only then; a class with no students yet says that. A row keeps its key as Silent's minutes
- * turn, so a name focused in it keeps focus.
+ * faded and the names plain, as they were at the last update. Everyone focused says so in one line;
+ * a class with no students yet says that. A row keeps its key as Silent's minutes turn, so a name
+ * focused in it keeps focus.
  */
 function CheckOn({
   classId,
   rows,
   total,
-  focused,
   stale,
 }: {
   classId: string;
   rows: CheckRow[];
   total: number;
-  /** How many the grid counts focused: everyone, or Check on has its say. */
-  focused: number;
   stale: boolean;
 }) {
   if (total === 0) return <p className="text-text-secondary">No students yet.</p>;
-  if (focused === total) {
+  const count = rows.reduce((n, row) => n + row.students.length, 0);
+  if (count === 0) {
     return (
       <p className="flex items-center gap-3 self-start border-y border-border-default py-4 font-medium text-state-focused-fg">
         <CircleCheck size={18} aria-hidden="true" className="shrink-0" />
@@ -120,8 +127,6 @@ function CheckOn({
       </p>
     );
   }
-  const count = rows.reduce((n, row) => n + row.students.length, 0);
-  if (count === 0) return null;
   return (
     <div className={stale ? 'opacity-60' : undefined}>
       <h3 className="mb-2 text-data font-semibold">Check on {count}</h3>
@@ -272,7 +277,6 @@ export function LiveWellView({
           classId={classId}
           rows={checkOn(students, grid.now)}
           total={counts.total}
-          focused={counts.counts.focused}
           stale={grid.stale !== null}
         />
       ) : null}

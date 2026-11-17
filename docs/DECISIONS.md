@@ -10,8 +10,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-17** — **LO3, Home: one page for a teacher's classes, built from the lock-only canvas's Main, HomeIdle,
   HomeStates, ClassFlows and PhonePages, its other moments drawn first on the canvas's new HomeMoments board (version
-  37); Classes' old address goes Home (the worker's calls and the conductor's, awaiting the owner's look; LO3,
-  #605).**
+  37); Classes' old address goes Home (the worker's calls and the conductor's, awaiting the owner's look, and
+  Check on's rarer rows the owner's; LO3, #605).**
 
   **The page:** Classes and the date, with New class; a later read of the account that failed, said under the head
   with Try again over what was read before; a well for each class live by this computer's clock to the server's
@@ -20,17 +20,17 @@ a real decision? Add a dated entry at the top: what was decided and why.
   retired pages do, so New class lives on Home and nothing is reached by its address alone any more.
 
   **A class live:** the class page's own grid (its snapshot, its live feed and its 15 s read, as v2's Home card was),
-  counted "24 of 28 focused", and Check on: the board's three states, a row each in its tile's chip and words,
-  Unlocked first, then Silent by its minutes, then Not here. **Check on's rarer rows wait for the owner:** the
-  conductor asked (2026-11-17) for a row for everyone else not focused too (Protection off, Left, Left · unlocked or
-  protection off, Unknown), so that no student who needs checking drops off Home. They would be new facts shown about
-  a student on Home, which no approved board shows there, and CLAUDE.md holds those for the owner's approval however
-  they are asked for (santa's reviewer found it), so they are drawn on HomeMoments as a proposal and not built. Until
-  the owner rules, such a student counts against the focused count ("27 of 28") and shows in the room, and an approval
-  is a small follow-up. "Everyone's focused." (LiveStates) shows only when everyone is.
-  A name links to `/classes/<id>?student=<id>`: the class page can open that
-  student's record from it once LO6 (the student panel) reads it; until then it opens the class's page. A class with
-  nobody enrolled says ClassStates' "No students yet.".
+  counted "24 of 28 focused", and Check on: everyone the grid shows who isn't focused, the count the board draws (28
+  − 24 = 4), a row per state in its tile's chip and words, Silent's by its minutes, the unlocks first, then
+  protection off, Silent, Not here, Left and Unknown. The boards draw Unlocked, Silent and Not here. **The rarer rows
+  (Protection off, Left, Left · unlocked or protection off, Unknown) are the owner's approval:** the conductor asked
+  on 2026-11-17, "Keep Home's extra Check on rows (protection off, left, unknown)?", Keep them the recommended answer,
+  and the owner replied "take your reccomended". So no student who needs checking drops off Home; the rows show only
+  what the room's tiles already show, by name, and HomeMoments draws them (version 47). Santa's first round had held
+  them back until the owner ruled, as CLAUDE.md holds anything new shown about a student. A name links to
+  `/classes/<id>?student=<id>`: the class page can open that student's record from it once LO6 (the student panel)
+  reads it; until then it opens the class's page. Everyone focused says LiveStates' "Everyone's focused."; a class
+  with nobody enrolled ClassStates' "No students yet.".
   Loading, a read that failed, and the feed dropped (LiveStates' faded count, its line over it, a still dot where
   LiveStates draws a spinner: nothing loops, DESIGN.md §7) are HomeMoments'. Two classes live: a well each. A
   session that ends while Home is open loses its well and its row's Live at once.
