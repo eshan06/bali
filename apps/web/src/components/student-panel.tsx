@@ -119,7 +119,7 @@ export function StudentPanel({
           <X size={16} aria-hidden="true" />
         </button>
       </div>
-      <div className="flex flex-col gap-6 overflow-y-auto p-6">
+      <div className="flex flex-col gap-6 overflow-y-auto overscroll-contain p-6">
         <section aria-labelledby={`${id}-session`} className="flex flex-col gap-4">
           <h3 id={`${id}-session`} className="mb-2 text-data font-semibold">
             This session

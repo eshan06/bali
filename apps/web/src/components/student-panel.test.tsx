@@ -344,7 +344,9 @@ describe('the panel, as lock.css’s `.panel` draws it', () => {
     expect(classes(head)).toEqual(
       expect.arrayContaining(['border-b', 'px-6', 'pt-6', 'pb-5', 'gap-3']),
     );
-    expect(classes(body)).toEqual(expect.arrayContaining(['overflow-y-auto', 'p-6', 'gap-6']));
+    expect(classes(body)).toEqual(
+      expect.arrayContaining(['overflow-y-auto', 'overscroll-contain', 'p-6', 'gap-6']),
+    );
     // This session's title, 14/20 semibold, 24 px over its log.
     const title = screen.getByRole('heading', { level: 3, name: 'This session' });
     expect(classes(title)).toEqual(['mb-2', 'text-data', 'font-semibold']);
