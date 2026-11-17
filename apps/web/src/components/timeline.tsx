@@ -1,140 +1,182 @@
 'use client';
 
+import { NAME_BUTTON } from '@/components/button';
 import {
-  CircleCheck,
-  Flag,
-  LockOpen,
-  type LucideIcon,
-  ShieldCheck,
-  ShieldOff,
-  Wifi,
-  WifiOff,
-} from 'lucide-react';
-import type { ReactNode } from 'react';
+  bareTime,
+  placement,
+  type RecapGroups,
+  type RecapStudent,
+  type StudentMoment,
+} from '@/lib/recap';
 
-import { reasonWords } from '@/components/unlock-popups';
-import type { Moment, RecapFormat, RecapGroups, RecapStudent } from '@/lib/recap';
-import { bellTime } from '@/lib/session-controls';
+/*
+ * The recap's timelines (LO7; ClassEnded, ClassEndedOpen, PhonePages' After the bell; lock.css's
+ * `.track`, `.key` and `.recap-row`): a student's session as stretches of colour on one thin
+ * track, what each colour means in the Key, and the rows of who wasn't focused the whole time,
+ * each name opening that student's record. The stretches are read from the recap's own moments
+ * (`recapGroups`, the student panel's `studentMoments`), so the two never disagree.
+ */
+
+/** What a stretch of a student's track says they were (ClassEnded's Key). */
+export type TrackState = 'focused' | 'unlocked' | 'off' | 'silent' | 'notin';
+
+/** One stretch of a track: what they were, from when to when (ms). */
+export interface Stretch {
+  state: TrackState;
+  from: number;
+  to: number;
+}
+
+/** The Key, in the board's order and words. */
+export const KEY: readonly (readonly [TrackState, string])[] = [
+  ['focused', 'Focused'],
+  ['unlocked', 'Unlocked'],
+  ['off', 'Protection off'],
+  ['silent', 'Silent'],
+  ['notin', 'Not here'],
+];
 
 /**
- * Each moment's words and icon, its state's (DESIGN.md §2): the owner's labels (2026-10-06), and
- * the grid's own words for its states. The recap's marks and words, and the student panel's moments
- * (PV11b), all say them so.
+ * A student's track, from the session's start to its end, as stretches: Not here until their tap-in
+ * and after they leave, then focused, unlocked or protection off as their moments turn them, the
+ * grid's own rules (`applyEvent`): Screen Time back on returns to unlocked while an unlock is open,
+ * else to focused; a tap-in or Back in focus closes an unlock. A silence lasts from going silent to
+ * checking in again, or to any moment of theirs, which their phone sent. Moments before their
+ * tap-in, or after the bell, change no stretch (the record lists them all the same). Stretches of
+ * one state side by side are one.
  */
-export const MOMENT: Record<Moment, [label: string, Icon: LucideIcon | null]> = {
-  in: ['Tapped in', null],
-  unlock: ['Unlocked', LockOpen],
-  focus: ['Back in focus', CircleCheck],
-  off: ['Protection off', ShieldOff],
-  on: ['Protection back on', ShieldCheck],
-  silent: ['Silent', WifiOff],
-  back: ['Checked in again', Wifi],
-  left: ['Left', Flag],
+export function stretchesOf(
+  moments: readonly Pick<StudentMoment, 'moment' | 'at'>[],
+  start: number,
+  end: number,
+): Stretch[] {
+  const out: Stretch[] = [];
+  let base: 'focused' | 'unlocked' | 'off' | null = null;
+  let unlockOpen = false;
+  let silent = false;
+  let at = start;
+  const until = (t: number) => {
+    const to = Math.min(Math.max(t, start), end);
+    if (to <= at) return;
+    const state: TrackState = base === null ? 'notin' : silent ? 'silent' : base;
+    const last = out.at(-1);
+    if (last?.state === state) last.to = to;
+    else out.push({ state, from: at, to });
+    at = to;
+  };
+  for (const m of moments) {
+    until(m.at.getTime());
+    // Their phone was heard: any silence is over. Only a tap-in brings them here.
+    if (m.moment !== 'silent') silent = false;
+    if (m.moment === 'in') {
+      base = 'focused';
+      unlockOpen = false;
+    } else if (m.moment === 'left') {
+      base = null;
+      unlockOpen = false;
+    } else if (base !== null) {
+      if (m.moment === 'unlock') {
+        base = 'unlocked';
+        unlockOpen = true;
+      } else if (m.moment === 'focus') {
+        base = 'focused';
+        unlockOpen = false;
+      } else if (m.moment === 'off') base = 'off';
+      else if (m.moment === 'on') base = unlockOpen ? 'unlocked' : 'focused';
+      else if (m.moment === 'silent') silent = true;
+    }
+  }
+  until(end);
+  return out;
+}
+
+/** Each state as a track's words say it. */
+const SAID: Record<TrackState, string> = {
+  focused: 'focused',
+  unlocked: 'unlocked',
+  off: 'protection off',
+  silent: 'silent',
+  notin: 'not here',
 };
 
 /**
- * Where each of a row's marks sits, as CSS `left` (its centre): at its time, or right after the
- * marks before it, packed edge to edge, each `size` px wide, whichever is later; and never past
- * the end less the room the marks after it take. So marks under a minute apart sit side by side,
- * each seen on its own at any width, nudged no further than they must be; a mark's time is in the
- * row's words all the same. CSS works it out at the axis's own width, so nothing is measured.
- * Marks only, never a bar. The recap's marks (PV12b) are 18 px.
- * ponytail: a row with more marks than its axis has room for piles its first ones up, overlapping,
- * at its start; and each mark's style names every mark before it, so a row's styles grow with the
- * square of its marks (~30 KB for 50). Drop the terms that can't bind if either ever shows.
+ * A track in words, for a screen reader, as ClassEnded words them: "Focused from 9:06, unlocked
+ * 9:18 to 9:24, then focused to the bell". From their first tap-in to their last stretch here, each
+ * time without AM or PM; the session's end is the bell. None at all: Not here.
  */
-export function lefts(marks: readonly { x: number }[], size: number): string[] {
-  let edge = 0;
-  const packed = marks.map(({ x }) => {
-    edge += size;
-    return { x, centre: edge - size / 2 };
-  });
-  const end = packed.at(-1)?.centre ?? 0;
-  return packed.map(({ x, centre }, i) => {
-    if (packed.length === 1) return `${x}%`;
-    const after = packed.slice(0, i).map((p) => `calc(${p.x}% + ${centre - p.centre}px)`);
-    const at = after.length > 0 ? `max(${x}%, ${after.join(', ')})` : `${x}%`;
-    const room = end - centre;
-    return `min(${at}, ${room > 0 ? `max(0%, calc(100% - ${room}px))` : '100%'})`;
-  });
-}
-
-/** One moment on a timeline: what happened, in its icon and its words, and when. */
-export interface TimelineMoment {
-  key: string;
-  Icon: LucideIcon;
-  words: ReactNode;
-  /** A line under the words, in the secondary ink: an unlock's reason, Recent activity's class. */
-  under?: ReactNode;
-  at: Date;
-  /** Its time as the list says it. */
-  time: string;
+export function trackWords(
+  stretches: readonly Stretch[],
+  end: number,
+  clock?: Intl.DateTimeFormat,
+): string {
+  const said = [...stretches];
+  while (said[0]?.state === 'notin') said.shift();
+  while (said.at(-1)?.state === 'notin') said.pop();
+  if (said.length === 0) return 'Not here';
+  const time = (t: number) => bareTime(t, clock);
+  const until = (t: number) => (t >= end ? 'the bell' : time(t));
+  const last = said.length - 1;
+  return said
+    .map(({ state, from, to }, i) => {
+      const words = SAID[state];
+      if (i === 0) {
+        const first = `${words.charAt(0).toUpperCase()}${words.slice(1)} from ${time(from)}`;
+        return last === 0 ? `${first} to ${until(to)}` : first;
+      }
+      if (i < last) return `${words} ${time(from)} to ${time(to)}`;
+      // Right after the first, whose end isn't said, its start is; after another, it was said.
+      return i === 1
+        ? `${words} from ${time(from)} to ${until(to)}`
+        : `then ${words} to ${until(to)}`;
+    })
+    .join(', ');
 }
 
 /**
- * v2.css's `.tl`: a 26 px grey dot each, joined by a hairline; the icon and the words say what
- * happened, with no colour behind them, and the time sits at the right. The student panel's moments
- * (PV11b) and Home's Recent activity (PV17c).
+ * Each stretch's fill on the track (lock.css's `.k-*`): focused green, an unlock's orange and a
+ * protection off's red, as v2's marks were, and a silence a dashed line along the middle; Not here
+ * is the bare track.
  */
-export function Timeline({
-  moments,
-  className = '',
-}: {
-  moments: readonly TimelineMoment[];
-  className?: string;
-}) {
+const FILL: Record<Exclude<TrackState, 'notin'>, string> = {
+  focused: 'inset-y-0 bg-track-focused',
+  unlocked: 'inset-y-0 bg-unlock-edge',
+  off: 'inset-y-0 bg-mark-off',
+  silent: 'top-0.75 h-0.5 track-dashes',
+};
+
+/** A Key's swatch (lock.css's `.sw`): 24 × 8, its state's fill; Not here the track's, edged. */
+function Swatch({ state }: { state: TrackState }) {
+  if (state === 'notin') {
+    return (
+      <span
+        aria-hidden="true"
+        className="h-2 w-6 shrink-0 rounded-full border border-border-strong bg-surface-sunken"
+      />
+    );
+  }
   return (
-    <ol className={['flex flex-col', className].filter(Boolean).join(' ')}>
-      {moments.map(({ key, Icon, words, under, at, time }) => (
-        <li
-          key={key}
-          className="relative grid grid-cols-[26px_minmax(0,1fr)_auto] items-start gap-2.5 pb-4.5 before:absolute before:top-6.5 before:bottom-0.5 before:left-[12.5px] before:w-px before:bg-border-default last:pb-0 last:before:hidden"
-        >
-          <span className="relative z-1 grid size-6.5 place-items-center rounded-full bg-surface-sunken text-text-secondary">
-            <Icon size={13} aria-hidden="true" />
-          </span>
-          <p className="pt-0.75 text-data font-normal wrap-anywhere">
-            {words}
-            {under ? (
-              <small className="block text-tile-line font-normal text-text-secondary">
-                {under}
-              </small>
-            ) : null}
-          </p>
-          <time dateTime={at.toISOString()} className="pt-1 text-tile-line text-text-tertiary">
-            {time}
-          </time>
-        </li>
-      ))}
-    </ol>
+    <span aria-hidden="true" className="relative h-2 w-6 shrink-0 overflow-hidden rounded-full">
+      <span className={`absolute inset-x-0 ${FILL[state]}`} />
+    </span>
   );
 }
 
-/**
- * A mark's ring (v2.css's `.mk`): an unlock's orange, a protection off's red, Silent's dashed,
- * every other stone, each in its state's ink.
- */
-const RING: Partial<Record<Moment, string>> = {
-  unlock: 'border-unlock-edge text-state-emergency-fg',
-  off: 'border-mark-off text-state-revoked-fg',
-  silent: 'border-dashed border-mark text-text-secondary',
-};
-
-/**
- * A student's moments in words, as ClassEnded says them: "Unlocked at 9:18 AM, Bathroom. Back in
- * focus at 9:24 AM." Each but their first tap-in, where their line starts; an unlock's reason (the
- * tile's words, none in lowercase) after its time, but in Present, which the class can see (#265).
- */
-export function saidOf(student: RecapStudent, present = false, format: RecapFormat = {}): string {
-  const first = student.moments.find((m) => m.moment === 'in');
-  return student.moments
-    .filter((m) => m !== first)
-    .map((m) => {
-      const why = m.reason === null ? 'no reason given' : reasonWords(m.reason);
-      const reason = m.moment === 'unlock' && !present ? `, ${why}` : '';
-      return `${MOMENT[m.moment][0]} at ${bellTime(m.at.toISOString(), format)}${reason}.`;
-    })
-    .join(' ');
+/** What the colours mean (ClassEnded's Key, opened by its button): a swatch each, in its words. */
+export function Key({ id }: { id: string }) {
+  return (
+    <ul
+      id={id}
+      aria-label="What the colors mean"
+      className="flex flex-wrap items-center gap-x-6 gap-y-2"
+    >
+      {KEY.map(([state, words]) => (
+        <li key={state} className="inline-flex items-center gap-2 text-meta text-text-secondary">
+          <Swatch state={state} />
+          {words}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /**
@@ -147,51 +189,50 @@ function tickHides(step: number, besideEnd: boolean): string {
   return besideEnd ? '@max-[30rem]/axis:hidden' : '@max-[15rem]/axis:hidden';
 }
 
-/** A row (v2.css's `.xrows`): the name, the line, the words, side by side; on a phone, stacked. */
-const XROW =
-  'grid grid-cols-1 items-center gap-x-4.5 gap-y-1.5 @min-[40rem]:grid-cols-[170px_minmax(0,1fr)_minmax(0,1.15fr)]';
-
-/**
- * A student's line (v2.css's `.mline`), for the eye only, the words saying all it draws: a thin
- * stone line from each tap-in, and each other moment a mark on it, side by side where they would
- * overlap (`lefts`), its icon at v2.css's 2.25 by a class, which outranks the 1.75 rule.
- */
-function Line({ student }: { student: RecapStudent }) {
-  const marks = student.moments.filter((m) => m.moment !== 'in');
-  const placed = lefts(marks, 18);
-  return (
-    <span aria-hidden="true" className="relative block h-5.5">
-      {student.spans.map((span, i) => (
-        <span
-          key={i}
-          style={{ left: `${span.from}%`, width: `${span.to - span.from}%` }}
-          className="absolute top-2.5 h-0.5 rounded-full bg-border-strong"
-        />
-      ))}
-      {marks.map((m, i) => {
-        const Icon = MOMENT[m.moment][1];
-        return (
-          <span
-            key={m.key}
-            style={{ left: placed[i] }}
-            className={`absolute top-0.5 -ml-2.25 grid size-4.5 place-items-center rounded-full border-[1.5px] bg-surface-card ${RING[m.moment] ?? 'border-mark text-text-secondary'}`}
-          >
-            {Icon ? <Icon size={10} aria-hidden="true" className="stroke-[2.25]" /> : null}
-          </span>
-        );
-      })}
-    </span>
+/** Where the axis ends, as `recapGroups` sets it: the session's end, or a later moment drawn on it. */
+export function axisEndOf(
+  groups: Pick<RecapGroups, 'partTime' | 'notJoined'>,
+  end: number,
+): number {
+  const drawn = [...groups.partTime, ...groups.notJoined].flatMap((s) =>
+    s.moments.map((m) => m.at.getTime()),
   );
+  return Math.max(end, ...drawn);
 }
 
-/** Students under the axis, a row each between hairlines. */
-function Rows({ students, groups, present }: { students: readonly RecapStudent[] } & Lists) {
+/** A row and the axis over the rows (`.recap-row`): the name in 180 px, the track beside it; on a phone, under it. */
+const ROW =
+  'grid grid-cols-[180px_minmax(0,1fr)] items-center gap-6 max-[760px]:grid-cols-1 max-[760px]:gap-2';
+
+/**
+ * Who wasn't focused the whole time (ClassEnded): the axis, its times each 10 minutes for 50, none
+ * on a phone; then a row each between hairlines, the name, which opens their record, beside their
+ * track, its words its label (`trackWords`), the stretches for the eye.
+ */
+export function RecapRows({
+  groups,
+  start,
+  end,
+  opened,
+  onOpen,
+}: {
+  groups: RecapGroups;
+  /** The session's start and end (ms), its tracks' own. */
+  start: number;
+  end: number;
+  /** Whose record is open, by their id. */
+  opened: string | null;
+  /** A name pressed: their record, the button pressed for focus to come back to. */
+  onOpen: (student: RecapStudent, from: HTMLButtonElement) => void;
+}) {
+  const axisEnd = axisEndOf(groups, end);
+  const x = (t: number) => placement(t, start, axisEnd);
   const last = groups.ticks.length - 1;
   return (
-    <ul>
-      <li aria-hidden="true" className={`${XROW} pb-1.5`}>
-        <span className="@max-[40rem]:hidden" />
-        <span className="@container/axis relative h-4">
+    <div className="flex flex-col">
+      <div aria-hidden="true" className={`${ROW} pb-2 max-[760px]:hidden`}>
+        <span />
+        <span className="@container/axis relative h-4.25">
           {groups.ticks.map((t, i) => (
             <span
               key={i}
@@ -202,80 +243,42 @@ function Rows({ students, groups, present }: { students: readonly RecapStudent[]
             </span>
           ))}
         </span>
-        <span className="@max-[40rem]:hidden" />
-      </li>
-      {students.map((s) => (
-        <li key={s.key} className={`${XROW} border-t border-border-default py-3 last:border-b`}>
-          <span className="text-tile-name wrap-anywhere">{s.name}</span>
-          <Line student={s} />
-          <span className="text-data font-normal text-text-secondary">{saidOf(s, present)}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** Names alone, each in a grey pill (v2.css's `.namelist`). */
-const names = (students: readonly RecapStudent[]) => (
-  <ul className="flex flex-wrap gap-x-2 gap-y-1.5">
-    {students.map((s) => (
-      <li
-        key={s.key}
-        className="rounded-full bg-surface-sunken px-2.5 py-0.75 text-meta wrap-anywhere"
-      >
-        {s.name}
-      </li>
-    ))}
-  </ul>
-);
-
-/** A group's label (v2.css's `.wlabel`). */
-const GROUP = 'text-section-label text-text-tertiary uppercase';
-
-interface Lists {
-  groups: RecapGroups;
-  present: boolean;
-}
-
-/**
- * The recap's three groups (PV12b; ClassEnded, from PV12a's `recapGroups`), each only when it has
- * someone. Someone who never joined but has an unlock or protection off here (rare; no board draws
- * it) gets a row under the names, so the moment is never hidden. No reason in Present (#265),
- * though the recap is never there since PV9.
- */
-export function RecapLists({ groups, present }: Lists) {
-  const { partTime, wholeTime, notJoined } = groups;
-  const marked = notJoined.filter((s) => s.moments.length > 0);
-  const named = notJoined.filter((s) => s.moments.length === 0);
-  return (
-    <>
-      {partTime.length > 0 ? (
-        <div>
-          <h3 className={`mb-1.5 ${GROUP}`}>Focused part of the time · {partTime.length}</h3>
-          <Rows students={partTime} groups={groups} present={present} />
-        </div>
-      ) : null}
-      {wholeTime.length > 0 ? (
-        <div>
-          <h3 className={`mb-1 ${GROUP}`}>Focused the whole time · {wholeTime.length}</h3>
-          <p className="mb-2.5 text-caption text-text-tertiary">
-            From their own tap-in to the end of the session, they never unlocked, turned protection
-            off, went silent or left. A late tap-in still counts.
-          </p>
-          {names(wholeTime)}
-        </div>
-      ) : null}
-      {notJoined.length > 0 ? (
-        <div>
-          <h3 className={`mb-2.5 ${GROUP}`}>Didn&apos;t join · {notJoined.length}</h3>
-          {named.length > 0 ? names(named) : null}
-          {marked.length > 0 ? (
-            <div className={named.length > 0 ? 'mt-4.5' : ''}>
-              <Rows students={marked} groups={groups} present={present} />
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </>
+      </div>
+      <ul>
+        {groups.partTime.map((s) => {
+          const stretches = stretchesOf(s.moments, start, end);
+          return (
+            <li key={s.key} className={`${ROW} border-t border-border-default py-3 last:border-b`}>
+              <button
+                type="button"
+                aria-current={opened === s.key ? 'true' : undefined}
+                onClick={(e) => onOpen(s, e.currentTarget)}
+                className={`justify-self-start text-body wrap-anywhere ${NAME_BUTTON}`}
+              >
+                {s.name}
+              </button>
+              <div
+                role="img"
+                aria-label={trackWords(stretches, end)}
+                className="relative h-2 overflow-hidden rounded-full bg-surface-sunken"
+              >
+                {stretches.map((stretch) =>
+                  stretch.state === 'notin' ? null : (
+                    <span
+                      key={stretch.from}
+                      style={{
+                        left: `${x(stretch.from)}%`,
+                        width: `${Math.round((x(stretch.to) - x(stretch.from)) * 100) / 100}%`,
+                      }}
+                      className={`absolute ${FILL[stretch.state]}`}
+                    />
+                  ),
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

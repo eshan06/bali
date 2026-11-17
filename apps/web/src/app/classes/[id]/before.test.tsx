@@ -489,8 +489,8 @@ describe('a class before it starts, what didn’t load (ClassBeforeStates)', () 
     const user = open();
     const said = await screen.findByRole('alert');
     expect(said.textContent).toBe(`Couldn't load this class. ${CANT_REACH}`);
-    // Under the header, before the well.
-    const well = screen.getByRole('form', { name: 'Session length' });
+    // Under the header, before the well, which shows once the last session is found (LO7).
+    const well = await screen.findByRole('form', { name: 'Session length' });
     expect(said.compareDocumentPosition(well)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(name().nextElementSibling?.textContent).toBe(String.fromCharCode(160));
     expect(screen.queryAllByRole('listitem')).toEqual([]);
@@ -586,20 +586,185 @@ describe('a class before it starts, its last session', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     await vi.waitFor(() => expect(document.activeElement).toBe(line));
   });
+});
 
-  it('shows the recap’s card the day a session ended, its end in the header, never the line', async () => {
-    // 9:05 to 9:55 this morning, whatever the time now: over today.
-    const ended = new Date(new Date().setHours(9, 55, 0, 0));
-    lastSession(ended);
+describe('a class after the bell, the day its session ended (LO7; ClassEnded, ClassEndedStates)', () => {
+  // 9:05 to 9:55 this morning, whatever the time now: over today.
+  const ended = () => new Date(new Date().setHours(9, 55, 0, 0));
+  const COUNT = { level: 2, name: '1 of 2 stayed focused the whole time' } as const;
+  const REPORT_KEY = `GET /v1/classes/${bali.CLASS}/reports/sessions/${bali.LAST}`;
+  const ROSTER_KEY = `GET /v1/classes/${bali.CLASS}/roster`;
+
+  /** Ana focused the whole time; Marcus used Emergency Unlock; Zuri, on the roster, never came. */
+  function endedToday() {
+    const end = ended();
+    bali.now.joined = [
+      { id: 'u-ana', displayName: 'Ana Rodríguez' },
+      { id: 'u-marcus', displayName: 'Marcus Bell' },
+    ];
+    bali.now.last = over(end);
+    const at = (minutes: number) => new Date(end.getTime() - minutes * 60_000).toISOString();
+    bali.now.events = [
+      { seq: 1, eventId: 'e1', type: 'tap_in', userId: 'u-ana', occurredAt: at(50), payload: {} },
+      {
+        seq: 2,
+        eventId: 'e2',
+        type: 'tap_in',
+        userId: 'u-marcus',
+        occurredAt: at(49),
+        payload: {},
+      },
+      {
+        seq: 3,
+        eventId: 'e3',
+        type: 'unlock',
+        userId: 'u-marcus',
+        occurredAt: at(20),
+        payload: { reason: 'nurse' },
+      },
+    ];
+    bali.now.unlocks = [
+      {
+        eventId: 'e3',
+        student: { id: 'u-marcus', displayName: 'Marcus Bell' },
+        occurredAt: at(20),
+        reason: 'nurse',
+        recordedAs: null,
+      },
+    ];
+    bali.now.students = [
+      bali.ana,
+      bali.marcus,
+      { ...bali.ana, enrollmentId: 'e-zuri', studentId: 'u-zuri', displayName: 'Zuri Mensah' },
+    ];
+  }
+
+  it('is the recap: its end under the name, Open the report and Start another session, no Start and no students', async () => {
+    endedToday();
     open();
-    const recap = await screen.findByRole('region', { name: 'Last session' });
-    await within(recap).findByRole('link', { name: 'Open its report' });
-    // "2 students", then "Ended at 9:55 AM", as ClassEnded's line says it.
+    await screen.findByRole('heading', COUNT);
+    // "3 students", then "Ended at 9:55 AM", as ClassEnded's line says it.
     expect(name().nextElementSibling?.textContent).toBe(
-      `2 studentsEnded at ${bellTime(ended.toISOString())}`,
+      `3 studentsEnded at ${bellTime(ended().toISOString())}`,
     );
+    // Open the report: Reports with this class picked, as ClassEnded links it.
+    const report = screen.getByRole('link', { name: 'Open the report' });
+    expect(report.getAttribute('href')).toBe(`/reports?class=${bali.CLASS}`);
+    expect(screen.getByRole('button', { name: 'Start another session' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: "This class's reports" })).toBeNull();
+    expect(screen.queryByRole('form', { name: 'Session length' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Students' })).toBeNull();
     expect(screen.queryByText(/stayed focused the whole time\./)).toBeNull();
+    // Who wasn't focused the whole time, who was, and who didn't join, from the roster.
+    expect(screen.getByRole('button', { name: 'Marcus Bell' })).toBeTruthy();
+    expect(screen.getByText('1 stayed focused the whole time')).toBeTruthy();
+    expect(screen.getByText("Didn't join: Zuri Mensah")).toBeTruthy();
     await settle();
     expect(bali.unexpected).toEqual([]);
+  });
+
+  it('holds the well’s place until the last session is found, so Start never shows and then goes', async () => {
+    endedToday();
+    bali.now.hold = LAST_KEY;
+    open();
+    await screen.findByRole('heading', { level: 1, name: 'Biology, period 3' });
+    await settle();
+    expect(screen.getByRole('status').textContent).toBe('Loading…');
+    expect(screen.queryByRole('button', { name: START })).toBeNull();
+    await act(async () => {
+      bali.holding.shift()?.();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    // Found: the head at once, the recap's place saying so until it is read.
+    await screen.findByRole('button', { name: 'Start another session' });
+    await screen.findByRole('heading', COUNT);
+    expect(screen.queryByRole('button', { name: START })).toBeNull();
+  });
+
+  it('says the recap is being read under its head while its report is on its way', async () => {
+    endedToday();
+    bali.now.hold = REPORT_KEY;
+    open();
+    await screen.findByRole('button', { name: 'Start another session' });
+    expect(screen.getByRole('status').textContent).toBe('Loading the last session…');
+    await act(async () => {
+      bali.holding.shift()?.();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await screen.findByRole('heading', COUNT);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('opens a student’s record from their name, their unlock’s reason in it', async () => {
+    endedToday();
+    const user = open();
+    await user.click(await screen.findByRole('button', { name: 'Marcus Bell' }));
+    const record = screen.getByRole('complementary', { name: 'Marcus Bell' });
+    expect(
+      within(record)
+        .getAllByRole('listitem')
+        .map((i) => i.textContent),
+    ).toEqual([
+      expect.stringMatching(/Tapped in and focused$/),
+      expect.stringMatching(/Used Emergency UnlockNurse$/),
+    ]);
+  });
+
+  it('Start another session: the page before a session, Today’s line with its report, focus on Start', async () => {
+    endedToday();
+    const user = open();
+    await user.click(await screen.findByRole('button', { name: 'Start another session' }));
+    const start = screen.getByRole('button', { name: 'Start 50-minute session' });
+    expect(document.activeElement).toBe(start);
+    expect(name().nextElementSibling?.textContent).toBe('3 students');
+    const line = screen.getByText('Today, 1 of 2 stayed focused the whole time.', { exact: false });
+    const report = within(line).getByRole('link', { name: 'Open the report' });
+    expect(report.getAttribute('href')).toBe(`/reports/${bali.CLASS}/${bali.LAST}`);
+    expect(screen.queryByRole('heading', COUNT)).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Students' })).toBeTruthy();
+  });
+
+  it('with no block yet, Start another session puts focus on the class’s name', async () => {
+    endedToday();
+    bali.now.block = false;
+    const user = open();
+    await user.click(await screen.findByRole('button', { name: 'Start another session' }));
+    await screen.findByRole('heading', { name: 'Register your block first' });
+    expect(document.activeElement).toBe(name());
+  });
+
+  it('says students that didn’t load under the head, the recap waiting; Try again, the recap', async () => {
+    endedToday();
+    bali.now.down.add(ROSTER_KEY);
+    const user = open();
+    await screen.findByRole('button', { name: 'Start another session' });
+    const said = await screen.findByRole('alert');
+    expect(said.textContent).toBe(`Couldn't load this class. ${CANT_REACH}`);
+    expect(name().nextElementSibling?.textContent).toBe(
+      `Ended at ${bellTime(ended().toISOString())}`,
+    );
+    expect(screen.queryByRole('heading', COUNT)).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+
+    bali.now.down.clear();
+    await user.click(button('Try again'));
+    await screen.findByRole('heading', COUNT);
+    expect(screen.queryByRole('alert')).toBeNull();
+    await vi.waitFor(() => expect(document.activeElement).toBe(name()));
+  });
+
+  it('shows the page before a session when its report didn’t load, the line saying why; Try again, the recap, focus on the class’s name', async () => {
+    endedToday();
+    bali.now.down.add(REPORT_KEY);
+    const user = open();
+    const said = await screen.findByRole('alert');
+    expect(said.textContent).toBe(`Couldn't load the last session. ${CANT_REACH}`);
+    expect(screen.getByRole('button', { name: START })).toBeTruthy();
+
+    bali.now.down.clear();
+    await user.click(button('Try again'));
+    await screen.findByRole('heading', COUNT);
+    expect(screen.queryByRole('button', { name: START })).toBeNull();
+    await vi.waitFor(() => expect(document.activeElement).toBe(name()));
   });
 });

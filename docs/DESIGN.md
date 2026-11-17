@@ -649,7 +649,7 @@ reads with the rest. Since LO4 (2026-11-17) a class's page while no session runs
 is ClassPage's: the well with the lengths and Start, the last session's line, the
 students with the join code behind Add students, its states as ClassStates and
 ClassBeforeStates draw them (drawn on the canvas first); the day a session ended,
-v2's recap card in the line's place until LO7; Try again, and Start while it
+ClassEnded in its place since LO7 (below); Try again, and Start while it
 sends, still v2's button until a step at the phase's end moves them. Since LO5
 (2026-11-17) a class's page while its session runs is ClassLive's: its header
 with +5 and +10 as one pair, End session and Present, then over a hairline the
@@ -673,7 +673,21 @@ check on, "(4) Biology, period 3", the name alone with nobody to check on; its
 in-between states as LiveListStates draws them (drawn on the canvas first). LO6
 added `log-time` (13/20: a time in a log) and the `drawer-in` and `pop-in`
 utilities (the panel's slide on the drawer curve and the pop-up's 6 px drop), in
-lane B's block.
+lane B's block. Since LO7 (2026-11-17) the recap is ClassEnded's, on a class's
+page the day its session ended (by this computer's calendar) and on a session's
+report page: the head with "Ended at 9:55 AM", Open the report (Reports, the
+class picked) and Start another session, which shows ClassPage with the day's
+line; over a hairline the count of who stayed focused the whole time, no words
+under it, over five figures; Not focused the whole time, a name and a track each,
+the Key opening on a tap; then two lines, how many stayed focused with Show names
+and who didn't join; a name opens that student's record (ClassEndedOpen), their
+moments oldest first in the student panel's words. A session's report is the same
+recap under a head of its own, the class's name over the day and the times, with
+This class's reports, no Unlocks table and no Questions card; its in-between
+states as ClassEndedStates draws them (drawn on the canvas first). LO7 added the
+colours `track-focused` (green-200) and `track-silent` (stone-500) and the
+`track-dashes` utility (a silence's dashed line), in lane B's block; an unlock's
+and a protection off's stretch take v2's marks' `unlock-edge` and `mark-off`.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the

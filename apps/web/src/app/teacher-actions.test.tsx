@@ -108,7 +108,7 @@ const bali = vi.hoisted(() => {
   };
   /** A time this morning, by this computer's clock, whatever the time now. */
   const thisMorning = (h: number, m: number) => new Date(new Date(at).setHours(h, m, 0, 0));
-  // Over today, 9:05 to 9:55 AM: after the bell, the class page shows its recap card (LO4).
+  // Over today, 9:05 to 9:55 AM: after the bell, the class page is its recap (ClassEnded, LO7).
   const last: SessionReportSummary = {
     id: LAST,
     startedAt: thisMorning(9, 5).toISOString(),
@@ -580,45 +580,65 @@ describe('Present and the recap (portal_present_opened, portal_recap_opened)', (
     await vi.waitFor(() => expect(counted()).toEqual(['portal_present_opened']));
   });
 
-  it('counts the recap once as the class page shows it, never while its read fails', async () => {
+  /** The recap's count, its page's one number (ClassEnded, LO7). */
+  const recapShown = () =>
+    screen.findByRole('heading', { level: 2, name: '1 of 1 stayed focused the whole time' });
+  /** The class page the day its last session ended, ClassEnded's or its line's failure in. */
+  function afterTheBell() {
     bali.now.ranBefore = true;
+    bali.now.block = true;
+    const user = userEvent.setup();
+    open(`/classes/${bali.CLASS}`, <ClassDetailPage />);
+    return user;
+  }
+
+  it('counts the recap once as the class page shows it, never while its read fails', async () => {
     bali.now.refused.add(`GET /v1/classes/${bali.CLASS}/reports/sessions/${bali.LAST}`);
-    const user = await classPage(false);
-    await screen.findByText("Couldn't load the last session.");
+    const user = afterTheBell();
+    await screen.findByText(/^Couldn't load the last session\./);
     expect(counted()).toEqual([]);
 
     bali.now.refused.clear();
     await user.click(screen.getByRole('button', { name: 'Try again' }));
-    await screen.findByRole('link', { name: 'Open its report' });
+    await recapShown();
     await vi.waitFor(() => expect(counted()).toEqual(['portal_recap_opened']));
-    // The page redrawn under it (another length picked): not again.
-    await user.click(screen.getByRole('radio', { name: '25 min' }));
+    // The page redrawn under it (Show names pressed): not again.
+    await user.click(screen.getByRole('button', { name: 'Show names' }));
     await settle();
     expect(counted()).toEqual(['portal_recap_opened']);
     expect(bali.unexpected).toEqual([]);
   });
 
   it('counts a recap shown as its page opens just once', async () => {
-    bali.now.ranBefore = true;
-    await classPage(false);
-    await screen.findByRole('link', { name: 'Open its report' });
+    afterTheBell();
+    await recapShown();
     await settle();
     expect(counted()).toEqual(['portal_recap_opened']);
   });
 
-  it('counts the recap only once its roster is in too, never while the card says it didn’t load', async () => {
-    bali.now.ranBefore = true;
+  it('counts the recap only once its roster is in too, never while the page says it didn’t load', async () => {
     bali.now.refused.add(`GET /v1/classes/${bali.CLASS}/roster`);
-    const user = await classPage(false);
-    const recap = await screen.findByRole('region', { name: 'Last session' });
-    await within(recap).findByText("Couldn't load the last session.");
+    const user = afterTheBell();
+    await screen.findByText(/^Couldn't load this class\./);
+    await screen.findByRole('button', { name: 'Start another session' });
     await settle();
+    expect(screen.queryByRole('heading', { name: /stayed focused/ })).toBeNull();
     expect(counted()).toEqual([]);
 
     bali.now.refused.clear();
-    await user.click(within(recap).getByRole('button', { name: 'Try again' }));
-    await within(recap).findByRole('link', { name: 'Open its report' });
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await recapShown();
     await vi.waitFor(() => expect(counted()).toEqual(['portal_recap_opened']));
+  });
+
+  it('counts nothing more as Start another session leaves the recap', async () => {
+    const user = afterTheBell();
+    await recapShown();
+    await vi.waitFor(() => expect(counted()).toEqual(['portal_recap_opened']));
+    await user.click(screen.getByRole('button', { name: 'Start another session' }));
+    await screen.findByRole('button', { name: /^Start \d+-minute session$/ });
+    await settle();
+    expect(counted()).toEqual(['portal_recap_opened']);
   });
 });
 
@@ -800,19 +820,19 @@ describe('a session’s report (portal_report_opened)', () => {
     bali.now.refused.add(REPORT);
     const user = userEvent.setup();
     report();
-    await screen.findByText("Couldn't load this session.");
+    await screen.findByText(/^Couldn't load this session\./);
     expect(counted()).toEqual([]);
 
     bali.now.refused.clear();
     await user.click(screen.getByRole('button', { name: 'Try again' }));
-    await screen.findByRole('heading', { name: 'This session' });
+    await screen.findByRole('heading', { name: '1 of 1 stayed focused the whole time' });
     await vi.waitFor(() => expect(counted()).toEqual(['portal_report_opened']));
     expect(countedAfter(REPORT)).toBe(true);
   });
 
   it('counts a report read as its page opens just once', async () => {
     report();
-    await screen.findByRole('heading', { name: 'This session' });
+    await screen.findByRole('heading', { name: '1 of 1 stayed focused the whole time' });
     await settle();
     expect(counted()).toEqual(['portal_report_opened']);
     expect(bali.unexpected).toEqual([]);
@@ -821,7 +841,7 @@ describe('a session’s report (portal_report_opened)', () => {
   it('counts nothing for a student, whatever page they reach and whatever Bali answers', async () => {
     bali.now.role = 'student';
     report();
-    await screen.findByRole('heading', { name: 'This session' });
+    await screen.findByRole('heading', { name: '1 of 1 stayed focused the whole time' });
     await settle();
     expect(counted()).toEqual([]);
   });
@@ -844,7 +864,7 @@ describe('a count that fails changes nothing on screen', () => {
           `/reports/${bali.CLASS}/${bali.LAST}`,
           <SessionReportPage classId={bali.CLASS} sessionId={bali.LAST} />,
         );
-        await screen.findByRole('heading', { name: 'This session' });
+        await screen.findByRole('heading', { name: '1 of 1 stayed focused the whole time' });
         await settle();
         const now = seen();
         cleanup();

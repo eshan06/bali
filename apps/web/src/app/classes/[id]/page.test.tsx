@@ -91,7 +91,15 @@ const bali = vi.hoisted(() => {
    * Start's answer waits for the test to give it (`starts`); and an extend's (`extending`); and
    * whether a Start finds a session running already (`existing`).
    */
-  const now = { running: true, holdStart: false, holdExtend: false, block: true, existing: false };
+  const now = {
+    running: true,
+    holdStart: false,
+    holdExtend: false,
+    block: true,
+    existing: false,
+    /** The session over, as the class's reports list it after the bell (LO7). */
+    ended: false,
+  };
   /**
    * What the session has open, as its read says it (L7, M6): a question and a slide, none unless a
    * test says so; and the teacher's decks, as `GET /v1/decks` lists them.
@@ -141,9 +149,39 @@ const bali = vi.hoisted(() => {
     // The student panel's read of the session's moments (PV11a): none yet.
     const moments = new RegExp(`^/v1/sessions/${SESSION}/events\\?after=(\\d+)$`).exec(path);
     if (method === 'GET' && moments) return [200, { events: [], nextAfter: Number(moments[1]) }];
-    // After the bell, the recap's read of the last session (PV12b): none to show here.
+    // After the bell, the read of the class's last session over: none to show here, unless a test
+    // says the session ended (`ended`), its recap Ana focused the whole time (LO7).
     if (method === 'GET' && path === `/v1/classes/${CLASS}/reports/sessions?limit=1`) {
-      return [200, { sessions: [], nextBefore: null }];
+      const over = {
+        ...snapshot.session,
+        endedAt: new Date().toISOString(),
+        ended: true,
+        joinedCount: 1,
+        focusMinutes: 20,
+        averageFocusMinutes: 20,
+        silentMinutes: 0,
+        unlockCount: 0,
+        protectionOffCount: 0,
+      };
+      return [200, { sessions: now.ended ? [over] : [], nextBefore: null }];
+    }
+    if (
+      method === 'GET' &&
+      now.ended &&
+      path === `/v1/classes/${CLASS}/reports/sessions/${SESSION}`
+    ) {
+      return [
+        200,
+        {
+          ended: true,
+          joined: [{ id: 'u-ana', displayName: 'Ana Rodríguez' }],
+          focusMinutes: 20,
+          averageFocusMinutes: 20,
+          silentMinutes: 0,
+          unlocks: [],
+          protectionOffs: [],
+        },
+      ];
     }
     unexpected.push(`${method} ${path}`);
     return [404, { error: { code: 'not_found', message: 'not found' } }];
@@ -266,6 +304,7 @@ afterEach(() => {
   bali.now.holdExtend = false;
   bali.now.block = true;
   bali.now.existing = false;
+  bali.now.ended = false;
   bali.lesson.question = null;
   bali.lesson.presentation = null;
   bali.lesson.decks = [];
@@ -986,6 +1025,48 @@ describe('Present’s toggle, focus following it (PV9)', () => {
     const start = await screen.findByRole('button', { name: 'Start 50-minute session' });
     expect(document.activeElement).toBe(start);
     await vi.waitFor(() => expect(lastRead()).toHaveLength(1));
+    expect(bali.unexpected).toEqual([]);
+  });
+
+  it('never shows the recap in Present, so no figure or reason reaches the room; left, the recap, focus on the class’s name (LO7)', async () => {
+    sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
+    const user = userEvent.setup();
+    render(
+      <main>
+        <ClassDetailPage />
+      </main>,
+    );
+    await screen.findByText('Ana Rodríguez');
+    await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
+    bali.now.running = false;
+    bali.now.ended = true;
+    await act(async () => {
+      bali.streams[0]?.onEvent({
+        seq: 5,
+        eventId: '019a0000-0000-7000-8000-000000000e05',
+        type: 'session_ended',
+        userId: null,
+        occurredAt: new Date().toISOString(),
+        payload: {},
+      });
+      await Promise.resolve();
+    });
+    await screen.findByRole('heading', { name: 'Class is over' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText(/stayed focused|Not focused|Didn't join/)).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Present' }));
+    const recap = await screen.findByRole('heading', {
+      level: 2,
+      name: '1 of 1 stayed focused the whole time',
+    });
+    expect(recap).toBeTruthy();
+    // ClassEnded's head, no Start: focus on the class's name.
+    expect(screen.getByRole('button', { name: 'Start another session' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Start \d+-minute session$/ })).toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole('heading', { level: 1, name: 'Biology, period 3' }),
+    );
     expect(bali.unexpected).toEqual([]);
   });
 

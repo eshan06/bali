@@ -65,7 +65,10 @@ const light = declarations(/^:root\s*\{([^}]*)\}/m.exec(css)?.[1]);
 const theme = declarations(
   [...css.matchAll(/@theme\s*\{([^}]*)\}/g)].map((m) => m[1] ?? '').join('\n'),
 );
-const inline = declarations(/@theme inline\s*\{([^}]*)\}/.exec(css)?.[1]);
+// And every @theme inline block, the lanes' own too (LO7).
+const inline = declarations(
+  [...css.matchAll(/@theme inline\s*\{([^}]*)\}/g)].map((m) => m[1] ?? '').join('\n'),
+);
 
 const byName = (list: Token[]) => new Map(list.map((t) => [t.name, t]));
 const colours = byName(tokens.color.tokens);
@@ -492,7 +495,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), a live card’s edge (W3), a question’s bars and correct letter (L7; the letter on Your questions too, L7b), the correct answer’s fill on the projector (L7, part 2), the "is ready" dialog’s check (PV16b), the sign-in page’s art panel (the sign-in redesign), and the lock-only look’s live class (LO2)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), a live card’s edge (W3), a question’s bars and correct letter (L7; the letter on Your questions too, L7b), the correct answer’s fill on the projector (L7, part 2), the "is ready" dialog’s check (PV16b), the sign-in page’s art panel (the sign-in redesign), the lock-only look’s live class (LO2), and the recap’s tracks (LO7)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -514,9 +517,16 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       '--color-pip',
       '--color-ready',
       '--color-scrim',
+      '--color-track-focused',
+      '--color-track-silent',
       '--color-unlock-edge',
       '--color-unlock-link',
     ]);
+    // The recap's tracks (LO7), as lock.css draws them: a focused stretch green-200 and a silence's
+    // dashes stone-500, beside the marks' orange and red below. Graphics read beside their words
+    // (each track's label and the Key's), as the marks were.
+    expect(inline.get('--color-track-focused')).toBe('var(--bali-green-200)');
+    expect(inline.get('--color-track-silent')).toBe('var(--bali-stone-500)');
     // A live card's edge: green-200, as v2.css's `.livecard` draws it.
     expect(inline.get('--color-live-edge')).toBe('var(--bali-green-200)');
     // The lock-only look's live class (LO2), as lock.css draws it: its fill green-50, under the
@@ -763,9 +773,8 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       files.filter((file) => bare(file) > 0).map((file) => [relative(src, file), bare(file)]),
     );
     // The stale banner, and v2's on the class page: the length
-    // picker's track, the join code's chip, the timeline's dots (the student panel's moments, and
-    // Home's Recent activity since PV17c) and the recap's name
-    // pills; on Reports (PV13) its table's head, its bars' tracks and the place-lost notice, drawn
+    // picker's track and the join code's chip; the recap's track and its Key's Not here (LO7, as
+    // lock.css's `.track` and `.sw.k-notin` draw them, where v2's dots and name pills were); on Reports (PV13) its table's head, its bars' tracks and the place-lost notice, drawn
     // as the stale banner is; and on Help (PV15, SupportPage) the two lists of what a teacher sees,
     // drawn so too; a live question's (L7) options' letters, and its "Results can't refresh", drawn
     // as the stale banner is, on the class page and in Present (L7, part 2); on Your questions
@@ -916,11 +925,8 @@ describe('Reports’ tables are each in a box that scrolls sideways (PV13, PV14;
     expect(list.match(/overflow-x-auto/g)).toHaveLength(1);
     expect(list).toMatch(/export const TABLE_BOX =\s*'overflow-x-auto [^']*';/);
     expect(list).toMatch(/<div className=\{TABLE_BOX\}>\s*<table\b/);
-    // A session's Unlocks on its own page (PV14), in the same box.
-    const unlocks = read('../components/session-report.tsx');
-    expect(unlocks.match(/<table\b/g)).toHaveLength(1);
-    expect(unlocks).toMatch(/<div className=\{TABLE_BOX\}>\s*<table\b/);
-    expect(unlocks).not.toMatch(/overflow-x/);
+    // A session's report is the recap since LO7, its Unlocks table gone with v2's page.
+    expect(read('../components/session-report.tsx')).not.toMatch(/overflow-x|<table\b/);
     expect(read('./reports/page.tsx')).not.toMatch(/overflow-x|<table\b/);
   });
 

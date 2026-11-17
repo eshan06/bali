@@ -6,9 +6,6 @@ import {
   type FeedEvent,
   MAX_SESSION_MINUTES,
   type RosterResponse,
-  type SessionReportResponse,
-  type SessionReportsPage,
-  type SessionReportSummary,
   type SessionView,
   type StartSessionResponse,
 } from '@bali/shared';
@@ -17,7 +14,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { type ComponentProps, useCallback, useEffect, useId, useRef, useState } from 'react';
 
-import { Button, LockButton, QUIET } from '@/components/button';
+import { Button, LockButton, lockButton, QUIET } from '@/components/button';
 import { WELL } from '@/components/card';
 import { useCount, useCountOpened } from '@/components/count';
 import { Input } from '@/components/field';
@@ -27,10 +24,10 @@ import { LiveCounts, LiveHead, LiveHeader, Ring } from '@/components/live-header
 import { PresentQuestion } from '@/components/present-question';
 import { PresentSlide } from '@/components/present-slide';
 import { useLiveQuestion } from '@/components/question-card';
-import { endedToday, RecapCard } from '@/components/recap-card';
+import { endedToday, Recap } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
 import { land, TryAgain } from '@/components/try-again';
-import { type ApiClient, SAVE_TIMEOUT_MS } from '@/lib/api-client';
+import { SAVE_TIMEOUT_MS } from '@/lib/api-client';
 import { getAccessToken } from '@/lib/auth';
 import { blockIdOf, type RegisterAnswer, registerBlock } from '@/lib/blocks';
 import { daysBefore } from '@/lib/classes';
@@ -42,7 +39,7 @@ import {
 } from '@/lib/errors';
 import { lessonsOn } from '@/lib/lessons';
 import { failureOf } from '@/lib/live-question';
-import { latestEnded, readEvents, recapGroups } from '@/lib/recap';
+import { loadRecap, recapGroups, type RecapState } from '@/lib/recap';
 import { reportPath } from '@/lib/reports';
 import {
   DEFAULT_MINUTES,
@@ -98,35 +95,6 @@ const students = (count: number) => `${count} ${count === 1 ? 'student' : 'stude
 /** A form's own button: Start, in its well. */
 const submitOf = (form: HTMLFormElement | null) =>
   form?.querySelector<HTMLButtonElement>('[type="submit"]') ?? null;
-
-/**
- * The class's last session, for the line under the well (ClassPage): none yet; one that ended today,
- * the recap card's (v2's ClassEnded, until LO7), which reads it whole; else its day, who joined and
- * how many of them stayed focused the whole time, as the recap counts them.
- */
-type Last =
-  | { kind: 'finding' }
-  | { kind: 'none' }
-  | { kind: 'today'; session: SessionReportSummary }
-  | { kind: 'line'; session: SessionReportSummary; joined: number; whole: number }
-  | { kind: 'error'; message: string };
-
-async function readLast(api: Pick<ApiClient, 'get'>, classId: string): Promise<Last> {
-  const reports = `/v1/classes/${encodeURIComponent(classId)}/reports/sessions`;
-  try {
-    const session = latestEnded(await api.get<SessionReportsPage>(`${reports}?limit=1`));
-    if (session === null) return { kind: 'none' };
-    if (endedToday(session) !== null) return { kind: 'today', session };
-    const [report, events] = await Promise.all([
-      api.get<SessionReportResponse>(`${reports}/${encodeURIComponent(session.id)}`),
-      readEvents(api, session.id),
-    ]);
-    const whole = recapGroups(session, report, events, []).wholeTime.length;
-    return { kind: 'line', session, joined: report.joined.length, whole };
-  } catch (e) {
-    return { kind: 'error', message: errText(e) };
-  }
-}
 
 /** When it ran, by this computer's calendar: "On Friday" for the last six days, else "On Oct 2". */
 function onDay(startedAt: string, now = new Date()): string {
@@ -268,12 +236,14 @@ function RegisterFirst({ onRegistered }: { onRegistered: () => void }) {
 }
 
 /**
- * A class's page. While no session runs (PV6; ClassBefore, ClassNewCode, ClassStates' lines before
- * a session, CopyStates): its name over "28 students · no session running" with Reports, the length
- * picker and Start, the last session's recap (PV12b; ClassEnded: its line then "28 students · the
- * session ended at 9:55 AM" for one that ended today, and no How it ended, which repeated it), then
- * the roster in three columns beside the join code's card. Until the class is read, a Loading or
- * Error card holds the session's place: a session may be live. While one runs (PV7; ClassLive,
+ * A class's page. While no session runs, the lock-only canvas's ClassPage (LO4; ClassStates,
+ * ClassBeforeStates): its name over its students with This class's reports, the well with the
+ * lengths and Start, the last session's line, and the students with the join code behind Add
+ * students. The day a session ended, ClassEnded (LO7; ClassEndedOpen, ClassEndedStates) in its
+ * place: the name over "28 students" and "Ended at 9:55 AM", Open the report and Start another
+ * session, which shows ClassPage, then the recap (`Recap`). Until the class and its last session
+ * are read, Loading… or the class's failure holds the well's place: a session may be live, or have
+ * ended today. While one runs (PV7; ClassLive,
  * ClassStale, ClassStates' lines during a session): the header with the ring, "Live · 25 of 28
  * joined" and the join code, the countdown and the bell, +5, +10 and End session, which asks first in
  * a dialog (GA6; GA1AClassLive, GA1APresent, GA1AStates); the class counted by state
@@ -308,9 +278,13 @@ export default function ClassDetailPage() {
   } | null>(null);
   // The live grid counted, for the header's line and the counts over the grid (PV7), by session.
   const [counted, setCounted] = useState<{ session: string; counts: StateCounts } | null>(null);
-  // The class's last session, for the line under the well, or the recap's card after the bell: read
-  // each time the page shows no session (LO4).
-  const [last, setLast] = useState<Last>({ kind: 'finding' });
+  // The class's last session over (`loadRecap`), read each time the page shows no session: the recap
+  // the day it ended (LO7), else the line under the well (LO4).
+  const [last, setLast] = useState<RecapState>({ kind: 'finding' });
+  // The session Start another session moved past: the page before a session shows in its recap's
+  // place until another session ends, or the page opens again.
+  const [movedOn, setMovedOn] = useState<string | null>(null);
+  const movingOn = useRef(false);
   // Whether the teacher has a block (ClassStates' "No block yet"), read once as the page opens: null
   // until it answers. One that failed counts as yes, so Bali never keeps Start from a teacher whose
   // blocks it couldn't list: a session starts without one, only the students' tap needs it.
@@ -359,18 +333,31 @@ export default function ClassDetailPage() {
   const toggle = useRef<HTMLButtonElement>(null);
   const startForm = useRef<HTMLFormElement>(null);
   const toggled = useRef(false);
+  // Present left after the bell: the page under it is drawn once the class's last session is found
+  // (ClassEnded the day it ended, else Start's well), so focus waits for it, never landing on the
+  // well's Loading… while Start is on its way.
+  const settled =
+    present || (grid !== null && !grid.over) || (hasBlock !== null && last.kind !== 'finding');
   useEffect(() => {
-    if (toggled.current) {
-      // The class page's Present is hidden on a phone (PhoneLive), so Present left there goes to
-      // the class's name, as no Start does.
-      const phone = window.matchMedia?.('(width < 760px)').matches === true;
-      const to = (present || !phone ? toggle.current : null) ?? submitOf(startForm.current);
-      // No block yet, so no Start: the class's name.
-      if (to) to.focus();
-      else land(document, []);
-    }
+    if (!toggled.current || !settled) return;
     toggled.current = false;
-  }, [present]);
+    // The class page's Present is hidden on a phone (PhoneLive), so Present left there goes to
+    // the class's name, as no Start does.
+    const phone = window.matchMedia?.('(width < 760px)').matches === true;
+    const to = (present || !phone ? toggle.current : null) ?? submitOf(startForm.current);
+    // No block yet, or the recap after the bell, so no Start: the class's name.
+    if (to) to.focus();
+    else land(document, []);
+  }, [present, settled]);
+  // Start another session pressed: focus on Start, the well's own button, or with no block yet,
+  // the class's name.
+  useEffect(() => {
+    if (!movingOn.current) return;
+    movingOn.current = false;
+    const start = submitOf(startForm.current);
+    if (start) start.focus();
+    else land(document, []);
+  }, [movedOn]);
   // Extend (P10): the last attempt whose answer never came, resent by Try again; and what is said
   // beside the grid: a failure (with Try again), a refusal, or a note on the session shown. An End
   // that failed is said in its confirm instead (`endSaid`, GA6).
@@ -527,12 +514,17 @@ export default function ClassDetailPage() {
   // The last session, read each time the page comes to show no session: as it opens, and after a
   // bell; forgotten as a Start takes the page, so the next one's never shows the one before it.
   // Only the newest read's answer is drawn.
+  // Read again by Try again, its failure said until the whole answer, never the step between.
   const lastReads = useRef(0);
-  const readLastSession = useCallback(async () => {
-    const mine = ++lastReads.current;
-    const next = await readLast(api, classId);
-    if (lastReads.current === mine) setLast(next);
-  }, [api, classId]);
+  const readLastSession = useCallback(
+    async (again = false) => {
+      const mine = ++lastReads.current;
+      await loadRecap(api, classId, (next) => {
+        if (lastReads.current === mine && !(again && next.kind === 'loading')) setLast(next);
+      });
+    },
+    [api, classId],
+  );
   // Never in Present, whose page after the bell says only that class is over.
   const showsLast = before && !present;
   useEffect(() => {
@@ -881,13 +873,21 @@ export default function ClassDetailPage() {
   const noSession = roster
     ? `${students(roster.students.length)} · no session running`
     : 'No session running';
-  // After the bell, a session that ended today: when, as ClassEnded's line says it (LO7's to redraw).
-  const endedAt = last.kind === 'today' ? endedToday(last.session) : null;
+  // The class's last session over, once found; the day it ended, by this computer's calendar, the
+  // page is ClassEnded (LO7), "Ended at 9:55 AM" under the name, unless Start another session moved
+  // past it.
+  const lastSession = last.kind === 'loading' || last.kind === 'ready' ? last.session : null;
+  const endedAt =
+    lastSession !== null && lastSession.id !== movedOn ? endedToday(lastSession) : null;
+  // Opened once the recap shows whole, its roster's who didn't join too (A3b).
+  useCountOpened(
+    'portal_recap_opened',
+    endedAt !== null && last.kind === 'ready' && roster !== null,
+  );
   // A read again of the class failed, or its roster didn't load: said under the header; or the
   // class didn't load, in the session's place. Held while a read of what it says is on its way,
-  // the class's or else its roster's, whichever Try again sent it: the class's own answering
-  // first, its roster's failure is said here held, and the recap's Try again for it holds too.
-  // Read, focus on the class's name (ClassRetryStates).
+  // the class's or else its roster's, whichever Try again sent it. Read, focus on the class's name
+  // (ClassRetryStates).
   const cantLoad = (message: string | null) =>
     message === null ? null : (
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
@@ -1039,9 +1039,12 @@ export default function ClassDetailPage() {
     </div>
   ) : (
     // No session running (PV6), or the class not read yet: the lock-only canvas's ClassPage since
-    // LO4 (ClassStates, PhonePages' "A class, before it starts"), its parts 40 px apart, 32 on a phone.
+    // LO4 (ClassStates, PhonePages' "A class, before it starts"), and the day a session ended its
+    // ClassEnded since LO7 (ClassEndedOpen, PhonePages' "After the bell", ClassEndedStates), its
+    // parts 40 px apart, 32 on a phone.
     <div className={present ? PRESENT_PAGE : 'flex flex-col gap-10 max-[760px]:gap-8'}>
-      {/* The name over its line, the class's reports at the end; on a phone under them. */}
+      {/* The name over its line, the class's reports at the end, or after the bell Open the report
+          and Start another session; on a phone under them. */}
       <header className="flex flex-wrap items-center gap-x-6 gap-y-4">
         <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-1">
           <h1
@@ -1057,9 +1060,31 @@ export default function ClassDetailPage() {
             {(klass && roster) || endedAt ? null : <>&nbsp;</>}
           </p>
         </div>
-        <Link href={`/reports?class=${encodeURIComponent(classId)}`} className={QUIET}>
-          This class&apos;s reports
-        </Link>
+        {endedAt !== null && lastSession !== null ? (
+          // Open the report: Reports with this class picked, as ClassEnded links it. Start another
+          // session: the page before a session in the recap's place, focus on Start.
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/reports?class=${encodeURIComponent(classId)}`}
+              className={lockButton('secondary')}
+            >
+              Open the report
+            </Link>
+            <LockButton
+              variant="secondary"
+              onClick={() => {
+                movingOn.current = true;
+                setMovedOn(lastSession.id);
+              }}
+            >
+              Start another session
+            </LockButton>
+          </div>
+        ) : (
+          <Link href={`/reports?class=${encodeURIComponent(classId)}`} className={QUIET}>
+            This class&apos;s reports
+          </Link>
+        )}
       </header>
 
       {/* The class is read and its roster isn't (or a read again failed): said under the header. */}
@@ -1074,14 +1099,33 @@ export default function ClassDetailPage() {
         <Oops onRetry={load} held={classReading} then={[]}>
           Couldn&apos;t load this class. {error}
         </Oops>
-      ) : klass === null || hasBlock === null ? (
-        // As tall as the well it holds the place of (118 px), so nothing jumps.
+      ) : klass === null || hasBlock === null || last.kind === 'finding' ? (
+        // As tall as the well it holds the place of (118 px), so nothing jumps; until the last
+        // session is found too, so Start never shows the day one ended, then goes (ClassEndedStates).
         <p
           role="status"
           className={`${WELL} flex min-h-29.5 items-center p-6 text-body text-text-secondary`}
         >
           Loading…
         </p>
+      ) : endedAt !== null ? (
+        // The recap (ClassEnded), once the session, its moments and the class's roster are read;
+        // a roster that didn't load is said under the header, the recap waiting for it.
+        last.kind === 'ready' && roster !== null ? (
+          <Recap
+            session={last.session}
+            report={last.report}
+            events={last.events}
+            roster={roster.students}
+          />
+        ) : rosterError !== null ? null : (
+          <p
+            role="status"
+            className="border-y border-border-default py-3 text-body text-text-secondary"
+          >
+            Loading the last session…
+          </p>
+        )
       ) : (
         <>
           {hasBlock ? (
@@ -1190,31 +1234,20 @@ export default function ClassDetailPage() {
               }}
             />
           )}
-          {/* The last session (ClassPage's line), or after the bell the day it ended, v2's recap
-              card (ClassEnded, PV12b) until LO7 redraws it: who didn't join is the roster's, whose
-              failure the card says too. Present after the bell is its own page, which says only
-              that class is over, so `present` is off here; passed all the same, so no reason ever
-              reaches the projector should that change. */}
-          {last.kind === 'today' ? (
-            <RecapCard
-              classId={classId}
-              present={present}
-              roster={roster?.students ?? null}
-              rosterError={rosterError}
-              onRetryRoster={load}
-              rosterReading={rosterReading}
-            />
-          ) : last.kind === 'line' ? (
+          {/* The last session (ClassPage's line): its day, and how many of who joined stayed
+              focused the whole time, as the recap counts them; Today's too once Start another
+              session moved past its recap (ClassEndedStates). Its report is the recap. */}
+          {last.kind === 'ready' ? (
             <p id={`${id}-last`} className="text-body text-text-secondary">
-              {last.joined === 0
+              {last.report.joined.length === 0
                 ? `${onDay(last.session.startedAt)}, nobody joined.`
-                : `${onDay(last.session.startedAt)}, ${last.whole} of ${last.joined} stayed focused the whole time.`}
+                : `${onDay(last.session.startedAt)}, ${recapGroups(last.session, last.report, last.events, []).wholeTime.length} of ${last.report.joined.length} stayed focused the whole time.`}
               <Link href={reportPath(classId, last.session.id)} className={`ml-3 ${QUIET}`}>
                 Open the report
               </Link>
             </p>
           ) : last.kind === 'error' ? (
-            <Oops onRetry={readLastSession} then={[`${id}-last`]}>
+            <Oops onRetry={() => readLastSession(true)} then={[`${id}-last`]}>
               Couldn&apos;t load the last session. {last.message}
             </Oops>
           ) : null}

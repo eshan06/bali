@@ -183,7 +183,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO6** 👀 Live: the session list, the pop-ups, the student panel, the tab title (#608; lane B; after LO5) — ✅ (#622; DECISIONS 2026-11-17); its in-between states on the canvas's LiveListStates (version 53); the list keeps the board's five kinds of line, a student's other moments in their panel; for the phase's tidy-up: `--color-unlock-link` unused; for Now at the phase's end: 22 source-text tests left (`student-panel.test.ts` converted)
 
-- **LO7** 👀 The recap (#609; lane B; after LO6)
+- **LO7** 👀 The recap (#609; lane B; after LO6) — ✅ (#PR; DECISIONS 2026-11-17); its in-between states on the canvas's ClassEndedStates (version 56); a session's report page is the recap, its Unlocks table gone; for the phase's tidy-up: `--color-mark` unused, the record's words in `recap-card.tsx` and `student-panel.tsx` both; for Now at the phase's end: 21 source-text tests left (`recap-card.test.ts` converted)
 
 - **LO8** 👀 Reports and the CSV (#610; lane A; after LO3)
 
