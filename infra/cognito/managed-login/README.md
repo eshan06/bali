@@ -92,7 +92,8 @@ classic's `/signup`, which the app's Sign up opens (seen on dev, 2026-11-12).
 
 ## The domain's switch, and back
 
-Prod's domain is still classic. Switching it is the owner's step (PLAN's Open owner items):
+Prod's domain switched on 2026-11-16, on the owner's go, through the console's Domain page (Branding
+version: Managed login); the owner's own sign-in on prod confirmed it. The same switch by command:
 
 ```bash
 aws cognito-idp update-user-pool-domain --region us-east-1 \

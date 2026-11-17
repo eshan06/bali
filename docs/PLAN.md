@@ -57,7 +57,8 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   portal and Sign out, and no device token registered; the server unchanged. Left: Android's twin.
 - **The sign-in pages on Cognito's managed login (the owner, 2026-11-12)** ✅ (#581; DECISIONS
   2026-11-12): Bali's style on both pools' four clients, the username and password on one page
-  (`infra/cognito/managed-login/`); dev's domain switched, prod's the owner's (Open owner items).
+  (`infra/cognito/managed-login/`); both domains switched, dev's 2026-11-12 and prod's 2026-11-16
+  (the owner's go; the owner's own sign-in on prod confirmed it).
   Rebuilt from the approved
   [Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB): the portal's sign-in
   page ✅ (#582) and the app's Sign in ✅ (#583), DECISIONS 2026-11-12; whether the 13+ question and
@@ -342,9 +343,6 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 
 **The rest of the owner's queue:**
 
-- 🔧 **Prod's sign-in pages to managed login (2026-11-12):** its two clients wear the style; switch
-  its domain, outside class hours, by the one command in `infra/cognito/managed-login/README.md`
-  ("The domain's switch, and back", its rollback beside it), then sign in once on prod to confirm.
 - 🔧 **Prod's MFA, a mismatch (2026-11-12):** AWS reports prod's pool's `MfaConfiguration` as `OFF`,
   where this file and runbook 2 say MFA Optional (TOTP) ✅. Nothing changed: the owner's to check.
 - **Bali Focus Inc. (2026-11-11):** App Store Connect's seller and copyright fields, and the provider's address and phone for the terms' California notice (§ 1789.3).

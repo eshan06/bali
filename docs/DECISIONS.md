@@ -8,6 +8,14 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-16** — **Prod's sign-in pages are on managed login, and the redesign stays sign-in only (the owner).** Prod's
+  Cognito domain was switched to managed login on the owner's go, through the console (the session's own command was
+  held by its permission check, as prod's should be); the owner then signed in on prod through the new page. The 13+
+  question (`AgeView`) and Delete account's screen (`DeletingView`) keep their original look (the owner: "leave the
+  other screens, this should just be for sign in"). New-look drafts of both were drawn beside today's on the
+  [Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB) canvas; the owner looked and kept the
+  originals ("lets just keep our original 13+ and delete account"), so the drafts stay unapproved and nothing is built.
+
 - **2026-11-13** — **AN11a2, a cap on how many push tokens one student holds: at most five, APNs's and FCM's together; a
   register that would make a sixth lets go of the student's oldest, by `updated_at` and then by token, in its own transaction
   under a lock per student, so no commit leaves more; `PUT /v1/me/push-token` answers as it always did (the conductor's three
@@ -1966,8 +1974,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   screen's text at the large sizes, a change for the owner's call, not made here.
 
   **Left as they are:** the 13+ question (`AgeView`) and Delete account's screen (`DeletingView`), laid out as
-  Sign in was (the mark, a title, the way on at the bottom), keep D1's look; whether they follow Sign in's is the
-  owner's design call.
+  Sign in was (the mark, a title, the way on at the bottom), keep D1's look; the owner kept
+  them so on 2026-11-16 (see that entry).
 
 - **2026-11-12** — **The portal's sign-in page is rebuilt from the sign-in redesign's board, "The portal's sign-in page"
   (the owner's approval, 2026-11-12), built as drawn.** Two panels side by side from 1024 px: green-50 with Bali, the
