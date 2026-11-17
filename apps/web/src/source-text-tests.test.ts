@@ -47,7 +47,6 @@ describe('the portal’s page and component tests drive the page', () => {
 const STILL_READING = [
   'app/class-page.test.ts',
   'app/icons.test.ts',
-  'app/present.test.ts',
   'app/rendering.test.ts',
   'app/tokens.test.ts',
   'components/ask-panel.test.ts',

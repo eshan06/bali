@@ -187,7 +187,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO8** 👀 Reports and the CSV (#610; lane A; after LO3) — ✅ (#624, one PR, the conductor's call; DECISIONS 2026-11-17); its in-between states and the CSV's columns on the canvas's ReportsMoments (version 55); ten sessions a page, each one's whole-time count read by the portal (a count on R3's rows, additive, a possible later step); for the phase's tidy-up: v2's `text-pill` and `text-bar-row` unused; for Now at the phase's end: 21 source-text tests left (`reports-list.test.ts` converted)
 
-- **LO9** 👀 Present (#611; lane B; after LO7)
+- **LO9** 👀 Present (#611; lane B; after LO7) — ✅ (this PR; DECISIONS 2026-11-17); its in-between states on the canvas's PresentStates (version 59); no lesson piece in Present, and none read; for the phase's tidy-up: v2's `present-title`, `present-tile-name`, `present-tile-state` and `code-present` unused; for Now at the phase's end: 19 source-text tests left (`present.test.ts` converted)
 
 - **LO10a** API: a tap's honest retry after its block moved, answered as any retry, never `409`, settled before any block can move (#612's first PR; after LO0) — ✅ (#621; DECISIONS 2026-11-17); a tag no live block holds answers such a retry too, where it was `404`
 

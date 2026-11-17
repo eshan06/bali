@@ -19,13 +19,13 @@ import { LiveGrid, LockChip } from './live-grid';
 /*
  * The live grid as a teacher meets it (the owner's decision of 2026-10-22: the portal's tests drive
  * the page): on the class page while a session runs, and in Present, the projector the class can
- * see (ClassPresent). On the class page, the lock-only look since LO5 (ClassLive, LiveStates,
- * LiveTopStates, PhoneLive): the count of who is focused, Check on, then the room, every tile its
- * state and its name only, the times and the reason in the student's panel (the owner,
- * 2026-11-16). Present keeps v2's tiles until LO9: each student's state, but never what is the
- * teacher's alone, an unlock's reason (2026-10-06) and Clock off (the owner, 2026-10-28). Bali's
- * answer to the grid's read is a stand-in's, held until the test gives it, and no stream runs: the
- * grid is the snapshot it read.
+ * see. On the class page, the lock-only look since LO5 (ClassLive, LiveStates, LiveTopStates,
+ * PhoneLive): the count of who is focused, Check on, then the room, every tile its state and its
+ * name only, the times and the reason in the student's panel (the owner, 2026-11-16). In Present,
+ * the lock-only look since LO9 (Present, PresentStates): the band, the time beside the count, then
+ * everyone's tile one size up, never what is the teacher's alone, an unlock's reason (2026-10-06),
+ * a last check-in or Clock off (the owner, 2026-10-28). Bali's answer to the grid's read is a
+ * stand-in's, held until the test gives it, and no stream runs: the grid is the snapshot it read.
  *
  * The grid's other tests, not converted yet, are in `live-grid.test.ts`; this file can't share its
  * name, since TypeScript drops a `.tsx` whose name a `.ts` beside it has (ESLint then says the
@@ -113,13 +113,18 @@ const snapshotOf = (students: SnapshotStudent[], more: Partial<SessionSnapshot> 
   ...more,
 });
 
+/** Present's time left, as the page hands it to the grid's band (`PresentClock`'s place). */
+const CLOCK = <p data-testid="band-time">23:14</p>;
+
 /** The grid on the class page while a session runs, or in Present, once Bali answers its read. */
 async function open(
   present: boolean,
   students: SnapshotStudent[],
   more: Partial<SessionSnapshot> = {},
 ) {
-  const view = render(<LiveGrid sessionId="S" livePage present={present} />);
+  const view = render(
+    <LiveGrid sessionId="S" livePage present={present} clock={present ? CLOCK : null} />,
+  );
   await answerRead(snapshotOf(students, more));
   return view;
 }
@@ -367,12 +372,12 @@ describe('the count and Check on (LO5; ClassLive, LiveStates, LiveTopStates)', (
     const view = await open(false, [student('Ana Rodríguez')]);
     await user.click(within(tile('Ana Rodríguez')).getByRole('button'));
     expect(screen.getByRole('complementary', { name: 'Ana Rodríguez' })).toBeTruthy();
-    view.rerender(<LiveGrid sessionId="S" livePage present />);
-    // No panel, and no session list either: Present keeps v2's room until LO9.
+    view.rerender(<LiveGrid sessionId="S" livePage present clock={CLOCK} />);
+    // No panel, and no session list either: Present draws neither (Present).
     expect(screen.queryByRole('complementary')).toBeNull();
-    // A tile alone there, never a button; no Check on, which the page draws.
+    // A tile alone there, never a button; no Check on.
     expect(screen.queryByRole('button')).toBeNull();
-    expect(screen.queryByText(/ of \d+ focused$/)).toBeNull();
+    expect(screen.queryByText(/^Check on/)).toBeNull();
   });
 
   it('says a session that didn’t load in the count’s place, Try again reading it again', async () => {
@@ -625,20 +630,104 @@ describe('Check on as an unlock lands (LO6; LiveStates’ An unlock lands)', () 
   });
 });
 
-describe('the live grid in Present (ClassPresent), v2’s until LO9', () => {
+describe('the live grid in Present (LO9; Present, PresentStates)', () => {
   const omar = student('Omar Siddiqui', { clockOff: true });
 
-  it('never says Clock off in Present, the projector the class can see (the owner, 2026-10-28)', async () => {
-    // And a phone heard from 70 s ago, whose line says "last seen".
+  it('draws the band, the time beside the count of who is focused over a hairline, then everyone’s tile one size up', async () => {
+    await open(true, [
+      student('Ana Rodríguez'),
+      student('Tomás Herrera', { lastSeenAt: ago(330) }),
+      student('Ethan Park', { state: 'unlocked', unlock: unlock('Ethan Park', 'nurse') }),
+      student('Zuri Mensah', { state: null }),
+    ]);
+    const count = screen.getByRole('heading', { level: 2, name: '1 of 4 focused' });
+    const band = count.parentElement;
+    // The page's time first, the count at the band's end, 88/88 over 30/38.
+    expect(band?.firstElementChild).toBe(screen.getByTestId('band-time'));
+    expect(Array.from(band?.classList ?? [])).toEqual(
+      expect.arrayContaining(['flex', 'flex-wrap', 'justify-between', 'border-b', 'pb-6']),
+    );
+    expect(band?.classList).toContain('border-border-strong');
+    expect(count.firstElementChild?.className).toBe('text-present-count tabular-nums');
+    expect(count.lastElementChild?.className).toBe('text-present-count-of text-text-secondary');
+    // Then the room, after the band: each tile its state and its name, as on the class page.
+    const room = screen.getByRole('list', { name: 'Everyone in the class' });
+    expect(band?.compareDocumentPosition(room)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(room.className).toMatch(
+      /\bgrid-cols-\[repeat\(auto-fill,minmax\(max\(200px,16%\),1fr\)\)\]/,
+    );
+    expect(['Ana Rodríguez', 'Tomás Herrera', 'Ethan Park', 'Zuri Mensah'].map(parts)).toEqual([
+      ['Ana Rodríguez', 'Focused'],
+      ['Tomás Herrera', 'Silent · 5 min'],
+      ['Ethan Park', 'Unlocked'],
+      ['Zuri Mensah', 'Not here'],
+    ]);
+    // One size up: at least 84 px tall, 12 px in, a 22 px icon, the name 18/23 and the state 15/20.
+    const box = tile('Ethan Park').firstElementChild;
+    expect(box?.tagName).toBe('DIV');
+    expect(Array.from(box?.classList ?? [])).toEqual(
+      expect.arrayContaining(['min-h-21', 'p-3', 'rounded-sm', 'border-[1.5px]']),
+    );
+    expect(box?.classList).toContain('bg-state-emergency-bg');
+    expect(box?.querySelector('svg')?.getAttribute('width')).toBe('22');
+    const name = within(tile('Ethan Park')).getByText('Ethan Park');
+    expect(name.className).toMatch(/\btext-present-room-name\b/);
+    expect(name.getAttribute('title')).toBe('Ethan Park');
+    expect(name.nextElementSibling?.className).toMatch(/\btext-present-room-state\b/);
+    // Silent's edge dashed, as in the room.
+    expect(tile('Tomás Herrera').firstElementChild?.className).toMatch(/\bborder-dashed\b/);
+    // Never a button, no Check on, no session list, no panel: nothing there is the class's to open.
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByText(/^Check on/)).toBeNull();
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
+
+  it('never says Clock off or a last check-in in Present, the projector the class can see (the owner, 2026-10-28)', async () => {
+    // And a phone heard from 70 s ago, whose tile said "last seen" in v2's Present.
     await open(true, [omar, student('Wei Zhang', { clockOff: true, lastSeenAt: ago(70) })]);
     const omarsTile = tile('Omar Siddiqui');
     // The state alone, as for any focused student: no line, no tooltip, nothing for a screen reader.
     expect(parts('Omar Siddiqui')).toEqual(['Omar Siddiqui', 'Focused']);
     expect(says(omarsTile)).toBe(['Omar Siddiqui', 'Focused'].join(''));
-    expect(parts('Wei Zhang')).toEqual(['Wei Zhang', 'Focused', 'last seen 1 min ago']);
-    expect(document.body.innerHTML).not.toMatch(/clock/i);
-    // A tile alone there, never a button.
-    expect(screen.queryByRole('button')).toBeNull();
+    expect(parts('Wei Zhang')).toEqual(['Wei Zhang', 'Focused']);
+    expect(document.body.innerHTML).not.toMatch(/clock|last seen/i);
+  });
+
+  it('pulses an unlock’s tile as the stream brings it, then holds it still', async () => {
+    await open(true, [student('Ana Rodríguez')]);
+    await bring(feed(13, 'unlock', 'u-Ana Rodríguez', 1, { reason: 'nurse' }));
+    const glow = tile('Ana Rodríguez').querySelector('.animate-softpulse');
+    expect(glow).not.toBeNull();
+    act(() => {
+      glow?.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
+    });
+    expect(tile('Ana Rodríguez').querySelector('.animate-softpulse')).toBeNull();
+    // No pop-up there: the unlock's reason is never the class's to read.
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(document.body.innerHTML).not.toMatch(/nurse/i);
+  });
+
+  it('says its session is being read, then one that didn’t load, in the room’s place, the band’s time kept', async () => {
+    const user = userEvent.setup();
+    render(<LiveGrid sessionId="S" livePage present clock={CLOCK} />);
+    expect(screen.getByRole('status').textContent).toBe('Loading this session…');
+    expect(screen.getByTestId('band-time')).toBeTruthy();
+    expect(screen.queryByRole('heading')).toBeNull();
+    await answerRead('none');
+    expect(screen.getByRole('alert').textContent).toBe(`Couldn't load this session. ${CANT_REACH}`);
+    expect(screen.getByTestId('band-time')).toBeTruthy();
+    expect(screen.queryByRole('heading')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await answerRead(snapshotOf([student('Ana Rodríguez')]));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('heading', { level: 2, name: '1 of 1 focused' })).toBeTruthy();
+  });
+
+  it('says a class with nobody in it yet in the room’s place, under 0 of 0', async () => {
+    await open(true, []);
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('0 of 0 focused');
+    expect(screen.getByText('No students yet.')).toBeTruthy();
+    expect(screen.queryByRole('list')).toBeNull();
   });
 
   const WORDS: Record<UnlockReason, RegExp> = {
@@ -681,21 +770,14 @@ describe('the live grid in Present (ClassPresent), v2’s until LO9', () => {
       await open(true, carrying(reason));
       // Nowhere in the grid: not a tile's words, nor a tooltip or a label on any tag.
       expect(document.body.innerHTML, reason).not.toMatch(WORDS[reason]);
-      expect(document.body.innerHTML, reason).not.toMatch(/clock/i);
-      // An Unlocked tile whose line was its reason alone, and a Left one, have no line at all.
+      expect(document.body.innerHTML, reason).not.toMatch(/clock|last seen/i);
+      // Every tile its state and its name alone, a protection off's unlock and a last check-in
+      // included, as on the class page.
       expect(parts('Ethan Park')).toEqual(['Ethan Park', 'Unlocked']);
-      expect(parts('Jaylen Brooks')).toEqual(['Jaylen Brooks', 'Unlocked', 'last seen 5 min ago']);
-      expect(parts('Lucas Ferreira')).toEqual([
-        'Lucas Ferreira',
-        'Protection off',
-        'Unlocked · last seen 5 min ago',
-      ]);
+      expect(parts('Jaylen Brooks')).toEqual(['Jaylen Brooks', 'Unlocked']);
+      expect(parts('Lucas Ferreira')).toEqual(['Lucas Ferreira', 'Protection off']);
       expect(parts('Mateo Silva')).toEqual(['Mateo Silva', 'Left · unlocked']);
-      expect(parts('Priya Natarajan')).toEqual([
-        'Priya Natarajan',
-        'Left · protection off',
-        'Unlocked',
-      ]);
+      expect(parts('Priya Natarajan')).toEqual(['Priya Natarajan', 'Left · protection off']);
       expect(parts('Omar Siddiqui')).toEqual(['Omar Siddiqui', 'Focused']);
       cleanup();
     }
@@ -707,10 +789,10 @@ describe('the live grid in Present (ClassPresent), v2’s until LO9', () => {
  * it comes (the audit's DR-05; CLAUDE.md: no silent failures), as a student hears "Can't reach
  * Bali", but never at each second's tick of its age (`aria-live="off"`, as YourPhone's minutes). On
  * the class page (LiveStates, LiveTopStates): over the count, the count and Check on faded and the
- * names plain, as they were at the last update. In Present (ClassStale), v2's: a lost stream as the
- * floating pill, a quiet one in the stone line over the tiles.
+ * names plain, as they were at the last update. In Present (PresentStates): over the band, the count
+ * faded, the tiles as they were.
  */
-describe('the grid’s health, said (LiveStates, LiveTopStates, ClassStale; DR-05)', () => {
+describe('the grid’s health, said (LiveStates, LiveTopStates, PresentStates; DR-05)', () => {
   // The grid's clock on a fake one that also runs as time does, so its read's answer still lands.
   beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
   afterEach(() => vi.useRealTimers());
@@ -805,94 +887,53 @@ describe('the grid’s health, said (LiveStates, LiveTopStates, ClassStale; DR-0
     );
   });
 
-  it('says a lost stream as the floating pill over the tiles in Present, a status', async () => {
-    await open(true, [student('Omar Siddiqui')]);
+  it('says a lost stream over the band in Present, the count faded, the tiles as they were', async () => {
+    await open(true, class28);
     expect(screen.queryByRole('status')).toBeNull();
     await status('reconnecting');
 
-    const pill = screen.getByRole('status');
-    expect(said(pill)).toEqual({ words: 'Reconnecting… last updated 0s ago', age: '0s ago' });
-    // Its stone dot, 7 px and round, then the words as one piece of the pill's row.
-    expect(pill.children).toHaveLength(2);
-    expect(pill.firstElementChild?.getAttribute('aria-hidden')).toBe('true');
-    expect(classes(pill.firstElementChild)).toEqual([
-      'size-1.75',
-      'shrink-0',
-      'rounded-full',
-      'bg-pip',
-    ]);
-    // White, a strong edge, shadow-2, 13/18 medium in the secondary ink, 6 × 14 px (DESIGN.md §4),
-    // 14 px from the page's top and in view as it scrolls.
-    expect(classes(pill)).toEqual(
+    const line = screen.getByRole('status');
+    expect(said(line)).toEqual({ words: 'Reconnecting… last updated 0s ago', age: '0s ago' });
+    // The class page's own line: a white pill, a strong edge, shadow-2, its dot still.
+    expect(classes(line)).toEqual(
       expect.arrayContaining([
-        'sticky',
-        'top-3.5',
-        'mx-auto',
-        'w-fit',
         'rounded-full',
-        'border',
         'border-border-strong',
         'bg-surface-card',
         'shadow-2',
-        'px-3.5',
-        'py-1.5',
-        'text-caption',
-        'font-medium',
-        'text-text-secondary',
       ]),
     );
-    // Its layer over the page's whole height, taking no room or clicks: 30 px less 16 is 14 px
-    // from the frame's top (22 less 8 on a phone). Before the tiles.
-    expect(classes(pill.parentElement)).toEqual(
-      expect.arrayContaining([
-        'pointer-events-none',
-        'absolute',
-        'inset-x-0',
-        '-top-4',
-        'bottom-0',
-        'max-sm:-top-2',
-      ]),
-    );
-    expect(pill.compareDocumentPosition(tile('Omar Siddiqui'))).toBe(
+    expect(classes(line.firstElementChild)).toContain('bg-pip');
+    // Before the band, which holds the time and the count; the count faded, the tiles not.
+    const count = screen.getByRole('heading', { level: 2, name: '1 of 2 focused' });
+    expect(line.compareDocumentPosition(screen.getByTestId('band-time'))).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
+    expect(classes(count)).toContain('opacity-60');
+    expect(tile('Ethan Park').outerHTML).not.toMatch(/opacity/);
 
-    // Seconds on, the same status: its age moves where it isn't said, the words said as they were.
-    const words = pill.lastElementChild?.firstChild;
+    // Seconds on, the same status: its age moves where it isn't said.
     await act(() => vi.advanceTimersByTimeAsync(5000));
-    expect(screen.getByRole('status')).toBe(pill);
-    expect(said(pill)).toEqual({ words: 'Reconnecting… last updated 5s ago', age: '5s ago' });
-    expect(pill.lastElementChild?.firstChild).toBe(words);
-    expect(words?.textContent).toBe('Reconnecting… last updated ');
+    expect(screen.getByRole('status')).toBe(line);
+    expect(said(line)).toEqual({ words: 'Reconnecting… last updated 5s ago', age: '5s ago' });
 
-    // Back, and nothing is said over the grid.
+    // Back, and nothing is said over the band; the count full again.
     await status('open');
     expect(screen.queryByRole('status')).toBeNull();
+    expect(classes(count)).not.toContain('opacity-60');
   });
 
-  it('says a quiet stream in the stone line over the tiles in Present, a status', async () => {
-    await open(true, [student('Omar Siddiqui')]);
+  it('says a quiet stream the same way in Present, in today’s words', async () => {
+    await open(true, class28);
     await quiet();
     const line = screen.getByRole('status');
     expect(said(line)).toEqual({
       words: 'Live feed has gone quiet. Last updated 1 min ago.',
       age: '1 min ago.',
     });
-    expect(classes(line)).toEqual([
-      'rounded-sm',
-      'border',
-      'border-border-default',
-      'bg-surface-sunken',
-      'px-4',
-      'py-3',
-      'text-body',
-      'text-text-primary',
-      'tabular-nums',
-    ]);
-    // In the page's flow, over the tiles: no layer.
-    expect(classes(line.parentElement)).toEqual(['flex', 'flex-col', 'gap-3']);
-    expect(line.compareDocumentPosition(tile('Omar Siddiqui'))).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
+    expect(classes(line)).toContain('rounded-full');
+    expect(classes(screen.getByRole('heading', { level: 2, name: '1 of 2 focused' }))).toContain(
+      'opacity-60',
     );
   });
 });

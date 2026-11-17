@@ -3,44 +3,19 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { bellTime } from '../lib/session-controls';
-import type { GridDisplay } from '../lib/grid-state';
-import { stateCounts } from './live-grid';
-import { LiveCounts, LiveHead, LiveHeader, nextTick, shareLeft, timeLeft } from './live-header';
+import { Countdown, LiveHead, nextTick, PresentClock, shareLeft, timeLeft } from './live-header';
 
 /*
- * A class's header while a session runs and its counts over the grid (PV7; ClassLive, and
- * PhoneClassLive at 390 px), rendered: the ring, the name over "Live · 25 of 28 joined · join code
- * VMAF7E", the countdown on this computer's clock to the server's bell with the bell's time under
- * it, the controls at the end; then the six counts in their states' tints, icons and words.
+ * The time left to a session's bell, rendered where it shows: the class page's live header in the
+ * lock-only look (LO5; ClassLive, LiveTopStates), Present's band (LO9; Present, PresentStates), and
+ * the student's lesson page's countdown (W4), each on this computer's clock to the server's bell.
  */
 const STARTED = '2026-10-12T14:05:00.000Z';
 const BELL = '2026-10-12T14:55:00.000Z';
 /** 23:14 before the bell, as ClassLive draws it. */
 const NOW = Date.parse(BELL) - (23 * 60 + 14) * 1000;
-
-/** ClassLive's 28 tiles, by their states. */
-const CLASS_LIVE: GridDisplay[] = [
-  ...Array<GridDisplay>(17).fill('focused'),
-  ...Array<GridDisplay>(3).fill('unlocked'),
-  ...Array<GridDisplay>(2).fill('protection_off'),
-  'silent',
-  ...Array<GridDisplay>(3).fill('absent'),
-  'ended',
-  'left_unprotected',
-];
-
-const header = (props: Partial<Parameters<typeof LiveHeader>[0]> = {}) =>
-  renderToStaticMarkup(
-    createElement(LiveHeader, {
-      name: 'Biology, period 3',
-      joinCode: 'VMAF7E',
-      counts: stateCounts(CLASS_LIVE),
-      startedAt: STARTED,
-      endsAt: BELL,
-      children: createElement('button', { type: 'button' }, 'End session'),
-      ...props,
-    }),
-  );
+/** A no-break space, as the countdown holds its line's place with one. */
+const NBSP = String.fromCharCode(0xa0);
 
 afterEach(() => vi.useRealTimers());
 
@@ -80,69 +55,6 @@ describe('the time left', () => {
   });
 });
 
-describe('the live header (ClassLive)', () => {
-  it('draws the ring, the name over its line, the countdown and the bell, then the controls', () => {
-    vi.useFakeTimers({ now: NOW });
-    const html = header();
-    expect(html).toMatch(
-      /^<header class="flex flex-wrap items-center gap-x-4\.5 gap-y-3\.5 max-sm:gap-x-3\.5"><svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true" class="shrink-0">/,
-    );
-    expect(html).toMatch(
-      /<h1 class="text-page-title text-balance wrap-anywhere max-sm:text-h3">Biology, period 3<\/h1>/,
-    );
-    expect(html).toMatch(
-      /<p class="mt-0\.5 text-meta text-text-secondary">Live · 25 of 28 joined · (<!-- -->)?join\u00a0code\u00a0<span translate="no" class="font-mono font-medium">VMAF7E<\/span><\/p>/,
-    );
-    expect(html).toContain(
-      `<span class="font-num text-data-lg tabular-nums">23:14</span><span class="text-countdown-sub text-text-secondary">ends <time dateTime="${BELL}">${bellTime(BELL)}</time></span>`,
-    );
-    // The controls at the end, on a line of their own on a phone.
-    expect(html).toMatch(
-      /<div class="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0 max-sm:basis-full"><button type="button">End session<\/button><\/div><\/header>$/,
-    );
-  });
-
-  it('sets the countdown apart by a hairline, at the right with none on a phone', () => {
-    vi.useFakeTimers({ now: NOW });
-    const countdown = /<p class="([^"]*)"><span class="font-num/.exec(header())?.[1]?.split(' ');
-    expect(countdown).toEqual(
-      expect.arrayContaining([
-        'border-l',
-        'border-border-default',
-        'pl-4.5',
-        'max-sm:border-l-0',
-        'max-sm:pl-0',
-        'max-sm:text-right',
-      ]),
-    );
-  });
-
-  it('draws the time left as a green arc from the top on its track, stroked 5 as drawn', () => {
-    vi.useFakeTimers({ now: NOW });
-    const ring = /<svg[^]*?<\/svg>/.exec(header())?.[0] ?? '';
-    expect(ring).toMatch(
-      /<circle cx="22" cy="22" r="19\.5" fill="none" stroke-width="5" class="stroke-arc-track"><\/circle>/,
-    );
-    const around = 2 * Math.PI * 19.5;
-    expect(ring).toContain(
-      `stroke-linecap="round" stroke-dasharray="${((1394 / 3000) * around).toFixed(1)} ${around.toFixed(1)}" transform="rotate(-90 22 22)" class="stroke-arc-fill"`,
-    );
-    // At the bell, the track alone: a round cap would draw a dot for nothing left.
-    vi.setSystemTime(Date.parse(BELL));
-    expect(header()).not.toContain('stroke-arc-fill');
-  });
-
-  it('says "Live" and the code until the grid is counted, and "…" until the bell is known', () => {
-    vi.useFakeTimers({ now: NOW });
-    const html = header({ counts: null, startedAt: null, endsAt: null });
-    expect(html).toMatch(/>Live · (<!-- -->)?join\u00a0code\u00a0<span translate="no"/);
-    expect(html).toContain(
-      '<span class="font-num text-data-lg text-text-tertiary">…</span><span class="text-countdown-sub">\u00a0</span>',
-    );
-    expect(html).not.toContain('stroke-arc-fill');
-  });
-});
-
 describe('the class page’s live header in the lock-only look (LO5; ClassLive, LiveTopStates)', () => {
   const head = (endsAt: string | null) =>
     renderToStaticMarkup(
@@ -175,150 +87,64 @@ describe('the class page’s live header in the lock-only look (LO5; ClassLive, 
   });
 });
 
-describe('Present’s header (ClassPresent, PresentEnded), one size up', () => {
-  const around = 2 * Math.PI * 28.5;
-  const ring = (html: string) => /<svg[^]*?<\/svg>/.exec(html)?.[0] ?? '';
+describe('Present’s time (LO9; Present, PresentStates)', () => {
+  const clock = (endsAt: string | null) =>
+    renderToStaticMarkup(createElement(PresentClock, { startedAt: STARTED, endsAt }));
+  const around = 2 * Math.PI * 37;
 
-  it('draws the ring at 64 px, r 28.5, stroked 7, as drawn', () => {
+  it('draws the ring at 84 px stroked 10, the time left at 64/64 over "left, until" the bell at 20/26', () => {
     vi.useFakeTimers({ now: NOW });
-    const drawn = ring(header({ present: true }));
-    expect(drawn).toMatch(/^<svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"/);
-    expect(drawn).toMatch(
-      /<circle cx="32" cy="32" r="28\.5" fill="none" stroke-width="7" class="stroke-arc-track"><\/circle>/,
+    const html = clock(BELL);
+    expect(html).toMatch(
+      /^<div class="flex items-center gap-5"><svg width="84" height="84" viewBox="0 0 84 84" aria-hidden="true" class="shrink-0">/,
     );
-    expect(drawn).toContain(
-      `stroke-dasharray="${((1394 / 3000) * around).toFixed(1)} ${around.toFixed(1)}" transform="rotate(-90 32 32)"`,
+    expect(html).toContain(
+      '<circle cx="42" cy="42" r="37" fill="none" stroke-width="10" class="stroke-arc-track"></circle>',
+    );
+    expect(html).toContain(
+      `stroke-linecap="round" stroke-dasharray="${((1394 / 3000) * around).toFixed(1)} ${around.toFixed(1)}" transform="rotate(-90 42 42)" class="stroke-arc-fill"`,
+    );
+    expect(html).toMatch(
+      new RegExp(
+        `<p class="flex flex-col gap-2"><span class="text-present-clock tabular-nums">23:14</span><span class="text-present-until text-text-secondary">left(<!-- -->)?, until <time dateTime="${BELL}">${bellTime(BELL)}</time></span></p></div>$`,
+      ),
     );
   });
 
-  it('draws the name at 36/42 over its line at 18/24, the countdown at 44/48, the bell at 16/22', () => {
+  it('says … over "left" until the bell is known, its ring the track alone', () => {
     vi.useFakeTimers({ now: NOW });
-    const html = header({ present: true });
+    const html = clock(null);
     expect(html).toContain(
-      '<h1 class="text-present-title text-balance wrap-anywhere">Biology, period 3</h1>',
+      '<span class="text-present-clock text-text-tertiary">…</span><span class="text-present-until text-text-secondary">left</span>',
     );
-    // The code out of the line: it has a well of its own.
-    expect(html).toContain(
-      '<p class="mt-0.5 text-h3 font-normal text-text-secondary">Live · 25 of 28 joined</p>',
-    );
-    expect(html).toContain(
-      `<span class="font-num text-present-countdown tabular-nums">23:14</span><span class="text-present-caption text-text-secondary">ends <time dateTime="${BELL}">${bellTime(BELL)}</time></span>`,
-    );
-    expect(header({ present: true, counts: null })).toContain('text-text-secondary">Live</p>');
-  });
-
-  it('sets the join code in its own well: its label, then the code at 34/44 on its grey chip', () => {
-    vi.useFakeTimers({ now: NOW });
-    const html = header({ present: true });
-    const well =
-      /<p class="ml-3 flex flex-wrap items-center gap-2\.5"><span class="text-present-caption text-text-tertiary">Join code<\/span><span translate="no" class="([^"]*)">VMAF7E<\/span><\/p>/.exec(
-        html,
-      );
-    expect(well?.[1]?.split(' ')).toEqual(
-      expect.arrayContaining([
-        'bg-surface-sunken',
-        'border',
-        'border-border-default',
-        'font-mono',
-        'select-all',
-        'rounded-frame',
-        'py-2',
-        'pr-4.5',
-        'pl-[calc(18px+0.16em)]',
-        'text-code-present',
-      ]),
-    );
-    // Before the controls, as ClassPresent draws it.
-    expect(html.indexOf('Join code')).toBeLessThan(html.indexOf('End session'));
-    expect(header()).not.toContain('text-code-present');
-  });
-
-  it('after the bell draws the ring whole, its line and no countdown (PresentEnded)', () => {
-    vi.useFakeTimers({ now: NOW });
-    const over = '28 students · no session running';
-    const html = header({ present: true, over, counts: null, startedAt: null, endsAt: null });
-    expect(ring(html)).toContain(
-      `stroke-dasharray="${around.toFixed(1)} ${around.toFixed(1)}" transform="rotate(-90 32 32)"`,
-    );
-    expect(html).toContain(`<p class="mt-0.5 text-h3 font-normal text-text-secondary">${over}</p>`);
-    expect(html).not.toMatch(/font-num|ends <time|…/);
-    expect(html).toContain('>VMAF7E</span>');
+    expect(html).not.toMatch(/, until|<time|stroke-arc-fill/);
   });
 });
 
-describe('the counts over the grid (ClassLive)', () => {
-  const html = renderToStaticMarkup(createElement(LiveCounts, { counts: stateCounts(CLASS_LIVE) }));
-  const chips = [...html.matchAll(/<li class="([^"]*)">([^]*?)<\/li>/g)];
+describe('the student’s lesson countdown (W4)', () => {
+  const countdown = (endsAt: string | null) =>
+    renderToStaticMarkup(createElement(Countdown, { endsAt, now: NOW }));
 
-  it('counts each state in its words, as ClassLive does, in its order', () => {
-    expect(html).toMatch(
-      /^<ul aria-label="The class right now" class="flex flex-wrap items-center gap-2">/,
+  it('sets the time left apart by a hairline, the bell under it, at the right with none on a phone', () => {
+    const html = countdown(BELL);
+    expect(html).toContain(
+      `<span class="font-num text-data-lg tabular-nums">23:14</span><span class="text-countdown-sub text-text-secondary">ends <time dateTime="${BELL}">${bellTime(BELL)}</time></span>`,
     );
-    expect(chips.map((m) => m[2]?.replace(/<svg[^]*<\/svg>/, ''))).toEqual([
-      '17 Focused',
-      '3 Unlocked',
-      '2 Protection off',
-      '1 Silent',
-      '3 Not here',
-      '2 Left',
-    ]);
-  });
-
-  it('draws each as a small chip in its state’s tint, with its icon, never colour alone', () => {
-    for (const [, classes = '', inner = ''] of chips) {
-      expect(classes.split(' ')).toEqual(
-        expect.arrayContaining([
-          'rounded-full',
-          'border-[1.5px]',
-          'px-2.5',
-          'py-0.75',
-          'gap-1.5',
-          'text-caption',
-          'font-medium',
-          'whitespace-nowrap',
-        ]),
-      );
-      expect(inner).toMatch(/^<svg[^>]*\bwidth="13"[^>]*\baria-hidden="true"/);
-    }
-    const tones = chips.map((m) => m[1]?.split(' ').find((c) => c.startsWith('bg-')));
-    expect(tones).toEqual([
-      'bg-state-focused-bg',
-      'bg-state-emergency-bg',
-      'bg-state-revoked-bg',
-      'bg-state-ended-bg',
-      'bg-state-notjoined-bg',
-      'bg-state-ended-bg',
-    ]);
-    // Silent's dashed edge tells it from Left's, as on its tile.
-    expect(chips[3]?.[1]).toMatch(/\bborder-dashed\b/);
-    expect(chips[5]?.[1]).not.toMatch(/\bborder-dashed\b/);
-  });
-
-  it('shows a zero too, so no count comes and goes', () => {
-    const none = renderToStaticMarkup(createElement(LiveCounts, { counts: stateCounts([]) }));
-    expect(none.match(/<li /g)).toHaveLength(6);
-    expect(none).toContain('0 Focused');
-  });
-
-  it('is one size up in Present (ClassPresent): 16/22, 8 × 15 px in, 9 apart, 18 px icons', () => {
-    const big = renderToStaticMarkup(
-      createElement(LiveCounts, { counts: stateCounts(CLASS_LIVE), present: true }),
+    expect(/^<p class="([^"]*)">/.exec(html)?.[1]?.split(' ')).toEqual(
+      expect.arrayContaining([
+        'border-l',
+        'border-border-default',
+        'pl-4.5',
+        'max-sm:border-l-0',
+        'max-sm:pl-0',
+        'max-sm:text-right',
+      ]),
     );
-    const items = [...big.matchAll(/<li class="([^"]*)">([^]*?)<\/li>/g)];
-    expect(items).toHaveLength(6);
-    for (const [, classes = '', inner = ''] of items) {
-      const list = classes.split(' ');
-      expect(list).toEqual(
-        expect.arrayContaining([
-          'text-present-caption',
-          'font-medium',
-          'px-3.75',
-          'py-2',
-          'gap-2.25',
-        ]),
-      );
-      expect(list).not.toContain('text-caption');
-      expect(inner).toMatch(/^<svg[^>]*\bwidth="18"/);
-    }
+  });
+
+  it('says … until the bell is known, its line’s place held', () => {
+    expect(countdown(null)).toContain(
+      `<span class="font-num text-data-lg text-text-tertiary">…</span><span class="text-countdown-sub">${NBSP}</span>`,
+    );
   });
 });

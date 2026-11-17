@@ -622,4 +622,41 @@
   );
 }
 
+/* Present's sizes (LO9; lock.css's `.proj`): the class's name in its header, the time left and the
+   line under it, the count and its words, a tile's name and state one size up, and the join line
+   with its code, sizes the scale lacks, pinned in tokens.test.ts with the lock-only look's others. */
+@theme {
+  --text-present-name: 30px;
+  --text-present-name--line-height: 36px;
+  --text-present-name--font-weight: 600;
+  --text-present-name--letter-spacing: -0.01em;
+  --text-present-clock: 64px;
+  --text-present-clock--line-height: 64px;
+  --text-present-clock--font-weight: 600;
+  --text-present-clock--letter-spacing: -0.03em;
+  --text-present-until: 20px;
+  --text-present-until--line-height: 26px;
+  --text-present-until--font-weight: 400;
+  --text-present-count: 88px;
+  --text-present-count--line-height: 88px;
+  --text-present-count--font-weight: 600;
+  --text-present-count--letter-spacing: -0.04em;
+  --text-present-count-of: 30px;
+  --text-present-count-of--line-height: 38px;
+  --text-present-count-of--font-weight: 500;
+  --text-present-room-name: 18px;
+  --text-present-room-name--line-height: 23px;
+  --text-present-room-name--font-weight: 600;
+  --text-present-room-state: 15px;
+  --text-present-room-state--line-height: 20px;
+  --text-present-room-state--font-weight: 500;
+  --text-present-join: 22px;
+  --text-present-join--line-height: 30px;
+  --text-present-join--font-weight: 400;
+  --text-code-join: 26px;
+  --text-code-join--line-height: 30px;
+  --text-code-join--font-weight: 500;
+  --text-code-join--letter-spacing: 0.06em;
+}
+
 /* End of lane B */
