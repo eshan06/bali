@@ -39,17 +39,19 @@ export const KEY: readonly (readonly [TrackState, string])[] = [
 /**
  * A student's track, from the session's start to its end, as stretches: Not here until their tap-in
  * and after they leave, then focused, unlocked or protection off as their moments turn them, the
- * grid's own rules (`applyEvent`): an unlock never softens protection off; Screen Time back on
- * returns to unlocked while an unlock is open, else to focused; a tap-in or Back in focus closes an
- * unlock. A silence lasts from going silent to
- * checking in again, or to any moment of theirs, which their phone sent. Moments before their
- * tap-in, or after the bell, change no stretch (the record lists them all the same). Stretches of
- * one state side by side are one.
+ * grid's own rules (`applyEvent`): an unlock never softens protection off, and one the engine noted
+ * `superseded` (their own return went ahead of it) turns nothing; Screen Time back on returns to
+ * unlocked while an unlock is open, else to focused; a tap-in or Back in focus closes an unlock. A
+ * silence lasts from going silent to checking in again, or to any moment of theirs, which their
+ * phone sent. Moments before their tap-in, or after the bell, change no stretch (the record lists
+ * them all the same). Stretches of one state side by side are one.
  */
 export function stretchesOf(
-  moments: readonly Pick<StudentMoment, 'moment' | 'at'>[],
+  moments: readonly Pick<StudentMoment, 'moment' | 'at' | 'key'>[],
   start: number,
   end: number,
+  /** The ids of the unlocks the engine noted `superseded`, which the grid never applies. */
+  superseded: ReadonlySet<string> = new Set(),
 ): Stretch[] {
   const out: Stretch[] = [];
   let base: 'focused' | 'unlocked' | 'off' | null = null;
@@ -66,6 +68,7 @@ export function stretchesOf(
     at = to;
   };
   for (const m of moments) {
+    if (m.moment === 'unlock' && superseded.has(m.key)) continue;
     until(m.at.getTime());
     // Their phone was heard: any silence is over. Only a tap-in brings them here.
     if (m.moment !== 'silent') silent = false;
@@ -216,6 +219,7 @@ export function RecapRows({
   groups,
   start,
   end,
+  superseded,
   opened,
   onOpen,
 }: {
@@ -223,6 +227,8 @@ export function RecapRows({
   /** The session's start and end (ms), its tracks' own. */
   start: number;
   end: number;
+  /** The unlocks the engine noted `superseded` (`stretchesOf`). */
+  superseded: ReadonlySet<string>;
   /** Whose record is open, by their id. */
   opened: string | null;
   /** A name pressed: their record, the button pressed for focus to come back to. */
@@ -249,7 +255,7 @@ export function RecapRows({
       </div>
       <ul>
         {groups.partTime.map((s) => {
-          const stretches = stretchesOf(s.moments, start, end);
+          const stretches = stretchesOf(s.moments, start, end, superseded);
           return (
             <li key={s.key} className={`${ROW} border-t border-border-default py-3 last:border-b`}>
               <button

@@ -379,6 +379,24 @@ describe('the recap’s rarer moments (ClassEndedStates, drawn first)', () => {
     expect(screen.getByText("Didn't join: Zuri Mensah, Hannah Levi")).toBeTruthy();
   });
 
+  it('draws an unlock the engine noted superseded as nothing, as the grid never applies it, the record listing it all the same', async () => {
+    // A phone's clock behind the start: its tap-in, its refocus and its late unlock all held to
+    // the start, the unlock last in the engine's order.
+    const events = [
+      event('tap_in', 'Ana Rodríguez', 5),
+      event('refocus', 'Ana Rodríguez', 5),
+      event('unlock', 'Ana Rodríguez', 5, { reason: 'nurse', recorded_as: 'superseded' }),
+    ];
+    const user = open(events, [enrolled('Ana Rodríguez')]);
+    expect(rows()).toEqual([`Ana Rodríguez: Focused from ${bare(5)} to the bell`]);
+    await user.click(screen.getByRole('button', { name: 'Ana Rodríguez' }));
+    expect(
+      within(screen.getByRole('complementary'))
+        .getAllByRole('listitem')
+        .map((i) => i.textContent),
+    ).toContain(`${bare(5)}Used Emergency UnlockNurse`);
+  });
+
   it('ends a track at an early End, and draws an unlock from before the tap-in as nothing on it', () => {
     const session = { ...SESSION, endedAt: AT(20) };
     const events = [

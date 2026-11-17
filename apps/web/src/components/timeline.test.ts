@@ -13,7 +13,7 @@ const START = AT(5);
 const END = AT(55);
 /** Moments at these minutes. */
 const moments = (...list: [Moment, number][]) =>
-  list.map(([moment, minute]) => ({ moment, at: new Date(AT(minute)) }));
+  list.map(([moment, minute], i) => ({ key: `m${i}`, moment, at: new Date(AT(minute)) }));
 /** Each stretch as "state from-to", in minutes. */
 const said = (list: { state: string; from: number; to: number }[]) =>
   list.map((s) => `${s.state} ${(s.from - AT(0)) / 60_000}-${(s.to - AT(0)) / 60_000}`);
@@ -58,6 +58,23 @@ describe('a student’s stretches (stretchesOf)', () => {
       'notin 5-6',
       'focused 6-15',
       'off 15-55',
+    ]);
+  });
+
+  it('turns nothing on an unlock the engine noted superseded, which the grid never applies (applyUnlock)', () => {
+    // A phone's clock behind the start: its tap-in, its refocus and its late unlock all held to
+    // the start, the unlock last in the engine's order.
+    const late = [
+      { key: 'in', moment: 'in' as const, at: new Date(START) },
+      { key: 'back', moment: 'focus' as const, at: new Date(START) },
+      { key: 'late', moment: 'unlock' as const, at: new Date(START) },
+      { key: 'off', moment: 'off' as const, at: new Date(AT(20)) },
+      { key: 'on', moment: 'on' as const, at: new Date(AT(25)) },
+    ];
+    expect(said(stretchesOf(late, START, END, new Set(['late'])))).toEqual([
+      'focused 5-20',
+      'off 20-25',
+      'focused 25-55',
     ]);
   });
 

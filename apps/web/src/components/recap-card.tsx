@@ -25,6 +25,7 @@ import { Key, RecapRows } from '@/components/timeline';
 import { reasonWords } from '@/components/unlock-popups';
 import {
   type Moment,
+  payloadOf,
   type RecapFormat,
   recapGroups,
   type RecapStudent,
@@ -183,6 +184,13 @@ export function Recap({
   const { partTime, wholeTime, notJoined } = groups;
   const start = Date.parse(session.startedAt);
   const end = Date.parse(session.endedAt ?? session.endsAt);
+  // The unlocks the engine noted superseded, from the session's log: the grid never applies one,
+  // so no track draws it (`stretchesOf`); the record and the figures keep it.
+  const superseded = new Set(
+    events
+      .filter((e) => e.type === 'unlock' && payloadOf(e.payload).recorded_as === 'superseded')
+      .map((e) => e.eventId),
+  );
   const n = new Intl.NumberFormat();
   const joined = report.joined.length;
   const unlocks = report.unlocks.length;
@@ -270,6 +278,7 @@ export function Recap({
             groups={groups}
             start={start}
             end={end}
+            superseded={superseded}
             opened={open}
             onOpen={(student, from) => {
               opener.current = from;

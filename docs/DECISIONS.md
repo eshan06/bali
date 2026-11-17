@@ -23,7 +23,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
   **The tracks** (the worker's call): stretches read from the recap's own moments by the grid's own rules
   (`applyEvent`): Not here until the tap-in and after a leave, an unlock never softening protection off (santa's
-  round 1), Screen Time back on returning to unlocked while an unlock is open, a tap of the block closing one. A silence runs from going silent to checking in again, or to any
+  round 1), an unlock the engine noted `superseded` turning nothing (Claude Review; read from the session's log, as
+  the moments don't carry the note), Screen Time back on returning to unlocked while an unlock is open, a tap of the
+  block closing one. A silence runs from going silent to checking in again, or to any
   moment the phone sent. A moment before the tap-in or after the bell changes no stretch; the record lists it all the
   same. Each track's words are its label, as the board words them ("Focused from 9:06, unlocked 9:18 to 9:24, then
   focused to the bell"). Built in the component from what `lib/recap.ts` gives, no lib change.
