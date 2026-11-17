@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Me } from '@/components/shell';
 import { type ApiClient, createApiClient } from '@/lib/api-client';
 import type { TaughtClass } from '@/lib/classes';
+import { CANT_REACH } from '@/lib/errors';
 import type { Home } from '@/lib/student-web';
 
 import ClassesPage from './classes/page';
@@ -38,6 +39,10 @@ const bali = vi.hoisted(() => {
     sent.push(key);
     if (key === 'GET /v1/blocks') return Promise.resolve(Response.json({ blocks: [] }));
     if (key === 'POST /v1/teacher-invites/redeem') return Promise.resolve(Response.json({}));
+    if (key === 'POST /v1/classes') {
+      const made = { id: 'c4', name: 'Period 4 Biology', joinCode: 'Q5FU3U', liveSessionId: null };
+      return Promise.resolve(Response.json({ ...made, createdAt: '2026-10-12T14:00:00.000Z' }));
+    }
     return new Promise<Response>(() => undefined);
   };
   // One sign-out for every render, as the hook's memo keeps it: a live grid reads once as it opens.
@@ -79,12 +84,12 @@ const account = (role: 'teacher' | 'student', classes: TaughtClass[] = []): MeRe
   armed: false,
 });
 
-/** The shell's read of the account as `home`, with its reads counted. */
-function readAs(home: Home | null) {
+/** The shell's read of the account as `home`, a later read's failure `error`, its reads counted. */
+function readAs(home: Home | null, error: string | null = null) {
   const me: Me = {
     home,
     me: home === null || home.kind === 'invite' ? null : home.me,
-    error: null,
+    error,
     load: vi.fn(),
     refresh: vi.fn(() => Promise.resolve()),
   };
@@ -228,6 +233,34 @@ describe('a teacher’s Home, as the page runs it (LO3)', () => {
       fireEvent(document, new Event('visibilitychange'));
     });
     expect(action()).toBe('Start…');
+  });
+
+  it('says the shell’s failed read of the account on Home, its Try again the shell’s own', async () => {
+    const user = userEvent.setup();
+    const me = readAs({ kind: 'teacher', me: account('teacher') }, CANT_REACH);
+    render(
+      <main>
+        <HomePage />
+      </main>,
+    );
+    expect(screen.getByRole('alert').textContent).toBe(CANT_REACH);
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(me.refresh).toHaveBeenCalledOnce();
+  });
+
+  it('reads the account again once New class answers, so a class just made is listed', async () => {
+    // jsdom's `<dialog>` has no `showModal`: opened as the browser opens it, no more.
+    HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+      this.setAttribute('open', '');
+    };
+    const user = userEvent.setup();
+    const { me } = open({ kind: 'teacher', me: account('teacher') });
+    expect(me.load).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole('button', { name: 'New class' }));
+    await user.type(screen.getByRole('textbox', { name: 'Class name' }), 'Period 4 Biology{Enter}');
+    await vi.waitFor(() => expect(me.load).toHaveBeenCalledTimes(2));
+    expect(me.load).toHaveBeenLastCalledWith();
+    expect(bali.sent).toContain('POST /v1/classes');
   });
 });
 

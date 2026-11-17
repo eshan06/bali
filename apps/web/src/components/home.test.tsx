@@ -427,6 +427,8 @@ describe('a class live (Main; HomeMoments)', () => {
     expect(studentHref('c3', 'u1')).toBe('/classes/c3?student=u1');
     // Never a reason or a time: the student's record holds them (the owner, 2026-11-16).
     expect(well.textContent).not.toMatch(/Nurse|ago/);
+    // Home's reads, every one: the grid's snapshot and Your block's list, nothing of its own.
+    expect([...new Set(bali.sent)].sort()).toEqual(['GET /v1/blocks', 'GET /v1/sessions/S']);
   });
 
   it('says everyone’s focused in one line, and no students yet for a class with none (LiveStates, HomeMoments)', async () => {
@@ -714,9 +716,12 @@ describe('Last session (HomeIdle; HomeMoments)', () => {
     expect(
       screen.getByRole('link', { name: 'Open the recap', description: 'Period 1 Biology' }),
     ).toBe(recap);
-    // The recap's own three reads, once each.
+    // The recap's own three reads, once each, and Your block's list: Home reads nothing else.
     expect(bali.sent.filter((key) => key === REPORT)).toHaveLength(1);
     expect(bali.sent.filter((key) => key === ROSTER)).toHaveLength(1);
+    expect([...new Set(bali.sent)].sort()).toEqual(
+      ['GET /v1/blocks', REPORT, `${EVENTS}?after=0`, `${EVENTS}?after=1`, ROSTER].sort(),
+    );
   });
 
   it('counts unlocks as unlocks, and says nobody joined in the figures’ place, the unlocks kept if any', async () => {
@@ -732,6 +737,12 @@ describe('Last session (HomeIdle; HomeMoments)', () => {
     expect(await within(nobody).findByText('Nobody joined this session.')).toBeDefined();
     expect(figures(nobody)).toEqual([]);
     expect(within(nobody).getByRole('link', { name: 'Open the recap' })).toBeDefined();
+    cleanup();
+    answers(0, 1);
+    home(IDLE);
+    const unlocked = screen.getByRole('region', { name: 'Last session' });
+    expect(await within(unlocked).findByText('Nobody joined this session.')).toBeDefined();
+    expect(figures(unlocked)).toEqual([['1', 'emergency unlock']]);
   });
 
   it('says a read that failed with Try again, which reads all three again, held until it answers, focus then on its title', async () => {
