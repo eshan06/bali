@@ -1,7 +1,7 @@
 'use client';
 
 import type { MeResponse, PortalEvent } from '@bali/shared';
-import { CircleQuestionMark, LayoutGrid, LogOut, type LucideIcon } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -22,6 +22,7 @@ import { errText } from '@/lib/errors';
 import { type Home, homeFor } from '@/lib/student-web';
 import { useApi } from '@/lib/use-api';
 
+import { ICON_BUTTON } from './button';
 import { CARD_ALONE } from './card';
 import { CountContext } from './count';
 import { Mark } from './mark';
@@ -34,11 +35,11 @@ export { initials };
 export const SIGNED_OUT_PATHS = /^\/(login|auth|support|privacy|terms)(\/|$)/;
 
 /**
- * How the shell frames a page: a teacher's top bar, a student's side menu or the bar, the page's
+ * How the shell frames a page: the top bar, a teacher's or a student's, or the bar, the page's
  * frame, or nothing yet.
  */
 export interface Frame {
-  chrome: 'top' | 'menu' | 'bar' | null;
+  chrome: 'top' | 'bar' | null;
   /** The page in its frame: under the top bar, the bar's (`TOP_PAGE`); else v2's (`PAGE`). */
   framed: boolean;
   /**
@@ -57,7 +58,7 @@ const INVITE_PATHS = new Set(['/', '/invite']);
  * it. Otherwise the page waits for the account, so no frame flashes before it is known and no page
  * is drawn from an account that left: Loading… with no menu or bar while it is read, its failure
  * under the bar with Sign out (PV5b, the owner's approval of #352's review); then the top bar for a
- * teacher (LO2), and the side menu for a student who said 13+ in the app (W3), but on the invite
+ * teacher (LO2) and for a student who said 13+ in the app (LO12), but a student's on the invite
  * page, which frames itself under the bar (Invite, PV15), as it does for an account the 13+ check
  * never passed, whose every page has the bar.
  */
@@ -70,9 +71,8 @@ export function frameFor(
   if (SIGNED_OUT_PATHS.test(path) || presenting)
     return { chrome: null, framed: false, hidden: false };
   if (home === null) return { chrome: error === null ? null : 'bar', framed: false, hidden: true };
-  if (home.kind === 'teacher') return { chrome: 'top', framed: true, hidden: false };
-  if (home.kind === 'student' && path !== '/invite')
-    return { chrome: 'menu', framed: true, hidden: false };
+  if (home.kind === 'teacher' || (home.kind === 'student' && path !== '/invite'))
+    return { chrome: 'top', framed: true, hidden: false };
   return { chrome: 'bar', framed: !INVITE_PATHS.has(path), hidden: false };
 }
 
@@ -167,7 +167,7 @@ export function accountReads(
 export const reloadOnRestore = (persisted: boolean, path: string): boolean =>
   persisted && !SIGNED_OUT_PATHS.test(path);
 
-/** Who is signed in, as the shell last read them: one read, for the menu's foot and for Home. */
+/** Who is signed in, as the shell last read them: one read, for the top bar and for Home. */
 export interface Me {
   /**
    * Where the account belongs (`homeFor`): a teacher or a student, with `/v1/me`'s answer, or an
@@ -213,49 +213,10 @@ export function usePresenting(on: boolean): void {
   }, [on, setPresenting]);
 }
 
-interface Item {
-  href: string;
-  label: string;
-  Icon: LucideIcon;
-  /** Pages under it at another path: a student's lessons under Your classes (W4). */
-  under?: string;
-}
-
 /**
- * A student's menu (StudentHome): Your classes, their lessons under it (StudentLesson), and Help
- * under the gap. A teacher's pages have the top bar since LO2 (`TopBar`).
+ * v2's page frame (v2.css's `.main`), for a page under the bar and for the account not read:
+ * left-aligned, 1260 px at most, 30/36/56 in, 22/16/40 on a phone.
  */
-const YOUR_CLASSES: Item = {
-  href: '/',
-  label: 'Your classes',
-  Icon: LayoutGrid,
-  under: '/lessons',
-};
-const HELP: Item = { href: '/support', label: 'Help', Icon: CircleQuestionMark };
-
-/*
- * v2.css's side menu (DESIGN.md §1; every teacher board's): 216 px, white with a hairline on its
- * right, 32/12/14 in, in view as the page scrolls (v2's own was sticky), and scrolling itself on a
- * window too short for it, so its foot is never out of reach. Under 776 px one bar on top
- * (StudentZoom); under 640 px three rows (PV1's phone boards): Bali and the account first, then
- * the links.
- */
-const NAV =
-  'sticky top-0 flex h-dvh w-54 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border-default bg-surface-card px-3 pt-8 pb-3.5 max-[776px]:static max-[776px]:h-auto max-[776px]:w-auto max-[776px]:flex-row max-[776px]:flex-wrap max-[776px]:items-center max-[776px]:gap-x-1.5 max-[776px]:gap-y-1 max-[776px]:overflow-visible max-[776px]:border-r-0 max-[776px]:border-b max-[776px]:px-4 max-[776px]:py-2.5';
-/** The lockup, a link home: its word in the brand's ink, as every board renders it (v2.css's links). */
-const BRAND =
-  'flex items-center gap-2.25 rounded-item px-2.5 pt-1 pb-4.5 text-lockup text-text-brand max-[776px]:py-1 max-[776px]:pr-3 max-[776px]:pl-1';
-/** An item: 14/20 medium in the secondary ink; on its own page grey, semibold, the primary ink. */
-const ITEM =
-  'flex items-center gap-2.5 rounded-item px-2.5 py-2 text-data text-text-secondary hover:bg-surface-sunken aria-[current=page]:bg-surface-sunken aria-[current=page]:font-semibold aria-[current=page]:text-text-primary';
-/** The gap that puts Help and the foot at the bottom; on a phone, the bar's break after Bali. */
-const GAP =
-  'min-h-6 flex-1 max-[776px]:hidden max-sm:order-2 max-sm:block max-sm:min-h-0 max-sm:basis-full';
-const FOOT =
-  'mt-2 border-t border-border-default pt-3 max-[776px]:mt-0 max-[776px]:ml-auto max-[776px]:border-t-0 max-[776px]:pt-0 max-sm:order-1';
-
-/** The page beside the menu: left-aligned, 1260 px at most, 30/36/56 in, 22/16/40 on a phone. */
-export const SHELL = 'flex max-[776px]:block';
 export const PAGE =
   'max-w-[1260px] min-w-0 flex-1 px-9 pt-7.5 pb-14 max-sm:px-4 max-sm:pt-5.5 max-sm:pb-10';
 
@@ -269,14 +230,34 @@ export const PAGE =
 export const TOP_PAGE =
   'mx-auto w-full max-w-[1360px] overflow-x-clip px-10 pt-8 pb-16 max-[760px]:px-4 max-[760px]:pt-6 max-[760px]:pb-12';
 
-/**
- * A student's side menu (StudentHome). Its foot names the account, its initials beside the name
- * and Sign out an icon; with no name on the account, Sign out in words alone (HomeNoName). A name too
- * long for the foot, such as the sign-in's email that an account with no name of its own shows, stays
- * on one line cut with an ellipsis, whole on hover and to a screen reader; on a phone the foot keeps
- * its place beside Bali, the name cut to fit (MenuNameStates, drawn first).
+/*
+ * lock.css's top bar for a student (StudentWebStates, drawn first; LO12), as the teacher's draws it
+ * (`TopBar`): on the page's colour with its hairline, in view as the page scrolls; its row 1360 px
+ * wide at most, 40 px in, 56 px tall and 16 px in under 760 px, one row there, as no class rides in
+ * it and no menu opens. Its places 14.5/20 in the secondary ink, 36 px tall, the page open grey in
+ * the primary ink.
  */
-export function SideMenu({
+const BAR = 'sticky top-0 z-3 border-b border-border-default bg-surface-page';
+const ROW =
+  'mx-auto flex min-h-15 w-full max-w-[1360px] items-center gap-6 px-10 max-[760px]:min-h-14 max-[760px]:gap-3 max-[760px]:px-4';
+const BRAND =
+  '-ml-1 inline-flex shrink-0 items-center gap-2 rounded-xs p-1 text-lockup text-text-primary';
+const PLACE =
+  'inline-flex min-h-9 items-center rounded-item px-3 text-nav text-text-secondary transition-colors hover:bg-surface-sunken hover:text-text-primary aria-[current=page]:bg-surface-sunken aria-[current=page]:text-text-primary';
+
+/** Your classes' pages: a student's home, and a lesson's under it (StudentLesson, lessons on). */
+const isYours = (path: string): boolean => path === '/' || path.startsWith('/lessons/');
+
+/**
+ * A student's top bar (StudentWeb's frame, StudentWebStates, drawn first; LO12), in place of v2's
+ * side menu on every signed-in page of theirs but the invite page: Bali, a link home; Your classes,
+ * marked on it and on a lesson's page under it; then Help, and the account, its initials, its name
+ * (whole on hover, gone under 1024 px) and Sign out an icon; with no name, Sign out in words, an icon
+ * on a phone (BarStates' rule). No class rides in it and no menu opens: under 760 px Your classes
+ * goes, Bali leading home, and Help and the account keep their places. Sign out held while it signs
+ * out, its words Signing out….
+ */
+export function StudentBar({
   path,
   name,
   leaving,
@@ -287,68 +268,62 @@ export function SideMenu({
   leaving: boolean;
   onSignOut: () => void;
 }) {
-  // Its own page, or one under it, or under its other path (a lesson under Your classes, W4;
-  // StudentLesson).
-  const here = (href: string, under?: string) =>
-    path === href ||
-    [href !== '/' && href, under].some((root) => root && path.startsWith(`${root}/`));
-  const link = ({ href, label, Icon, under }: Item) => (
-    <Link
-      key={href}
-      href={href}
-      aria-current={here(href, under) ? 'page' : undefined}
-      className={`${ITEM} max-sm:order-3`}
-    >
-      <Icon size={17} aria-hidden="true" className="shrink-0" />
-      {label}
-    </Link>
-  );
   return (
-    <nav aria-label="Main" className={NAV}>
-      <Link href="/" translate="no" className={BRAND}>
-        <Mark size={20} />
-        Bali
-      </Link>
-      {link(YOUR_CLASSES)}
-      <div className={GAP} />
-      {link(HELP)}
-      {name ? (
-        <div
-          className={`flex items-center gap-2.25 pr-1.5 pl-2.5 max-[776px]:p-0 max-sm:min-w-0 max-sm:flex-1 max-sm:basis-0 max-sm:justify-end ${FOOT}`}
-        >
-          <span
-            aria-hidden="true"
-            className="grid size-7 shrink-0 place-items-center rounded-full bg-avatar-bg text-menu-initials text-avatar-fg"
-          >
-            {initials(name)}
-          </span>
-          <span title={name} className="min-w-0 truncate text-menu-name">
-            {name}
-          </span>
-          <button
-            type="button"
-            aria-label="Sign out"
-            aria-disabled={leaving}
-            onClick={onSignOut}
-            className="ml-auto grid size-9 shrink-0 cursor-pointer place-items-center rounded-item text-text-tertiary hover:bg-surface-sunken hover:text-text-primary aria-disabled:cursor-default aria-disabled:opacity-55 max-sm:ml-0"
-          >
-            <LogOut size={16} aria-hidden="true" />
-          </button>
+    <header className={BAR}>
+      <div className={ROW}>
+        <Link href="/" aria-label="Bali, your classes" translate="no" className={BRAND}>
+          <Mark size={22} />
+          Bali
+        </Link>
+        <nav aria-label="Main" className="flex shrink-0 items-center max-[760px]:hidden">
+          <Link href="/" aria-current={isYours(path) ? 'page' : undefined} className={PLACE}>
+            Your classes
+          </Link>
+        </nav>
+        <div className="ml-auto flex shrink-0 items-center gap-3">
+          <Link href="/support" className={PLACE}>
+            Help
+          </Link>
+          <div className="flex min-w-0 items-center gap-2 border-l border-border-default pl-3">
+            {name ? (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="grid size-7 shrink-0 place-items-center rounded-full bg-avatar-bg text-menu-initials text-avatar-fg"
+                >
+                  {initials(name)}
+                </span>
+                <span
+                  title={name}
+                  className="max-w-50 min-w-0 truncate text-data font-normal text-text-secondary max-lg:hidden"
+                >
+                  {name}
+                </span>
+              </>
+            ) : (
+              <button
+                type="button"
+                aria-disabled={leaving}
+                onClick={onSignOut}
+                className={`${PLACE} cursor-pointer gap-2 aria-disabled:cursor-not-allowed aria-disabled:opacity-55 max-[760px]:hidden`}
+              >
+                <LogOut size={16} aria-hidden="true" />
+                {leaving ? 'Signing out…' : 'Sign out'}
+              </button>
+            )}
+            <button
+              type="button"
+              aria-label="Sign out"
+              aria-disabled={leaving}
+              onClick={onSignOut}
+              className={`${ICON_BUTTON} ${name ? '' : 'min-[760px]:hidden'}`}
+            >
+              <LogOut size={16} aria-hidden="true" />
+            </button>
+          </div>
         </div>
-      ) : (
-        <div className={FOOT}>
-          <button
-            type="button"
-            aria-disabled={leaving}
-            onClick={onSignOut}
-            className={`${ITEM} w-full cursor-pointer aria-disabled:cursor-default aria-disabled:opacity-55`}
-          >
-            <LogOut size={17} aria-hidden="true" className="shrink-0" />
-            {leaving ? 'Signing out…' : 'Sign out'}
-          </button>
-        </div>
-      )}
-    </nav>
+      </div>
+    </header>
   );
 }
 
@@ -387,9 +362,9 @@ export function AccountUnread({
 /**
  * The page's place, and its one `<main>` in every state (the owner's follow-up of 2026-10-16): on
  * a signed-in page the shell's own, holding the account not read (`AccountUnread`) with the page
- * waiting hidden after it (PV5b), else the page, in the top bar's frame under it (LO2), v2's beside
- * the menu or under the bar, or alone in Present. A page draws its parts in it, never a `<main>` of
- * its own, so none waits hidden
+ * waiting hidden after it (PV5b), else the page, in the top bar's frame under it (a teacher's since
+ * LO2, a student's since LO12), v2's under the bar, or alone in Present. A page draws its parts in
+ * it, never a `<main>` of its own, so none waits hidden
  * beside the shell's. One element throughout, so the page is never remounted as its frame changes.
  * A page read without signing in draws its own bar and its own `<main>`: going there from a
  * signed-in page, or back, opens another page, mounted afresh either way.
@@ -427,7 +402,7 @@ export function PagePlace({
  * again by Try again and on the next page opened; a tab with no sign-in sent to /login. `frameFor`
  * says what to draw, and the page's one `<main>` is the shell's (`PagePlace`). One tree throughout,
  * so the page under it is never remounted as its frame changes (a redeem's turn from the bar to the
- * menu, Present).
+ * top bar, Present).
  */
 export function Shell({ children }: { children: ReactNode }) {
   const api = useApi();
@@ -518,13 +493,13 @@ export function Shell({ children }: { children: ReactNode }) {
     () => ({ home, me, error, load, refresh }),
     [home, me, error, load, refresh],
   );
-  // The account's name, as the bar and the menu name it: none for an account with no name.
+  // The account's name, as the top bar names it: none for an account with no name.
   const name = me?.user.displayName?.trim() || null;
   return (
     <MeContext value={value}>
       <CountContext value={count}>
         <PresentingContext value={setPresenting}>
-          <div className={frame.chrome === 'menu' ? SHELL : undefined}>
+          <div>
             {frame.chrome === 'top' && home?.kind === 'teacher' ? (
               <TopBar
                 path={path}
@@ -534,8 +509,8 @@ export function Shell({ children }: { children: ReactNode }) {
                 onSignOut={onSignOut}
                 refresh={refresh}
               />
-            ) : frame.chrome === 'menu' ? (
-              <SideMenu path={path} name={name} leaving={leaving} onSignOut={onSignOut} />
+            ) : frame.chrome === 'top' ? (
+              <StudentBar path={path} name={name} leaving={leaving} onSignOut={onSignOut} />
             ) : frame.chrome === 'bar' ? (
               <PortalBar leaving={leaving} onSignOut={onSignOut} />
             ) : null}
