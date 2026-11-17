@@ -2,6 +2,7 @@ import {
   armTap,
   type Database,
   resolveTapTarget,
+  retryAtRemovedBlock,
   sessionRunning,
   tapIn,
   TransitionError,
@@ -35,6 +36,15 @@ function endOfDay(now: Date): Date {
   return end;
 }
 
+/** A session as an answer names it: the window a phone shields to, or none. */
+function sessionView(
+  session: { id: string; classId: string; endsAt: Date } | null | undefined,
+): TapResponse['session'] {
+  return session
+    ? { id: session.id, classId: session.classId, endsAt: session.endsAt.toISOString() }
+    : null;
+}
+
 /**
  * POST /v1/taps — the tap. Resolves the block to its teacher, then either joins
  * the running session the student is enrolled in (tapIn: joined/switched) or,
@@ -52,7 +62,8 @@ export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () 
     const student = await accountOf(db, identity);
     const join = async () => {
       const target = await resolveTapTarget(db, body.tagId, student.id);
-      if (!target) throw ApiError.notFound('unknown block');
+      const now = clock();
+      if (!target) return { target, now, result: undefined };
 
       // The newest session running by the server's clock (`sessionRunning`,
       // A17) — by this read, which takes no lock, and again under the session's
@@ -62,7 +73,6 @@ export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () 
       // Over there too, nothing joinable runs, and the tap arms as when nothing
       // does. One running by this read and marked over since is refused, as
       // before (its retry arms).
-      const now = clock();
       const running = target.sessions.find((s) => sessionRunning(s, now));
       const session = running ?? target.sessions[0];
       const result =
@@ -73,6 +83,7 @@ export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () 
               sessionId: session.id,
               studentId: student.id,
               eventId: body.eventId,
+              tagId: body.tagId,
               deviceTime,
               order: body.order ?? null,
               now,
@@ -99,29 +110,39 @@ export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () 
     let tried = await join();
     if (tried.result?.outcome === 'not_enrolled') tried = await join();
     const { target, now, result } = tried;
-    if (result && result.outcome !== 'not_enrolled') {
+    if (!target) {
+      // No live block holds the tag: its block was removed (LO10), and maybe
+      // registered again by no one yet. The retry of a tap made there before
+      // is still that tap's retry (tap step 9), answered as the arm path
+      // answers one; anything else is the unknown block it always was.
+      const retry = await retryAtRemovedBlock(db, {
+        studentId: student.id,
+        eventId: body.eventId,
+        tagId: body.tagId,
+        now,
+      });
+      if (!retry) throw ApiError.notFound('unknown block');
       return {
-        outcome: result.outcome,
-        session: result.session && {
-          id: result.session.id,
-          classId: result.session.classId,
-          endsAt: result.session.endsAt.toISOString(),
-        },
-        state: result.state,
+        outcome: retry.outcome,
+        session: sessionView(retry.session),
+        state: retry.state ?? null,
       };
+    }
+    if (result && result.outcome !== 'not_enrolled') {
+      return { outcome: result.outcome, session: sessionView(result.session), state: result.state };
     }
 
     // Mapped, exactly like the tapIn call above. `armTap` refuses an event_id
     // that is not this caller's tap — another student's, another event
-    // type's, or one spent under another teacher — and a TransitionError
-    // carries no statusCode, so unmapped it falls through every branch of the
-    // handler in errors.ts to the catch-all and ships as `500 internal`. A 500
-    // reads to any outbox as a transient server fault; the 409 this maps to
-    // says what is actually wrong, a permanent conflict, which is what
-    // `tapDisposition` (@bali/shared) needs in order to surface it. Pinned
-    // by "is a 409 when the event_id belongs to another student's armed
-    // tap" — an engine test cannot catch this, because the throw is right
-    // and only the status is wrong.
+    // type's, or one spent under another teacher at another tag — and a
+    // TransitionError carries no statusCode, so unmapped it falls through
+    // every branch of the handler in errors.ts to the catch-all and ships as
+    // `500 internal`. A 500 reads to any outbox as a transient server fault;
+    // the 409 this maps to says what is actually wrong, a permanent conflict,
+    // which is what `tapDisposition` (@bali/shared) needs in order to surface
+    // it. Pinned by "is a 409 when the event_id belongs to another student's
+    // armed tap" — an engine test cannot catch this, because the throw is
+    // right and only the status is wrong.
     //
     // Its order is kept with it (A12), for the `tap_in` the Start records;
     // its day and its expiry are judged at the same moment, on the same clock.
@@ -130,6 +151,7 @@ export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () 
         studentId: student.id,
         teacherId: target.teacherId,
         blockId: target.blockId,
+        tagId: body.tagId,
         eventId: body.eventId,
         deviceTime,
         order: body.order ?? null,
@@ -137,6 +159,11 @@ export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () 
         now,
       }),
     );
-    return { outcome: armed.outcome, session: null, state: null };
+    // A replay names the session its tap is still live in, an armed tap none.
+    return {
+      outcome: armed.outcome,
+      session: sessionView(armed.session),
+      state: armed.state ?? null,
+    };
   });
 }

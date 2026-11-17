@@ -75,6 +75,64 @@ a real decision? Add a dated entry at the top: what was decided and why.
   reshape `student-panel.tsx`, so a split would review the same file twice in a row, and about 460 of the lines are
   deletions and re-indentation from that move.
 
+- **2026-11-17** — **LO10a, a tap's honest retry after its block moved: answered as any retry, never `409`, settled
+  before any block can move (the owner's "Free the code"; the worker's calls, awaiting the owner's look; LO10a, part of
+  #612).**
+
+  **The owner's choice.** The conductor asked, "When a teacher removes a lost block, what happens to its code?", with
+  two ways to build it (#612): free the code, as the schema allows, after first settling tap step 9's other-teacher
+  case; or retire it from everyone but its own teacher (the conductor's lean), so a block never moves. The owner chose
+  the first: **"Free the code"**. A removed block's code can be registered again by anyone, as
+  `blocks_tag_active_unique` (live rows only) allows. LO10b adds the removal; this step comes first.
+
+  **Why first.** A retry carries the tag its tap did. Once a block moves (its teacher removes it, another teacher
+  registers its code), the honest retry of a tap made before the move reaches the server under the new teacher while
+  the tap is on record under the old one, and looked exactly like a spent id reused at another teacher's block: a
+  `409`, which the phone keeps, retries and shows, for a tap the server kept. 2026-09-22's recorded follow-up said the
+  endpoint that lets blocks move must settle both lookups, the `events` one and the `armed_taps` one; this does.
+
+  **The test** (`sameTap`, `packages/db/src/transitions.ts`): a tap on record under the id is this tap resent when it
+  is the same student's and was recorded under the teacher whose block the tag is now, or under a teacher who held a
+  block with this tag. A removal keeps the block's row (decision 3), so the tag says whose block it was. The plainest
+  test both rows support: a `tap_in` records its class, so its teacher, but no block; a waiting tap records its teacher.
+  The blocks are read only when the teachers differ, so a tap at a block that never moved pays nothing. The same id at a
+  tag that teacher never held is still a client bug, `409`, as is another student's id and another kind's.
+
+  **The answers**, step 10's, as any retry gets them: a tap that landed, `replay` naming the session it is still live
+  in, else none, so the phone re-reads the truth; a waiting tap, its own row's answer, `already_armed` while it waits.
+  On every path, the arm path too (santa's round 1, both reviewers): it named none there, which a move makes wrong, since
+  the old teacher's class can still run with the student in it while nothing of the new teacher's does; `stillLive`
+  now answers for `tapIn` and the arm path alike, rule 4's "while that is still true". The waiting row stays with the
+  teacher it was made for and converts at their Start: the follow-up's "consumes the stale X row and answers about the
+  Y one" is set aside, since a retry is the tap made at X's block, not a new one at Y's. `armTap`'s two 23505
+  recoveries read a row's owner by the same rule.
+
+  **A tag no live block holds** (the worker's call, the owner away): removed and not registered again, it was `404`,
+  which the phone keeps retrying and shows, for a tap that landed. The route now asks the engine first
+  (`retryAtRemovedBlock`): the same rule with no teacher now, answered as the arm path answers; anything else there
+  stays `404`, another student's id at that tag too, so nothing about whose an id is shows. A `/v1` correction (API
+  decision 2). A school's disposal (C6a), which removes its blocks too, is answered the same way.
+
+  **Costs, said plainly:**
+  - The same id reused at a block whose tag that teacher also once held reads as a retry: `replay`, and that physical
+    tap is dropped, though not silently, since the phone re-reads the truth. The cost a same-teacher reuse already
+    carries (2026-09-24, A4); an honest phone mints one id per tap.
+  - A waiting tap's retry that finds the new teacher's class running, the student in it, joins that class (the
+    worker's call, the owner away). Any retry of a waiting tap that finds a class running where its tag points does
+    today, and so does a tap first heard after the move, which no server can tell from one made after it, since the
+    phone's clock isn't trusted. The waiting row is then declined at its own teacher's Start (`armed_tap_skipped`).
+    Answering it `already_armed` instead would read `armed_taps` on every tap, for a case that needs a lost answer, the
+    phone offline across a removal and a registration, and the new teacher's class running with the student in it.
+
+  **Tests:** PGlite (`transitions.test.ts`, "a retry after its block moved": both paths, a waiting tap, a tap at the
+  moved block for real beside it, the session named while live, the 409s that stay, and no live block); the route
+  (`taps.test.ts`, "after its block moved"); real Postgres: the route racing the move, its retry reading the tag before,
+  between and after the removal and the registration, three shapes of twelve rounds, and a retry at a removed block
+  waiting out its tap still landing (`taps.test.ts`), and the 23505 recovery staged under a moved block
+  (`races.test.ts`). Each retry test fails on `main`'s rule, each refusal kept on a rule that skips the tag, and the
+  landing's test without `retryAtRemovedBlock`'s lock. A17's "an arm waits out the same tap still landing", heard
+  before the bell, now expects its replay to name the class the tap is live in.
+
 - **2026-11-17** — **LO5, live: the top of a class's page while its session runs rebuilt from ClassLive, the count of who
   is focused, Check on and the room; no lesson piece on the class page whichever way the switch is set; Present v2's until
   LO9; one PR (the worker's calls, awaiting the owner's look; LO5, #607).**
