@@ -68,6 +68,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   `student-panel.test.tsx` (22 source-text tests left); `lib/session-log.test.ts` is new; the pop-ups', the grid's and
   the class page's driven tests carry the rest.
 
+  **One PR** (the conductor's call): 868 changed lines without tests, over santa's 400, kept whole rather than the
+  proposed three (~330, ~460, ~60): the pop-ups' and the panel's new look and the panel's move onto the shared log both
+  reshape `student-panel.tsx`, so a split would review the same file twice in a row, and about 460 of the lines are
+  deletions and re-indentation from that move.
+
 - **2026-11-17** — **LO5, live: the top of a class's page while its session runs rebuilt from ClassLive, the count of who
   is focused, Check on and the room; no lesson piece on the class page whichever way the switch is set; Present v2's until
   LO9; one PR (the worker's calls, awaiting the owner's look; LO5, #607).**
