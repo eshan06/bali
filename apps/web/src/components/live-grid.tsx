@@ -391,20 +391,23 @@ export function FeedLine({ stale }: { stale: Staleness }) {
 
 /**
  * A line that something didn't load or wasn't done, in the lock-only look (HomeStates' `.oops`;
- * LO4, the class page's own, moved here for its live part): between hairlines, after the alert's
- * icon; with Try again when `onRetry` sends it again, held while `held` says a read or a send of it
- * is on its way, focus then where `then` says.
+ * LO4, the class page's own, moved here for its live part): after the alert's icon, between
+ * hairlines unless `ruled` is off, where the live page's own rule is beside it already
+ * (LiveTopStates); with Try again when `onRetry` sends it again, held while `held` says a read or a
+ * send of it is on its way, focus then where `then` says.
  */
 export function Oops({
   children,
   onRetry,
   held = false,
   then = [],
+  ruled = true,
 }: {
   children: ReactNode;
   onRetry?: () => unknown;
   held?: boolean;
   then?: readonly string[];
+  ruled?: boolean;
 }) {
   const line = (
     <p role="alert" className="flex min-w-0 items-center gap-2 text-body">
@@ -413,7 +416,9 @@ export function Oops({
     </p>
   );
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-y border-border-default py-4">
+    <div
+      className={`flex flex-wrap items-center gap-x-4 gap-y-3${ruled ? ' border-y border-border-default py-4' : ''}`}
+    >
       {onRetry ? (
         <TryAgain onRetry={onRetry} held={held} then={then}>
           {line}
@@ -838,7 +843,7 @@ export function LiveGrid({
   // Read, focus on the class's name, the page's heading (ClassRetryStates, LiveTopStates).
   if (error) {
     return room ? (
-      <Oops onRetry={retry} held={retrying}>
+      <Oops onRetry={retry} held={retrying} ruled={false}>
         Couldn&apos;t load this session. {error}
       </Oops>
     ) : (

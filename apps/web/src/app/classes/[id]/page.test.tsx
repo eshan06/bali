@@ -338,6 +338,84 @@ describe('a class live, time past 16 hours in all (the owner, 2026-10-28)', () =
 });
 
 /*
+ * The class page's header while its session runs (LO5; ClassLive, PhoneLive), converted from the
+ * source text of `app/class-page.test.ts` and `app/present.test.ts`: the ring, the class's name over
+ * when it ends and its join code, the time left over "left", then +5 and +10 as one pair, End
+ * session and Present, which a phone never shows; each small on a phone. In Present, v2's header
+ * until LO9, +5, +10 and End kept there, Present after them (the owner, 2026-10-12). A line said
+ * under it in the lock-only look: after the alert's icon, over the page's rule (LiveTopStates).
+ */
+describe('the live header (LO5; ClassLive, PhoneLive), and Present’s (ClassPresent)', () => {
+  /** The header's own buttons, in order. */
+  const buttons = () =>
+    within(screen.getByRole('banner'))
+      .getAllByRole('button')
+      .map((b) => b.textContent);
+
+  it('heads the class page with the ring, the name, when it ends and the join code, the time left, then the controls', async () => {
+    render(<ClassDetailPage />);
+    await screen.findByText('Ana Rodríguez');
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('heading', { level: 1 }).textContent).toBe('Biology, period 3');
+    const bell = header.querySelector(`time[datetime="${bali.endsAt}"]`);
+    expect(bell?.parentElement?.textContent).toBe(`Ends ${bell?.textContent}`);
+    const code = within(header).getByText('VMAF7E');
+    expect(code.parentElement?.textContent).toBe('Join code VMAF7E');
+    expect(code.getAttribute('translate')).toBe('no');
+    // 25 minutes to the bell, on this computer's clock.
+    expect(within(header).getByText(/^2[45]:\d\d$/).nextElementSibling?.textContent).toBe('left');
+    expect(header.querySelector('svg')?.getAttribute('width')).toBe('48');
+    expect(buttons()).toEqual(['+5 min', '+10 min', 'End session', 'Present']);
+    // +5 and +10 one pair: their shared edge square and drawn once.
+    const [plus5, plus10, end, present] = within(header).getAllByRole('button');
+    expect(plus5?.parentElement).toBe(plus10?.parentElement);
+    expect(plus5?.classList).toContain('rounded-r-none');
+    expect(Array.from(plus10?.classList ?? [])).toEqual(
+      expect.arrayContaining(['-ml-px', 'rounded-l-none']),
+    );
+    // Small on a phone, where Present never shows (PhoneLive).
+    for (const small of [plus5, plus10, end]) {
+      expect(Array.from(small?.classList ?? [])).toEqual(
+        expect.arrayContaining(['max-[760px]:h-8.5', 'max-[760px]:text-button-sm']),
+      );
+    }
+    expect(present?.classList).toContain('max-[760px]:hidden');
+    expect(present?.getAttribute('aria-pressed')).toBe('false');
+    // No count in the header: the count is the page's own, under it.
+    expect(header.textContent).not.toMatch(/joined|focused/);
+    expect(bali.unexpected).toEqual([]);
+  });
+
+  it('keeps +5, +10 and End in Present’s header, Present after them, in v2’s look', async () => {
+    sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
+    render(<ClassDetailPage />);
+    await screen.findByText('Ana Rodríguez');
+    expect(buttons()).toEqual(['+5 min', '+10 min', 'End session', 'Present']);
+    expect(screen.getByRole('button', { name: 'Present' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    // Its line, the class counted, v2's: "Live · 1 of 1 joined".
+    expect(within(screen.getByRole('banner')).getByText('Live · 1 of 1 joined')).toBeTruthy();
+  });
+
+  it('says time it can’t add under the header, after the alert’s icon, over the page’s rule', async () => {
+    const user = userEvent.setup();
+    render(<ClassDetailPage />);
+    await screen.findByText('Ana Rodríguez');
+    await user.click(screen.getByRole('button', { name: '+5 min' }));
+    const said = await screen.findByRole('alert');
+    expect(said.textContent).toBe(PAST_16_HOURS);
+    expect(said.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    // No hairlines of its own: the rule over the count is the next thing under it.
+    expect(said.parentElement?.className).not.toMatch(/border/);
+    expect(said.parentElement?.nextElementSibling?.classList).toContain('border-t');
+    expect(screen.getByRole('banner').compareDocumentPosition(said)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+});
+
+/*
  * An extend that got no answer (ClassRetryStates): it may have landed, so its line says so with
  * Try again, which sends the same one again under its id, held, as every control is while any send
  * is on its way, so focus stays on it; answered, the time added in the line's place, focus on the
@@ -454,13 +532,18 @@ describe('an extend with no answer, and its Try again (ClassRetryStates)', () =>
 
 /*
  * An unlock the grid's stream brings opens its pop-up (PV10; ClassUnlock), placed as GA2's boards
- * draw it: over the grid's top right, never over the teacher's controls. jsdom lays nothing out, so
- * the place is the box it is laid over: the tiles' own, after the header, the counts with Present
- * and the Questions and slides card, holding none of their controls (the audit's C01, where a click
- * on End session landed on a pop-up). Screenshots at each width show the rest, beside their boards.
+ * draw it: over the room's top right, never over the teacher's controls. jsdom lays nothing out, so
+ * the place is the box it is laid over: the tiles' own, after the header with Present, the count
+ * and Check on (LO5), holding none of their controls (the audit's C01, where a click on End session
+ * landed on a pop-up). Screenshots at each width show the rest, beside their boards.
  */
 describe('a class live, an unlock lands (GA2)', () => {
-  const CONTROLS = ['+5 min', '+10 min', 'End session', 'Present', 'Ask a question', 'Show slides'];
+  const CONTROLS = ['+5 min', '+10 min', 'End session', 'Present'];
+  /** Ana's tile in the room, a button that opens her panel. */
+  const anasTile = () =>
+    within(screen.getByRole('list', { name: 'Everyone in the class' })).getByRole('button', {
+      name: /^Ana Rodríguez/,
+    });
   /** Ana's unlock, as the stream brings it: a `seq` past the read's newest (4) lands live. */
   const unlocked = (seq: number): FeedEvent => ({
     seq,
@@ -483,31 +566,35 @@ describe('a class live, an unlock lands (GA2)', () => {
     });
   };
 
-  it('lays its pop-up over the grid’s tiles alone, after every control of the header and the card', async () => {
+  it('lays its pop-up over the room’s tiles alone, after every control of the header and Check on', async () => {
     await live();
     await bring(unlocked(5));
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toMatch(/^Ana Rodríguez used Emergency Unlock/);
     // Beside her tile's pulse (bali-softpulse), which the same live unlock starts.
-    const anasTile = screen.getByRole('button', { name: /^Ana Rodríguez/ });
-    expect(anasTile.querySelector('.animate-softpulse')).not.toBeNull();
+    expect(anasTile().querySelector('.animate-softpulse')).not.toBeNull();
     // The pop-ups' layer, and the positioned box it is laid over: the tiles' own.
     const layer = alert.closest('.absolute');
     const box = layer?.parentElement;
     expect(layer?.classList.contains('inset-y-0')).toBe(true);
     expect(box?.classList.contains('relative')).toBe(true);
-    expect(box?.contains(screen.getByRole('button', { name: /^Ana Rodríguez/ }))).toBe(true);
-    // Every control of the header, the counts' row and the card is outside that box, before it.
-    for (const name of CONTROLS) {
-      const control = screen.getByRole('button', { name });
+    expect(box?.contains(anasTile())).toBe(true);
+    // Every control of the header, and Check on's, is outside that box, before it: her name in
+    // Check on and its Open, now she is unlocked.
+    const checkOn = screen.getByRole('region', { name: '0 of 1 focused' });
+    const controls = [
+      ...CONTROLS.map((name) => screen.getByRole('button', { name })),
+      ...within(checkOn).getAllByRole('button'),
+    ];
+    expect(controls).toHaveLength(CONTROLS.length + 2);
+    for (const control of controls) {
+      const name = control.textContent ?? '';
       expect(box?.contains(control), name).toBe(false);
       expect(control.compareDocumentPosition(box as Node), name).toBe(
         Node.DOCUMENT_POSITION_FOLLOWING,
       );
     }
-    const card = screen.getByRole('heading', { name: 'Questions and slides' });
-    expect(box?.contains(card)).toBe(false);
     expect(bali.unexpected).toEqual([]);
   });
 
@@ -516,9 +603,8 @@ describe('a class live, an unlock lands (GA2)', () => {
     await bring(unlocked(4));
     expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
     // Her tile says Unlocked, as the replay applies it, and doesn't pulse.
-    const anasTile = screen.getByRole('button', { name: /^Ana Rodríguez/ });
-    expect(anasTile.textContent).toMatch(/Unlocked/);
-    expect(anasTile.querySelector('.animate-softpulse')).toBeNull();
+    expect(anasTile().textContent).toMatch(/Unlocked/);
+    expect(anasTile().querySelector('.animate-softpulse')).toBeNull();
   });
 
   it('closes on Open student, the student’s panel opening from their tile', async () => {
@@ -527,8 +613,7 @@ describe('a class live, an unlock lands (GA2)', () => {
     await bring(unlocked(5));
     await user.click(await screen.findByRole('button', { name: 'Open student' }));
     expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
-    const tile = screen.getByRole('button', { name: /^Ana Rodríguez/ });
-    expect(tile.getAttribute('aria-expanded')).toBe('true');
+    expect(anasTile().getAttribute('aria-expanded')).toBe('true');
   });
 
   // The last one closed, nothing takes its Close's place: focus goes to the tile of the student it
@@ -545,7 +630,7 @@ describe('a class live, an unlock lands (GA2)', () => {
         await user.keyboard('{Enter}');
       }
       expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
-      expect(document.activeElement).toBe(screen.getByRole('button', { name: /^Ana Rodríguez/ }));
+      expect(document.activeElement).toBe(anasTile());
     });
   }
 
@@ -1021,16 +1106,16 @@ describe('End session asks first, in a dialog (GA6)', () => {
 });
 
 /*
- * The live lesson on the class page (L7, M6) as a teacher meets it, and the lessons switch (LO1;
- * ARCHITECTURE, Web portal, decision 8). With lessons on: the Questions and slides card between
- * the counts and the grid, a question asked in it as the stream names it, the slide card in its
- * place while a slide shows and no question does, the question first; in Present the question, or
- * else the slide, in the tiles' place, the grid kept underneath with its one stream, never the
- * card or a side panel. With lessons off: none of it, and nothing of a lesson read, a question or a
- * slide left open before it went off included; Present shows the room. Converted from the source
- * text of `app/present.test.ts` and `components/question-card.test.ts` (LO1).
+ * The live lesson as a teacher meets it on a class's page (L7, M6), and the lessons switch (LO1;
+ * ARCHITECTURE, Web portal, decision 8). The class page is rebuilt from the lock-only canvas since
+ * LO5, which draws no lesson piece, so it shows none whichever way the switch is set, and reads
+ * nothing of a lesson there. Present keeps v2's until LO9: with lessons on, the question, or else the
+ * slide, in the tiles' place, the grid kept underneath with its one stream, the question first. With
+ * lessons off: none of it, and nothing of a lesson read, a question or a slide left open before it
+ * went off included; Present shows the room. Converted from the source text of
+ * `app/present.test.ts` and `components/question-card.test.ts` (LO1).
  */
-describe('the live lesson on the class page, lessons on and off (L7, M6; LO1)', () => {
+describe('the live lesson on the class page, lessons on and off (L7, M6; LO1, LO5)', () => {
   const QUESTION: TeacherQuestion = {
     id: '019a0000-0000-7000-8000-00000000a001',
     prompt: 'Which value of x solves x² − 5x + 6 = 0?',
@@ -1097,58 +1182,85 @@ describe('the live lesson on the class page, lessons on and off (L7, M6; LO1)', 
     return user;
   }
   const present = () => screen.getByRole('button', { name: 'Present' });
+  /** Present's counts over its grid (ClassPresent). */
   const counts = () => screen.queryByRole('list', { name: 'The class right now' });
+  /** The class page's count, Check on over the room (ClassLive). */
+  const theCount = () => screen.queryByRole('region', { name: /^\d+ of \d+ focused$/ });
   const theCard = () => screen.queryByRole('region', { name: 'Questions and slides' });
   /** The session's reads: the grid's snapshot, and the lesson's of what it has open. */
   const sessionReads = () =>
     bali.sent.filter(
       ({ method, path }) => method === 'GET' && path === `/v1/sessions/${bali.SESSION}`,
     ).length;
+  /** Every lesson read the page has sent: a question's totals, the decks, the teacher's questions. */
+  const lessonReads = () =>
+    bali.sent.filter(({ path }) => /^\/v1\/(questions|decks|saved-questions)\b/.test(path));
 
-  describe('with lessons on', () => {
-    it('shows the Questions and slides card between the counts and the grid, and the question the stream names in it (L7)', async () => {
-      await live();
-      const card = theCard();
-      const tile = screen.getByRole('button', { name: /^Ana Rodríguez/ });
-      expect(counts()?.compareDocumentPosition(card as Node)).toBe(
-        Node.DOCUMENT_POSITION_FOLLOWING,
-      );
-      expect(card?.compareDocumentPosition(tile)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-      // The grid's read of the session, and the lesson's for what it has open: nothing yet.
-      expect(sessionReads()).toBe(2);
-
-      // Asked from another tab: the stream names it, and the page reads the session for its words.
+  /** The class page with the switch either way: the count, Check on and the room, no lesson piece. */
+  for (const lessons of ['on', 'off'] as const) {
+    it(`shows no lesson piece on the class page with lessons ${lessons}: the count, Check on, then the room (LO5)`, async () => {
+      if (lessons === 'off') vi.stubEnv('NEXT_PUBLIC_LESSONS', 'off');
       bali.lesson.question = QUESTION;
-      await bring(said(5, 'question_opened', { question_id: QUESTION.id }));
-      expect(await screen.findByRole('heading', { name: QUESTION.prompt })).toBeTruthy();
-      expect(screen.getByText('Question · open')).toBeTruthy();
+      bali.lesson.decks = [DECK];
+      bali.lesson.presentation = { slide: SLIDE, eventId: SHOWN };
+      await live();
       expect(theCard()).toBeNull();
-      expect(sessionReads()).toBe(3);
-      // Its totals, read once it shows: none answered yet, of everyone who could.
-      expect(await screen.findByText('of 1 answered')).toBeTruthy();
+      for (const name of ['Ask a question', 'Show slides']) {
+        expect(screen.queryByRole('button', { name }), name).toBeNull();
+      }
+      for (const name of ['+5 min', '+10 min', 'End session', 'Present']) {
+        expect(screen.getByRole('button', { name }), name).toBeTruthy();
+      }
+      expect(screen.queryByText(QUESTION.prompt)).toBeNull();
+      // The count's section, then the room's, with nothing between them.
+      const room = screen.getByRole('region', { name: 'Everyone' });
+      expect(theCount()?.nextElementSibling).toBe(room);
+      // The stream names a question and a slide change: neither is read, nor shown.
+      await bring(said(5, 'question_opened', { question_id: QUESTION.id }));
+      await bring(said(6, 'slide_shown', { deck_id: DECK.id, page: 2 }));
+      expect(screen.queryByText(QUESTION.prompt)).toBeNull();
+      expect(screen.queryByText(/of 12/)).toBeNull();
+      // The session read once, the grid's own; nothing of a lesson asked.
+      expect(sessionReads()).toBe(1);
+      expect(lessonReads()).toEqual([]);
       expect(bali.unexpected).toEqual([]);
     });
+  }
 
-    it('in Present, shows the question in the tiles’ place, the grid kept underneath, never the class page’s card (L7, part 2; PresentQuestion)', async () => {
+  describe('with lessons on, in Present', () => {
+    it('shows the question in the tiles’ place, the grid kept underneath; out of Present, the room (L7, part 2; PresentQuestion)', async () => {
       bali.lesson.question = QUESTION;
       const user = await live(true);
       const shown = await screen.findByRole('region', { name: QUESTION.prompt });
       expect(within(shown).getByText('Question')).toBeTruthy();
       expect(within(shown).getByText('Answer in Bali on your phone.')).toBeTruthy();
-      // In the tiles' place: no tile, no counts' bar, no card of the class page's.
+      // In the tiles' place: no tile, no counts' bar.
       expect(screen.queryByText('Ana Rodríguez')).toBeNull();
       expect(counts()).toBeNull();
-      expect(screen.queryByText('Question · open')).toBeNull();
+      // Its totals, read once it shows: none answered yet, of everyone who could.
+      expect(await screen.findByText('of 1 answered')).toBeTruthy();
 
-      // Out of Present: the card holds the question, the tiles are back, the grid never reopened.
+      // Out of Present: no question, the room back, the grid never reopened.
       await user.click(present());
-      expect(screen.getByText('Question · open')).toBeTruthy();
+      expect(screen.queryByText(QUESTION.prompt)).toBeNull();
+      expect(screen.queryByText('Question · open')).toBeNull();
       expect(screen.getByText('Ana Rodríguez')).toBeTruthy();
       expect(bali.streams).toHaveLength(1);
       expect(bali.unexpected).toEqual([]);
     });
 
-    it('puts a closed question away by Done in Present, the room back and focus on Present in its header (L7, part 3)', async () => {
+    it('shows a question asked from another tab as the stream names it (L7)', async () => {
+      await live(true);
+      // The grid's read of the session, and the lesson's for what it has open: nothing yet.
+      expect(sessionReads()).toBe(2);
+      bali.lesson.question = QUESTION;
+      await bring(said(5, 'question_opened', { question_id: QUESTION.id }));
+      expect(await screen.findByRole('region', { name: QUESTION.prompt })).toBeTruthy();
+      expect(sessionReads()).toBe(3);
+      expect(bali.unexpected).toEqual([]);
+    });
+
+    it('puts a closed question away by Done, the room back and focus on Present in its header (L7, part 3)', async () => {
       bali.lesson.question = QUESTION;
       const user = await live(true);
       await screen.findByRole('region', { name: QUESTION.prompt });
@@ -1164,52 +1276,34 @@ describe('the live lesson on the class page, lessons on and off (L7, M6; LO1)', 
       expect(bali.unexpected).toEqual([]);
     });
 
-    it('turns Present on and off with the grid kept, one stream throughout, a side panel open only out of Present (PV9; L7-1b)', async () => {
+    it('turns Present on and off with the grid kept, one stream throughout (PV9)', async () => {
       const user = await live();
-      await user.click(screen.getByRole('button', { name: 'Show slides' }));
-      expect(await screen.findByRole('complementary', { name: 'Show slides' })).toBeTruthy();
-
+      expect(theCount()).not.toBeNull();
       await user.click(present());
-      // The projector: the room, never the teacher's panel or the class page's card.
+      // The projector: its counts over the room, never the class page's count or Check on.
       expect(present().getAttribute('aria-pressed')).toBe('true');
-      expect(screen.queryByRole('complementary')).toBeNull();
-      expect(theCard()).toBeNull();
-      expect(screen.getByText('Ana Rodríguez')).toBeTruthy();
       expect(counts()).not.toBeNull();
+      expect(theCount()).toBeNull();
+      expect(screen.getByText('Ana Rodríguez')).toBeTruthy();
 
       await user.click(present());
-      expect(screen.getByRole('complementary', { name: 'Show slides' })).toBeTruthy();
-      expect(theCard()).not.toBeNull();
+      expect(theCount()).not.toBeNull();
+      expect(counts()).toBeNull();
       expect(bali.streams).toHaveLength(1);
       expect(bali.unexpected).toEqual([]);
     });
 
-    it('shows the slide card in the question card’s place while a slide shows, the stream’s turn reaching it; in Present the slide in the tiles’ place (M6)', async () => {
+    it('shows the slide in the tiles’ place, the stream’s turn reaching it (M6)', async () => {
       bali.lesson.decks = [DECK];
       bali.lesson.presentation = { slide: SLIDE, eventId: SHOWN };
-      const user = await live();
-      const card = await screen.findByRole('region', { name: DECK.title });
-      expect(within(card).getByText('Slides · showing')).toBeTruthy();
-      const page = () => within(card).getByText('of 12').previousElementSibling?.textContent;
-      expect(page()).toBe('1');
-      expect(theCard()).toBeNull();
-      // Its Ask a question opens the side panel, which it then controls.
-      const ask = within(card).getByRole('button', { name: 'Ask a question' });
-      await user.click(ask);
-      expect(ask.getAttribute('aria-expanded')).toBe('true');
-      expect(await screen.findByRole('complementary', { name: 'Ask a question' })).toBeTruthy();
-
-      // Another tab turns the page: the stream says so, and the card follows.
-      await bring(said(5, 'slide_shown', { deck_id: DECK.id, page: 2 }));
-      expect(page()).toBe('2');
-
-      // In Present: the slide in the tiles' place, its title and page under it; no panel there.
-      await user.click(present());
-      expect(screen.getByRole('region', { name: `${DECK.title} · 2 of 12` })).toBeTruthy();
-      expect(screen.queryByText('Slides · showing')).toBeNull();
+      await live(true);
+      expect(await screen.findByRole('region', { name: `${DECK.title} · 1 of 12` })).toBeTruthy();
       expect(screen.queryByText('Ana Rodríguez')).toBeNull();
       expect(counts()).toBeNull();
-      expect(screen.queryByRole('complementary')).toBeNull();
+
+      // Another tab turns the page: the stream says so, and Present follows.
+      await bring(said(5, 'slide_shown', { deck_id: DECK.id, page: 2 }));
+      expect(screen.getByRole('region', { name: `${DECK.title} · 2 of 12` })).toBeTruthy();
       expect(bali.streams).toHaveLength(1);
       expect(bali.unexpected).toEqual([]);
     });
@@ -1217,8 +1311,8 @@ describe('the live lesson on the class page, lessons on and off (L7, M6; LO1)', 
     it('reads the session again for a deck shown from another tab that it hasn’t listed, and follows it (M6, part 2b)', async () => {
       bali.lesson.decks = [DECK];
       bali.lesson.presentation = { slide: SLIDE, eventId: SHOWN };
-      await live();
-      await screen.findByRole('region', { name: DECK.title });
+      await live(true);
+      await screen.findByRole('region', { name: `${DECK.title} · 1 of 12` });
       const before = sessionReads();
       // Uploaded since this page read the decks, then shown: the stream can't say its pages, so the
       // page reads the session for what it shows, then the decks for its title.
@@ -1231,42 +1325,22 @@ describe('the live lesson on the class page, lessons on and off (L7, M6; LO1)', 
       await bring(shown);
       await settle();
       expect(sessionReads()).toBe(before + 1);
-      const card = await screen.findByRole('region', { name: LATER.title });
-      expect(within(card).getByText('of 9').previousElementSibling?.textContent).toBe('1');
+      expect(await screen.findByRole('region', { name: `${LATER.title} · 1 of 9` })).toBeTruthy();
       expect(bali.unexpected).toEqual([]);
     });
 
-    it('shows the question, never the slide, while both show, on the class page and in Present: the question first (the conductor’s call, 2026-10-16)', async () => {
+    it('shows the question, never the slide, while both show: the question first (the conductor’s call, 2026-10-16)', async () => {
       bali.lesson.question = QUESTION;
       bali.lesson.decks = [DECK];
       bali.lesson.presentation = { slide: SLIDE, eventId: SHOWN };
-      const user = await live();
-      expect(await screen.findByText('Question · open')).toBeTruthy();
-      expect(screen.queryByText('Slides · showing')).toBeNull();
-      await user.click(present());
-      expect(screen.getByText('Answer in Bali on your phone.')).toBeTruthy();
+      await live(true);
+      expect(await screen.findByText('Answer in Bali on your phone.')).toBeTruthy();
       expect(screen.queryByRole('region', { name: `${DECK.title} · 1 of 12` })).toBeNull();
     });
   });
 
   describe('with lessons off (LO1)', () => {
-    it('shows no Questions and slides card and none of its controls: the counts, then the room', async () => {
-      vi.stubEnv('NEXT_PUBLIC_LESSONS', 'off');
-      await live();
-      expect(theCard()).toBeNull();
-      for (const name of ['Ask a question', 'Show slides']) {
-        expect(screen.queryByRole('button', { name }), name).toBeNull();
-      }
-      for (const name of ['+5 min', '+10 min', 'End session', 'Present']) {
-        expect(screen.getByRole('button', { name }), name).toBeTruthy();
-      }
-      // Nothing between the counts' row and the grid.
-      const tile = screen.getByRole('button', { name: /^Ana Rodríguez/ });
-      expect(counts()?.parentElement?.nextElementSibling?.contains(tile)).toBe(true);
-      expect(bali.unexpected).toEqual([]);
-    });
-
-    it('reads nothing of a lesson and shows none, a question and a slide left open before it went off included, in Present too', async () => {
+    it('reads nothing of a lesson and shows none in Present, a question and a slide left open before it went off included', async () => {
       vi.stubEnv('NEXT_PUBLIC_LESSONS', 'off');
       bali.lesson.question = QUESTION;
       bali.lesson.decks = [DECK];
@@ -1287,9 +1361,7 @@ describe('the live lesson on the class page, lessons on and off (L7, M6; LO1)', 
       expect(theCard()).toBeNull();
       // The session read once, the grid's own; no question's totals, decks or questions asked.
       expect(sessionReads()).toBe(1);
-      expect(
-        bali.sent.filter(({ path }) => /^\/v1\/(questions|decks|saved-questions)\b/.test(path)),
-      ).toEqual([]);
+      expect(lessonReads()).toEqual([]);
       expect(bali.streams).toHaveLength(1);
       expect(bali.unexpected).toEqual([]);
     });

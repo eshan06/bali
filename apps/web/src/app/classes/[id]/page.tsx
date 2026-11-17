@@ -916,7 +916,7 @@ export default function ClassDetailPage() {
       {error === null ? null : present ? (
         cantLoad(error)
       ) : (
-        <Oops onRetry={load} held={classReading}>
+        <Oops onRetry={load} held={classReading} ruled={false}>
           Couldn&apos;t load this class. {error}
         </Oops>
       )}
@@ -924,14 +924,15 @@ export default function ClassDetailPage() {
       {/* Said right under the controls, where they are. */}
       {said === null ? null : !present ? (
         said.kind === 'note' ? (
-          <p
-            role="status"
-            className="border-y border-border-default py-3 text-body text-text-secondary"
-          >
+          <p role="status" className="text-body text-text-secondary">
             {said.message}
           </p>
         ) : (
-          <Oops onRetry={said.kind === 'failed' ? resend : undefined} held={busy !== null}>
+          <Oops
+            onRetry={said.kind === 'failed' ? resend : undefined}
+            held={busy !== null}
+            ruled={false}
+          >
             {said.message}
           </Oops>
         )

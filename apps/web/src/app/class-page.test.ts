@@ -123,26 +123,15 @@ describe('the class page while no session runs', () => {
 });
 
 describe('the class page while a session runs (ClassLive)', () => {
-  it('heads it with ClassLive’s header: the ring, the line, the countdown, then +5, +10 and End', () => {
-    expect(live).toMatch(
-      /<LiveHeader\s+name=\{klass\.name\}\s+joinCode=\{klass\.joinCode\}\s+counts=\{counts\}\s+startedAt=\{grid\.startedAt\}\s+endsAt=\{grid\.endsAt\}\s+present=\{present\}\s*>\s*\{extend\}\s*\{end\('ml-2'\)\}\s*\{present \? presentToggle\(false, 'ml-2'\) : null\}\s*<\/LiveHeader>/,
-    );
-    // Its parts 22 px apart, as v2.css's page; `relative` places the reconnect pill over it.
-    expect(live).toMatch(/: 'relative flex flex-col gap-5\.5'\}>/);
-  });
+  // Its header, its controls, Present's and the lines said under them are driven in
+  // classes/[id]/page.test.tsx since LO5.
 
-  it('counts the class over the grid, beside a small Present that a phone never shows', () => {
-    expect(live).toMatch(
-      /\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}/,
-    );
+  it('counts Present’s grid by the live grid’s own session', () => {
     // The live grid's own counts, never another session's (a Start after an end).
     expect(page).toMatch(
       /const counts = grid !== null && counted\?\.session === grid\.id \? counted\.counts : null;/,
     );
     expect(page).toMatch(/onCounts=\{onCounts\}/);
-    const toggle = page.slice(page.indexOf('const presentToggle'));
-    expect(toggle).toMatch(/size=\{beside \? 'sm' : 'md'\}/);
-    expect(toggle).toMatch(/className=\{beside \? 'ml-auto max-sm:hidden' : className\}/);
   });
 
   it('shows no roster and no New code: the grid names every student, and ClassLive draws none', () => {
@@ -150,20 +139,7 @@ describe('the class page while a session runs (ClassLive)', () => {
   });
 
   it('says a roster that didn’t load only after the bell, where a roster shows', () => {
-    expect(live).toMatch(/\{cantLoad\(error\)\}/);
     expect(live).not.toMatch(/rosterError/);
-  });
-
-  it('says its lines as ClassStates does: right under the header, Try again small', () => {
-    // A failed read again of the class (`cantLoad`), and an extend's failure, refusal or note:
-    // `TryAgain`'s small button, the same size in Present.
-    expect(live).toMatch(
-      /\{said \? \(\s*<div className="flex flex-wrap items-center gap-x-4 gap-y-3">\s*\{said\.kind === 'failed' \? \(\s*<TryAgain\b[^]*?>\s*\{saidLine\}\s*<\/TryAgain>\s*\) : \(\s*saidLine\s*\)\}\s*<\/div>\s*\) : null\}/,
-    );
-    expect(page).toMatch(
-      /const saidLine = said && \(\s*<p role=\{said\.kind === 'note' \? 'status' : 'alert'\} className="text-body">\s*\{said\.message\}\s*<\/p>\s*\);/,
-    );
-    expect(live).not.toMatch(/size=\{present/);
   });
 
   // An extend's Try again (ClassRetryStates) is driven in classes/[id]/page.test.tsx since A3b.

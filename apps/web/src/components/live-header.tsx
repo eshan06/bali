@@ -330,11 +330,13 @@ export function LiveHead({
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 max-[760px]:w-full max-[760px]:justify-between">
         <p className="flex flex-col items-end max-[760px]:items-start">
-          <span
-            className={`text-home-countdown tabular-nums ${endsAt ? '' : 'text-text-tertiary'}`}
-          >
-            {endsAt ? timeLeft(Date.parse(endsAt) - now) : '…'}
-          </span>
+          {endsAt ? (
+            <span className="text-home-countdown tabular-nums">
+              {timeLeft(Date.parse(endsAt) - now)}
+            </span>
+          ) : (
+            <span className="text-home-countdown text-text-tertiary">…</span>
+          )}
           <span className="text-countdown-sub text-text-tertiary">left</span>
         </p>
         <div className="flex flex-wrap items-center gap-2">{children}</div>

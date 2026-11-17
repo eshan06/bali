@@ -6,18 +6,24 @@ import {
   type UnlockReason,
 } from '@bali/shared';
 import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { NetworkError } from '@/lib/api-client';
+import { CANT_REACH } from '@/lib/errors';
+
 import { LiveGrid, LockChip } from './live-grid';
-import { CLOCK_OFF } from './student-panel';
 
 /*
  * The live grid as a teacher meets it (the owner's decision of 2026-10-22: the portal's tests drive
  * the page): on the class page while a session runs, and in Present, the projector the class can
- * see (ClassPresent). Present shows the room each student's state, but never what is the teacher's
- * alone: an unlock's reason (2026-10-06) and Clock off (the owner, 2026-10-28). The class page's
- * own grid says both. Bali's answer to the grid's read is a stand-in's, held until the test gives
- * it, and no stream runs: the grid is the snapshot it read.
+ * see (ClassPresent). On the class page, the lock-only look since LO5 (ClassLive, LiveStates,
+ * LiveTopStates, PhoneLive): the count of who is focused, Check on, then the room, every tile its
+ * state and its name only, the times and the reason in the student's panel (the owner,
+ * 2026-11-16). Present keeps v2's tiles until LO9: each student's state, but never what is the
+ * teacher's alone, an unlock's reason (2026-10-06) and Clock off (the owner, 2026-10-28). Bali's
+ * answer to the grid's read is a stand-in's, held until the test gives it, and no stream runs: the
+ * grid is the snapshot it read.
  *
  * The grid's other tests, not converted yet, are in `live-grid.test.ts`; this file can't share its
  * name, since TypeScript drops a `.tsx` whose name a `.ts` beside it has (ESLint then says the
@@ -25,11 +31,11 @@ import { CLOCK_OFF } from './student-panel';
  */
 
 const bali = vi.hoisted(() => {
-  /** Each read of the grid on its way, its answer the test's to give. */
-  const reads: ((snapshot: unknown) => void)[] = [];
-  const get = () =>
-    new Promise((answer) => {
-      reads.push(answer);
+  /** Each read on its way (the grid's, a student panel's), its answer the test's to give. */
+  const reads: { path: string; answer: (body: unknown) => void; fail: (e: unknown) => void }[] = [];
+  const get = (path: string) =>
+    new Promise((answer, fail) => {
+      reads.push({ path, answer, fail });
     });
   // One client and one sign-out for every render, as the hooks' memos keep them: the grid reads
   // once as it opens.
@@ -80,36 +86,46 @@ const unlock = (name: string, reason: UnlockReason) => ({
   occurredAt: ago(60),
 });
 
+/** The grid's read on its way now, answered: the snapshot, or no answer at all. */
+async function answerRead(snapshot: SessionSnapshot | 'none') {
+  await act(async () => {
+    const read = bali.reads.find(({ path }) => path === '/v1/sessions/S');
+    if (!read) throw new Error('no read of the grid on its way');
+    bali.reads.splice(bali.reads.indexOf(read), 1);
+    if (snapshot === 'none') read.fail(new NetworkError());
+    else read.answer(snapshot);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+const snapshotOf = (students: SnapshotStudent[], more: Partial<SessionSnapshot> = {}) => ({
+  session: {
+    id: 'S',
+    classId: 'C',
+    startedAt: ago(1500),
+    endsAt: new Date(Date.now() + 20 * 60_000).toISOString(),
+  },
+  ended: false,
+  latestSeq: 12,
+  students,
+  ...more,
+});
+
 /** The grid on the class page while a session runs, or in Present, once Bali answers its read. */
 async function open(
   present: boolean,
   students: SnapshotStudent[],
   more: Partial<SessionSnapshot> = {},
 ) {
-  render(<LiveGrid sessionId="S" livePage present={present} />);
-  const snapshot: SessionSnapshot = {
-    session: {
-      id: 'S',
-      classId: 'C',
-      startedAt: ago(1500),
-      endsAt: new Date(Date.now() + 20 * 60_000).toISOString(),
-    },
-    ended: false,
-    latestSeq: 12,
-    students,
-    ...more,
-  };
-  await act(async () => {
-    const read = bali.reads.shift();
-    if (!read) throw new Error('no read of the grid on its way');
-    read(snapshot);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+  const view = render(<LiveGrid sessionId="S" livePage present={present} />);
+  await answerRead(snapshotOf(students, more));
+  return view;
 }
 
-/** A student's tile, found by their name. */
+/** A student's tile, found by their name in the room (the class page) or the grid (Present). */
 function tile(name: string): HTMLElement {
-  const found = screen.getByText(name).closest('li');
+  const room = screen.queryByRole('list', { name: 'Everyone in the class' });
+  const found = (room ? within(room) : screen).getByText(name).closest('li');
   if (!found) throw new Error(`no tile for ${name}`);
   return found;
 }
@@ -119,30 +135,248 @@ const says = (el: HTMLElement) => (el.textContent ?? '').replace(/\s+/g, ' ');
 
 /** A tile's words part by part, its name first: the name, the state and its line, if it has one. */
 function parts(name: string): string[] {
-  const words = screen.getByText(name).parentElement;
+  const words = within(tile(name)).getByText(name).parentElement;
   if (!words) throw new Error(`no words for ${name}`);
   return Array.from(words.children, (part) => (part.textContent ?? '').replace(/\s+/g, ' '));
 }
 
-describe('the live grid on the class page and in Present (ClassPresent)', () => {
-  const omar = student('Omar Siddiqui', { clockOff: true });
+/** Check on's rows, each its chip's words and the names in it, as a teacher reads them. */
+function checks(): string[][] {
+  const title = screen.queryByText(/^Check on \d+$/);
+  const list = title?.nextElementSibling;
+  if (!list) return [];
+  return Array.from(list.children, (row) => {
+    const [chip, people] = Array.from(row.children);
+    return [
+      (chip?.textContent ?? '').replace(/\s+/g, ' '),
+      ...Array.from(people?.children ?? [], (name) => name.textContent ?? ''),
+    ];
+  });
+}
 
-  it('says Clock off on the class page, with its tooltip, a button that opens the student’s panel', async () => {
-    await open(false, [omar]);
-    const button = screen.getByRole('button', { name: /^Omar Siddiqui/ });
-    expect(button.closest('li')).toBe(tile('Omar Siddiqui'));
-    expect(within(button).getByTitle(CLOCK_OFF).textContent).toBe('Clock off');
+describe('the room on the class page (LO5; ClassLive, LiveStates’ rare tiles)', () => {
+  it('names everyone with their count, each tile its state and its name, nothing else', async () => {
+    await open(false, [
+      student('Ana Rodríguez'),
+      student('Omar Siddiqui', { clockOff: true }),
+      student('Ethan Park', { state: 'unlocked', unlock: unlock('Ethan Park', 'nurse') }),
+      student('Tomás Herrera', { lastSeenAt: ago(330) }),
+      student('Amara Okafor', { state: 'protection_off', lastSeenAt: ago(330) }),
+      student('Caleb Washington', { endedAt: ago(60) }),
+      student('Mateo Silva', {
+        state: 'unlocked',
+        unlock: unlock('Mateo Silva', 'other'),
+        endedAt: ago(30),
+      }),
+      student('Zuri Mensah', { state: null }),
+      student('Grace Kim', { state: 'mystery' as SnapshotStudent['state'] }),
+    ]);
+    const room = screen.getByRole('region', { name: 'Everyone' });
+    expect(within(room).getByText('9')).toBeTruthy();
+    expect(
+      ['Ana Rodríguez', 'Omar Siddiqui', 'Ethan Park', 'Tomás Herrera', 'Amara Okafor'].map(parts),
+    ).toEqual([
+      ['Ana Rodríguez', 'Focused'],
+      ['Omar Siddiqui', 'Focused'],
+      ['Ethan Park', 'Unlocked'],
+      ['Tomás Herrera', 'Silent · 5 min'],
+      ['Amara Okafor', 'Protection off'],
+    ]);
+    expect(['Caleb Washington', 'Mateo Silva', 'Zuri Mensah', 'Grace Kim'].map(parts)).toEqual([
+      ['Caleb Washington', 'Left'],
+      ['Mateo Silva', 'Left · unlocked'],
+      ['Zuri Mensah', 'Not here'],
+      ['Grace Kim', 'Unknown · refresh'],
+    ]);
+    // No reason, no "last seen", no Clock off: the student's panel says those.
+    expect(says(room)).not.toMatch(/nurse|other reason|last seen|clock/i);
   });
 
+  it('draws each tile one size in its state’s tint, Silent’s and Unknown’s edge dashed, the whole name on hover', async () => {
+    const long = 'Bartholomew Montgomery-Whitfield';
+    await open(false, [
+      student(long),
+      student('Tomás Herrera', { lastSeenAt: ago(330) }),
+      student('Mateo Silva', {
+        state: 'unlocked',
+        unlock: unlock('Mateo Silva', 'other'),
+        endedAt: ago(30),
+      }),
+      student('Grace Kim', { state: 'mystery' as SnapshotStudent['state'] }),
+    ]);
+    const button = (name: string) => within(tile(name)).getByRole('button');
+    const classes = (name: string) => Array.from(button(name).classList);
+    // At least 60 px tall, 8 × 12 px in, 10 px corners, a 1.5 px edge; pressed, it scales.
+    expect(classes(long)).toEqual(
+      expect.arrayContaining([
+        'min-h-15',
+        'px-3',
+        'py-2',
+        'rounded-sm',
+        'border-[1.5px]',
+        'press',
+        'bg-state-focused-bg',
+        'border-transparent',
+        'hover:border-border-strong',
+      ]),
+    );
+    // Cut short, never wrapped, and whole on hover.
+    const name = within(tile(long)).getByText(long);
+    expect(Array.from(name.classList)).toEqual(
+      expect.arrayContaining(['truncate', 'text-room-name', 'max-[760px]:text-room-name-phone']),
+    );
+    expect(name.getAttribute('title')).toBe(long);
+    for (const dashed of ['Tomás Herrera', 'Grace Kim']) {
+      expect(classes(dashed), dashed).toEqual(
+        expect.arrayContaining([
+          'border-dashed',
+          'border-border-strong',
+          'hover:border-border-input',
+        ]),
+      );
+    }
+    // A student who left while unlocked keeps the unlock's orange, the flag its icon, so it never
+    // reads as a quiet Left.
+    expect(classes('Mateo Silva')).toContain('bg-state-emergency-bg');
+    const icons = button('Mateo Silva').querySelectorAll('svg');
+    expect(icons).toHaveLength(1);
+    expect(icons[0]?.getAttribute('class')).toMatch(/lucide-flag\b/);
+    expect(icons[0]?.getAttribute('width')).toBe('18');
+  });
+
+  it('has no room for a class nobody has joined, Check on saying so under 0 of 0', async () => {
+    await open(false, []);
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('0 of 0 focused');
+    expect(screen.getByText('No students yet.')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Everyone' })).toBeNull();
+  });
+});
+
+describe('the count and Check on (LO5; ClassLive, LiveStates, LiveTopStates)', () => {
+  it('counts who is focused of everyone, then lists everyone else by state, the unlocks first', async () => {
+    await open(false, [
+      student('Zuri Mensah', { state: null }),
+      student('Ana Rodríguez'),
+      student('Wei Zhang', { lastSeenAt: ago(150) }),
+      student('Tomás Herrera', { lastSeenAt: ago(330) }),
+      student('Noor Haddad', { lastSeenAt: ago(150) }),
+      student('Grace Kim', { state: 'mystery' as SnapshotStudent['state'] }),
+      student('Caleb Washington', { endedAt: ago(60) }),
+      student('Amara Okafor', { state: 'protection_off', lastSeenAt: ago(10) }),
+      student('Mateo Silva', {
+        state: 'unlocked',
+        unlock: unlock('Mateo Silva', 'other'),
+        endedAt: ago(30),
+      }),
+      student('Ethan Park', { state: 'unlocked', unlock: unlock('Ethan Park', 'nurse') }),
+      student('Hannah Levi', { state: null }),
+    ]);
+    const count = screen.getByRole('region', { name: '1 of 11 focused' });
+    expect(within(count).getByText('Check on 10')).toBeTruthy();
+    // A row per state in its tile's words, two silent for different times a row each; each row's
+    // names in the grid's order. The state and the name, nothing else.
+    expect(checks()).toEqual([
+      ['Unlocked', 'Ethan Park'],
+      ['Left · unlocked', 'Mateo Silva'],
+      ['Protection off', 'Amara Okafor'],
+      ['Silent · 2 min', 'Wei Zhang', 'Noor Haddad'],
+      ['Silent · 5 min', 'Tomás Herrera'],
+      ['Not here', 'Zuri Mensah', 'Hannah Levi'],
+      ['Left', 'Caleb Washington'],
+      ['Unknown · refresh', 'Grace Kim'],
+    ]);
+    expect(says(count)).not.toMatch(/nurse|other reason|last seen/i);
+    // Open at the end of a row of one, named for whom, hidden on a phone; none for a row of
+    // several, whose names are their own buttons.
+    const opens = within(count).getAllByRole('button', { name: /^Open / });
+    expect(opens.map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Open Ethan Park',
+      'Open Mateo Silva',
+      'Open Amara Okafor',
+      'Open Tomás Herrera',
+      'Open Caleb Washington',
+      'Open Grace Kim',
+    ]);
+    for (const button of opens) expect(button.classList).toContain('max-[760px]:hidden');
+    expect(within(count).getByRole('button', { name: 'Wei Zhang' })).toBeTruthy();
+  });
+
+  it('says everyone is focused in one line, and nothing to check', async () => {
+    await open(false, [student('Ana Rodríguez'), student('Marcus Bell')]);
+    const count = screen.getByRole('region', { name: '2 of 2 focused' });
+    expect(within(count).getByText('Everyone’s focused.'.replace('’', "'"))).toBeTruthy();
+    expect(screen.queryByText(/^Check on/)).toBeNull();
+  });
+
+  it('opens a student’s panel from their name, focus into it, and back on the name as it closes', async () => {
+    const user = userEvent.setup();
+    await open(false, [
+      student('Ethan Park', { state: 'unlocked', unlock: unlock('Ethan Park', 'nurse') }),
+      student('Ana Rodríguez'),
+    ]);
+    const count = screen.getByRole('region', { name: '1 of 2 focused' });
+    const name = within(count).getByRole('button', { name: 'Ethan Park' });
+    await user.click(name);
+    const panel = screen.getByRole('complementary', { name: 'Ethan Park' });
+    expect(document.activeElement).toBe(within(panel).getByRole('heading', { name: 'Ethan Park' }));
+    expect(name.getAttribute('aria-expanded')).toBe('true');
+    expect(name.getAttribute('aria-controls')).toBe(panel.id);
+    await user.click(within(panel).getByRole('button', { name: "Close Ethan Park's panel" }));
+    expect(screen.queryByRole('complementary')).toBeNull();
+    expect(document.activeElement).toBe(name);
+
+    // Its Open the same, focus back on Open; a tile's own back on the tile.
+    const openIt = within(count).getByRole('button', { name: 'Open Ethan Park' });
+    await user.click(openIt);
+    await user.keyboard('{Escape}');
+    expect(document.activeElement).toBe(openIt);
+    const anasTile = within(tile('Ana Rodríguez')).getByRole('button');
+    await user.click(anasTile);
+    expect(anasTile.getAttribute('aria-expanded')).toBe('true');
+    await user.keyboard('{Escape}');
+    expect(document.activeElement).toBe(anasTile);
+  });
+
+  it('never opens a panel in Present, and closes one as Present turns on', async () => {
+    const user = userEvent.setup();
+    const view = await open(false, [student('Ana Rodríguez')]);
+    await user.click(within(tile('Ana Rodríguez')).getByRole('button'));
+    expect(screen.getByRole('complementary', { name: 'Ana Rodríguez' })).toBeTruthy();
+    view.rerender(<LiveGrid sessionId="S" livePage present />);
+    expect(screen.queryByRole('complementary')).toBeNull();
+    // A tile alone there, never a button; no Check on, which the page draws.
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByText(/ of \d+ focused$/)).toBeNull();
+  });
+
+  it('says a session that didn’t load in the count’s place, Try again reading it again', async () => {
+    const user = userEvent.setup();
+    render(<LiveGrid sessionId="S" livePage />);
+    expect(screen.getByRole('status').textContent).toBe('Loading this session…');
+    await answerRead('none');
+    const line = screen.getByRole('alert');
+    expect(line.textContent).toBe(`Couldn't load this session. ${CANT_REACH}`);
+    const again = screen.getByRole('button', { name: 'Try again' });
+    await user.click(again);
+    // Held while it reads, its line kept; read, the count in its place.
+    expect(again.getAttribute('aria-busy')).toBe('true');
+    expect(screen.getByRole('alert').textContent).toBe(line.textContent);
+    await answerRead(snapshotOf([student('Ana Rodríguez')]));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('region', { name: '1 of 1 focused' })).toBeTruthy();
+  });
+});
+
+describe('the live grid in Present (ClassPresent), v2’s until LO9', () => {
+  const omar = student('Omar Siddiqui', { clockOff: true });
+
   it('never says Clock off in Present, the projector the class can see (the owner, 2026-10-28)', async () => {
-    // And a phone heard from 70 s ago, whose line says "last seen" and whose one detail on a phone
-    // would be Clock off on the class page.
+    // And a phone heard from 70 s ago, whose line says "last seen".
     await open(true, [omar, student('Wei Zhang', { clockOff: true, lastSeenAt: ago(70) })]);
     const omarsTile = tile('Omar Siddiqui');
     // The state alone, as for any focused student: no line, no tooltip, nothing for a screen reader.
     expect(parts('Omar Siddiqui')).toEqual(['Omar Siddiqui', 'Focused']);
     expect(says(omarsTile)).toBe(['Omar Siddiqui', 'Focused'].join(''));
-    expect(within(omarsTile).queryByTitle(CLOCK_OFF)).toBeNull();
     expect(parts('Wei Zhang')).toEqual(['Wei Zhang', 'Focused', 'last seen 1 min ago']);
     expect(document.body.innerHTML).not.toMatch(/clock/i);
     // A tile alone there, never a button.
@@ -180,24 +414,12 @@ describe('the live grid on the class page and in Present (ClassPresent)', () => 
     omar,
   ];
 
-  it('says each unlock’s reason on the class page', async () => {
+  it('never says an unlock’s reason, on the class page or in Present, every tile its state', async () => {
     for (const reason of UNLOCK_REASONS) {
       await open(false, carrying(reason));
-      for (const name of [
-        'Ethan Park',
-        'Jaylen Brooks',
-        'Lucas Ferreira',
-        'Mateo Silva',
-        'Priya Natarajan',
-      ]) {
-        expect(says(tile(name)), `${name}, ${reason}`).toMatch(WORDS[reason]);
-      }
+      // The class page: the reason is the student panel's, never the room's or Check on's.
+      expect(document.body.innerHTML, reason).not.toMatch(WORDS[reason]);
       cleanup();
-    }
-  });
-
-  it('never says an unlock’s reason in Present, "last seen" kept, every tile its state', async () => {
-    for (const reason of UNLOCK_REASONS) {
       await open(true, carrying(reason));
       // Nowhere in the grid: not a tile's words, nor a tooltip or a label on any tag.
       expect(document.body.innerHTML, reason).not.toMatch(WORDS[reason]);
@@ -223,12 +445,14 @@ describe('the live grid on the class page and in Present (ClassPresent)', () => 
 });
 
 /*
- * The grid's health (ClassStale; ARCHITECTURE, Web portal, decision 4): a lost stream said as the
- * floating pill, a quiet one in the stone line over the tiles, each a status a screen reader hears
- * as it comes (the audit's DR-05; CLAUDE.md: no silent failures), as a student hears "Can't reach
- * Bali", but never at each second's tick of its age (`aria-live="off"`, as YourPhone's minutes).
+ * The grid's health (ARCHITECTURE, Web portal, decision 4), each a status a screen reader hears as
+ * it comes (the audit's DR-05; CLAUDE.md: no silent failures), as a student hears "Can't reach
+ * Bali", but never at each second's tick of its age (`aria-live="off"`, as YourPhone's minutes). On
+ * the class page (LiveStates, LiveTopStates): over the count, the count and Check on faded and the
+ * names plain, as they were at the last update. In Present (ClassStale), v2's: a lost stream as the
+ * floating pill, a quiet one in the stone line over the tiles.
  */
-describe('the grid’s health, said (ClassStale; DR-05)', () => {
+describe('the grid’s health, said (LiveStates, LiveTopStates, ClassStale; DR-05)', () => {
   // The grid's clock on a fake one that also runs as time does, so its read's answer still lands.
   beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
   afterEach(() => vi.useRealTimers());
@@ -247,82 +471,147 @@ describe('the grid’s health, said (ClassStale; DR-05)', () => {
     age: line.querySelector('[aria-live="off"]')?.textContent ?? null,
   });
   const classes = (el: Element | null | undefined) => Array.from(el?.classList ?? []);
-
-  for (const present of [false, true]) {
-    it(`says a lost stream as the floating pill over the tiles, a status${present ? ', in Present' : ''}`, async () => {
-      await open(present, [student('Omar Siddiqui')]);
-      expect(screen.queryByRole('status')).toBeNull();
-      await status('reconnecting');
-
-      const pill = screen.getByRole('status');
-      expect(said(pill)).toEqual({ words: 'Reconnecting… last updated 0s ago', age: '0s ago' });
-      // Its stone dot, 7 px and round, then the words as one piece of the pill's row.
-      expect(pill.children).toHaveLength(2);
-      expect(pill.firstElementChild?.getAttribute('aria-hidden')).toBe('true');
-      expect(classes(pill.firstElementChild)).toEqual([
-        'size-1.75',
-        'shrink-0',
-        'rounded-full',
-        'bg-pip',
-      ]);
-      // White, a strong edge, shadow-2, 13/18 medium in the secondary ink, 6 × 14 px (DESIGN.md §4),
-      // 14 px from the page's top and in view as it scrolls.
-      expect(classes(pill)).toEqual(
-        expect.arrayContaining([
-          'sticky',
-          'top-3.5',
-          'mx-auto',
-          'w-fit',
-          'rounded-full',
-          'border',
-          'border-border-strong',
-          'bg-surface-card',
-          'shadow-2',
-          'px-3.5',
-          'py-1.5',
-          'text-caption',
-          'font-medium',
-          'text-text-secondary',
-        ]),
-      );
-      // Its layer over the page's whole height, taking no room or clicks: 30 px less 16 is 14 px
-      // from the frame's top (22 less 8 on a phone). Before the tiles.
-      expect(classes(pill.parentElement)).toEqual(
-        expect.arrayContaining([
-          'pointer-events-none',
-          'absolute',
-          'inset-x-0',
-          '-top-4',
-          'bottom-0',
-          'max-sm:-top-2',
-        ]),
-      );
-      expect(pill.compareDocumentPosition(tile('Omar Siddiqui'))).toBe(
-        Node.DOCUMENT_POSITION_FOLLOWING,
-      );
-
-      // Seconds on, the same status: its age moves where it isn't said, the words said as they were.
-      const words = pill.lastElementChild?.firstChild;
-      await act(() => vi.advanceTimersByTimeAsync(5000));
-      expect(screen.getByRole('status')).toBe(pill);
-      expect(said(pill)).toEqual({ words: 'Reconnecting… last updated 5s ago', age: '5s ago' });
-      expect(pill.lastElementChild?.firstChild).toBe(words);
-      expect(words?.textContent).toBe('Reconnecting… last updated ');
-
-      // Back, and nothing is said over the grid.
-      await status('open');
-      expect(screen.queryByRole('status')).toBeNull();
-    });
-  }
-
-  it('says a quiet stream in the stone line over the tiles, a status', async () => {
-    await open(false, [student('Omar Siddiqui')]);
+  const quiet = async () => {
     await status('open');
     // Three heartbeats missed with no sign of life: a minute.
     await act(() => vi.advanceTimersByTimeAsync(59_000));
     expect(screen.queryByRole('status')).toBeNull();
     await act(() => vi.advanceTimersByTimeAsync(2000));
+  };
+  const class28 = [
+    student('Ethan Park', { state: 'unlocked', unlock: unlock('Ethan Park', 'nurse') }),
+    student('Ana Rodríguez'),
+  ];
 
+  it('says a lost stream over the count on the class page, the count and Check on faded, names plain', async () => {
+    await open(false, class28);
+    expect(screen.queryByRole('status')).toBeNull();
+    await status('reconnecting');
+
+    const line = screen.getByRole('status');
+    expect(said(line)).toEqual({ words: 'Reconnecting… last updated 0s ago', age: '0s ago' });
+    // A white pill, a strong edge, shadow-2, its dot still: nothing loops (DESIGN.md §7).
+    expect(classes(line)).toEqual(
+      expect.arrayContaining([
+        'rounded-full',
+        'border-border-strong',
+        'bg-surface-card',
+        'shadow-2',
+        'text-meta',
+      ]),
+    );
+    expect(classes(line.firstElementChild)).toEqual([
+      'size-1.75',
+      'shrink-0',
+      'rounded-full',
+      'bg-pip',
+    ]);
+    expect(line.innerHTML).not.toMatch(/animate-/);
+    // In the count's section, before the count; the count and the rows faded, the names plain.
+    const count = screen.getByRole('heading', { level: 2, name: '1 of 2 focused' });
+    expect(line.compareDocumentPosition(count)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(classes(count)).toContain('opacity-60');
+    const row = screen.getByText('Check on 1').nextElementSibling?.firstElementChild;
+    expect(classes(row)).toContain('opacity-60');
+    const region = screen.getByRole('region', { name: '1 of 2 focused' });
+    expect(within(region).queryByRole('button')).toBeNull();
+    expect(within(region).getByText('Ethan Park').tagName).toBe('SPAN');
+    // The room unchanged: its tiles still open a student.
+    expect(within(tile('Ethan Park')).getByRole('button')).toBeTruthy();
+
+    // Seconds on, the same status: its age moves where it isn't said.
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    expect(screen.getByRole('status')).toBe(line);
+    expect(said(line)).toEqual({ words: 'Reconnecting… last updated 5s ago', age: '5s ago' });
+
+    // Back, and nothing is said; the names open a student again.
+    await status('open');
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(within(region).getByRole('button', { name: 'Ethan Park' })).toBeTruthy();
+  });
+
+  it('says a quiet stream the same way on the class page, in today’s words', async () => {
+    await open(false, class28);
+    await quiet();
+    const line = screen.getByRole('status');
+    expect(said(line)).toEqual({
+      words: 'Live feed has gone quiet. Last updated 1 min ago.',
+      age: '1 min ago.',
+    });
+    expect(classes(line)).toContain('rounded-full');
+    expect(classes(screen.getByRole('heading', { level: 2, name: '1 of 2 focused' }))).toContain(
+      'opacity-60',
+    );
+  });
+
+  it('says a lost stream as the floating pill over the tiles in Present, a status', async () => {
+    await open(true, [student('Omar Siddiqui')]);
+    expect(screen.queryByRole('status')).toBeNull();
+    await status('reconnecting');
+
+    const pill = screen.getByRole('status');
+    expect(said(pill)).toEqual({ words: 'Reconnecting… last updated 0s ago', age: '0s ago' });
+    // Its stone dot, 7 px and round, then the words as one piece of the pill's row.
+    expect(pill.children).toHaveLength(2);
+    expect(pill.firstElementChild?.getAttribute('aria-hidden')).toBe('true');
+    expect(classes(pill.firstElementChild)).toEqual([
+      'size-1.75',
+      'shrink-0',
+      'rounded-full',
+      'bg-pip',
+    ]);
+    // White, a strong edge, shadow-2, 13/18 medium in the secondary ink, 6 × 14 px (DESIGN.md §4),
+    // 14 px from the page's top and in view as it scrolls.
+    expect(classes(pill)).toEqual(
+      expect.arrayContaining([
+        'sticky',
+        'top-3.5',
+        'mx-auto',
+        'w-fit',
+        'rounded-full',
+        'border',
+        'border-border-strong',
+        'bg-surface-card',
+        'shadow-2',
+        'px-3.5',
+        'py-1.5',
+        'text-caption',
+        'font-medium',
+        'text-text-secondary',
+      ]),
+    );
+    // Its layer over the page's whole height, taking no room or clicks: 30 px less 16 is 14 px
+    // from the frame's top (22 less 8 on a phone). Before the tiles.
+    expect(classes(pill.parentElement)).toEqual(
+      expect.arrayContaining([
+        'pointer-events-none',
+        'absolute',
+        'inset-x-0',
+        '-top-4',
+        'bottom-0',
+        'max-sm:-top-2',
+      ]),
+    );
+    expect(pill.compareDocumentPosition(tile('Omar Siddiqui'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+
+    // Seconds on, the same status: its age moves where it isn't said, the words said as they were.
+    const words = pill.lastElementChild?.firstChild;
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    expect(screen.getByRole('status')).toBe(pill);
+    expect(said(pill)).toEqual({ words: 'Reconnecting… last updated 5s ago', age: '5s ago' });
+    expect(pill.lastElementChild?.firstChild).toBe(words);
+    expect(words?.textContent).toBe('Reconnecting… last updated ');
+
+    // Back, and nothing is said over the grid.
+    await status('open');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('says a quiet stream in the stone line over the tiles in Present, a status', async () => {
+    await open(true, [student('Omar Siddiqui')]);
+    await quiet();
     const line = screen.getByRole('status');
     expect(said(line)).toEqual({
       words: 'Live feed has gone quiet. Last updated 1 min ago.',
