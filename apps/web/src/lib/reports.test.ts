@@ -14,6 +14,9 @@ import { CANT_REACH, TOO_MANY_TRIES } from './errors';
 import { classFigures } from './recap';
 import {
   FIRST_READ,
+  focusBar,
+  focusShare,
+  minutesLong,
   readSessionPage,
   readSessionQuestions,
   readSessions,
@@ -22,6 +25,7 @@ import {
   sessionRow,
   startRead,
   UUID,
+  wholeTimeOf,
 } from './reports';
 
 // A class's lessons at 9:05 in New York, each ended by the sweep at its bell, newest first.
@@ -59,8 +63,57 @@ const KLASS: ClassDetail = {
 };
 
 const CLASS = '/v1/classes/c1';
-const NEWEST = '/v1/classes/c1/reports/sessions';
-const after = (id: string) => `/v1/classes/c1/reports/sessions?before=${id}`;
+const NEWEST = '/v1/classes/c1/reports/sessions?limit=10';
+const after = (id: string) => `/v1/classes/c1/reports/sessions?limit=10&before=${id}`;
+const R2 = (s: SessionReportSummary) => `/v1/classes/c1/reports/sessions/${s.id}`;
+const FEED = (s: SessionReportSummary, from: number) => `/v1/sessions/${s.id}/events?after=${from}`;
+
+/** The four who joined each lesson: the first stays focused, the other three don't. */
+const FOUR = ['p1', 'p2', 'p3', 'p4'].map((id) => ({ id, displayName: null }));
+
+/**
+ * What Bali holds for a lesson's count: its report (R2), all four joined, the second and third
+ * unlocking and the fourth turning protection off, which ends their whole time whatever its events
+ * say; and its events, read in two pages, the second empty: each tap-in a minute in.
+ */
+function holding(s: SessionReportSummary, more: FeedEvent[] = []): Record<string, unknown[]> {
+  const at = new Date(Date.parse(s.startedAt) + 60_000).toISOString();
+  const report: SessionReportResponse = {
+    ended: true,
+    startedAt: s.startedAt,
+    endsAt: s.endsAt,
+    endedAt: s.endedAt,
+    joined: FOUR,
+    focusMinutes: s.focusMinutes,
+    averageFocusMinutes: s.averageFocusMinutes,
+    silentMinutes: s.silentMinutes,
+    unlocks: [FOUR[1], FOUR[2]].map((student, i) => ({
+      eventId: `${s.id}-u${i}`,
+      student,
+      occurredAt: at,
+      reason: null,
+      recordedAs: null,
+    })),
+    protectionOffs: [{ eventId: `${s.id}-o`, student: FOUR[3], occurredAt: at, recordedAs: null }],
+  };
+  const taps: FeedEvent[] = FOUR.map(({ id }, i) => ({
+    seq: i + 1,
+    eventId: `${s.id}-t${i}`,
+    type: 'tap_in',
+    userId: id,
+    occurredAt: at,
+    payload: {},
+  }));
+  const events = [...taps, ...more];
+  const last = events.at(-1)?.seq ?? 0;
+  return {
+    [R2(s)]: [report],
+    [FEED(s, 0)]: [{ events, nextAfter: last }],
+    [FEED(s, last)]: [{ events: [], nextAfter: last }],
+  };
+}
+/** Every read of a lesson's count. */
+const countReads = (s: SessionReportSummary) => [R2(s), FEED(s, 0), FEED(s, 4)];
 const STALE = new ApiError(
   400,
   'bad_input',
@@ -86,25 +139,104 @@ function fakeApi(answers: Record<string, unknown[]>) {
   };
 }
 
-/** The list once its newest page, `first`, has answered. */
-async function loaded(first: SessionReportsPage): Promise<SessionList> {
-  return readSessions(fakeApi({ [CLASS]: [KLASS], [NEWEST]: [first] }), 'c1', FIRST_READ, 'newest');
+/** Each lesson's count, as Bali holds it. */
+const holdingAll = (...sessions: SessionReportSummary[]) =>
+  Object.assign({}, ...sessions.map((s) => holding(s))) as Record<string, unknown[]>;
+
+/** The list once its newest page, `first`, has answered, each lesson's count with it. */
+async function loaded(first: SessionReportsPage, counted = new Map<string, number>()) {
+  const counts = holdingAll(...first.sessions.filter((s) => s.ended));
+  const api = fakeApi({ [CLASS]: [KLASS], [NEWEST]: [first], ...counts });
+  return readSessions(api, 'c1', FIRST_READ, 'newest', counted);
 }
 
 describe('readSessions', () => {
-  it('reads the newest page with the class, listing the sessions the server has marked over', async () => {
-    const api = fakeApi({ [CLASS]: [KLASS], [NEWEST]: [page('s2', RUNNING, MON, SUN)] });
+  it('reads the newest ten with the class, listing the sessions over, each with its whole-time count', async () => {
+    const api = fakeApi({
+      [CLASS]: [KLASS],
+      [NEWEST]: [page('s2', RUNNING, MON, SUN)],
+      ...holdingAll(MON, SUN),
+    });
     const list = await readSessions(api, 'c1', FIRST_READ, 'newest');
     expect(list).toEqual({
       className: 'Biology, period 3',
       sessions: [MON, SUN],
+      wholeTime: { s3: 1, s2: 1 },
       nextBefore: 's2',
       loaded: true,
       reading: null,
       failure: null,
       restarted: false,
     });
+    // The one running has no count to read: it isn't listed.
+    expect(api.asked.sort()).toEqual(
+      [CLASS, NEWEST, ...countReads(MON), ...countReads(SUN)].sort(),
+    );
+  });
+
+  it('counts as the recap does, from the session’s events too: going silent before the bell ends it', async () => {
+    // The first of the four goes quiet ten minutes in: none of the four stayed.
+    const silent: FeedEvent = {
+      seq: 5,
+      eventId: 'quiet',
+      type: 'went_silent',
+      userId: 'p1',
+      occurredAt: new Date(Date.parse(MON.startedAt) + 10 * 60_000).toISOString(),
+      payload: {},
+    };
+    const api = fakeApi({
+      [CLASS]: [KLASS],
+      [NEWEST]: [page(null, MON)],
+      ...holding(MON, [silent]),
+    });
+    expect((await readSessions(api, 'c1', FIRST_READ, 'newest')).wholeTime).toEqual({ s3: 0 });
+  });
+
+  it('reads no count for a session nobody joined', async () => {
+    const empty = lesson('s0', 2, { joinedCount: 0, averageFocusMinutes: null, focusMinutes: 0 });
+    const api = fakeApi({ [CLASS]: [KLASS], [NEWEST]: [page(null, empty)] });
+    const list = await readSessions(api, 'c1', FIRST_READ, 'newest');
+    expect(list).toMatchObject({ sessions: [empty], wholeTime: {}, failure: null });
     expect(api.asked.sort()).toEqual([CLASS, NEWEST]);
+  });
+
+  it('keeps each count for the page, read again only once its figures change', async () => {
+    const counted = new Map<string, number>();
+    const first = fakeApi({ [CLASS]: [KLASS], [NEWEST]: [page(null, MON)], ...holding(MON) });
+    await readSessions(first, 'c1', FIRST_READ, 'newest', counted);
+    // The class picked again: its page read afresh, its count kept.
+    const again = fakeApi({ [CLASS]: [KLASS], [NEWEST]: [page(null, MON)] });
+    expect((await readSessions(again, 'c1', FIRST_READ, 'newest', counted)).wholeTime).toEqual({
+      s3: 1,
+    });
+    expect(again.asked.sort()).toEqual([CLASS, NEWEST]);
+    // A late unlock landed since: R3's count of them moved, so the session is counted again.
+    const late = { ...MON, unlockCount: MON.unlockCount + 1 };
+    const moved = fakeApi({ [CLASS]: [KLASS], [NEWEST]: [page(null, late)], ...holding(late) });
+    await readSessions(moved, 'c1', FIRST_READ, 'newest', counted);
+    expect(moved.asked).toEqual(expect.arrayContaining(countReads(late)));
+  });
+
+  it('says a count that failed as the page failing, where it was asked, the counts in kept for Try again', async () => {
+    const counted = new Map<string, number>();
+    const answers = {
+      [CLASS]: [KLASS],
+      [NEWEST]: [page(null, MON, SUN)],
+      ...holdingAll(MON, SUN),
+      [R2(SUN)]: [new NetworkError()],
+    };
+    const failed = await readSessions(fakeApi(answers), 'c1', FIRST_READ, 'newest', counted);
+    expect(failed).toMatchObject({
+      sessions: [],
+      reading: null,
+      failure: { at: 'newest', message: CANT_REACH },
+    });
+    // Monday's count, in before Sunday's failed, isn't read again.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const retry = fakeApi({ [CLASS]: [KLASS], [NEWEST]: [page(null, MON, SUN)], ...holding(SUN) });
+    const read = await readSessions(retry, 'c1', startRead(failed, 'newest'), 'newest', counted);
+    expect(read).toMatchObject({ wholeTime: { s3: 1, s2: 1 }, failure: null });
+    expect(retry.asked.filter((path) => path.includes('s3'))).toEqual([]);
   });
 
   it('reads no sessions when the class has none over, its first one running included', async () => {
@@ -119,12 +251,14 @@ describe('readSessions', () => {
   it('puts Show earlier’s page after those read, each session once, until the end', async () => {
     const list = await loaded(page('s2', MON, SUN));
     // A session started between the two reads moves none: the cursor names a row (R3).
-    const api = fakeApi({ [after('s2')]: [page(null, SUN, SAT)] });
+    const api = fakeApi({ [after('s2')]: [page(null, SUN, SAT)], ...holding(SAT) });
     const more = await readSessions(api, 'c1', startRead(list, 'earlier'), 'earlier');
     expect(more.sessions).toEqual([MON, SUN, SAT]);
+    expect(more.wholeTime).toEqual({ s3: 1, s2: 1, s1: 1 });
     expect(more.nextBefore).toBeNull();
     expect(more.reading).toBeNull();
-    expect(api.asked).toEqual([after('s2')]);
+    // Only the new session is counted: Sunday's count came with the newest page.
+    expect(api.asked.sort()).toEqual([after('s2'), ...countReads(SAT)].sort());
   });
 
   it('says why the newest page failed, in the list’s place', async () => {
@@ -158,21 +292,24 @@ describe('readSessions', () => {
   });
 
   it('reads the newest page again for a cursor the class doesn’t hold, and says so', async () => {
-    const list = await loaded(page('s2', MON, SUN));
+    const counted = new Map<string, number>();
+    const list = await loaded(page('s2', MON, SUN), counted);
     const api = fakeApi({
       [after('s2')]: [STALE],
       [CLASS]: [KLASS],
       [NEWEST]: [page('s3', RUNNING, MON)],
     });
-    const again = await readSessions(api, 'c1', startRead(list, 'earlier'), 'earlier');
+    const again = await readSessions(api, 'c1', startRead(list, 'earlier'), 'earlier', counted);
     expect(again).toMatchObject({
       sessions: [MON],
+      wholeTime: { s3: 1 },
       nextBefore: 's3',
       reading: null,
       failure: null,
       restarted: true,
     });
     expect(api.asked.slice(0, 1)).toEqual([after('s2')]);
+    // Monday's count kept for the page: only the page is read again.
     expect(api.asked.slice(1).sort()).toEqual([CLASS, NEWEST]);
   });
 
@@ -212,13 +349,80 @@ describe('readSessions', () => {
   });
 
   it('puts the class id and the cursor in the path as one segment and one value each', async () => {
+    const nobody = lesson('s0', 2, { joinedCount: 0, averageFocusMinutes: null, focusMinutes: 0 });
     const api = fakeApi({
       '/v1/classes/a%2Fb': [{ ...KLASS, id: 'a/b' }],
-      '/v1/classes/a%2Fb/reports/sessions': [page('x&y', MON)],
-      '/v1/classes/a%2Fb/reports/sessions?before=x%26y': [page(null)],
+      '/v1/classes/a%2Fb/reports/sessions?limit=10': [page('x&y', nobody)],
+      '/v1/classes/a%2Fb/reports/sessions?limit=10&before=x%26y': [page(null)],
     });
     const list = await readSessions(api, 'a/b', FIRST_READ, 'newest');
     expect((await readSessions(api, 'a/b', list, 'earlier')).nextBefore).toBeNull();
+  });
+});
+
+describe('wholeTimeOf', () => {
+  it('reads the session’s report and its events, the class and the session one segment each', async () => {
+    const odd = { ...MON, id: 'x/y' };
+    const counts = holding(odd);
+    const api = fakeApi({
+      '/v1/classes/a%2Fb/reports/sessions/x%2Fy': counts[R2(odd)],
+      '/v1/sessions/x%2Fy/events?after=0': counts[FEED(odd, 0)],
+      '/v1/sessions/x%2Fy/events?after=4': counts[FEED(odd, 4)],
+    });
+    expect(await wholeTimeOf(api, 'a/b', odd)).toBe(1);
+    expect(api.asked).toHaveLength(3);
+  });
+});
+
+describe('a session’s average focus as its bar, and the share of class time spent focused (LO8)', () => {
+  // Ended early, at 9:41 for a 9:05 start: 36 minutes long.
+  const EARLY = lesson('s5', 2, { endedAt: '2026-10-02T13:41:00.000Z', averageFocusMinutes: 35 });
+
+  it('is its average out of its length, start to end in whole minutes', () => {
+    expect(minutesLong(MON)).toBe(25);
+    expect(focusBar(MON)).toEqual({ words: '21 of 25 min', percent: 84 });
+    // An early End counts to the End, as the table's times say it.
+    expect(focusBar(EARLY)).toEqual({ words: '35 of 36 min', percent: (35 / 36) * 100 });
+    // Not marked over yet: to its bell.
+    expect(focusBar({ ...MON, endedAt: null })?.words).toBe('21 of 25 min');
+    // Its exact length rounded, as R2 rounds the average: 35 min 20 s is 35.
+    const seconds = { startedAt: '2026-10-02T13:05:50.000Z', endedAt: '2026-10-02T13:41:10.000Z' };
+    expect(focusBar({ ...EARLY, ...seconds })?.words).toBe('35 of 35 min');
+  });
+
+  it('has no bar for a session nobody joined, and never runs past its track', () => {
+    expect(focusBar({ ...MON, averageFocusMinutes: null })).toBeNull();
+    expect(focusBar({ ...MON, endedAt: MON.startedAt })).toEqual({
+      words: '21 of 0 min',
+      percent: 0,
+    });
+    expect(focusBar({ ...MON, averageFocusMinutes: 26 })?.percent).toBe(100);
+    expect(focusBar({ ...MON, averageFocusMinutes: 1250 }, 'en-US')?.words).toBe('1,250 of 25 min');
+  });
+
+  it('shares the class’s focus minutes over its students’ time, every session someone joined weighed by it', () => {
+    // 83 of 4 × 25 = 100 minutes, and 35 × 2 = 70 of 2 × 36 = 72: 153 of 172 is 88.95 %.
+    const two = { ...EARLY, joinedCount: 2, focusMinutes: 70 };
+    expect(focusShare([MON, two])).toBe(88);
+    expect(focusShare([MON])).toBe(83);
+  });
+
+  it('rounds down, never claiming more than was kept, exact where the share is whole', () => {
+    // 29 of 100 is 29 %: 0.29 × 100 in floating point is 28.999…, which a careless floor says 28.
+    const hundred = lesson('s6', 2, { joinedCount: 4, focusMinutes: 29 });
+    expect(focusShare([hundred])).toBe(29);
+    expect(focusShare([{ ...hundred, focusMinutes: 99 }])).toBe(99);
+    expect(focusShare([{ ...hundred, focusMinutes: 100 }])).toBe(100);
+    // A clock's rounding past the whole: never over a hundred.
+    expect(focusShare([{ ...hundred, focusMinutes: 101 }])).toBe(100);
+  });
+
+  it('has none when nobody joined any session listed, or none is listed', () => {
+    const nobody = lesson('s0', 2, { joinedCount: 0, averageFocusMinutes: null, focusMinutes: 0 });
+    expect(focusShare([nobody])).toBeNull();
+    expect(focusShare([])).toBeNull();
+    // A session nobody joined weighs nothing beside one somebody did.
+    expect(focusShare([nobody, MON])).toBe(83);
   });
 });
 
@@ -246,7 +450,7 @@ describe('startRead', () => {
       failure: { at: 'newest', message: 'nope' },
     };
     const read = await readSessions(
-      fakeApi({ [CLASS]: [KLASS], [NEWEST]: [page(null, MON)] }),
+      fakeApi({ [CLASS]: [KLASS], [NEWEST]: [page(null, MON)], ...holding(MON) }),
       'c1',
       startRead(failed, 'newest'),
       'newest',
@@ -267,7 +471,8 @@ describe('sessionRow', () => {
     const row = sessionRow(MON, NY);
     expect({ ...row, times: row.times.replace(/\s/g, ' ') }).toEqual({
       day: 'Mon, Oct 5',
-      times: '9:05 AM to 9:30 AM',
+      // Reports' board: the start's AM left off when the end's is the same (LO8).
+      times: '9:05 to 9:30 AM',
       figures: { joined: '4', focus: '83', average: '21', silent: '2' },
       unlocks: '3',
       protectionOffs: '1',
@@ -275,6 +480,18 @@ describe('sessionRow', () => {
     // As the recap card says them from R2's report of the 4 who joined (`RecapBody`).
     const report = { focusMinutes: 83, averageFocusMinutes: 21, silentMinutes: 2 };
     expect(row.figures).toEqual(classFigures(4, report, NY.locale));
+  });
+
+  it('keeps the start’s AM or PM when the end’s isn’t the same', () => {
+    // 11:30 AM to 12:20 PM in New York.
+    const noon = lesson('s7', 6, {
+      startedAt: '2026-10-06T15:30:00.000Z',
+      endsAt: '2026-10-06T16:20:00.000Z',
+      endedAt: '2026-10-06T16:20:00.000Z',
+    });
+    expect(sessionRow(noon, NY).times.replace(/\s/g, ' ')).toBe('11:30 AM to 12:20 PM');
+    // A 24-hour clock has no AM or PM to leave off.
+    expect(sessionRow(MON, { ...NY, locale: 'en-GB' }).times).toBe('9:05 to 9:30');
   });
 
   it('has no figures when nobody joined, and still counts what was recorded', () => {
