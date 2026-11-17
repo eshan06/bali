@@ -9,7 +9,7 @@ is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
 _Last updated: 2026-11-16 (Central) — Bali's portal becomes a phone lock only: the Lock-only portal
-phase is planned (LO0, #LO0PR; DECISIONS 2026-11-16), rebuilding it from the approved canvas, with
+phase is planned (LO0, #614; DECISIONS 2026-11-16), rebuilding it from the approved canvas, with
 questions and slides switched off but kept in the code, and two workers at once on its lanes. Before
 it, a student holds at most five push tokens (AN11a2, #599). Next: LO1 and LO10 at once, then LO2,
 then lanes A and B; while the phase runs, its step lines below are its status and this line waits
@@ -169,7 +169,7 @@ lane B (LO4–LO7, LO9), a lane's next step waiting for a free worker. Every lin
 up front, in LO0: a step's worker changes only its own, adding ✅, its PR and its DECISIONS date in
 that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is done.
 
-- **LO0** The docs: the decision, the design, these lines and the two-worker rule (#602) — ✅ (#LO0PR; DECISIONS 2026-11-16)
+- **LO0** The docs: the decision, the design, these lines and the two-worker rule (#602) — ✅ (#614; DECISIONS 2026-11-16)
 
 - **LO1** The lessons switch, `NEXT_PUBLIC_LESSONS` (#603; after LO0, beside LO10)
 

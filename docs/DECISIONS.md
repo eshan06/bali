@@ -10,7 +10,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-16** — **Bali's teacher portal becomes a phone lock only: questions and slides are switched off in the portal
   but kept in the code, the portal is rebuilt from the approved canvas "Bali portal, lock only", and the conductor may run
-  two workers at once on a phase's lanes (the owner; LO0, #LO0PR, the docs of PLAN's Lock-only portal phase).**
+  two workers at once on a phase's lanes (the owner; LO0, #614, the docs of PLAN's Lock-only portal phase).**
 
   **Why** (the owner, word for word): "Something I'm having concerns with is not really going by the value prop of the app.
   We talk about how there's legislation banning phone use in all these different states. Yet, Bali as an app still has this

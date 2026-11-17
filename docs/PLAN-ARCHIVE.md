@@ -2616,7 +2616,7 @@ runs unchanged, and `npm test` passes whole on the PC.
   DECISIONS 2026-10-22), `zod` 4.6.6 (#444; DECISIONS 2026-10-23) and the database pool's guard
   (#439; DECISIONS 2026-10-22); their full lines in `docs/PLAN-ARCHIVE.md`.
 
-**In flight, three finished lines as PLAN.md said them until LO0 (2026-11-16, #LO0PR; moved for its word cap):**
+**In flight, three finished lines as PLAN.md said them until LO0 (2026-11-16, #614; moved for its word cap):**
 - **A stuck slide upload stops (the owner, 2026-10-22: "ok fine the 30 s and 25 min outer limit is
   good")** ✅ (#436; DECISIONS 2026-10-22): nothing sent for 30 s stops it as one with no answer, in
   the boards' line with Try again; 2 minutes for the bucket's answer once the whole file is sent (the
@@ -2655,13 +2655,13 @@ runs unchanged, and `npm test` passes whole on the PC.
   alert named only the class, and prod's log showed no APNs refusal. Left: dev's step 4. Android's
   FCM tokens are taken since AN11a (#598); their sender is AN11b.
 
-**Now, Phase 7's paragraph as PLAN.md said it until LO0 (2026-11-16, #LO0PR; moved for its word cap):**
+**Now, Phase 7's paragraph as PLAN.md said it until LO0 (2026-11-16, #614; moved for its word cap):**
 **Phase 7, Live lesson: building.** Every step with no screen is done, L3c the last (2026-10-15);
 M0 is done (deck storage on, 2026-10-12); the web screens come after the redesign's PV15 (✅ #388),
 W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407, #408, its follow-up #409), L7b (✅ #393, #394, #395, #411), L7c (✅ #412), M6 (✅ #413–#418), W5 (✅ #419), so every web screen of Phase 7 is built, and the phone's L8, M8 and M8b (✅ L8a–L8c, M8, #452, and M8b, #454; their 📱 device checks passed on prod, 2026-11-08, but for three steps not run); the exit checks L9, M10 and W6 passed with one student (2026-11-08). L0b, production backups, is on before the Vanderbilt pilot (the owner,
 2026-11-05).
 
-**In flight, the Mac session's line as PLAN.md said it until LO0 (2026-11-16, #LO0PR; moved for its word cap):**
+**In flight, the Mac session's line as PLAN.md said it until LO0 (2026-11-16, #614; moved for its word cap):**
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
   keeps D1's look, Sign in the sign-in redesign's (#583), until the owner approves a new one (its
   redesign rolled back, 2026-10-06). The
@@ -2671,7 +2671,7 @@ W3 the first (✅ #392), M5 (✅ #400), L7 (✅ #402, #405), W4 (✅ #406, #407,
   the owner's, the three steps it didn't run (Before the pilot, item 2). C2's legal words (⚖️) go
   into the portal's pages, on the Windows PC.
 
-**Before the pilot, the list as PLAN.md said it until LO0 (2026-11-16, #LO0PR; moved for its word cap):**
+**Before the pilot, the list as PLAN.md said it until LO0 (2026-11-16, #614; moved for its word cap):**
 **Before the pilot (the owner, 2026-11-03; DECISIONS 2026-11-03).** Left, in order:
 1. A new prod TestFlight build from `main` — ✅ build 12 (2026-11-07, from #538), linking the old
    portal address, which redirects, and build 13 (2026-11-07, from #542), the first linking
@@ -2882,7 +2882,7 @@ of 2026-10-10, their words and states carried over except where it changes them 
 "Live lesson", decisions 11–13; DESIGN.md, Sources). The exit checks, M0 and L0b are
 the owner's.
 
-The section's intro as PLAN.md said it until LO0 (2026-11-16, #LO0PR; moved for its word cap):
+The section's intro as PLAN.md said it until LO0 (2026-11-16, #614; moved for its word cap):
 
 Planned 2026-10-05 (`docs/DECISIONS.md`); the design is ARCHITECTURE's "Live lesson (Phase 7)",
 and every step builds against it. **Status: building** (the owner lifted the hold and approved both canvases on 2026-10-10): the steps with no screen are done, and M0 is done (2026-10-12). **The web screens come after the portal redesign's PV15** (the owner, 2026-10-12: its groundwork, its side menu and the pages they sit on first; "Portal redesign (v2's look) steps"). Then the UI, **web first** (the owner, 2026-10-10): in each slice the teacher's portal, then the student web, then the phone (Slice 1: L7, W3, W4, L7b, L3c, L7c, then L8; Slice 2: M5, M6, W5, then M8); the redesign's PV16 and PV17 follow the web screens, not waiting for the phone's (L8, M8). Each step is one PR from a fresh worker, under ~400 changed
@@ -2896,7 +2896,7 @@ of 2026-10-10, their words and states carried over except where it changes them 
 "Live lesson", decisions 11–13; DESIGN.md, Sources). The exit checks, M0 and L0b are
 the owner's.
 
-L0b's line as PLAN.md said it until LO0 (2026-11-16, #LO0PR; moved for its word cap), L0b still open:
+L0b's line as PLAN.md said it until LO0 (2026-11-16, #614; moved for its word cap), L0b still open:
 - **L0b** 🔧 **Before the Vanderbilt pilot** ("Before the pilot", item 7; the owner, 2026-11-05, withdrawing 2026-11-03's "we dont need hte prod backups"). The owner: production backups on before the first actual pilot, the Vanderbilt pilot's first class (the owner, 2026-10-12: "we will do the backups later before our first actual pilot", and that pilot is the Vanderbilt one, withdrawing the ruling of 2026-10-05 that ran it without them; until then it was before any build that can answer reaches prod, answers being education records, and before any screen, settled and ordered 2026-10-10), holding back no screen: Railway's Pro plan (runbook 1, step 4), or the nightly `pg_dump` to encrypted S3 that is built ready to enable (Open owner items) — validation: runbook 4's restore drill
 
 Slice 1 — live questions:
@@ -3154,7 +3154,7 @@ plan backstop already treats it as source).
 
 ### The audit's fixes (GA; one PR each; 👀 = the owner looks at screenshots)
 
-The section's intro and its step lines as PLAN.md held them until LO0 (2026-11-16, #LO0PR; moved for its word cap):
+The section's intro and its step lines as PLAN.md held them until LO0 (2026-11-16, #614; moved for its word cap):
 
 The owner's ruling of 2026-11-01 (`docs/DECISIONS.md`): the gstack audit's (2026-10-24) 3 crucial and
 7 cheap findings first, the rest polish left for later. The audit's list lives outside the repo, on
@@ -3186,7 +3186,7 @@ Done items, and the lines `docs/PLAN.md` keeps short or once (as of 2026-10-13).
 - ✅ Before C4: the phone's Cognito app client allows the `aws.cognito.signin.user.admin` scope (Cognito's `DeleteUser` needs it) — prod (2026-10-04) and dev's `bali-ios-dev-public` (2026-10-05).
 - ✅ The pre-pilot event-id step, done 2026-10-23 with part 3 (#449); its line as PLAN.md held it, under "Before the pilot's first class, four steps for sessions": a repeated-`event_id` check on every data-changing route, driven from the authorization matrix's route list, in three parts: part 1, the check ✅ (#442; DECISIONS 2026-10-23), its list the five routes that failed then; part 2, Create class's event id ✅ (#447; DECISIONS 2026-10-23), off the list; next part 3, the three places #319's survey found comparing an id as text, so a retry in upper case misses (a deck's removal, a tap with the unlock sent under it, and an unlock's replay after its reason changed; DECISIONS 2026-10-22), each taking its entries off the list;
 - Two done lines as PLAN.md held them until 2026-11-12 (moved for its word cap): "✅ **Answered** (the owner, 2026-10-14; DECISIONS 2026-10-14): PV5b's whole-page error kept; its review notes folded into PV15 and PV17a; PV4c's two test limits left." and, from Phase 6's owner list, "✅ The reviewers' rules (#359; `docs/DECISIONS.md`, 2026-10-13): security holes, personal data the privacy paths miss and loosened tests block; reviews judge by `main`'s rules and clear the last failed review first; santa's Reviewer B reviews as an attacker; both Claude workflows on Opus 5.5; merged by the owner's ruleset toggle (GOTCHAS)"
-- From Phase 6's owner list, its done line as PLAN.md held it until LO0 (2026-11-16, #LO0PR; moved for its word cap): "✅ Apple's §3.3.3(P) (ISSUES #3): ask App Review whether a teacher-started session and the teacher's grid are allowed, and settle a fallback design if not — **gate**, and the first thing to do — asked by the owner 2026-10-13, case 102994872143 (`docs/APP-STORE.md` §5.6, as sent); **answered** (the owner, 2026-11-03): submit it for review, since App Review decides only once it sees the build, so App Review is the answer; submitted 2026-11-09, approved 2026-11-12"
+- From Phase 6's owner list, its done line as PLAN.md held it until LO0 (2026-11-16, #614; moved for its word cap): "✅ Apple's §3.3.3(P) (ISSUES #3): ask App Review whether a teacher-started session and the teacher's grid are allowed, and settle a fallback design if not — **gate**, and the first thing to do — asked by the owner 2026-10-13, case 102994872143 (`docs/APP-STORE.md` §5.6, as sent); **answered** (the owner, 2026-11-03): submit it for review, since App Review decides only once it sees the build, so App Review is the answer; submitted 2026-11-09, approved 2026-11-12"
 
 ## Go-live features
 
@@ -3272,7 +3272,7 @@ Decisions 6–12 as they read on 2026-10-13 (1–5 are in `docs/PLAN.md`):
 
 ## External / waiting
 
-The finished note as PLAN.md held it until LO0 (2026-11-16, #LO0PR; moved for its word cap):
+The finished note as PLAN.md held it until LO0 (2026-11-16, #614; moved for its word cap):
 
 No longer waiting: the **Family Controls distribution entitlement** (Apple) —
 ✅ granted (owner, 2026-09-24), so TestFlight and the App Store no longer wait
