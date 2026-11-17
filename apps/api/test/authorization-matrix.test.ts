@@ -128,6 +128,7 @@ const MATRIX = {
   'POST /v1/classes/:id/sessions':          [401, 401, 403,     403,     403,     403,       200],
   'POST /v1/blocks':                        [401, 401, 403,     403,     409,     409,       200],
   'GET /v1/blocks':                         [401, 401, 403,     403,     200,     200,       200],
+  'DELETE /v1/blocks/:id':                  [401, 401, 403,     403,     403,     403,       200],
   'GET /v1/sessions/:id':                   [401, 401, 403,     403,     403,     403,       200],
   'GET /v1/sessions/:id/events':            [401, 401, 403,     403,     403,     403,       200],
   'GET /v1/sessions/:id/stream':            [401, 401, 403,     403,     403,     403,       200],
@@ -297,6 +298,11 @@ const REQUESTS: Record<RouteKey, (w: World) => Sent | Promise<Sent>> = {
   'POST /v1/blocks': (w) => ({ url: '/v1/blocks', body: { tagId: w.block.tagId } }),
   // Each teacher's own: another teacher reads theirs, never the owner's block.
   'GET /v1/blocks': () => ({ url: '/v1/blocks' }),
+  // The owner's own block, while its class's session runs (LO10b): another teacher's is refused.
+  'DELETE /v1/blocks/:id': (w) => ({
+    url: `/v1/blocks/${w.block.id}`,
+    body: { eventId: newUuidV7() },
+  }),
   'GET /v1/sessions/:id': (w) => ({ url: `/v1/sessions/${w.sessionId}` }),
   'GET /v1/sessions/:id/events': (w) => ({ url: `/v1/sessions/${w.sessionId}/events` }),
   'GET /v1/sessions/:id/stream': (w) => ({

@@ -225,6 +225,13 @@
       "when": 1794620141987,
       "tag": "0031_push_token_service",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794953352291,
+      "tag": "0032_block_removed_event_id",
+      "breakpoints": true
     }
   ]
 }

@@ -4,10 +4,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   createBlock,
   createClass,
+  findBlock,
   generateJoinCode,
   JOIN_CODE_ALPHABET,
   JOIN_CODE_LENGTH,
   listBlocks,
+  removeBlock,
   updateClass,
 } from '../src/management.js';
 import { newUuidV7 } from '../src/ids.js';
@@ -286,12 +288,11 @@ describe('createBlock', () => {
     // dead block and teacher B's live one can share it; without the
     // `removed_at IS NULL` filter the read could pick A's dead row and answer
     // `already_registered`, handing A a removed block and hiding B's claim.
-    // Staged by soft-removing directly: no shipped path removes a block yet.
     const a = await makeTeacher('cb-dead-a');
     const b = await makeTeacher('cb-dead-b');
     const dead = await createBlock(db, { teacherId: a.teacherId, tagId: 'CB-TAG-DEAD' });
     if (dead.outcome !== 'registered') throw new Error(`registered, got ${dead.outcome}`);
-    await db.update(blocks).set({ removedAt: new Date() }).where(eq(blocks.id, dead.block.id));
+    await removeBlock(db, { blockId: dead.block.id, eventId: newUuidV7() });
     expect((await createBlock(db, { teacherId: b.teacherId, tagId: 'CB-TAG-DEAD' })).outcome).toBe(
       'registered',
     );
@@ -312,11 +313,121 @@ describe('listBlocks', () => {
     await createBlock(db, { teacherId: b.teacherId, tagId: 'LB-TAG-B' });
     if (first.outcome !== 'registered' || second.outcome !== 'registered') throw new Error('seed');
     if (gone.outcome !== 'registered') throw new Error('seed');
-    // Staged by soft-removing directly: no shipped path removes a block yet.
-    await db.update(blocks).set({ removedAt: new Date() }).where(eq(blocks.id, gone.block.id));
+    await removeBlock(db, { blockId: gone.block.id, eventId: newUuidV7() });
 
     const listed = await listBlocks(db, a.teacherId);
     expect(listed.map((block) => block.tagId)).toEqual(['LB-TAG-1', 'LB-TAG-2']);
     expect(await listBlocks(db, (await makeTeacher('lb-none')).teacherId)).toEqual([]);
+  });
+});
+
+describe('removeBlock (LO10b)', () => {
+  /** A teacher's block, registered: its row. */
+  async function aBlock(tag: string, teacherId?: string) {
+    teacherId ??= (await makeTeacher(tag)).teacherId;
+    const made = await createBlock(db, { teacherId, tagId: `RB-${tag}` });
+    if (made.outcome !== 'registered') throw new Error(`registered, got ${made.outcome}`);
+    return made.block;
+  }
+
+  const rowOf = async (id: string) => one(await db.select().from(blocks).where(eq(blocks.id, id)));
+
+  it('marks the block removed, never deleted, at the clock it is given, under its eventId', async () => {
+    const block = await aBlock('rb-basic');
+    const now = new Date('2026-11-17T15:00:00Z');
+    const eventId = newUuidV7();
+
+    const removed = await removeBlock(db, { blockId: block.id, eventId, now });
+    expect(removed).toEqual({
+      outcome: 'removed',
+      block: { ...block, removedAt: now, removedEventId: eventId },
+    });
+    expect(await rowOf(block.id)).toEqual({ ...block, removedAt: now, removedEventId: eventId });
+    expect(await listBlocks(db, block.teacherId)).toEqual([]);
+  });
+
+  it('a resend under its id, in either case, is a replay: the block as it is, nothing written', async () => {
+    const block = await aBlock('rb-replay');
+    const eventId = newUuidV7();
+    const first = await removeBlock(db, { blockId: block.id, eventId });
+    if (first.outcome !== 'removed') throw new Error(`removed, got ${first.outcome}`);
+
+    for (const resent of [eventId, eventId.toUpperCase()]) {
+      const later = new Date(Date.now() + 60_000);
+      expect(await removeBlock(db, { blockId: block.id, eventId: resent, now: later })).toEqual({
+        outcome: 'replay',
+        block: first.block,
+      });
+    }
+    expect(await rowOf(block.id)).toEqual(first.block);
+  });
+
+  it('removed twice, under a new id: a replay too, the first removal kept as it was', async () => {
+    // Two tabs of the portal, each pressing Remove: the second finds it removed already, the truth.
+    const block = await aBlock('rb-twice');
+    const first = await removeBlock(db, { blockId: block.id, eventId: newUuidV7() });
+    if (first.outcome !== 'removed') throw new Error(`removed, got ${first.outcome}`);
+
+    const second = await removeBlock(db, { blockId: block.id, eventId: newUuidV7() });
+    expect(second).toEqual({ outcome: 'replay', block: first.block });
+    expect(await rowOf(block.id)).toEqual(first.block);
+  });
+
+  it("an id another block's removal holds is EVENT_ID_CONFLICT, in either case, and removes nothing", async () => {
+    const teacher = await makeTeacher('rb-spent');
+    const gone = await aBlock('rb-spent-1', teacher.teacherId);
+    const live = await aBlock('rb-spent-2', teacher.teacherId);
+    const eventId = newUuidV7();
+    await removeBlock(db, { blockId: gone.id, eventId });
+
+    for (const spent of [eventId, eventId.toUpperCase()]) {
+      await expect(removeBlock(db, { blockId: live.id, eventId: spent })).rejects.toMatchObject({
+        code: 'EVENT_ID_CONFLICT',
+      });
+    }
+    expect(await rowOf(live.id)).toEqual(live);
+  });
+
+  it('no block with the id is block_not_found, and writes nothing', async () => {
+    expect(await removeBlock(db, { blockId: newUuidV7(), eventId: newUuidV7() })).toEqual({
+      outcome: 'block_not_found',
+    });
+  });
+
+  it('frees the tag: registered again at once, by its teacher or another, as a new block', async () => {
+    // The owner's "Free the code" (2026-11-17): `blocks_tag_active_unique` holds live rows only.
+    const a = await makeTeacher('rb-free-a');
+    const b = await makeTeacher('rb-free-b');
+    const lost = await aBlock('rb-free', a.teacherId);
+    await removeBlock(db, { blockId: lost.id, eventId: newUuidV7() });
+
+    const again = await createBlock(db, { teacherId: a.teacherId, tagId: lost.tagId });
+    if (again.outcome !== 'registered') throw new Error(`registered, got ${again.outcome}`);
+    expect(again.block.id).not.toBe(lost.id);
+    expect((await rowOf(lost.id)).removedAt).not.toBeNull();
+    expect(await listBlocks(db, a.teacherId)).toEqual([again.block]);
+
+    // Removed again, and another teacher's now: their own new block, a third row with the tag.
+    await removeBlock(db, { blockId: again.block.id, eventId: newUuidV7() });
+    const theirs = await createBlock(db, { teacherId: b.teacherId, tagId: lost.tagId });
+    if (theirs.outcome !== 'registered') throw new Error(`registered, got ${theirs.outcome}`);
+    expect(await listBlocks(db, b.teacherId)).toEqual([theirs.block]);
+    expect(await listBlocks(db, a.teacherId)).toEqual([]);
+    expect(await db.select().from(blocks).where(eq(blocks.tagId, lost.tagId))).toHaveLength(3);
+    expect(
+      await db
+        .select()
+        .from(blocks)
+        .where(and(eq(blocks.tagId, lost.tagId), isNull(blocks.removedAt))),
+    ).toEqual([theirs.block]);
+  });
+
+  it('findBlock reads a block live or removed, and none for an id no block has', async () => {
+    const block = await aBlock('rb-find');
+    expect(await findBlock(db, block.id)).toEqual(block);
+    const removed = await removeBlock(db, { blockId: block.id, eventId: newUuidV7() });
+    if (removed.outcome !== 'removed') throw new Error(`removed, got ${removed.outcome}`);
+    expect(await findBlock(db, block.id)).toEqual(removed.block);
+    expect(await findBlock(db, newUuidV7())).toBeUndefined();
   });
 });

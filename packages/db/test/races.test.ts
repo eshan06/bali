@@ -10,7 +10,7 @@ import {
 } from '../src/cognito-deletions.js';
 import { PUSH_TOKENS_PER_STUDENT, registerPushToken } from '../src/device-tokens.js';
 import { newUuidV7 } from '../src/ids.js';
-import { createBlock, createClass } from '../src/management.js';
+import { createBlock, createClass, removeBlock } from '../src/management.js';
 import {
   claimDecksToDrop,
   findOrCreateStudent,
@@ -6527,5 +6527,118 @@ describe.runIf(REAL_PG)('live lesson questions under contention (real Postgres, 
         laterFirst ? [later.eventId] : [earlier.eventId, later.eventId],
       );
     }
+  }, 20_000);
+});
+
+describe.runIf(REAL_PG)('blocks removed under contention (real Postgres, LO10b)', () => {
+  beforeAll(async () => {
+    await Promise.all(Array.from({ length: 5 }, () => db.execute(sql`select 1`)));
+  });
+
+  /** A teacher of their own, and the block they registered: its row. */
+  async function registered(tag: string) {
+    const teacher = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: `t-${tag}`, role: 'teacher' })
+        .returning(),
+    );
+    const made = await createBlock(db, { teacherId: teacher.id, tagId: `TAG-${tag}` });
+    if (made.outcome !== 'registered') throw new Error(`registered, got ${made.outcome}`);
+    return made.block;
+  }
+
+  const rowOf = async (id: string) => one(await db.select().from(blocks).where(eq(blocks.id, id)));
+
+  it('a removal behind another of the same block, uncommitted, waits, then is its replay', async () => {
+    // The first holds the block's row FOR UPDATE: the one behind waits for its commit, then reads
+    // the block removed, under the first's id, whether it is the first's resend (in upper case
+    // here) or another removal (two tabs).
+    for (const behind of ['resend', 'another'] as const) {
+      const block = await registered(`race-remove-${behind}`);
+      const eventId = newUuidV7();
+      const settled = await behindCommit(
+        (tx) => removeBlock(tx, { blockId: block.id, eventId }),
+        () =>
+          removeBlock(db, {
+            blockId: block.id,
+            eventId: behind === 'resend' ? eventId.toUpperCase() : newUuidV7(),
+          }),
+      );
+
+      if (settled.status === 'rejected') throw settled.reason as Error;
+      const removed = await rowOf(block.id);
+      expect(removed.removedEventId).toBe(eventId);
+      expect(settled.value).toEqual({ outcome: 'replay', block: removed });
+    }
+  }, 40_000);
+
+  it('two blocks removed under one id at once: one removed, the other EVENT_ID_CONFLICT and live', async () => {
+    // The column's unique constraint arbitrates: the second write waits for the first's commit,
+    // then meets its id, and is refused as an id another removal holds, never a raw 23505 (a 500).
+    const first = await registered('race-remove-spent-1');
+    const second = await registered('race-remove-spent-2');
+    const eventId = newUuidV7();
+    const settled = await behindCommit(
+      (tx) => removeBlock(tx, { blockId: first.id, eventId }),
+      () => removeBlock(db, { blockId: second.id, eventId }),
+    );
+
+    expect(settled.status).toBe('rejected');
+    if (settled.status === 'rejected') {
+      expect(settled.reason).toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    }
+    expect((await rowOf(first.id)).removedEventId).toBe(eventId);
+    expect(await rowOf(second.id)).toEqual(second);
+  }, 20_000);
+
+  it('a registration meeting the removal of its tag’s block under way waits it out, then registers', async () => {
+    // The removal's two statements, as `removeBlock` makes them, paused between: its block's row
+    // held FOR UPDATE, not yet written. The registration's insert meets the block, live (a lock
+    // alone never makes it wait), and does nothing; its read of the tag's holder, FOR SHARE, waits
+    // for the removal; the removal writes and commits; the read finds no live holder (Postgres
+    // re-checks the row it waited for), and the registration goes again, the tag free. Without
+    // that, `tag_taken` for a tag no block held.
+    const lost = await registered('race-remove-free');
+    const teacher = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 't-race-remove-free-next', role: 'teacher' })
+        .returning(),
+    );
+    let release!: () => void;
+    const go = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked!: () => void;
+    const holding = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const removal = db.transaction(async (tx) => {
+      await tx.select().from(blocks).where(eq(blocks.id, lost.id)).for('update');
+      locked();
+      await go;
+      await tx
+        .update(blocks)
+        .set({ removedAt: new Date(), removedEventId: newUuidV7() })
+        .where(eq(blocks.id, lost.id));
+    });
+    await holding;
+    const registering = createBlock(db, { teacherId: teacher.id, tagId: lost.tagId });
+    registering.catch(() => undefined);
+    // Released whatever the wait finds, so the removal never holds the row past it.
+    const parked = await waitForLockWaiter('for share').finally(release);
+    await removal;
+
+    expect(parked, 'the registration never waited on the removal: not staged').toBe(true);
+    const result = await registering;
+    const live = one(
+      await db
+        .select()
+        .from(blocks)
+        .where(and(eq(blocks.tagId, lost.tagId), isNull(blocks.removedAt))),
+    );
+    expect(result).toEqual({ outcome: 'registered', block: live });
+    expect(live.teacherId).toBe(teacher.id);
   }, 20_000);
 });

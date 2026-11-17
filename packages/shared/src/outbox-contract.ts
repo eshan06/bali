@@ -111,8 +111,8 @@ const TAP_RECORDED: Record<TapOutcome, 'joins' | 'waits'> = {
  *   - 401 -> 'reauth'. No response, 408, 429, any 5xx, or a 2xx without a
  *     known outcome -> 'retry'.
  *   - any other 4xx -> 'retry_and_surface'. What `/v1/taps` refuses: 400 (a
- *     malformed tap; 413 and 415 are Fastify's), 404 (not a registered
- *     block), and 409 — `conflict`, told apart by `error.reason` (A5). The
+ *     malformed tap; 413 and 415 are Fastify's), 404 (no live block holds
+ *     the tag), and 409 — `conflict`, told apart by `error.reason` (A5). The
  *     409s:
  *       - `event_id_conflict`: the id is held by a different event — another
  *         student's, another kind, or this student's tap under another
@@ -123,7 +123,13 @@ const TAP_RECORDED: Record<TapOutcome, 'joins' | 'waits'> = {
  *         server resolving the block and locking the session (the bell),
  *         whose retry resolves afresh.
  *     A retry recorded but no longer current is not among them since A4: it
- *     is `200 replay` with no session ('reread').
+ *     is `200 replay` with no session ('reread'). Nor, since LO10a, the retry
+ *     of a tap whose block moved: its teacher removed it, which frees its
+ *     tag, and another may have registered the tag since (LO10b). A tap of
+ *     this student's on record under a teacher who held a block with the tag
+ *     is this tap's retry (`sameTap` in `@bali/db`), answered as any retry
+ *     is, never 409 or 404; the same id at a tag that teacher never held is
+ *     still `event_id_conflict`.
  */
 export function tapDisposition(
   result: number | 'network_error',

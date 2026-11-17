@@ -81,6 +81,12 @@ export const blocks = pgTable(
       .references(() => users.id),
     createdAt: createdAt(),
     removedAt: removedAt(),
+    /**
+     * The `eventId` of the teacher's removal that removed it (LO10b, `DELETE /v1/blocks/{id}`): a
+     * resend finds its block here, and another block's removal can't spend it again. Null for a
+     * live block, and for one a school's disposal removed.
+     */
+    removedEventId: uuid('removed_event_id').unique(),
   },
   (t) => [
     // One active owner per physical tag — but a tag can be re-registered
