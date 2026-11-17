@@ -504,6 +504,12 @@
     outline-offset: 2px;
   }
 
+  /* The top bar stays in view as a teacher's page scrolls (LO2): a control focused or scrolled to
+     lands clear of it, its phone row with a live class included (WCAG 2.4.11). */
+  html {
+    scroll-padding-top: 7rem;
+  }
+
   /* Italic text in Instrument Sans's italic face, a family of its own (fonts.ts), never the
      upright slanted: `italic`, as Reports' framing line takes it, `em` and `i`. */
   :where(.italic, em, i) {

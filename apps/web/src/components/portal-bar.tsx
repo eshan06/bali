@@ -1,16 +1,18 @@
 'use client';
 
+import type { SessionSnapshot } from '@bali/shared';
 import { LogOut, Menu, X } from 'lucide-react';
 import Link from 'next/link';
-import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Button, ICON_BUTTON, LockButton } from '@/components/button';
 import { LOCKUP, Mark, TOP_BAR } from '@/components/mark';
 import { liveNow, nextBell, type TaughtClass } from '@/lib/classes';
-import { gridDisplay } from '@/lib/grid-state';
+import { fromSnapshot, gridDisplay } from '@/lib/grid-state';
 import { laterBell } from '@/lib/session-controls';
+import { useApi } from '@/lib/use-api';
 
-import { type GridNow, LiveGrid, stateCounts } from './live-grid';
+import { stateCounts } from './live-grid';
 import { Ring, shareLeft, timeLeft, useClock } from './live-header';
 
 /**
@@ -101,103 +103,84 @@ function ridingFor(
 const STRIP =
   'inline-flex min-h-9 max-w-full items-center gap-3 rounded-full border border-live-edge bg-live-fill pr-4 pl-2 text-meta whitespace-nowrap text-text-secondary transition-colors hover:border-live-hover';
 
-/**
- * The live class in the bar, drawn from its grid as it stands (`GridNow`), a link to its page
- * (Reports; BarStates, drawn first): the ring, the time left to the bell, its name, cut to fit
- * with the whole of it on hover and in the link's words, and how many of the class are focused,
- * gone under 1024 px, as on a phone. Nothing until its session is first read, so a class ended a
- * moment ago never shows as live; no count while Bali can't vouch for it (its feed reconnecting or
- * quiet, or its read failed). A read that failed is tried again as each page opens.
- */
-export function LiveStripView({
-  name,
-  href,
-  grid,
-  startedAt,
-  bell,
-  now,
-  path,
-}: {
-  name: string;
-  href: string;
-  grid: GridNow;
-  startedAt: string | null;
-  bell: string;
-  now: number;
-  path: string;
-}) {
-  const seen = useRef(path);
-  useEffect(() => {
-    if (seen.current === path) return;
-    seen.current = path;
-    if (grid.error !== null && !grid.retrying) grid.retry();
-  });
-  if (grid.students === null && grid.error === null) return null;
-  const counts =
-    grid.students === null || grid.error !== null || grid.stale !== null
-      ? null
-      : stateCounts(Object.values(grid.students).map((s) => gridDisplay(s, grid.now)));
-  const left = `${timeLeft(Date.parse(bell) - now)} left`;
-  const focused = counts === null ? null : `${counts.counts.focused} of ${counts.total} focused`;
-  return (
-    <Link
-      href={href}
-      aria-label={`${name} is live. ${left}${focused === null ? '' : `, ${focused}`}. Open the class.`}
-      className={STRIP}
-    >
-      <span className="shrink-0 p-px">
-        <Ring
-          share={startedAt === null ? 0 : shareLeft(startedAt, bell, now)}
-          box={18}
-          stroke={3}
-        />
-      </span>
-      <span title={name} className="min-w-0 truncate font-semibold text-text-primary">
-        {name}
-      </span>
-      <span>{left}</span>
-      {focused === null ? null : (
-        <span className="font-medium text-state-focused-fg max-lg:hidden">{focused}</span>
-      )}
-    </Link>
-  );
-}
+/** How often the bar reads its live class's session again: the class page's own 15 s. */
+const READ_EVERY_MS = 15_000;
 
 /**
- * The live class's grid, as Home's live card reads it (`LiveGrid`: its snapshot, its live feed,
- * its 15 s read), its bell the later of the account's and the snapshot's (time added), drawn as
- * `LiveStripView` until that bell by this computer's clock; the server ending it is told to the bar.
+ * The live class in the bar (Reports; BarStates, drawn first), a link to its page: the ring, the
+ * time left to the bell, its name, cut to fit with the whole of it on hover and in the link's
+ * words, and how many of the class are focused, gone under 1024 px as on a phone. Its session is
+ * read as it shows and every 15 s after, as the class page reads its own, with no live feed of its
+ * own, which in every tab would count against a teacher's five. Nothing until a read says the
+ * session runs, so a class ended a moment ago never shows as live; no count while the latest read
+ * failed. Its bell is the later of the account's and the read's: a later one (time added, in this
+ * tab or another) has the account read again (`onLater`, the shell's `refresh`), as Home's live
+ * card does, so the bar keeps the class to it. The server's end is told to the bar (`onEnded`).
  */
 function LiveStrip({
   riding: { c, session },
-  path,
   onEnded,
+  onLater,
 }: {
   riding: Riding;
-  path: string;
   onEnded: (sessionId: string) => void;
+  onLater: () => Promise<void>;
 }) {
-  const [read, setRead] = useState<{ startedAt: string; endsAt: string } | null>(null);
-  const bell = laterBell(read?.endsAt ?? null, session.endsAt);
+  const api = useApi();
+  const [snap, setSnap] = useState<SessionSnapshot | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let gone = false;
+    const read = () =>
+      api.get<SessionSnapshot>(`/v1/sessions/${session.id}`).then(
+        (answer) => {
+          if (gone) return;
+          if (answer.ended) onEnded(session.id);
+          setSnap(answer);
+          setFailed(false);
+        },
+        () => {
+          if (!gone) setFailed(true);
+        },
+      );
+    void read();
+    const timer = window.setInterval(() => void read(), READ_EVERY_MS);
+    return () => {
+      gone = true;
+      window.clearInterval(timer);
+    };
+  }, [api, session.id, onEnded]);
+  const later = snap !== null && Date.parse(snap.session.endsAt) > Date.parse(session.endsAt);
+  useEffect(() => {
+    if (later) void onLater();
+  }, [later, snap, onLater]);
+  const bell = laterBell(snap?.session.endsAt ?? null, session.endsAt);
   const now = useClock(bell);
-  if (now >= Date.parse(bell)) return null;
+  if (snap === null || snap.ended || now >= Date.parse(bell)) return null;
+  const counts = failed
+    ? null
+    : stateCounts(Object.values(fromSnapshot(snap)).map((s) => gridDisplay(s, new Date(now))));
+  const left = `${timeLeft(Date.parse(bell) - now)} left`;
+  const focused = counts === null ? null : `${counts.counts.focused} of ${counts.total} focused`;
   return (
-    <LiveGrid
-      sessionId={session.id}
-      onEnded={onEnded}
-      onSession={({ startedAt, endsAt }) => setRead({ startedAt, endsAt })}
-      card={(grid) => (
-        <LiveStripView
-          name={c.name}
-          href={`/classes/${c.id}`}
-          grid={grid}
-          startedAt={read?.startedAt ?? null}
-          bell={bell}
-          now={now}
-          path={path}
-        />
-      )}
-    />
+    <div className="min-w-0 max-[760px]:col-span-2 max-[760px]:row-start-2 max-[760px]:pb-2.5">
+      <Link
+        href={`/classes/${c.id}`}
+        aria-label={`${c.name} is live. ${left}${focused === null ? '' : `, ${focused}`}. Open the class.`}
+        className={STRIP}
+      >
+        <span className="shrink-0 p-px">
+          <Ring share={shareLeft(snap.session.startedAt, bell, now)} box={18} stroke={3} />
+        </span>
+        <span title={c.name} className="min-w-0 truncate font-semibold text-text-primary">
+          {c.name}
+        </span>
+        <span>{left}</span>
+        {focused === null ? null : (
+          <span className="font-medium text-state-focused-fg max-lg:hidden">{focused}</span>
+        )}
+      </Link>
+    </div>
   );
 }
 
@@ -255,6 +238,7 @@ export function TopBar({
   const open = openOn === path;
   const [now, setNow] = useState(() => Date.now());
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
+  const ended = useCallback((id: string) => setGone((had) => new Set(had).add(id)), []);
 
   const was = useRef(path);
   useEffect(() => {
@@ -303,14 +287,7 @@ export function TopBar({
           ))}
         </nav>
         {riding === null ? null : (
-          <div className="min-w-0 max-[760px]:col-span-2 max-[760px]:row-start-2 max-[760px]:pb-2.5">
-            <LiveStrip
-              key={riding.session.id}
-              riding={riding}
-              path={path}
-              onEnded={(id) => setGone((had) => new Set(had).add(id))}
-            />
-          </div>
+          <LiveStrip key={riding.session.id} riding={riding} onEnded={ended} onLater={refresh} />
         )}
         <div className="ml-auto flex shrink-0 items-center gap-3 max-[760px]:col-start-2 max-[760px]:row-start-1">
           <Link href={HELP.href} className={`${PLACE} max-[760px]:hidden`}>
@@ -377,6 +354,7 @@ export function TopBar({
             key={place.href}
             href={place.href}
             aria-current={isHere(path, place) ? 'page' : undefined}
+            onClick={() => setOpenOn(null)}
             className={MENU_LINK}
           >
             {place.label}

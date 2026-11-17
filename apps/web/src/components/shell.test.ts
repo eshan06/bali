@@ -449,12 +449,13 @@ describe('the shell', () => {
   const page = createElement('div', null, 'page');
   const own = createElement('main', null, 'page');
 
-  it('sets the page under the top bar centred under its row, 1360 px at most, in its gutters (LO2)', () => {
+  it('sets the page under the top bar centred under its row, 1360 px at most, in its gutters, its sides clipped (LO2)', () => {
     expect(TOP_PAGE.split(' ')).toEqual(
       expect.arrayContaining([
         'mx-auto',
         'w-full',
         'max-w-[1360px]',
+        'overflow-x-clip',
         'px-10',
         'pt-8',
         'pb-16',

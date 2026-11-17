@@ -1,36 +1,42 @@
 // @vitest-environment jsdom
 import type { SessionSnapshot } from '@bali/shared';
-import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TaughtClass } from '../lib/classes';
-import type { Students } from '../lib/grid-state';
-import type { GridNow } from './live-grid';
-import { LiveStripView, TopBar } from './portal-bar';
+import { TopBar } from './portal-bar';
 
 /*
  * A teacher's top bar (LO2; the lock-only canvas's Main, Reports and PhonePages, and BarStates for
  * what they don't draw), as a teacher meets it (the owner's decision of 2026-10-22: the portal's
  * tests drive the page): its places and the page it marks, never Questions or Slides whichever way
  * the lessons switch is set; the account and its Sign out; the phone's menu; and the live class it
- * carries on every other page, its session read as Home's live card reads it (`LiveGrid`), Bali's
- * answers held by the test.
+ * carries on every other page, its session read as it shows and every 15 s after, Bali's answers
+ * the test's.
  */
 const bali = vi.hoisted(() => {
   /** The snapshot each session's read answers with; one missing is held for the test. */
   const snapshots = new Map<string, unknown>();
   /** The reads held, by path, for the test to answer. */
   const held = new Map<string, (body: unknown) => void>();
+  /** The sessions whose reads fail, as with no connection. */
+  const failing = new Set<string>();
+  /** Every read, in order. */
+  const reads: string[] = [];
   return {
     snapshots,
     held,
+    failing,
+    reads,
     // One client and one sign-out for the page's life, as the portal's own hooks keep them.
     api: {
       get: (path: string) =>
-        new Promise((resolve) => {
+        new Promise((resolve, reject) => {
+          reads.push(path);
           const id = path.replace('/v1/sessions/', '');
-          if (snapshots.has(id)) resolve(snapshots.get(id));
+          if (failing.has(id)) reject(new Error('offline'));
+          else if (snapshots.has(id)) resolve(snapshots.get(id));
           else held.set(path, resolve);
         }),
     },
@@ -39,11 +45,10 @@ const bali = vi.hoisted(() => {
 });
 
 vi.mock('@/lib/use-api', () => ({ useApi: () => bali.api, useSignOut: () => bali.signOut }));
-// The live feed, open and quiet: no network.
+// No live feed: a stream opened by the bar would fail here.
 vi.mock('@/lib/sse-client', () => ({
-  createSseClient: (opts: { onStatus?: (status: string) => void }) => {
-    opts.onStatus?.('open');
-    return { close: () => undefined };
+  createSseClient: () => {
+    throw new Error('the bar opens no live feed');
   },
 }));
 
@@ -69,16 +74,24 @@ const BIOLOGY = klass(1, 'Biology, period 3', null);
 const AP = klass(4, 'Period 6 AP Biology', (34 * 60 + 10) * 1000);
 const BIOLOGY_LIVE = klass(1, 'Biology, period 3', (23 * 60 + 4) * 1000);
 
-/** A session's snapshot: `focused` of `count` students in focus, the rest not here. */
-function snapshot(n: number, count: number, focused: number, ended = false): SessionSnapshot {
-  // Its bell the account's, as the class's own (`klass`): none added since.
+/**
+ * A session's snapshot: `focused` of `count` students in focus, the rest not here; its bell the
+ * account's, as the class's own (`klass`), unless time was added since (`endsAt`).
+ */
+function snapshot(
+  n: number,
+  count: number,
+  focused: number,
+  ended = false,
+  endsAt?: string,
+): SessionSnapshot {
   const runs = [BIOLOGY_LIVE, AP].find((c) => c.id === `c${n}`)?.summary?.runningSession;
   return {
     session: {
       id: `s${n}`,
       classId: `c${n}`,
       startedAt: iso(NOW - 16 * 60_000),
-      endsAt: runs?.endsAt ?? iso(NOW),
+      endsAt: endsAt ?? runs?.endsAt ?? iso(NOW),
     },
     ended,
     latestSeq: 1,
@@ -100,6 +113,8 @@ function snapshot(n: number, count: number, focused: number, ended = false): Ses
 beforeEach(() => {
   bali.snapshots.clear();
   bali.held.clear();
+  bali.failing.clear();
+  bali.reads.length = 0;
 });
 afterEach(() => {
   cleanup();
@@ -256,6 +271,10 @@ describe('the phone’s menu (PhonePages, The menu, open)', () => {
     again({ path: '/' });
     expect(panel?.hidden).toBe(true);
     expect(menu.getAttribute('aria-expanded')).toBe('false');
+    // The page open's own link too, though the page stays the same.
+    await user.click(menu);
+    fireEvent.click(within(panel as HTMLElement).getByRole('link', { name: 'Classes' }));
+    expect(panel?.hidden).toBe(true);
   });
 
   it('says Signing out… in the menu while it signs out, and Sign out alone with no name (BarStates)', async () => {
@@ -353,91 +372,75 @@ describe('the live class in the bar (Reports, BarStates)', () => {
   });
 });
 
-describe('the live class’s strip as its grid stands (BarStates)', () => {
-  const BELL = iso(NOW + (34 * 60 + 10) * 1000);
-  const STUDENTS: Students = {
-    u1: {
-      studentId: 'u1',
-      displayName: 'Ethan Park',
-      state: 'focused',
-      joinedAt: new Date(NOW - 15 * 60_000),
-      lastSeenAt: new Date(NOW),
-      endedAt: null,
-      unlock: null,
-      clockOff: false,
-    },
-    u2: {
-      studentId: 'u2',
-      displayName: 'Zuri Mensah',
-      state: null,
-      joinedAt: null,
-      lastSeenAt: null,
-      endedAt: null,
-      unlock: null,
-      clockOff: false,
-    },
-  };
-  const grid = (over: Partial<GridNow>): GridNow => ({
-    students: STUDENTS,
-    now: new Date(NOW),
-    error: null,
-    retry: vi.fn(),
-    retrying: false,
-    stale: null,
-    ...over,
+describe('the live class’s reads and bell, on a fake clock (BarStates)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ now: NOW });
   });
-  const strip = (g: GridNow, path = '/reports') =>
-    render(
-      <LiveStripView
-        name="Period 6 AP Biology"
-        href="/classes/c4"
-        grid={g}
-        startedAt={iso(NOW - 16 * 60_000)}
-        bell={BELL}
-        now={NOW}
-        path={path}
-      />,
-    );
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  /** This page's clock moved on by `ms`, every answer it brings drawn. */
+  const tick = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
+  const UNCOUNTED = /^Period 6 AP Biology is live\. (?:33|34):\d\d left\. Open the class\.$/;
 
-  it('says how many are focused while Bali can vouch for it, and only then', () => {
-    strip(grid({}));
-    expect(riding()?.getAttribute('aria-label')).toBe(
-      'Period 6 AP Biology is live. 34:10 left, 1 of 2 focused. Open the class.',
-    );
-    cleanup();
-    // Its feed reconnecting or gone quiet, or its read failed: the name and the time left alone.
-    for (const g of [
-      grid({ stale: { reason: 'reconnecting', secondsAgo: 40 } }),
-      grid({ stale: { reason: 'stale', secondsAgo: 120 } }),
-      grid({ students: null, error: 'Couldn’t reach Bali.' }),
-    ]) {
-      strip(g);
-      expect(riding()?.getAttribute('aria-label')).toBe(
-        'Period 6 AP Biology is live. 34:10 left. Open the class.',
-      );
-      expect(riding()?.textContent).toBe('Period 6 AP Biology34:10 left');
-      cleanup();
-    }
-    // Before its first read: nothing at all.
-    const { container } = strip(grid({ students: null }));
-    expect(container.innerHTML).toBe('');
+  it('reads its session again every 15 s, with no live feed of its own; while the latest read fails, its name and the time left without a count', async () => {
+    bali.snapshots.set('s4', snapshot(4, 24, 22));
+    bar();
+    await tick(0);
+    expect(riding()?.getAttribute('aria-label')).toMatch(/, 22 of 24 focused\. Open the class\.$/);
+    expect(bali.reads).toEqual(['/v1/sessions/s4']);
+    bali.failing.add('s4');
+    await tick(15_000);
+    expect(bali.reads).toHaveLength(2);
+    expect(riding()?.getAttribute('aria-label')).toMatch(UNCOUNTED);
+    expect(riding()?.textContent).toMatch(/^Period 6 AP Biology(?:33|34):\d\d left$/);
+    // Read again, it answers: its count back.
+    bali.failing.delete('s4');
+    bali.snapshots.set('s4', snapshot(4, 24, 21));
+    await tick(15_000);
+    expect(riding()?.getAttribute('aria-label')).toMatch(/, 21 of 24 focused\. Open the class\.$/);
   });
 
-  it('tries a read that failed again as the next page opens, and not before', () => {
-    const failed = grid({ students: null, error: 'Couldn’t reach Bali.' });
-    const { rerender } = strip(failed);
-    expect(failed.retry).not.toHaveBeenCalled();
-    rerender(
-      <LiveStripView
-        name="Period 6 AP Biology"
-        href="/classes/c4"
-        grid={failed}
-        startedAt={null}
-        bell={BELL}
-        now={NOW}
-        path="/reports/c1/s1"
-      />,
+  it('carries nothing of a class whose first read fails, until a read says it runs', async () => {
+    bali.snapshots.set('s4', snapshot(4, 24, 22));
+    bali.failing.add('s4');
+    bar();
+    await tick(0);
+    expect(riding()).toBeNull();
+    bali.failing.delete('s4');
+    await tick(15_000);
+    expect(riding()?.getAttribute('aria-label')).toMatch(/, 22 of 24 focused\. Open the class\.$/);
+  });
+
+  it('leaves the bar at its bell by this computer’s clock', async () => {
+    const soon = klass(4, 'Period 6 AP Biology', 60_000);
+    bali.snapshots.set('s4', snapshot(4, 24, 22, false, iso(NOW + 60_000)));
+    bar({ classes: [BIOLOGY, soon] });
+    await tick(0);
+    expect(riding()?.getAttribute('aria-label')).toMatch(/is live\. 1:00 left/);
+    // Just past the clock's own read of each second.
+    await tick(59_020);
+    expect(riding()?.getAttribute('aria-label')).toMatch(/is live\. 0:01 left/);
+    await tick(1_000);
+    expect(riding()).toBeNull();
+  });
+
+  it('keeps the class to a later bell its session’s read gives (time added, in this tab or another), having the account read again as Home does', async () => {
+    // The account read before time was added: the bell in a minute. The session now runs ten more.
+    const added = klass(4, 'Period 6 AP Biology', 60_000);
+    const later = iso(NOW + 11 * 60_000);
+    bali.snapshots.set('s4', snapshot(4, 24, 22, false, later));
+    const { props, again } = bar({ classes: [BIOLOGY, added] });
+    await tick(0);
+    expect(riding()?.getAttribute('aria-label')).toMatch(/is live\. 11:00 left, 22 of 24 focused/);
+    expect(props.refresh).toHaveBeenCalled();
+    // The account's answer, with the later bell: the class rides on past the first.
+    again({ classes: [BIOLOGY, klass(4, 'Period 6 AP Biology', 11 * 60_000)] });
+    await tick(90_020);
+    // Past the first bell, still riding (its students silent by now: this stand-in's check-ins
+    // stopped at the start).
+    expect(riding()?.getAttribute('aria-label')).toMatch(
+      /^Period 6 AP Biology is live\. 9:30 left/,
     );
-    expect(failed.retry).toHaveBeenCalledTimes(1);
   });
 });

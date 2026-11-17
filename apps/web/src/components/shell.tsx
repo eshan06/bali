@@ -262,10 +262,12 @@ export const PAGE =
 /**
  * The page under the top bar (lock.css's `.wrap.page`; LO2): centred under the bar's row, 1360 px
  * at most, 40 px in at the sides, 32 over and 64 under; under 760 px 16 px in, 24 over and 48 under.
- * A page not yet rebuilt from the lock-only canvas keeps its own look in it.
+ * A page not yet rebuilt from the lock-only canvas keeps its own look in it, its sides clipped as
+ * lock.css clips the page's, so a layer v2 drew for its own wider gutters (the unlock pop-ups', 36 px
+ * out) never scrolls the page sideways.
  */
 export const TOP_PAGE =
-  'mx-auto w-full max-w-[1360px] px-10 pt-8 pb-16 max-[760px]:px-4 max-[760px]:pt-6 max-[760px]:pb-12';
+  'mx-auto w-full max-w-[1360px] overflow-x-clip px-10 pt-8 pb-16 max-[760px]:px-4 max-[760px]:pt-6 max-[760px]:pb-12';
 
 /**
  * A student's side menu (StudentHome). Its foot names the account, its initials beside the name

@@ -23,11 +23,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   dialog, the unlock pop-ups and the reconnect pill, which stick to the window's top as before, over it.
 
   **The live class in the bar** (the conductor: from what the portal already reads, no API change): the account's
-  running sessions, the first in Your classes' order that isn't the page's own class, none on Classes; its session read
-  as Home's live card reads it (`LiveGrid`), and shown only once that read says it runs, so a class ended a moment ago
-  never shows as live; its count only while Bali can vouch for it. A session starts, ends or runs longer only on a
-  class's page, so as one is left the bar has the shell read the account again (its `refresh`, never beside a read on
-  its way, and after the next page's own reads begin): the account's reads are unchanged, and every other page change
+  running sessions, the first in Your classes' order that isn't the page's own class, none on Classes. Its session is
+  read as it shows and every 15 s after, as the class page reads its own, with no live feed of its own: one in every
+  tab would count against a teacher's five streams and could keep the class page's own, which brings the unlock
+  pop-ups, from connecting (santa's round 1). It shows only once a read says the session runs, so a class ended a
+  moment ago never shows as live, and its count only while the latest read answered. A session starts, ends or runs
+  longer only on a class's page, so as one is left the bar has the shell read the account again (its `refresh`, never
+  beside a read on its way, and after the next page's own reads begin); and a read whose bell is later than the
+  account's (time added, in this tab or another) has it read again too, as Home's live card does, so the class rides
+  to the later bell (santa's round 1, both reviewers). The account's reads are unchanged, and every other page change
   keeps the one read. A class started in another tab rides in the bar from the next read (Home, Classes, or leaving a
   class's page).
 
