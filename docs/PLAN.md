@@ -189,7 +189,9 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO9** 👀 Present (#611; lane B; after LO7)
 
-- **LO10** API: remove a lost block, the conductor's call, awaiting the owner's look (#612; after LO0, beside LO1). The first endpoint that frees a block's code for another teacher, so it settles the other-teacher case first: a tap's honest retry after the block moves (ARCHITECTURE, tap step 9; DECISIONS 2026-09-22's recorded follow-up), an engine change with its race tests
+- **LO10a** API: a tap's honest retry after its block moved, answered as any retry, never `409`, settled before any block can move (#612's first PR; after LO0) — ✅ (#621; DECISIONS 2026-11-17); a tag no live block holds answers such a retry too, where it was `404`
+
+- **LO10b** API: remove a lost block, its code freed for anyone to register again (the owner's "Free the code", 2026-11-17; #612's second PR, which closes it; after LO10a)
 
 - **LO11** 👀 Home: Remove a lost block (#613; lane A; after LO3 and LO10)
 
