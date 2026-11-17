@@ -10,6 +10,7 @@ import type {
 } from '@bali/shared';
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
+import { useLayoutEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Me } from '@/components/shell';
@@ -208,6 +209,19 @@ function open(
       <ReportsPage />
     </main>,
   );
+}
+
+/**
+ * A part rendered after the page that notes, as React commits each render and before any effect of
+ * the page's runs, whether a table is drawn: what the page shows in the render that picks a class.
+ */
+function probing(seen: boolean[]) {
+  return function Probe() {
+    useLayoutEffect(() => {
+      seen.push(document.querySelector('table') !== null);
+    });
+    return null;
+  };
 }
 
 /** Each row of the sessions' table, its cells' words. */
@@ -556,12 +570,17 @@ describe('Reports in between (ReportsMoments, drawn first)', () => {
     const view = open();
     await screen.findByRole('table');
     nav.params = new URLSearchParams(`class=${C2}`);
+    const seen: boolean[] = [];
+    const Probe = probing(seen);
     view.rerender(
       <main>
         <ReportsPage />
+        <Probe />
       </main>,
     );
-    // Never the last class's rows under this one's tab.
+    // Never the last class's rows under this one's tab, not even in the render that picks it
+    // (santa's round 2): their links would name this class with the last one's sessions.
+    expect(seen[0]).toBe(false);
     expect(screen.queryByRole('link', { name: new RegExp(sessionRow(MON).day) })).toBeNull();
     await screen.findByRole('link', { name: new RegExp(sessionRow(SEP).day) });
     bali.sent.length = 0;
@@ -611,11 +630,15 @@ describe('Reports in between (ReportsMoments, drawn first)', () => {
     // The account read again with no class left: no tab, and none of the last class's rows.
     const none = { kind: 'teacher' as const, me: account([]) };
     shell.me = { ...(shell.me as Me), home: none, me: none.me };
+    const seen: boolean[] = [];
+    const Probe = probing(seen);
     view.rerender(
       <main>
         <ReportsPage />
+        <Probe />
       </main>,
     );
+    expect(seen[0]).toBe(false);
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByRole('navigation', { name: 'Class' })).toBeNull();
     expect(screen.getByText('When a session ends, its report shows here.')).toBeDefined();

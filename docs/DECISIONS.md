@@ -58,8 +58,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the 709 lines delete v2's view (the conductor's call, 2026-11-17)."
 
   **Tests:** driven (`app/reports/page.test.tsx`); `components/reports-list.test.ts` converted and gone, 21 source-text
-  tests left, its pins of the page's stale-answer guard, the same-render reset and the cleanup's bump driven now, each
-  shown failing on its mutant (santa's round 1, Reviewer B's blocker); the counts, the share and the bar in
+  tests left, its pins of the page's stale-answer guard, the same-render reset (the render itself seen by a
+  layout-effect probe, santa's round 2) and the cleanup's bump driven now, each shown failing on its mutant (santa's
+  round 1, Reviewer B's blocker); the counts, the share and the bar in
   `lib/reports.test.ts`, the CSV in `lib/report-csv.test.ts`. The share's
   size, `share` (56/56), joins lane A's block. Left for the phase's tidy-up: v2's `text-pill` and `text-bar-row`, unused
   now.
