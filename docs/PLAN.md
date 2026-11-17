@@ -177,7 +177,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO3** 👀 Home, one page for your classes (#605; lane A; after LO2)
 
-- **LO4** 👀 A class before it starts (#606; lane B; after LO2)
+- **LO4** 👀 A class before it starts (#606; lane B; after LO2) — ✅ (#618; DECISIONS 2026-11-17); its in-between states on the canvas's ClassBeforeStates (version 35); left for a step at the phase's end: Try again, and Start while it sends, still v2's button (`TryAgain`, every rebuilt page); for Now at the phase's end: 26 source-text tests left (`join-code.test.ts` converted)
 
 - **LO5** 👀 Live: the count, Check on, the room (#607; lane B; after LO4)
 

@@ -1,28 +1,39 @@
 'use client';
 
 import {
+  type BlockListResponse,
   type ClassDetail,
   type FeedEvent,
   MAX_SESSION_MINUTES,
   type RosterResponse,
+  type SessionReportResponse,
+  type SessionReportsPage,
   type SessionReportSummary,
   type SessionView,
   type StartSessionResponse,
 } from '@bali/shared';
-import { ChartBar, Check, Presentation } from 'lucide-react';
+import { Check, CircleAlert, Presentation } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import {
+  type ComponentProps,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 
 import { AskPanel, NEW_DRAFT, PickPanel } from '@/components/ask-panel';
-import { Button, buttonClass } from '@/components/button';
-import { CARD_ALONE } from '@/components/card';
+import { Button, LockButton, QUIET } from '@/components/button';
+import { WELL } from '@/components/card';
 import { useCount, useCountOpened } from '@/components/count';
 import { DecksPanel } from '@/components/decks-panel';
-import { Field } from '@/components/field';
+import { Input } from '@/components/field';
 import { DIALOG, JoinCode } from '@/components/join-code';
 import { LiveGrid, type StateCounts } from '@/components/live-grid';
-import { LiveCounts, LiveHeader } from '@/components/live-header';
+import { LiveCounts, LiveHeader, Ring } from '@/components/live-header';
 import { PresentQuestion } from '@/components/present-question';
 import { PresentSlide } from '@/components/present-slide';
 import { isOpen, QuestionCard, useLiveQuestion } from '@/components/question-card';
@@ -30,11 +41,20 @@ import { endedToday, RecapCard } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
 import { SlideCard } from '@/components/slide-card';
 import { land, TryAgain } from '@/components/try-again';
-import { SAVE_TIMEOUT_MS } from '@/lib/api-client';
+import { type ApiClient, SAVE_TIMEOUT_MS } from '@/lib/api-client';
 import { getAccessToken } from '@/lib/auth';
-import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
+import { blockIdOf, type RegisterAnswer, registerBlock } from '@/lib/blocks';
+import { daysBefore } from '@/lib/classes';
+import {
+  errText,
+  NOT_A_BLOCK_ID,
+  NOT_A_SESSION_LENGTH,
+  SESSION_ALREADY_RUNNING,
+} from '@/lib/errors';
 import { lessonsOn } from '@/lib/lessons';
 import { failureOf, type QuestionDraft } from '@/lib/live-question';
+import { latestEnded, readEvents, recapGroups } from '@/lib/recap';
+import { reportPath } from '@/lib/reports';
 import {
   DEFAULT_MINUTES,
   EXTEND_PRESETS,
@@ -64,23 +84,219 @@ import { useSlide } from '@/lib/use-slide';
 const PRESENT_PAGE = 'relative flex min-h-dvh flex-col gap-5.5 px-4 pt-9 pb-10 sm:px-12';
 
 /**
- * The length picker, v2's segmented control (ClassBefore): a grey track holding each length as a
- * segment, the radio inside it read by screen readers and clipped away, so the focus ring is drawn
- * on the label for it. The pick is white and raised, in the primary ink, with a check, never colour
- * alone.
+ * The length picker in its well (ClassPage's `.seg`): a stone track holding each length as a
+ * segment, 34 px tall, the radio inside it read by screen readers and clipped away, so the focus ring
+ * is drawn on the label for it. The pick is white and raised, in the primary ink, with a check, never
+ * colour alone; another one greys on hover.
  */
-const TRACK = 'inline-flex flex-wrap gap-0.5 rounded-sm bg-surface-sunken p-0.75';
+const TRACK = 'inline-flex flex-wrap gap-1 self-start rounded-sm bg-border-default p-1';
 const SEGMENT =
-  'relative inline-flex cursor-pointer items-center gap-1.5 rounded-item px-4 py-2.25 text-segment text-text-secondary select-none has-checked:bg-surface-card has-checked:text-text-primary has-checked:shadow-1 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring';
+  'relative inline-flex h-8.5 cursor-pointer items-center gap-1.5 rounded-item px-3 text-segment max-[760px]:px-2.5 whitespace-nowrap text-text-secondary transition-colors select-none [&:not(:has(:checked))]:hover:bg-border-strong has-checked:bg-surface-card has-checked:text-text-primary has-checked:shadow-1 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring';
 
-/**
- * A label over a part of the page (Roster, Join code): v2's section label, 32 px above its card as
- * ClassBefore draws it, its own 12 px and its section's 20 px gap.
- */
-const LABEL = 'mb-3 text-section-label text-text-tertiary uppercase';
+/** A well before class (ClassPage's `.ready`): 24 px in, 20 on a phone, its parts on one row as they fit. */
+const READY = `${WELL} flex flex-wrap items-center justify-between gap-x-8 gap-y-5 p-6 max-[760px]:p-5`;
 
 /** "28 students", "1 student". */
 const students = (count: number) => `${count} ${count === 1 ? 'student' : 'students'}`;
+
+/** A form's own button: Start, in its well. */
+const submitOf = (form: HTMLFormElement | null) =>
+  form?.querySelector<HTMLButtonElement>('[type="submit"]') ?? null;
+
+/**
+ * The class's last session, for the line under the well (ClassPage): none yet; one that ended today,
+ * the recap card's (v2's ClassEnded, until LO7), which reads it whole; else its day, who joined and
+ * how many of them stayed focused the whole time, as the recap counts them.
+ */
+type Last =
+  | { kind: 'finding' }
+  | { kind: 'none' }
+  | { kind: 'today'; session: SessionReportSummary }
+  | { kind: 'line'; session: SessionReportSummary; joined: number; whole: number }
+  | { kind: 'error'; message: string };
+
+async function readLast(api: Pick<ApiClient, 'get'>, classId: string): Promise<Last> {
+  const reports = `/v1/classes/${encodeURIComponent(classId)}/reports/sessions`;
+  try {
+    const session = latestEnded(await api.get<SessionReportsPage>(`${reports}?limit=1`));
+    if (session === null) return { kind: 'none' };
+    if (endedToday(session) !== null) return { kind: 'today', session };
+    const [report, events] = await Promise.all([
+      api.get<SessionReportResponse>(`${reports}/${encodeURIComponent(session.id)}`),
+      readEvents(api, session.id),
+    ]);
+    const whole = recapGroups(session, report, events, []).wholeTime.length;
+    return { kind: 'line', session, joined: report.joined.length, whole };
+  } catch (e) {
+    return { kind: 'error', message: errText(e) };
+  }
+}
+
+/** When it ran, by this computer's calendar: "On Friday" for the last six days, else "On Oct 2". */
+function onDay(startedAt: string, now = new Date()): string {
+  const at = new Date(startedAt);
+  const ago = daysBefore(at, now);
+  if (ago <= 0) return 'Today';
+  if (ago < 7) return `On ${at.toLocaleDateString(undefined, { weekday: 'long' })}`;
+  const year = at.getFullYear() === now.getFullYear() ? undefined : 'numeric';
+  return `On ${at.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year })}`;
+}
+
+/**
+ * A text field in the lock-only look (ClassStates' Block code): its label over it in the meta size,
+ * the Field's own input 220 px wide, its help under it.
+ */
+function LockField({
+  id,
+  label,
+  help,
+  'aria-describedby': describedBy,
+  ...props
+}: Omit<ComponentProps<'input'>, 'className'> & {
+  id: string;
+  label: string;
+  help?: string;
+  mono?: boolean;
+}) {
+  const described = [help ? `${id}-help` : null, describedBy].filter(Boolean).join(' ');
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <label htmlFor={id} className="text-meta text-text-secondary">
+        {label}
+      </label>
+      <div className="w-55 max-w-full">
+        <Input id={id} aria-describedby={described || undefined} {...props} />
+      </div>
+      {help ? (
+        <p id={`${id}-help`} className="text-countdown-sub text-text-tertiary">
+          {help}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A line that something didn't load (HomeStates' `.oops`), between hairlines, with Try again; held
+ * while `held` says a read of it is on its way.
+ */
+function Oops({
+  children,
+  onRetry,
+  held = false,
+  then,
+}: {
+  children: ReactNode;
+  onRetry: () => unknown;
+  held?: boolean;
+  then: readonly string[];
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-y border-border-default py-4">
+      <TryAgain onRetry={onRetry} held={held} then={then}>
+        <p role="alert" className="flex min-w-0 items-center gap-2 text-body">
+          <CircleAlert size={18} aria-hidden="true" className="shrink-0" />
+          {children}
+        </p>
+      </TryAgain>
+    </div>
+  );
+}
+
+/**
+ * No block yet (ClassStates): students lock in by tapping one, so the start waits for one, and the
+ * well asks for its code. The code is checked as the phone reads a tag before it is sent (P3); each
+ * refusal is said under the form, and an answer that never came is sent again as it was by Try
+ * again, which is safe: one's own tag registers once. Registered, the well becomes Start's.
+ */
+function RegisterFirst({ onRegistered }: { onRegistered: () => void }) {
+  const api = useApi();
+  const count = useCount();
+  const id = useId();
+  const field = useRef<HTMLInputElement>(null);
+  // A send under way: a second Enter before the page redraws sends nothing.
+  const sending = useRef(false);
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<Exclude<RegisterAnswer, { kind: 'registered' }> | null>(null);
+
+  async function register() {
+    if (sending.current) return;
+    const tagId = blockIdOf(typed);
+    if (!tagId) {
+      setSaid({ kind: 'refused', message: NOT_A_BLOCK_ID });
+      field.current?.focus();
+      return;
+    }
+    sending.current = true;
+    setBusy(true);
+    setSaid(null);
+    const answer = await registerBlock(api, tagId, []);
+    sending.current = false;
+    setBusy(false);
+    if (answer.kind !== 'registered') {
+      setSaid(answer);
+      if (answer.kind === 'refused') field.current?.focus();
+      return;
+    }
+    count?.('portal_block_registered');
+    onRegistered();
+  }
+
+  return (
+    <section aria-labelledby={`${id}-title`} className={READY}>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <h2 id={`${id}-title`} className="text-section-title">
+          Register your block first
+        </h2>
+        <p className="text-meta text-text-secondary">
+          10 letters and digits, written on your block.
+        </p>
+      </div>
+      {/* Register block's own press; Enter in the field presses it too, the submit sending nothing. */}
+      <form onSubmit={(e) => e.preventDefault()} className="flex flex-wrap items-end gap-2">
+        <LockField
+          ref={field}
+          id={`${id}-code`}
+          label="Block code"
+          mono
+          name="block-code"
+          value={typed}
+          onChange={(e) => {
+            setTyped(e.target.value);
+            setSaid(null);
+          }}
+          readOnly={busy}
+          autoComplete="off"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          translate="no"
+          aria-invalid={said?.kind === 'refused'}
+          aria-describedby={said ? `${id}-said` : undefined}
+        />
+        <TryAgain
+          type="submit"
+          variant="primary"
+          size="md"
+          onRetry={register}
+          held={busy}
+          then={[]}
+          send={{
+            words: 'Register block',
+            sending: 'Registering…',
+            failed: said?.kind === 'failed',
+          }}
+        />
+      </form>
+      {said ? (
+        <p id={`${id}-said`} role="alert" className="basis-full text-body break-words">
+          {said.message}
+        </p>
+      ) : null}
+    </section>
+  );
+}
 
 /**
  * A class's page. While no session runs (PV6; ClassBefore, ClassNewCode, ClassStates' lines before
@@ -123,9 +339,15 @@ export default function ClassDetailPage() {
   } | null>(null);
   // The live grid counted, for the header's line and the counts over the grid (PV7), by session.
   const [counted, setCounted] = useState<{ session: string; counts: StateCounts } | null>(null);
-  // The last session the recap found, for the header's line after the bell (PV12b): its end as the
-  // server marked it, never this computer's clock.
-  const [last, setLast] = useState<SessionReportSummary | null>(null);
+  // The class's last session, for the line under the well, or the recap's card after the bell: read
+  // each time the page shows no session (LO4).
+  const [last, setLast] = useState<Last>({ kind: 'finding' });
+  // Whether the teacher has a block (ClassStates' "No block yet"), read once as the page opens: null
+  // until it answers. One that failed counts as yes, so Bali never keeps Start from a teacher whose
+  // blocks it couldn't list: a session starts without one, only the students' tap needs it.
+  const [hasBlock, setHasBlock] = useState<boolean | null>(null);
+  // Add students, open: the join code under the students' heading (ClassStates).
+  const [adding, setAdding] = useState(false);
   // The class didn't load: said in the session's place, with Try again. Its roster didn't, or a
   // read again of the class failed: said under the header, with Try again. Each said until its read
   // answers, so Try again holds in its place (ClassRetryStates).
@@ -160,12 +382,18 @@ export default function ClassDetailPage() {
   const count = useCount();
   useCountOpened('portal_present_opened', present && klass !== null);
   // The toggle moves as it is pressed (beside the counts, into Present's header), so focus follows;
-  // to Start where none is left to follow (Present left with no session to show).
+  // to Start, its well's own button, where none is left to follow (Present left with no session to
+  // show).
   const toggle = useRef<HTMLButtonElement>(null);
-  const start = useRef<HTMLButtonElement>(null);
+  const startForm = useRef<HTMLFormElement>(null);
   const toggled = useRef(false);
   useEffect(() => {
-    if (toggled.current) (toggle.current ?? start.current)?.focus();
+    if (toggled.current) {
+      const to = toggle.current ?? submitOf(startForm.current);
+      // No block yet, so no Start: the class's name.
+      if (to) to.focus();
+      else land(document, []);
+    }
     toggled.current = false;
   }, [present]);
   // Extend (P10): the last attempt whose answer never came, resent by Try again; and what is said
@@ -321,6 +549,18 @@ export default function ClassDetailPage() {
     void load();
   }, [load, router]);
 
+  useEffect(() => {
+    if (!getAccessToken()) return;
+    let gone = false;
+    void api.get<BlockListResponse>('/v1/blocks').then(
+      (r) => !gone && setHasBlock(r.blocks.length > 0),
+      () => !gone && setHasBlock(true),
+    );
+    return () => {
+      gone = true;
+    };
+  }, [api]);
+
   // A session over here: the roster read again, so the recap's Didn't join counts who joined the
   // class during it and leaves out who left (PV12b); the card waits for it.
   const over = grid?.over ?? false;
@@ -350,6 +590,26 @@ export default function ClassDetailPage() {
     if (live && wasBefore.current && (at === null || at === document.body)) land(document, []);
     wasBefore.current = before;
   }, [live, before]);
+
+  // The last session, read each time the page comes to show no session: as it opens, and after a
+  // bell; forgotten as a Start takes the page, so the next one's never shows the one before it.
+  // Only the newest read's answer is drawn.
+  const lastReads = useRef(0);
+  const readLastSession = useCallback(async () => {
+    const mine = ++lastReads.current;
+    const next = await readLast(api, classId);
+    if (lastReads.current === mine) setLast(next);
+  }, [api, classId]);
+  // Never in Present, whose page after the bell says only that class is over.
+  const showsLast = before && !present;
+  useEffect(() => {
+    if (!showsLast) return;
+    void readLastSession();
+    return () => {
+      lastReads.current += 1;
+      setLast({ kind: 'finding' });
+    };
+  }, [showsLast, readLastSession]);
 
   // The class's last pick on this computer, and Present as this tab left it, read once the page is
   // in the browser (never at render, where the server has no storage), so before the class's read
@@ -416,8 +676,8 @@ export default function ClassDetailPage() {
     }
   }
 
-  function startSession(e: React.FormEvent) {
-    e.preventDefault();
+  /** Start's own press; Enter in the well presses it too, the form's submit sending nothing. */
+  function startSession() {
     if (minutes === null) {
       setLengthSaid(true);
       otherField.current?.focus();
@@ -622,19 +882,12 @@ export default function ClassDetailPage() {
   // The live grid counted, once its session's grid is read.
   const counts = grid !== null && counted?.session === grid.id ? counted.counts : null;
 
-  // The class's line with no session running: "28 students · no session running".
+  // Present's line after the bell, with no session running: "28 students · no session running".
   const noSession = roster
     ? `${students(roster.students.length)} · no session running`
     : 'No session running';
-  // After the bell (ClassEnded), once the recap has found a session that ended today: "28 students ·
-  // the session ended at 9:55 AM". Present's stays `noSession` (PV9's, as it is).
-  const endedAt = endedToday(last);
-  const headLine =
-    endedAt === null
-      ? noSession
-      : roster
-        ? `${students(roster.students.length)} · the session ended at ${endedAt}`
-        : `The session ended at ${endedAt}`;
+  // After the bell, a session that ended today: when, as ClassEnded's line says it (LO7's to redraw).
+  const endedAt = last.kind === 'today' ? endedToday(last.session) : null;
   // A read again of the class failed, or its roster didn't load: said under the header; or the
   // class didn't load, in the session's place. Held while a read of what it says is on its way,
   // the class's or else its roster's, whichever Try again sent it: the class's own answering
@@ -818,189 +1071,238 @@ export default function ClassDetailPage() {
       </section>
     </div>
   ) : (
-    // No session running (PV6), or the class not read yet: v2's look, its parts 22 px apart.
-    <div className={present ? PRESENT_PAGE : 'flex flex-col gap-5.5'}>
-      {/* The name over its line, Reports at the end; on a phone the name at the card titles' size and
-          Reports on a line of its own. */}
-      <header className="flex flex-wrap items-center gap-x-4.5 gap-y-3.5 max-sm:gap-x-3.5">
-        <div className="min-w-0 max-sm:flex-1">
+    // No session running (PV6), or the class not read yet: the lock-only canvas's ClassPage since
+    // LO4 (ClassStates, PhonePages' "A class, before it starts"), its parts 40 px apart, 32 on a phone.
+    <div className={present ? PRESENT_PAGE : 'flex flex-col gap-10 max-[760px]:gap-8'}>
+      {/* The name over its line, the class's reports at the end; on a phone under them. */}
+      <header className="flex flex-wrap items-center gap-x-6 gap-y-4">
+        <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-1">
           <h1
-            className={`text-page-title text-balance wrap-anywhere max-sm:text-h3 ${klass ? '' : 'text-text-tertiary'}`}
+            className={`text-page-title text-balance wrap-anywhere max-[760px]:text-page-title-phone ${klass ? '' : 'text-text-tertiary'}`}
           >
             {klass?.name ?? '…'}
           </h1>
-          {/* Its line's place held while the class is read, so nothing under it moves. */}
-          <p className="mt-0.5 text-meta text-text-secondary">
-            {klass === null ? '\u00a0' : headLine}
+          {/* Its line's place held while the class and its roster are read, so nothing under it
+              moves. */}
+          <p className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-meta text-text-secondary">
+            {klass && roster ? <span>{students(roster.students.length)}</span> : null}
+            {endedAt ? <span>Ended at {endedAt}</span> : null}
+            {(klass && roster) || endedAt ? null : <>&nbsp;</>}
           </p>
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2 max-sm:ml-0 max-sm:basis-full">
-          <Link
-            href={`/reports?class=${encodeURIComponent(classId)}`}
-            className={buttonClass('secondary', '', 'sm')}
-          >
-            <ChartBar size={16} aria-hidden="true" />
-            Reports
-          </Link>
-        </div>
+        <Link href={`/reports?class=${encodeURIComponent(classId)}`} className={QUIET}>
+          This class&apos;s reports
+        </Link>
       </header>
 
       {/* The class is read and its roster isn't (or a read again failed): said under the header. */}
-      {klass ? cantLoad(error ?? rosterError) : null}
+      {klass && (error ?? rosterError) !== null ? (
+        <Oops onRetry={load} held={error !== null ? classReading : rosterReading} then={[]}>
+          Couldn&apos;t load this class. {error ?? rosterError}
+        </Oops>
+      ) : null}
 
-      {klass === null ? (
-        // Until the class is read, the session's place holds no Start: one may already be live.
-        error ? (
-          <section className={CARD_ALONE}>{cantLoad(error)}</section>
-        ) : (
-          // As tall as the Start card it holds the place of (118 px), so nothing jumps.
-          <section aria-label="Session" className={`flex min-h-29.5 items-center ${CARD_ALONE}`}>
-            <p role="status" className="text-body text-text-secondary">
-              Loading…
-            </p>
-          </section>
-        )
+      {klass === null && error !== null ? (
+        // In the well's place: no Start until the class is read, as one may already be live.
+        <Oops onRetry={load} held={classReading} then={[]}>
+          Couldn&apos;t load this class. {error}
+        </Oops>
+      ) : klass === null || hasBlock === null ? (
+        // As tall as the well it holds the place of (118 px), so nothing jumps.
+        <p
+          role="status"
+          className={`${WELL} flex min-h-29.5 items-center p-6 text-body text-text-secondary`}
+        >
+          Loading…
+        </p>
       ) : (
         <>
-          {/* noValidate: the length is checked here and said in Bali's words under the field,
-              never by the browser's own bubble over the number input. */}
-          <form onSubmit={startSession} noValidate className={CARD_ALONE}>
-            <fieldset>
-              <legend className="text-body font-medium">Session length</legend>
-              {/* The lengths on the left, Start on the right; on a phone Start goes under them. */}
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5">
-                <div className={TRACK}>
-                  {[...LENGTH_PRESETS, 'other' as const].map((option) => (
-                    <label key={option} className={SEGMENT}>
-                      <input
-                        type="radio"
-                        name="session-length"
-                        value={option}
-                        checked={pick === option}
-                        onChange={() => {
-                          setPick(option);
+          {hasBlock ? (
+            // noValidate: the length is checked here and said in Bali's words under the field,
+            // never by the browser's own bubble over the number input.
+            <form
+              ref={startForm}
+              onSubmit={(e) => e.preventDefault()}
+              noValidate
+              aria-labelledby={`${id}-length`}
+              className={READY}
+            >
+              <div className="flex min-w-0 flex-wrap items-center gap-x-8 gap-y-4">
+                <Ring share={0} box={48} stroke={5} />
+                <fieldset className="flex min-w-0 flex-col">
+                  <legend id={`${id}-length`} className="mb-2 text-meta text-text-secondary">
+                    Session length
+                  </legend>
+                  {/* Held while a Start is on its way, as Start is: dimmed, a pick changing nothing. */}
+                  <div className={`${TRACK} ${busy === 'start' ? 'opacity-55' : ''}`}>
+                    {[...LENGTH_PRESETS, 'other' as const].map((option) => (
+                      <label key={option} className={SEGMENT}>
+                        <input
+                          type="radio"
+                          name="session-length"
+                          value={option}
+                          checked={pick === option}
+                          onChange={() => {
+                            if (busy === 'start') return;
+                            setPick(option);
+                            setLengthSaid(false);
+                            setStartSaid(null);
+                          }}
+                          className="sr-only"
+                        />
+                        {pick === option ? <Check size={15} aria-hidden="true" /> : null}
+                        {option === 'other' ? 'Other…' : `${option} min`}
+                      </label>
+                    ))}
+                  </div>
+                  {pick === 'other' ? (
+                    <div className="mt-4">
+                      <LockField
+                        ref={otherField}
+                        id={`${id}-minutes`}
+                        label="Minutes"
+                        help={`A whole number from 1 to ${MAX_SESSION_MINUTES}.`}
+                        name="minutes"
+                        type="number"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        min={1}
+                        max={MAX_SESSION_MINUTES}
+                        step={1}
+                        value={other}
+                        onChange={(e) => {
+                          setOther(e.target.value);
                           setLengthSaid(false);
+                          setStartSaid(null);
                         }}
-                        className="sr-only"
+                        readOnly={busy === 'start'}
+                        aria-invalid={lengthSaid}
+                        aria-describedby={lengthSaid ? `${id}-said` : undefined}
                       />
-                      {pick === option ? <Check size={15} aria-hidden="true" /> : null}
-                      {option === 'other' ? 'Other…' : `${option} min`}
-                    </label>
-                  ))}
-                </div>
-                {/* One button throughout, so focus stays on it whatever it comes to say. */}
-                <Button
-                  ref={start}
-                  type="submit"
-                  aria-disabled={busy !== null}
-                  aria-busy={busy === 'start'}
-                >
-                  {busy === 'start'
-                    ? 'Starting…'
-                    : minutes === null
-                      ? 'Start session'
-                      : `Start ${minutes}-minute session`}
-                </Button>
+                    </div>
+                  ) : null}
+                  {/* Right under the help. */}
+                  {lengthSaid ? (
+                    <p id={`${id}-said`} role="alert" className="mt-2 max-w-110 text-body">
+                      {NOT_A_SESSION_LENGTH}
+                    </p>
+                  ) : null}
+                </fieldset>
               </div>
-              {pick === 'other' ? (
-                <div className="mt-4 max-w-xs">
-                  <Field
-                    ref={otherField}
-                    id={`${id}-minutes`}
-                    label="Minutes"
-                    help={`A whole number from 1 to ${MAX_SESSION_MINUTES}.`}
-                    name="minutes"
-                    type="number"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    min={1}
-                    max={MAX_SESSION_MINUTES}
-                    step={1}
-                    value={other}
-                    onChange={(e) => {
-                      setOther(e.target.value);
-                      setLengthSaid(false);
-                    }}
-                    readOnly={busy === 'start'}
-                    aria-invalid={lengthSaid}
-                    aria-describedby={lengthSaid ? `${id}-said` : undefined}
-                  />
-                </div>
-              ) : null}
-              {/* Right under the help, as ClassStates says it. */}
-              {lengthSaid ? (
-                <p id={`${id}-said`} role="alert" className="text-body">
-                  {NOT_A_SESSION_LENGTH}
-                </p>
-              ) : null}
-              {/* A Start that failed, said in its card; Start sends it again. */}
+              {/* One button throughout, so focus stays on it whatever it comes to say: Start,
+                  Starting… while it is on its way, and Try again once one failed. */}
+              <TryAgain
+                type="submit"
+                variant="primary"
+                size="md"
+                onRetry={startSession}
+                held={busy === 'start'}
+                then={[]}
+                send={{
+                  words: minutes === null ? 'Start session' : `Start ${minutes}-minute session`,
+                  sending: 'Starting…',
+                  failed: startSaid !== null,
+                }}
+              />
+              {/* A Start that failed, said across the well's foot; Try again sends it again. */}
               {startSaid ? (
-                <p role="alert" className="mt-3.5 text-body">
+                <p
+                  role="alert"
+                  className="flex basis-full items-center gap-2 border-t border-border-strong pt-4 text-body"
+                >
+                  <CircleAlert size={18} aria-hidden="true" className="shrink-0" />
                   {startSaid}
                 </p>
               ) : null}
-            </fieldset>
-          </form>
-          {/* The last session's recap (R4; ClassEnded since PV12b) until a new one starts; only
-              once the class is read, so a session already running never shows it. Who didn't join
-              is the roster's, whose failure the card says too. Present after the bell is its own
-              page, which says only that class is over, so `present` is off here; passed all the
-              same, so no reason ever reaches the projector should that change. */}
-          <RecapCard
-            classId={classId}
-            present={present}
-            roster={roster?.students ?? null}
-            rosterError={rosterError}
-            onRetryRoster={load}
-            rosterReading={rosterReading}
-            onFound={setLast}
-          />
-          {/* The roster beside the join code's card; on a narrow page the card goes under it. */}
-          <div className="flex flex-wrap items-start gap-5">
-            <section
-              aria-labelledby={`${id}-roster`}
-              className="flex min-w-0 flex-[999_1_520px] flex-col gap-5"
-            >
-              <h2 id={`${id}-roster`} className={LABEL}>
-                {roster ? `Roster · ${students(roster.students.length)}` : 'Roster'}
+            </form>
+          ) : (
+            <RegisterFirst
+              onRegistered={() => {
+                setHasBlock(true);
+                window.requestAnimationFrame(() => submitOf(startForm.current)?.focus());
+              }}
+            />
+          )}
+          {/* The last session (ClassPage's line), or after the bell the day it ended, v2's recap
+              card (ClassEnded, PV12b) until LO7 redraws it: who didn't join is the roster's, whose
+              failure the card says too. Present after the bell is its own page, which says only
+              that class is over, so `present` is off here; passed all the same, so no reason ever
+              reaches the projector should that change. */}
+          {last.kind === 'today' ? (
+            <RecapCard
+              classId={classId}
+              present={present}
+              roster={roster?.students ?? null}
+              rosterError={rosterError}
+              onRetryRoster={load}
+              rosterReading={rosterReading}
+            />
+          ) : last.kind === 'line' ? (
+            <p id={`${id}-last`} className="text-body text-text-secondary">
+              {last.joined === 0
+                ? `${onDay(last.session.startedAt)}, nobody joined.`
+                : `${onDay(last.session.startedAt)}, ${last.whole} of ${last.joined} stayed focused the whole time.`}
+              <Link href={reportPath(classId, last.session.id)} className={`ml-3 ${QUIET}`}>
+                Open the report
+              </Link>
+            </p>
+          ) : last.kind === 'error' ? (
+            <Oops onRetry={readLastSession} then={[`${id}-last`]}>
+              Couldn&apos;t load the last session. {last.message}
+            </Oops>
+          ) : null}
+          {/* The students, the join code behind Add students; for a class with none yet, open. */}
+          <section aria-labelledby={`${id}-students`} className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+              <h2 id={`${id}-students`} className="text-section-title">
+                Students
               </h2>
-              {/* Unread, it says so under the header with Try again, never "Loading…" here. */}
-              {roster === null ? (
-                rosterError ? null : (
-                  <p role="status" className="text-body text-text-secondary">
-                    Loading…
-                  </p>
-                )
-              ) : roster.students.length === 0 ? (
-                <p className="text-body text-text-secondary">No students have joined yet.</p>
-              ) : (
-                <div className={CARD_ALONE}>
-                  {/* ponytail: as v2.css draws it, a word wider than its column runs on into the
-                      32 px gap rather than break mid-word (a long surname on a phone); one wider
-                      than both (some 13 letters on a phone, 30 on a computer) reaches the next
-                      column. break-words if a real roster shows one. */}
-                  <ul className="columns-3 gap-x-8">
-                    {roster.students.map((s) => (
-                      <li key={s.enrollmentId} className="break-inside-avoid py-1.5 text-body">
-                        {s.displayName ?? s.studentId.slice(0, 8)}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </section>
-            <section
-              aria-labelledby={`${id}-code`}
-              className="flex min-w-0 flex-[1_1_320px] flex-col gap-5"
-            >
-              <h2 id={`${id}-code`} className={LABEL}>
-                Join code
-              </h2>
-              <div className={CARD_ALONE}>
-                <JoinCode classId={classId} code={klass.joinCode} onClass={setKlass} />
-              </div>
-            </section>
-          </div>
+              {roster ? (
+                <span className="text-data font-normal text-text-tertiary">
+                  {roster.students.length}
+                </span>
+              ) : null}
+              {/* Unread, it waits; a roster that didn't load leaves the code in reach. */}
+              {(roster === null ? rosterError !== null : roster.students.length > 0) ? (
+                <LockButton
+                  variant="secondary"
+                  size="sm"
+                  aria-expanded={adding}
+                  onClick={() => setAdding(!adding)}
+                  className="ml-auto"
+                >
+                  Add students
+                </LockButton>
+              ) : null}
+            </div>
+            {adding || roster?.students.length === 0 ? (
+              <JoinCode classId={classId} code={klass.joinCode} onClass={setKlass} />
+            ) : null}
+            {/* Unread, its failure is said under the header with Try again, never here. */}
+            {roster === null ? (
+              rosterError ? null : (
+                <p
+                  role="status"
+                  className="border-y border-border-default py-3 text-body text-text-secondary"
+                >
+                  Loading…
+                </p>
+              )
+            ) : roster.students.length === 0 ? (
+              <p className="text-body text-text-secondary">No students yet.</p>
+            ) : (
+              <ul className="columns-[4_168px] gap-x-8 max-[760px]:columns-[2_140px]">
+                {roster.students.map((s) => (
+                  <li
+                    key={s.enrollmentId}
+                    className="break-inside-avoid border-b border-border-default py-2 text-body wrap-break-word"
+                  >
+                    {s.displayName ?? s.studentId.slice(0, 8)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </>
       )}
     </div>

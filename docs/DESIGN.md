@@ -642,7 +642,14 @@ live class's fill) and `live-hover` (green-600: its edge in the bar on hover);
 and the press, the `press` utility (0.97, an icon button's 0.94, on the
 ease-out curve over 140 ms; nothing under reduced motion). A text field keeps
 the Field's `border-input` edge, the owner's 3:1 ruling, where `lock.css` draws
-`rule-strong`.
+`rule-strong`. LO4 added `page-title-phone` (23/29, semibold, −0.01em: a page's
+title under 760 px), in lane B's block of `globals.css`, which `tokens.test.ts`
+reads with the rest. Since LO4 (2026-11-17) a class's page while no session runs
+is ClassPage's: the well with the lengths and Start, the last session's line, the
+students with the join code behind Add students, its states as ClassStates and
+ClassBeforeStates draw them (drawn on the canvas first); the day a session ended,
+v2's recap card in the line's place until LO7; Try again, and Start while it
+sends, still v2's button until a step at the phase's end moves them.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the

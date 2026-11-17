@@ -112,21 +112,8 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     );
   });
 
-  it('follows the toggle with focus as it moves into the header and back', () => {
-    const toggle = page.slice(page.indexOf('const presentToggle'));
-    expect(toggle).toMatch(
-      /^const presentToggle = \(beside = false, className = ''\) => \(\s*<Button\s+ref=\{toggle\}/,
-    );
-    expect(toggle.slice(0, toggle.indexOf('</Button>'))).toMatch(
-      /onClick=\{\(\) => \{\s*rememberPresent\(classId, !present\);\s*toggled\.current = true;\s*setPresent\(!present\);/,
-    );
-    // Only a press moves focus: the page coming back in Present takes none. Present left with no
-    // session to show leaves no toggle to follow, so focus goes to Start, the next thing to do.
-    expect(page).toMatch(
-      /useEffect\(\(\) => \{\s*if \(toggled\.current\) \(toggle\.current \?\? start\.current\)\?\.focus\(\);\s*toggled\.current = false;\s*\}, \[present\]\);/,
-    );
-    expect(page).toMatch(/<Button\s+ref=\{start\}\s+type="submit"/);
-  });
+  // The toggle's focus as it moves into the header and back, and to Start as Present is left after
+  // the bell, is driven in classes/[id]/page.test.tsx since LO4.
 });
 
 describe('the class page in Present after the bell (PresentEnded)', () => {
