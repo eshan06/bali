@@ -337,7 +337,7 @@ becomes real pain during the iOS build, the named fallback is Clerk.
 *Amended 2026-11-12 (the owner's ask):* Cognito's own pages, where everyone signs in, signs up and
 resets a password, move from the classic hosted UI to its **managed login**, the pages' second
 version, in Bali's tokens (`infra/cognito/managed-login/`), their words still AWS's: dev's on
-2026-11-12, prod's once the owner switches its domain (PLAN). Cognito stays rather than Clerk:
+2026-11-12, prod's 2026-11-16. Cognito stays rather than Clerk:
 passwords can't be moved out of Cognito, so a move would have every account set a new one, and the
 app App Review approved has Cognito built in. Username and password sit on one page: an app client
 allowing choice-based sign-in (`ALLOW_USER_AUTH`) gets managed login's identifier-first form, the
