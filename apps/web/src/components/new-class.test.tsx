@@ -240,7 +240,7 @@ describe('a class just made (ClassFlows; HomeMoments)', () => {
     // well at the dialog's start.
     expect(dialog().className).toBe(DIALOG_LOCK);
     expect(title.getAttribute('tabindex')).toBe('-1');
-    expect(title.className).toBe('text-panel-title wrap-anywhere');
+    expect(title.className).toBe('text-panel-title text-balance wrap-anywhere');
     expect(screen.getByText('Q5FU3U').className).toBe(`${CODE_WELL} self-start`);
   });
 

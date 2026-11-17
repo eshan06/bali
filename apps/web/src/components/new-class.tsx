@@ -124,7 +124,7 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
             ref={title}
             id={`${id}-title`}
             tabIndex={-1}
-            className="text-panel-title wrap-anywhere"
+            className="text-panel-title text-balance wrap-anywhere"
           >
             {made.name}
           </h2>

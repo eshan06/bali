@@ -687,6 +687,8 @@ describe('Last session (HomeIdle; HomeMoments)', () => {
     })),
   };
   function answers(joined: number, unlocks: number) {
+    // A page an earlier call answered goes, so these events are the ones read.
+    for (const key of bali.routes.keys()) if (key.startsWith(`${EVENTS}?`)) bali.routes.delete(key);
     bali.routes.set(REPORT, () => [200, report(joined, unlocks)]);
     bali.routes.set(EVENTS, () => [200, events(unlocks)]);
     bali.routes.set(`${EVENTS}?after=${unlocks}`, () => [200, { events: [], nextAfter: unlocks }]);

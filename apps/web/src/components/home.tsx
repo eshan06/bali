@@ -211,7 +211,7 @@ export function LiveWellView({
           stroke={5}
         />
         <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-0.5">
-          <h2 id={id} className="text-section-title wrap-anywhere">
+          <h2 id={id} className="text-section-title text-balance wrap-anywhere">
             {name}
           </h2>
           <p className="text-meta text-text-secondary">
