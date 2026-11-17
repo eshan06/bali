@@ -4,9 +4,10 @@ import { SessionReportPage } from '@/components/session-report';
 import { UUID } from '@/lib/reports';
 
 /**
- * A session's report on a page and a URL of its own (PV14), where Reports' rows and the class
- * page's recap lead. Its class and its session each an id the API mints: anything else names no
- * page, as any URL with none does, so no other path reaches the API.
+ * A session's report on a page and a URL of its own (PV14), the recap since LO7, where Reports'
+ * rows and the class page's last session's line lead. Its class and its session each an id the
+ * API mints: anything else names no page, as any URL with none does, so no other path reaches the
+ * API.
  */
 export default async function SessionReport({
   params,

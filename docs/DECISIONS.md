@@ -8,6 +8,67 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-17** — **LO7, after the bell: the recap rebuilt from ClassEnded and ClassEndedOpen, on a class's page the
+  day its session ended and on a session's report page, the same recap under a head of its own; its in-between states
+  on the canvas's ClassEndedStates, drawn first (version 56) (the worker's calls, awaiting the owner's look; LO7,
+  #609).**
+
+  **What it shows** (ClassEnded, ClassEndedOpen, PhonePages' After the bell): over a hairline, "22 of 26 stayed
+  focused the whole time", no words under it (the owner, 2026-11-16), over five figures, who joined, R2's emergency
+  unlocks and protection offs, the silences before the bell and who didn't join; Not focused the whole time, a name and
+  a track each, by when focus first broke, the Key opening on a tap; then two lines, "22 stayed focused the whole time"
+  with Show names, and "Didn't join: …". A name opens that student's record, the student panel's look and words, oldest
+  first as ClassEndedOpen lists them, an unlock's reason under it. The counts and groups are `recapGroups`', so the
+  recap, Home's Last session and the class page's line never disagree.
+
+  **The tracks** (the worker's call): stretches read from the recap's own moments by the grid's own rules
+  (`applyEvent`): Not here until the tap-in and after a leave, an unlock never softening protection off (santa's
+  round 1), an unlock the engine noted `superseded` turning nothing (Claude Review; read from the session's log, as
+  the moments don't carry the note), Screen Time back on returning to unlocked while an unlock is open, a tap of the
+  block closing one. A silence runs from going silent to checking in again, or to any
+  moment the phone sent. A moment before the tap-in or after the bell changes no stretch; the record lists it all the
+  same. Each track's words are its label, as the board words them ("Focused from 9:06, unlocked 9:18 to 9:24, then
+  focused to the bell"). Built in the component from what `lib/recap.ts` gives, no lib change.
+
+  **When the class page is the recap** (the worker's calls): the day its session ended by this computer's calendar,
+  LO4's rule. Until the class's last session is found the well's place says Loading…, so Start never shows the day one
+  ended and then goes, and focus as Present is left waits for the page under it. Open the report goes to Reports with
+  the class picked, as ClassEnded links it (a session's report is the recap itself). Start another session shows
+  ClassPage in place, its line "Today, 22 of 26 …" with Open the report, focus on Start (the class's name with no
+  block); the recap comes back as the page opens again or the next session ends. A roster that didn't load is said
+  under the head, the recap waiting for it; a report that didn't load leaves the page unable to tell when the session
+  ended, so it shows ClassPage with LO4's line and Try again, which brings the recap.
+
+  **A session's report page** (the worker's call, drawn first): the class's name over the day and the times, This
+  class's reports at the head's end; then the recap. v2's Unlocks table is gone (no board draws one; each unlock is
+  in its student's record and counted in the figures), and so is the Questions card and its read, whichever way the
+  lessons switch is set (ARCHITECTURE, Web portal, decision 8).
+
+  **Awaiting the owner, left out with no board drawing it** (CLAUDE.md, Working rules: anything new shown about a
+  student waits for the owner's approval): a student who never joined but has an Emergency Unlock or protection off
+  on record is counted in the figures and named under Didn't join, with no row and no record, where v2's recap gave
+  them a row with the moment; nobody joined shows only those figures. With the report page's Unlocks table gone, that
+  unlock's time and reason show nowhere in the portal after the bell (santa's round 1). A row or a record for them is
+  the owner's to approve. **The tracks' contrast**, also the owner's to look at: the focused green (green-200) on the bare track
+  (stone-100) is under WCAG 1.4.11's 3:1, as the board draws it; each track's words (its label) and the Key carry what
+  the colours say, and restyling the approved board is the owner's call.
+
+  **Left for the phase-end tidy-up** (the conductor's call): Home's Open the recap (lane A's link) leads to the class's
+  page, so for a session from an earlier day it lands on ClassPage's line, whose Open the report opens the recap.
+
+  **Tokens:** `track-focused` (green-200) and `track-silent` (stone-500) and the `track-dashes` utility, in lane B's
+  block; `tokens.test.ts` now reads every `@theme inline` block. For the phase's tidy-up: `--color-mark` (v2's marks)
+  has no user now, and the record's words are written twice, `recap-card.tsx` and `student-panel.tsx`.
+
+  **One PR** (the conductor's call): 1,394 changed lines without tests, over santa's 400, kept whole rather than the
+  proposed three (~250, ~330 plus deletions, ~220 plus ~450 deletions): 704 of them delete v2's card, its marks and
+  the report's Unlocks table, and a split would review `recap-card.tsx` and `timeline.tsx` twice.
+
+  **Tests:** driven. `recap-card.test.ts` is converted to `recap-card.test.tsx` (21 source-text tests left), the
+  report page's two files are one driven `session-report.test.tsx`, `timeline.test.ts` tests the tracks, and the class
+  page's after-the-bell pins in `class-page.test.ts` and `present.test.ts` are converted into `before.test.tsx` and
+  `page.test.tsx`.
+
 - **2026-11-17** — **LO8, Reports in the lock-only look: a tab per class, the share of the listed sessions' class time
   spent focused, Download CSV of their totals, and the sessions ten a page, each with how many stayed focused the whole
   time; its in-between states and the CSV's columns drawn first on the canvas's ReportsMoments (version 55); one PR (the

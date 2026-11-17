@@ -58,7 +58,6 @@ const STILL_READING = [
   'components/present-question.test.ts',
   'components/present-slide.test.ts',
   'components/question-card.test.ts',
-  'components/recap-card.test.ts',
   'components/report-questions.test.ts',
   'components/saved-questions.test.ts',
   'components/shell.test.ts',

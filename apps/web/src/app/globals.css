@@ -606,4 +606,20 @@
   }
 }
 
+/* The recap's tracks (LO7; lock.css's `.track` and `.sw`): a focused stretch's green and a
+   silence's dashes, the primitives lock.css draws them with, pinned in tokens.test.ts; an unlock's
+   and a protection off's are v2's marks' own (`unlock-edge`, `mark-off`). A silence is a dashed
+   line, 4 px on and 3 off. */
+@theme inline {
+  --color-track-focused: var(--bali-green-200);
+  --color-track-silent: var(--bali-stone-500);
+}
+@utility track-dashes {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-track-silent) 0 4px,
+    transparent 4px 7px
+  );
+}
+
 /* End of lane B */

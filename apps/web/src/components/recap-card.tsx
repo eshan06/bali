@@ -6,106 +6,45 @@ import type {
   SessionReportResponse,
   SessionReportSummary as Summary,
 } from '@bali/shared';
-import { ChartBar } from 'lucide-react';
-import Link from 'next/link';
+import {
+  CircleCheck,
+  Flag,
+  LockOpen,
+  type LucideIcon,
+  ShieldCheck,
+  ShieldOff,
+  Wifi,
+  WifiOff,
+  X,
+} from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 
-import { buttonClass } from '@/components/button';
-import { CARD_ALONE } from '@/components/card';
-import { useCountOpened } from '@/components/count';
-import { RecapLists } from '@/components/timeline';
-import { TryAgain } from '@/components/try-again';
+import { ICON_BUTTON, LockButton, QUIET } from '@/components/button';
+import { INK, Log, logIcon } from '@/components/log';
+import { Key, RecapRows } from '@/components/timeline';
+import { reasonWords } from '@/components/unlock-popups';
 import {
-  classFigures,
-  loadRecap,
+  type Moment,
+  payloadOf,
   type RecapFormat,
   recapGroups,
-  type RecapState,
-  sessionTimes,
+  type RecapStudent,
   type SessionWindow,
 } from '@/lib/recap';
-import { reportPath } from '@/lib/reports';
 import { bellTime } from '@/lib/session-controls';
-import { useApi } from '@/lib/use-api';
 
-interface Props {
-  classId: string;
-  present?: boolean;
-  /** The class page's roster (PV12b), who didn't join: null while it is read or when it failed. */
-  roster?: readonly RosterStudent[] | null;
-  rosterError?: string | null;
-  /** The roster read again, its failure said until it answers. */
-  onRetryRoster?: () => Promise<void>;
-  /** A read of the roster on its way, whichever Try again sent it: its failure's held meanwhile. */
-  rosterReading?: boolean;
-  /** The session it found, for the page's line; null while none is. */
-  onFound?: (session: Summary | null) => void;
-}
-
-/**
- * The recap card (R4; ClassEnded since PV12b): the class's last session, once the server has
- * marked it over, as R2 reports it and as its events tell it. The class page shows it while no
- * session runs, so a Start takes it away, and it reads the session each time it is shown. Its head
- * names the session, with Open its report, the session's own page (PV14); then its figures, who
- * wasn't focused the whole time, who was and who didn't join (`RecapBody`, who didn't join read
- * from the page's roster, whose failure it says too): class aggregates, moments and names, never
- * one student's minutes. A card standing alone (DESIGN.md §4), laid out by its own width. In
- * `present` (the projector, which the class can see) no unlock's reason is said.
+/*
+ * The recap (LO7; ClassEnded, ClassEndedOpen, PhonePages' After the bell; its in-between states on
+ * the canvas's ClassEndedStates, drawn first): a session after the bell, on the class page the day
+ * it ended and on the session's own report page. Its figures and groups are the recap's own
+ * (`recapGroups`, over R2's report and the session's events), class aggregates and names, never one
+ * student's minutes, so nothing ranks them.
  */
-export function RecapCard(props: Props) {
-  const api = useApi();
-  const { classId, rosterError, onRetryRoster, onFound } = props;
-  const [state, setState] = useState<RecapState>({ kind: 'finding' });
-  // The newest read: an answer counts only while no later read, or another class, has started.
-  const reads = useRef(0);
-
-  useEffect(() => {
-    const mine = ++reads.current;
-    void loadRecap(api, classId, (next) => {
-      if (reads.current === mine) setState(next);
-    });
-    return () => {
-      reads.current += 1;
-    };
-  }, [api, classId]);
-
-  // The session found, for the page's line: none until one is, and none when its read failed.
-  const found = state.kind === 'ready' || state.kind === 'loading' ? state.session : null;
-  useEffect(() => {
-    onFound?.(found);
-  }, [found, onFound]);
-  // Gone (a Start), none: the next session's end never paints with this one's.
-  useEffect(() => () => onFound?.(null), [onFound]);
-  // Opened once the card shows it whole, its roster's who didn't join too (A3b).
-  useCountOpened('portal_recap_opened', state.kind === 'ready' && (props.roster ?? null) !== null);
-
-  // Nothing until there is a session to recap: a class that never ran one shows no card.
-  if (state.kind === 'finding' || state.kind === 'none') return null;
-  return (
-    <RecapShown
-      {...props}
-      state={state}
-      onRetry={async () => {
-        // Its own read unless it is in, and the roster's if it failed, each failure said until
-        // its answer, never Loading… in its place (ClassRetryStates).
-        const mine = ++reads.current;
-        await Promise.all([
-          state.kind === 'ready'
-            ? null
-            : loadRecap(api, classId, (next) => {
-                if (reads.current === mine && next.kind !== 'loading') setState(next);
-              }),
-          rosterError ? onRetryRoster?.() : null,
-        ]);
-      }}
-    />
-  );
-}
 
 /**
- * The page's line after the bell (ClassEnded), the time in "the session ended at 9:55 AM": the end
- * the server marked, when that was today on this computer's calendar. Null for none, and for an
- * older session, whose card says its day: the line then stays "no session running".
+ * The class page's line after the bell (ClassEnded), the time in "Ended at 9:55 AM": the end the
+ * server marked, when that was today on this computer's calendar. Null for none, and for an older
+ * session, which the page shows as its last line instead.
  */
 export function endedToday(
   session: Summary | null,
@@ -121,159 +60,274 @@ export function endedToday(
   return day.format(new Date(end)) === day.format(now) ? bellTime(end, format) : null;
 }
 
-/** The card as its state draws it, rendered on its own by the tests. */
-export function RecapShown({
-  classId,
-  present = false,
-  roster = null,
-  rosterError = null,
-  rosterReading = false,
-  state: read,
-  onRetry,
-}: Props & {
-  state: Exclude<RecapState, { kind: 'finding' | 'none' }>;
-  /** Read again what failed, its line said until the answer. */
-  onRetry: () => unknown;
-}) {
-  const headingId = useId();
-  // The card waits for the roster, and says its failure.
-  const state: typeof read =
-    read.kind !== 'ready' || roster !== null
-      ? read
-      : rosterError === null
-        ? { kind: 'loading', session: read.session }
-        : { kind: 'error', message: rosterError };
-  const shown = state.kind === 'error' ? null : state.session;
-  return (
-    <section
-      aria-labelledby={headingId}
-      aria-busy={state.kind === 'loading'}
-      className={`@container flex flex-col gap-4.5 ${CARD_ALONE}`}
-    >
-      {/* ClassEnded's head: the session, then Open its report beside it, under it on a phone
-          (ReportPageStates, an intermediate state). */}
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        <div className="flex flex-col gap-0.75">
-          <h2 id={headingId} className="text-section-label text-text-tertiary uppercase">
-            Last session
-          </h2>
-          {shown ? <p className="text-body font-semibold">{sessionTimes(shown)}</p> : null}
-        </div>
-        {state.kind === 'ready' ? (
-          <Link
-            href={reportPath(classId, state.session.id)}
-            className={buttonClass('secondary', '', 'sm')}
-          >
-            <ChartBar size={16} aria-hidden="true" />
-            Open its report
-          </Link>
-        ) : null}
-      </div>
-      {state.kind === 'loading' ? (
-        <p role="status" className="text-body text-text-secondary">
-          Loading the last session…
-        </p>
-      ) : state.kind === 'error' ? (
-        <div>
-          {/* Held until its reads answer, the roster's sent from under the page's header too;
-              read, focus on Last session (ClassRetryStates). */}
-          <TryAgain
-            size="md"
-            onRetry={onRetry}
-            held={read.kind === 'ready' && rosterReading}
-            then={[headingId]}
-            className="mt-3.5"
-          >
-            <div role="alert" className="text-body">
-              <p className="font-semibold">Couldn&apos;t load the last session.</p>
-              <p className="text-text-secondary">{state.message}</p>
-            </div>
-          </TryAgain>
-        </div>
-      ) : (
-        <RecapBody
-          session={state.session}
-          report={state.report}
-          events={state.events}
-          roster={roster ?? []}
-          present={present}
-        />
-      )}
-    </section>
-  );
-}
+/**
+ * Each moment in the record's words and icon, in its state's ink: the student panel's own
+ * (`student-panel.tsx`, ClassStudent and LiveListStates), as ClassEndedOpen draws them.
+ */
+const MOMENT: Record<Moment, [words: string, Icon: LucideIcon, ink: string]> = {
+  in: ['Tapped in and focused', CircleCheck, INK.focused],
+  unlock: ['Used Emergency Unlock', LockOpen, INK.unlocked],
+  focus: ['Back in focus', CircleCheck, INK.focused],
+  off: ['Turned protection off', ShieldOff, INK.off],
+  on: ['Turned protection back on', ShieldCheck, INK.quiet],
+  silent: ['Went silent', WifiOff, INK.quiet],
+  back: ['Checked in again', Wifi, INK.quiet],
+  left: ['Left', Flag, INK.quiet],
+};
 
 /**
- * v2.css's `.stats`: each name over its figure, the unit beside the number. The recap's, and Home's
- * Last session (PV17c), each spaced as its board draws it.
+ * A student's record (ClassEndedOpen): lock.css's `.panel`, 372 px from the right as the student
+ * panel is, sliding in on the drawer curve, its name over This session, their moments oldest first,
+ * each with its time and an unlock its reason under it. Focus comes to the name as it opens; Close
+ * or Escape closes it.
  */
-export function Figures({
-  figures,
-  className,
+function Record({
+  id,
+  student,
+  onClose,
 }: {
-  figures: readonly (readonly [label: string, value: string])[];
-  className: string;
+  id: string;
+  student: RecapStudent;
+  onClose: () => void;
 }) {
+  const name = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    name.current?.focus();
+  }, [student.key]);
   return (
-    <dl className={`flex flex-wrap ${className}`}>
-      {figures.map(([label, value]) => (
-        <div key={label} className="flex flex-col gap-0.5">
-          <dt className="text-tile-line font-normal text-text-tertiary">{label}</dt>
-          <dd className="font-num text-h2">{value}</dd>
-        </div>
-      ))}
-    </dl>
+    <aside
+      id={id}
+      aria-labelledby={`${id}-name`}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+      className="fixed inset-y-0 right-0 z-5 flex w-93 max-w-full flex-col bg-surface-card shadow-3 drawer-in"
+    >
+      <div className="flex items-start gap-3 border-b border-border-default px-6 pt-6 pb-5">
+        <h2
+          ref={name}
+          id={`${id}-name`}
+          tabIndex={-1}
+          className="min-w-0 flex-1 text-panel-title wrap-anywhere"
+        >
+          {student.name}
+        </h2>
+        <button
+          type="button"
+          aria-label={`Close ${student.name}'s record`}
+          onClick={onClose}
+          className={ICON_BUTTON}
+        >
+          <X size={16} aria-hidden="true" />
+        </button>
+      </div>
+      <div className="flex flex-col gap-6 overflow-y-auto overscroll-contain p-6">
+        <section aria-labelledby={`${id}-session`} className="flex flex-col gap-4">
+          <h3 id={`${id}-session`} className="mb-2 text-data font-semibold">
+            This session
+          </h3>
+          <Log
+            items={student.moments.map((m) => {
+              const [words, Icon, ink] = MOMENT[m.moment];
+              return {
+                key: m.key,
+                at: m.at,
+                icon: logIcon(Icon, ink),
+                words,
+                under: m.moment === 'unlock' ? reasonWords(m.reason) : null,
+              };
+            })}
+          />
+        </section>
+      </div>
+    </aside>
   );
 }
 
+/** A figure (lock.css's `.figures`): its number over its words, hairlines between them. */
+const FIGURE =
+  'flex flex-col gap-0.5 border-l border-border-default px-6 first:border-l-0 first:pl-0 max-[760px]:px-4 max-[760px]:first:pl-0';
+
+/** A line of Everyone else (`.fold-list`), between hairlines. */
+const FOLD = 'border-b border-border-default py-4';
+
 /**
- * A session's recap as ClassEnded and ReportOpened draw it, in the class page's card and on the
- * session's own page (PV14): the class's figures and the note on silence, then the three groups.
- * Nobody joined: that line alone, but for someone who never joined with an unlock or protection
- * off here, never hidden.
+ * A session's recap (ClassEnded): over a hairline, how many of who joined stayed focused the whole
+ * time, the page's one number, over the figures: who joined, the emergency unlocks and protection
+ * offs R2 lists, the silences before the bell, and who didn't join. Then who wasn't focused the
+ * whole time, each a name and a track (`RecapRows`), the Key opening over them; then everyone else
+ * in two lines, how many stayed focused the whole time with Show names, and who didn't join by name.
+ * A name opens that student's record. Nobody joined: today's line in the number's place, who didn't
+ * join under it, and only the figures that count someone (ClassEndedStates). Each part shows only
+ * when it has someone. Its parts sit in the page's column, 40 px apart, 32 on a phone.
  */
-export function RecapBody({
+export function Recap({
   session,
   report,
   events,
   roster,
-  present = false,
 }: {
   session: SessionWindow;
   report: SessionReportResponse;
   events: readonly FeedEvent[];
+  /** The class's roster now: who didn't join is read from it. */
   roster: readonly RosterStudent[];
-  present?: boolean;
 }) {
+  const id = useId();
+  const [keyOpen, setKeyOpen] = useState(false);
+  const [namesOpen, setNamesOpen] = useState(false);
+  const [open, setOpen] = useState<string | null>(null);
+  // The name that opened the record, for focus to come back to.
+  const opener = useRef<HTMLButtonElement | null>(null);
+
   const groups = recapGroups(session, report, events, roster);
-  const figures = classFigures(report.joined.length, report);
-  const nobody = report.joined.length === 0;
+  const { partTime, wholeTime, notJoined } = groups;
+  const start = Date.parse(session.startedAt);
+  const end = Date.parse(session.endedAt ?? session.endsAt);
+  // The unlocks the engine noted superseded, from the session's log: the grid never applies one,
+  // so no track draws it (`stretchesOf`); the record and the figures keep it.
+  const superseded = new Set(
+    events
+      .filter((e) => e.type === 'unlock' && payloadOf(e.payload).recorded_as === 'superseded')
+      .map((e) => e.eventId),
+  );
+  const n = new Intl.NumberFormat();
+  const joined = report.joined.length;
+  const unlocks = report.unlocks.length;
+  const offs = report.protectionOffs.length;
+  // Each silence before the bell, as the other figures count each moment; one first marked at the
+  // bell or after it came once class was over (`recapGroups`).
+  const silences = partTime
+    .flatMap((s) => s.moments)
+    .filter((m) => m.moment === 'silent' && m.at.getTime() < end).length;
+  const unlocked: [string, string] = [
+    unlocks === 1 ? 'emergency unlock' : 'emergency unlocks',
+    n.format(unlocks),
+  ];
+  const offed: [string, string] = ['protection off', n.format(offs)];
+  const figures: [string, string][] =
+    joined > 0
+      ? [
+          ['joined', n.format(joined)],
+          unlocked,
+          offed,
+          ['went silent', n.format(silences)],
+          ["didn't join", n.format(notJoined.length)],
+        ]
+      : [...(unlocks > 0 ? [unlocked] : []), ...(offs > 0 ? [offed] : [])];
+  const record = partTime.find((s) => s.key === open) ?? null;
+  const close = () => {
+    setOpen(null);
+    opener.current?.focus();
+  };
+
   return (
     <>
-      {nobody ? (
-        <p className="text-body text-text-secondary">Nobody joined this session.</p>
-      ) : (
-        <>
-          <Figures
-            figures={[
-              ['Joined', figures.joined],
-              ['Class focus time', `${figures.focus} min`],
-              ['Average per student', `${figures.average} min`],
-              ['Silent', `${figures.silent} min`],
-            ]}
-            className="gap-x-10 gap-y-4"
-          />
-          <p className="text-caption text-text-tertiary">
-            A phone is silent when it stops checking in. Silent time doesn&apos;t count as focus.
-          </p>
-          {report.unlocks.length === 0 ? (
-            <p className="text-body text-text-secondary">No unlocks.</p>
+      <section
+        aria-labelledby={`${id}-count`}
+        className="flex flex-col gap-6 border-t border-border-default pt-8"
+      >
+        <h2 id={`${id}-count`} className="flex flex-wrap items-baseline gap-x-3">
+          {joined > 0 ? (
+            <>
+              <span className="text-count tabular-nums max-[760px]:text-count-phone">
+                {n.format(wholeTime.length)}
+              </span>{' '}
+            </>
           ) : null}
-        </>
-      )}
-      {nobody && !groups.notJoined.some((s) => s.moments.length > 0) ? null : (
-        <RecapLists groups={groups} present={present} />
-      )}
+          <span className="text-count-of text-text-secondary max-[760px]:text-count-of-phone">
+            {joined > 0
+              ? `of ${n.format(joined)} stayed focused the whole time`
+              : 'Nobody joined this session.'}
+          </span>
+        </h2>
+        {figures.length > 0 ? (
+          <dl className="flex flex-wrap gap-y-4">
+            {figures.map(([words, value]) => (
+              <div key={words} className={FIGURE}>
+                <dt className="order-2 text-caption text-text-secondary">{words}</dt>
+                <dd className="order-1 text-h2 tabular-nums">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      </section>
+
+      {partTime.length > 0 ? (
+        <section aria-labelledby={`${id}-part`} className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+            <h2 id={`${id}-part`} className="text-section-title">
+              Not focused the whole time
+            </h2>
+            <span className="text-data font-normal text-text-tertiary">
+              {n.format(partTime.length)}
+            </span>
+            <LockButton
+              variant="secondary"
+              size="sm"
+              aria-expanded={keyOpen}
+              aria-controls={keyOpen ? `${id}-key` : undefined}
+              onClick={() => setKeyOpen(!keyOpen)}
+              className="ml-auto"
+            >
+              Key
+            </LockButton>
+          </div>
+          {keyOpen ? <Key id={`${id}-key`} /> : null}
+          <RecapRows
+            groups={groups}
+            start={start}
+            end={end}
+            superseded={superseded}
+            opened={open}
+            onOpen={(student, from) => {
+              opener.current = from;
+              setOpen(open === student.key ? null : student.key);
+            }}
+          />
+        </section>
+      ) : null}
+
+      {(joined > 0 && wholeTime.length > 0) || notJoined.length > 0 ? (
+        <section aria-labelledby={`${id}-rest`}>
+          <h2 id={`${id}-rest`} className="sr-only">
+            Everyone else
+          </h2>
+          <ul className="flex flex-col border-t border-border-default text-body">
+            {joined > 0 && wholeTime.length > 0 ? (
+              <li className={FOLD}>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+                  <span>{n.format(wholeTime.length)} stayed focused the whole time</span>
+                  <button
+                    type="button"
+                    aria-expanded={namesOpen}
+                    aria-controls={namesOpen ? `${id}-names` : undefined}
+                    onClick={() => setNamesOpen(!namesOpen)}
+                    className={QUIET}
+                  >
+                    {namesOpen ? 'Hide names' : 'Show names'}
+                  </button>
+                </div>
+                {namesOpen ? (
+                  <p
+                    id={`${id}-names`}
+                    className="mt-3 max-w-[96ch] text-text-secondary wrap-anywhere"
+                  >
+                    {wholeTime.map((s) => s.name).join(', ')}
+                  </p>
+                ) : null}
+              </li>
+            ) : null}
+            {notJoined.length > 0 ? (
+              <li className={`${FOLD} wrap-anywhere`}>
+                Didn&apos;t join: {notJoined.map((s) => s.name).join(', ')}
+              </li>
+            ) : null}
+          </ul>
+        </section>
+      ) : null}
+
+      {record ? <Record id={`${id}-record`} student={record} onClose={close} /> : null}
     </>
   );
 }

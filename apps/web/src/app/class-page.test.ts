@@ -24,8 +24,6 @@ const page = readFileSync(
   'utf8',
 );
 
-/** The page while no session runs: the render's second branch, to the end. */
-const before = page.slice(page.indexOf('// No session running (PV6)'));
 /** The page while a session runs: the render's first branch, before Present's after the bell. */
 const live = page.slice(
   page.indexOf('return klass !== null && grid !== null && !grid.over ? ('),
@@ -68,12 +66,11 @@ describe('the class page before its class is read', () => {
     // The class's Try again in the session's place reads its roster too. The class answering first,
     // the roster's earlier failure was said under the header with a Try again not held until the
     // roster's read answered (#429's review): each line holds while a read of what it says runs,
-    // the class's or else its roster's, and so does the recap's, the roster's other Try again.
+    // the class's or else its roster's. The recap after the bell has no Try again of its own since
+    // LO7: the roster's failure is said under the header alone (driven in before.test.tsx).
     expect(page).toMatch(
       /<TryAgain onRetry=\{load\} held=\{error !== null \? classReading : rosterReading\} then=\{\[\]\}>/,
     );
-    const [recap] = before.match(/<RecapCard\b[^]*?\/>/) ?? [];
-    expect(recap).toMatch(/rosterReading=\{rosterReading\}/);
     // Each on its way from its start to its newest read's answer, never an older one's.
     expect(page).toMatch(
       /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;\s*setRosterReading\(true\);\s*try \{[^]*?\} finally \{\s*if \(reads\.current\.roster === mine\) setRosterReading\(false\);\s*\}\s*\}, \[api, classId\]\);/,
@@ -105,16 +102,6 @@ describe('the class page while no session runs', () => {
       /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;\s*setRosterReading\(true\);\s*try \{\s*const next = await api\.get<RosterResponse>/,
     );
     expect(page.match(/\/roster`\)/g)).toHaveLength(1);
-  });
-
-  it('shows the recap with the roster, whose failure it says too, and no How it ended', () => {
-    const [recap] = before.match(/<RecapCard\b[^]*?\/>/) ?? [];
-    expect(recap).toMatch(/roster=\{roster\?\.students \?\? null\}/);
-    expect(recap).toMatch(/rosterError=\{rosterError\}/);
-    expect(recap).toMatch(/onRetryRoster=\{load\}/);
-    // ClassEnded draws no How it ended (it repeated the list) and no Present after the bell.
-    expect(page).not.toMatch(/How it ended<|-ended`/);
-    expect(before).not.toMatch(/presentToggle|<LiveGrid/);
   });
 
   it('draws none of it while a session runs: no length picker, no join code’s card', () => {
