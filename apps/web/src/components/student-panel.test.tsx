@@ -60,23 +60,23 @@ function event(type: EventType, minute: number, payload: FeedEvent['payload'] = 
 }
 const ready = (...events: FeedEvent[]): LogRead => ({ kind: 'ready', events });
 
-function panel(
+/** The panel for `s` with the log as given, as the live grid draws it. */
+const element = (
   s: Student,
   log: LogRead,
   on: { close?: () => void; retry?: () => Promise<void> } = {},
-) {
-  return render(
-    <StudentPanel
-      id="g-panel"
-      student={s}
-      chip={<StateChip student={s} now={NOW} />}
-      log={log}
-      now={NOW}
-      onClose={on.close ?? (() => undefined)}
-      onRetry={on.retry ?? (() => Promise.resolve())}
-    />,
-  );
-}
+) => (
+  <StudentPanel
+    id="g-panel"
+    student={s}
+    chip={<StateChip student={s} now={NOW} />}
+    log={log}
+    now={NOW}
+    onClose={on.close ?? (() => undefined)}
+    onRetry={on.retry ?? (() => Promise.resolve())}
+  />
+);
+const panel = (...args: Parameters<typeof element>) => render(element(...args));
 
 /** Each moment as the log reads it: its time, then what happened, then an unlock's reason. */
 const moments = () =>
@@ -113,6 +113,7 @@ describe('the panel’s head, as ClassStudent draws it', () => {
     );
 
     const closeIt = screen.getByRole('button', { name: "Close Ethan Park's panel" });
+    expect(closeIt.getAttribute('type')).toBe('button');
     expect(closeIt.textContent).toBe('');
     expect(closeIt.querySelector('svg')?.classList).toContain('lucide-x');
     // lock.css's `.icon-btn`: 32 px, its hit area 44 px.
@@ -133,6 +134,21 @@ describe('the panel’s head, as ClassStudent draws it', () => {
     );
   });
 
+  it('draws Left · unlocked with the state’s own icon alone, where the tile draws the flag', () => {
+    panel(
+      student({
+        state: 'unlocked',
+        unlock: { eventId: 'v', reason: 'other', at: at(20) },
+        endedAt: at(22),
+      }),
+      ready(event('tap_in', 7)),
+    );
+    const chip = screen.getByRole('heading', { level: 2 }).nextElementSibling;
+    expect(chip?.textContent).toBe(`Left${String.fromCharCode(0xa0)}· unlocked`);
+    expect(chip?.querySelectorAll('svg')).toHaveLength(1);
+    expect(classes(chip?.querySelector('svg'))).toContain('lucide-lock-open');
+  });
+
   it('closes on Escape from inside it', async () => {
     const user = userEvent.setup();
     const close = vi.fn();
@@ -144,12 +160,31 @@ describe('the panel’s head, as ClassStudent draws it', () => {
 });
 
 describe('its moments, as ClassStudent and LiveListStates draw them', () => {
-  it('waits for the session’s log with the name and the state alone', () => {
+  it('waits for the session’s log with the name and the state alone, a status a screen reader hears', () => {
     panel(student(), { kind: 'loading' });
     const section = screen.getByRole('region', { name: 'This session' });
-    expect(within(section).getByText('Loading this session…')).toBeTruthy();
+    expect(within(section).getByRole('status').textContent).toBe('Loading this session…');
     expect(moments()).toEqual([]);
     expect(notes()).toEqual([]);
+  });
+
+  it('lands focus on This session once Try again’s read is in (ClassRetryStates)', async () => {
+    const user = userEvent.setup();
+    let answer = () => undefined as void;
+    const retry = vi.fn(() => new Promise<void>((done) => (answer = done)));
+    const view = panel(student(), { kind: 'error', message: CANT_REACH }, { retry });
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    // Read: the moments in the failure's place, its Try again gone with it.
+    await act(async () => {
+      view.rerender(element(student(), ready(event('tap_in', 6)), { retry }));
+      answer();
+      await Promise.resolve();
+    });
+    await act(() => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined))));
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole('heading', { level: 3, name: 'This session' }),
+    );
   });
 
   it('says a log that didn’t load, with Try again, held until Bali answers', async () => {

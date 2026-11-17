@@ -14,7 +14,7 @@ import {
 import type { ReactNode } from 'react';
 
 import { ICON_BUTTON } from '@/components/button';
-import { INK, Log, logIcon } from '@/components/session-list';
+import { INK, Log, logIcon } from '@/components/log';
 import { reasonWords } from '@/components/unlock-popups';
 import { gridDisplay, lastSeenNote, type Student } from '@/lib/grid-state';
 import type { Moment } from '@/lib/recap';
@@ -125,7 +125,9 @@ export function StudentPanel({
             This session
           </h3>
           {log.kind === 'loading' ? (
-            <p className="text-body text-text-secondary">Loading this session…</p>
+            <p role="status" className="text-body text-text-secondary">
+              Loading this session…
+            </p>
           ) : log.kind === 'error' ? (
             <Oops onRetry={onRetry} then={[`${id}-session`]}>
               Couldn&apos;t load this session. {log.message}

@@ -55,7 +55,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
   **A name from Home's Check on** (`?student=`, LO3): the class page reads it as it opens and drops it from the address
   at once, as `?present`, so a reload opens the page alone; the grid opens that student's panel once read if they are
-  on it (an own key of the grid's: the address is anyone's to type), never in Present, and asks once.
+  on it (an own key of the grid's: the address is anyone's to type), never in Present, and asks once. The ask is for
+  the session live as Home named it: once the page shows none running, read so or after a bell, it goes, so a later
+  session's grid opens nobody's panel (santa's round 1, both reviewers).
 
   **A tablet** (the worker's call, drawn first): under 1024 px the list goes under the room, 40 px down, 32 on a phone,
   since beside it the room narrows to a tile or two a row on an upright iPad; lock.css stacks it only under 760 px.

@@ -517,6 +517,12 @@ export default function ClassDetailPage() {
     if (live && wasBefore.current && (at === null || at === document.body)) land(document, []);
     wasBefore.current = before;
   }, [live, before]);
+  // A name from Home's Check on asks for the session live as Home named it: once the page shows
+  // none running, read so or after a bell, the ask goes, so a later session's grid opens nobody's
+  // panel (santa's round 1).
+  useEffect(() => {
+    if (before) setOpening(null);
+  }, [before]);
 
   // The last session, read each time the page comes to show no session: as it opens, and after a
   // bell; forgotten as a Start takes the page, so the next one's never shows the one before it.

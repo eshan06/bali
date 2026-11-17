@@ -768,6 +768,8 @@ describe('a class live: the tab’s title, and a name from Home’s Check on (LO
       await Promise.resolve();
     });
   };
+  /** Every effect the last render queued run, and what they drew drawn. */
+  const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 20)));
   beforeEach(() => {
     document.title = TITLE;
   });
@@ -805,6 +807,34 @@ describe('a class live: the tab’s title, and a name from Home’s Check on (LO
       .setup()
       .click(within(panel).getByRole('button', { name: "Close Ana Rodríguez's panel" }));
     expect(screen.queryByRole('complementary', { name: 'Ana Rodríguez' })).toBeNull();
+  });
+
+  it('opens it for that session alone: the next one started on the page opens no panel (santa’s round 1)', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', `/classes/${bali.CLASS}?student=u-ana`);
+    await live();
+    const panel = await screen.findByRole('complementary', { name: 'Ana Rodríguez' });
+    await user.click(within(panel).getByRole('button', { name: "Close Ana Rodríguez's panel" }));
+    // The bell, then the next Start on the same page: its grid opens nobody's panel.
+    await bring(event(5, 'session_ended'));
+    await user.click(await screen.findByRole('button', { name: /^Start/ }));
+    await vi.waitFor(() => expect(bali.streams).toHaveLength(2));
+    await screen.findByRole('button', { name: /^Ana Rodríguez/ });
+    await settle();
+    expect(screen.queryByRole('complementary', { name: 'Ana Rodríguez' })).toBeNull();
+  });
+
+  it('opens none for a session started after a page that opened on none', async () => {
+    const user = userEvent.setup();
+    bali.now.running = false;
+    window.history.replaceState(null, '', `/classes/${bali.CLASS}?student=u-ana`);
+    render(<ClassDetailPage />);
+    await user.click(await screen.findByRole('button', { name: /^Start/ }));
+    await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
+    await screen.findByRole('button', { name: /^Ana Rodríguez/ });
+    await settle();
+    expect(screen.queryByRole('complementary', { name: 'Ana Rodríguez' })).toBeNull();
+    expect(window.location.search).toBe('');
   });
 
   it('opens none for a name no student on the grid has, and forgets it all the same', async () => {

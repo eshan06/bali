@@ -459,7 +459,7 @@ describe('the session list (LO6; ClassLive, PhoneLive, LiveListStates)', () => {
     await answerRead(snapshotOf(class3));
     const list = screen.getByRole('complementary', { name: 'This session' });
     expect(within(list).getByRole('heading', { level: 2 }).textContent).toBe('This session');
-    expect(within(list).getByText('Loading this session…')).toBeTruthy();
+    expect(within(list).getByRole('status').textContent).toBe('Loading this session…');
     await answerLog([
       feed(1, 'session_started', null, 1500),
       feed(2, 'tap_in', 'u-Ethan Park', 1440),
@@ -743,6 +743,8 @@ describe('the grid’s health, said (LiveStates, LiveTopStates, ClassStale; DR-0
 
   it('says a lost stream over the count on the class page, the count and Check on faded, names plain', async () => {
     await open(false, class28);
+    // The session list read, so the only status is the feed's.
+    await answerLog([]);
     expect(screen.queryByRole('status')).toBeNull();
     await status('reconnecting');
 
@@ -790,6 +792,7 @@ describe('the grid’s health, said (LiveStates, LiveTopStates, ClassStale; DR-0
 
   it('says a quiet stream the same way on the class page, in today’s words', async () => {
     await open(false, class28);
+    await answerLog([]);
     await quiet();
     const line = screen.getByRole('status');
     expect(said(line)).toEqual({
