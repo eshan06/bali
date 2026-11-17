@@ -12,7 +12,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   live class riding in it; a student keeps v2's side menu; the new look's shared pieces beside v2's (the worker's calls,
   awaiting the owner's look; LO2, #604).**
 
-  **The bar** (Main, Reports, PhonePages; its in-between states on the canvas's BarStates, drawn first, version 31):
+  **The bar** (Main, Reports, PhonePages; its in-between states on the canvas's BarStates, drawn first, version 32):
   Bali, Classes and Reports, Help and the account, never Questions or Slides whichever way the lessons switch is set.
   Classes links `/`, as the boards do; until LO3 makes Home and Classes one page it is marked on `/classes` and a class's
   page too, and a teacher with classes reaches New class at `/classes` by its address only (Home's Create a class still
@@ -31,8 +31,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   longer only on a class's page, so as one is left the bar has the shell read the account again (its `refresh`, never
   beside a read on its way, and after the next page's own reads begin); and a read whose bell is later than the
   account's (time added, in this tab or another) has it read again too, as Home's live card does, so the class rides
-  to the later bell (santa's round 1, both reviewers). The account's reads are unchanged, and every other page change
-  keeps the one read. A class started in another tab rides in the bar from the next read (Home, Classes, or leaving a
+  to the later bell (santa's round 1, both reviewers); and so does each bell, the account read again just after it as
+  Home and Classes read it (they do so themselves), so time added after the strip's last read before the bell brings
+  the class back (santa's round 2). The account's reads are unchanged, and every other page change keeps the one read. A class started in another tab rides in the bar from the next read (Home, Classes, or leaving a
   class's page).
 
   **Narrow windows:** under 1024 px the account's name and the class's count go, as on a phone; under 760 px the menu

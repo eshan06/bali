@@ -7,7 +7,7 @@ import { type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } f
 
 import { Button, ICON_BUTTON, LockButton } from '@/components/button';
 import { LOCKUP, Mark, TOP_BAR } from '@/components/mark';
-import { liveNow, nextBell, type TaughtClass } from '@/lib/classes';
+import { AFTER_BELL_MS, liveNow, nextBell, type TaughtClass } from '@/lib/classes';
 import { fromSnapshot, gridDisplay } from '@/lib/grid-state';
 import { laterBell } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
@@ -256,6 +256,16 @@ export function TopBar({
     const timer = window.setTimeout(() => setNow(Math.max(Date.now(), bell)), bell - Date.now());
     return () => window.clearTimeout(timer);
   }, [bell]);
+  // And the account read again just after the first bell it counts running, past ones too, as Home
+  // and Classes read it (they do so themselves): time added after the strip's last read before the
+  // bell then brings the class back. Once a bell: an answer still counting it running waits for a
+  // later read.
+  const readAt = path === '/' || path === '/classes' ? null : nextBell([...classes], 0);
+  useEffect(() => {
+    if (readAt === null) return;
+    const timer = window.setTimeout(() => void refresh(), readAt + AFTER_BELL_MS - Date.now());
+    return () => window.clearTimeout(timer);
+  }, [readAt, refresh]);
 
   const riding = ridingFor(classes, path, now, gone);
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {

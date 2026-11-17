@@ -443,4 +443,34 @@ describe('the live class’s reads and bell, on a fake clock (BarStates)', () =>
       /^Period 6 AP Biology is live\. 9:30 left/,
     );
   });
+
+  it('has the account read again just after a bell, as Home and Classes do, so time added after its last read before the bell brings the class back (santa’s round 2)', async () => {
+    const soon = klass(4, 'Period 6 AP Biology', 60_000);
+    bali.snapshots.set('s4', snapshot(4, 24, 22, false, iso(NOW + 60_000)));
+    const { props, again } = bar({ classes: [BIOLOGY, soon] });
+    await tick(0);
+    expect(riding()).not.toBeNull();
+    // Five minutes added in another tab at 50 s, after this strip's last read (45 s).
+    await tick(50_000);
+    bali.snapshots.set('s4', snapshot(4, 24, 22, false, iso(NOW + 6 * 60_000)));
+    // At the account's bell the class goes, as the bell is all this tab knows.
+    await tick(10_020);
+    expect(riding()).toBeNull();
+    expect(props.refresh).not.toHaveBeenCalled();
+    // Just after it, the account is read again; its answer brings the class back to its new bell.
+    await tick(3_000);
+    expect(props.refresh).toHaveBeenCalledTimes(1);
+    again({ classes: [BIOLOGY, klass(4, 'Period 6 AP Biology', 6 * 60_000)] });
+    await tick(0);
+    expect(riding()?.getAttribute('aria-label')).toMatch(
+      /^Period 6 AP Biology is live\. 4:57 left/,
+    );
+  });
+
+  it('never reads the account at a bell on Home or Classes, which read it themselves then', async () => {
+    const soon = klass(4, 'Period 6 AP Biology', 60_000);
+    const { props } = bar({ classes: [BIOLOGY, soon], path: '/' });
+    await tick(70_000);
+    expect(props.refresh).not.toHaveBeenCalled();
+  });
 });
