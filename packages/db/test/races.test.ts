@@ -3489,9 +3489,10 @@ describe.runIf(REAL_PG)('a tap at the bell (real Postgres, A17)', () => {
       // Heard here before the bell, the replay names the class the tap is live in,
       // as `tapIn`'s does (rule 4; LO10a). Past the bell it names none, as the
       // route's twin of this test pins ("heard past the bell").
-      expect(await arming).toEqual({
+      const answer = await arming;
+      expect(answer && { ...answer, session: answer.session?.id }).toEqual({
         outcome: 'replay',
-        session: expect.objectContaining({ id: session.id }),
+        session: session.id,
         state: 'focused',
       });
       expect(await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId))).toEqual([]);
