@@ -9,14 +9,15 @@ import { type ApiClient, createApiClient, SAVE_TIMEOUT_MS } from '@/lib/api-clie
 import { ACCOUNT_DELETED, CANT_COPY, CANT_CREATE, CANT_REACH } from '@/lib/errors';
 import { captureApiFailure } from '@/lib/monitoring';
 
-import { CODE, DIALOG } from './join-code';
+import { CODE_WELL, DIALOG_LOCK } from './card';
 import { cardId, NewClass, type NewClassHandle } from './new-class';
 
 /*
- * New class (PV16b) as a teacher meets it (the owner's decision of 2026-10-22: the portal's tests
- * drive the page): v2's dialog (ClassesNew), its states as ClassesStates draws them, and once Bali
- * makes the class, "<name> is ready" with its join code, Copy code and Done (ClassesCreated,
- * CopyStates). Bali's answers come from a stand-in `fetch` under the portal's own API client, so
+ * New class (PV16b; the lock-only look since LO3) as a teacher meets it (the owner's decision of
+ * 2026-10-22: the portal's tests drive the page): the dialog ClassFlows draws, its states as
+ * HomeMoments draws them, and once Bali makes the class, ClassFlows' "A class just made", titled by
+ * the class's name, with its join code, Copy code and Open the class. Bali's answers come from a
+ * stand-in `fetch` under the portal's own API client, so
  * a create's time limit and its `eventId` are the ones the page really sends (2026-10-23): one
  * create, one id, sent again by every press while no answer has come, a new one for the next.
  *
@@ -62,7 +63,7 @@ const KLASS: ClassDetail = {
 
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-/** Classes, as far as New class needs it: its New class, and the list's cards once read. */
+/** Home, as far as New class needs it: its New class, and Your classes' rows once read. */
 function Page({ onAnswer, cards = [] }: { onAnswer: () => void; cards?: string[] }) {
   const dialog = useRef<NewClassHandle>(null);
   return (
@@ -152,8 +153,8 @@ async function opened(name = '', onAnswer = vi.fn(), cards: string[] = []) {
   return { user, onAnswer, page };
 }
 
-describe('New class, the dialog (ClassesNew)', () => {
-  it('opens as the class page’s dialog, titled New class, the name focused and its help under it', async () => {
+describe('New class, the dialog (ClassFlows)', () => {
+  it('opens as the lock-only look’s dialog, titled New class, the name focused and its help under it', async () => {
     const user = userEvent.setup();
     render(<Page onAnswer={vi.fn()} />);
     // Drawn closed, as the page holds it, until New class opens it as a modal.
@@ -161,8 +162,9 @@ describe('New class, the dialog (ClassesNew)', () => {
     await user.click(button('New class'));
     expect(dialog().open).toBe(true);
     expect(screen.getByRole('dialog', { name: 'New class' })).toBe(dialog());
-    // v2's dialog, the class page's New code's own: 460 px, 120 px down, over the warm backdrop.
-    expect(dialog().className).toBe(DIALOG);
+    // The lock-only look's dialog (LO2): 440 px, 120 px down, over the warm backdrop.
+    expect(dialog().className).toBe(DIALOG_LOCK);
+    expect(screen.getByRole('heading', { name: 'New class' }).className).toBe('text-panel-title');
     expect(document.activeElement).toBe(field());
     expect(field()).toHaveProperty('maxLength', 120);
     expect(field().getAttribute('autocomplete')).toBe('off');
@@ -172,8 +174,9 @@ describe('New class, the dialog (ClassesNew)', () => {
       screen.getByRole('textbox', { description: 'Your students see this name in the Bali app.' }),
     ).toBe(field());
     expect(screen.queryByRole('alert')).toBeNull();
-    // v2's buttons: Cancel secondary, Create class primary.
+    // Cancel the lock-only look's secondary, pressed by `press`; Create class primary.
     expect(button('Cancel').classList).toContain('border-border-strong');
+    expect(button('Cancel').classList).toContain('press');
     expect(button('Create class').classList).toContain('bg-action-primary-bg');
     // The form's own submit goes nowhere: Enter in the field presses Create class instead.
     expect(fireEvent.submit(dialog().querySelector('form')!)).toBe(false);
@@ -213,14 +216,14 @@ describe('New class, the dialog (ClassesNew)', () => {
   });
 });
 
-describe('a class made: "<name> is ready" (ClassesCreated, CopyStates)', () => {
-  it('turns the dialog into its join code with Copy code and Done, its title focused, the list read again', async () => {
+describe('a class just made (ClassFlows; HomeMoments)', () => {
+  it('turns the dialog into the class’s name over its join code, Copy code and Open the class, its title focused, the list read again', async () => {
     const { user, onAnswer } = await opened('Period 4 Biology');
     await user.keyboard('{Enter}');
     await answer(200, KLASS);
-    const title = screen.getByRole('heading', { name: 'Period 4 Biology is ready' });
+    const title = screen.getByRole('heading', { name: 'Period 4 Biology' });
     expect(document.activeElement).toBe(title);
-    expect(screen.getByRole('dialog', { name: 'Period 4 Biology is ready' })).toBe(dialog());
+    expect(screen.getByRole('dialog', { name: 'Period 4 Biology' })).toBe(dialog());
     expect(
       screen.getByRole('dialog', {
         description: 'Put this join code on the board. Students join with it in the Bali app.',
@@ -228,24 +231,17 @@ describe('a class made: "<name> is ready" (ClassesCreated, CopyStates)', () => {
     ).toBe(dialog());
     expect(screen.getByText('Q5FU3U').getAttribute('translate')).toBe('no');
     expect(button('Copy code')).toBeDefined();
-    expect(button('Done')).toBeDefined();
+    const open = screen.getByRole('link', { name: 'Open the class' });
+    expect(open.getAttribute('href')).toBe(`/classes/${KLASS.id}`);
+    expect(open.classList).toContain('bg-action-primary-bg');
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
     expect(onAnswer).toHaveBeenCalledTimes(1);
-    // As ClassesCreated draws it: its parts at the dialog's start; its 40 px check at a 1.5 stroke,
-    // in green; the title focusable by the page alone; the code on the card's chip; Done its whole
-    // width.
-    expect(dialog().className).toBe(`${DIALOG} items-start`);
-    const check = dialog().querySelector('svg')!;
-    expect(['width', 'height', 'aria-hidden'].map((a) => check.getAttribute(a))).toEqual([
-      '40',
-      '40',
-      'true',
-    ]);
-    expect(check.classList).toContain('stroke-[1.5]');
-    expect(check.classList).toContain('text-ready');
+    // As ClassFlows draws it: no check, the title focusable by the page alone, the code in its
+    // well at the dialog's start.
+    expect(dialog().className).toBe(DIALOG_LOCK);
     expect(title.getAttribute('tabindex')).toBe('-1');
-    expect(title.className).toBe('text-dialog-title wrap-anywhere');
-    expect(screen.getByText('Q5FU3U').className).toBe(CODE);
-    expect(button('Done').classList).toContain('w-full');
+    expect(title.className).toBe('text-panel-title text-balance wrap-anywhere');
+    expect(screen.getByText('Q5FU3U').className).toBe(`${CODE_WELL} self-start`);
   });
 
   it('copies the code, saying Copied, or, with no clipboard, how to copy it by hand', async () => {
@@ -268,21 +264,21 @@ describe('a class made: "<name> is ready" (ClassesCreated, CopyStates)', () => {
     vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValueOnce(new Error('denied'));
     await user.click(button('Copy code'));
     expect(screen.getByRole('alert').textContent).toBe(CANT_COPY);
-    await user.click(button('Done'));
+    await user.keyboard('{Escape}');
     await user.click(button('New class'));
     await user.type(field(), 'Period 5{Enter}');
     const next = { ...KLASS, id: '019a0000-0000-7000-8000-0000000000c2', name: 'Period 5' };
     await answer(200, { ...next, joinCode: 'K7M2PQ' });
-    expect(screen.getByRole('heading', { name: 'Period 5 is ready' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Period 5' })).toBeDefined();
     expect(button('Copy code')).toBeDefined();
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('closes with Done, focus on the class’s card, and the next New class starts afresh under a new eventId', async () => {
+  it('closes with Escape, focus on the class’s row, and the next New class starts afresh under a new eventId', async () => {
     const { user } = await opened('Period 4 Biology', vi.fn(), [KLASS.id]);
     await user.keyboard('{Enter}');
     await answer(200, KLASS);
-    await user.click(button('Done'));
+    await user.keyboard('{Escape}');
     expect(dialog().open).toBe(false);
     expect(document.activeElement).toBe(document.getElementById(cardId(KLASS.id)));
     await user.click(button('New class'));
@@ -295,7 +291,7 @@ describe('a class made: "<name> is ready" (ClassesCreated, CopyStates)', () => {
   });
 });
 
-describe('a create with no answer, or refused (ClassesStates)', () => {
+describe('a create with no answer, or refused (HomeMoments)', () => {
   it('says Couldn’t reach Bali once a save’s 10 s pass with no answer; Try again sends it again under its eventId, focus kept on it, and is answered with the class', async () => {
     vi.useFakeTimers();
     const onAnswer = vi.fn();
@@ -309,7 +305,7 @@ describe('a create with no answer, or refused (ClassesStates)', () => {
     expect(button('Creating…')).toBe(create);
     expect(screen.queryByRole('alert')).toBeNull();
     await act(() => vi.advanceTimersByTimeAsync(1));
-    // Under the help, the field described by it, as ClassesStates draws "No answer at all".
+    // Under the help, the field described by it, as HomeMoments draws an answer that never came.
     expect(screen.getByRole('alert').textContent).toBe(CANT_REACH);
     expect(
       screen.getByRole('textbox', {
@@ -329,9 +325,7 @@ describe('a create with no answer, or refused (ClassesStates)', () => {
       bali.calls[1]?.answer(Response.json(KLASS));
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(document.activeElement).toBe(
-      screen.getByRole('heading', { name: 'Period 4 Biology is ready' }),
-    );
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Period 4 Biology' }));
     expect(onAnswer).toHaveBeenCalledTimes(2);
   });
 
@@ -349,7 +343,7 @@ describe('a create with no answer, or refused (ClassesStates)', () => {
     expect(sent()[1]).toEqual({ name: 'Period 4 Bio', eventId: sent()[0]?.eventId });
     // The first had landed: its resend is answered with that class, as Bali holds it.
     await answer(200, KLASS);
-    expect(screen.getByRole('heading', { name: 'Period 4 Biology is ready' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Period 4 Biology' })).toBeDefined();
   });
 
   it('says a refusal with no Try again, and the next press is a new create, under a new eventId', async () => {
@@ -385,7 +379,7 @@ describe('a create with no answer, or refused (ClassesStates)', () => {
     expect(dialog().open).toBe(false);
     await answer(200, KLASS);
     expect(dialog().open).toBe(true);
-    expect(screen.getByRole('heading', { name: 'Period 4 Biology is ready' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Period 4 Biology' })).toBeDefined();
   });
 
   it('closed by the browser during a create that gets no answer, keeps the name and its eventId: Try again resends it', async () => {

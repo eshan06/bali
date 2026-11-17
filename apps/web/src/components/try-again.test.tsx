@@ -627,21 +627,20 @@ describe('every read’s Try again in the portal is this one', () => {
 });
 
 /**
- * Home and Classes whole (the account's card, your classes, the live card, Recent activity, Last
- * session, your block and Register block), the live grid's own line (the class page's and
- * Present's), and the student's home; then the class page's own lines (its class and roster, an
- * extend's), the recap, the student panel, New code's Make new code, Reports, a session's report
- * and its Questions; then a close (the class page's and Present's) and the slides (the slide's line,
- * the card's, Present's and a student's, and a slide change's, Show slides' too); then the rest:
- * the side panel's two lists and an ask (one of your questions, or one written), Your questions (its
- * list and a save) and Your slides (its list and a stopped upload), New class's Create class, the
- * invite code's own button, and a student's lesson.
+ * Home whole (the account's line, a live class's well, Last session, your block and Register
+ * block; Classes' page went into it in LO3, and its file draws no Try again since), the live grid's
+ * own line (the class page's and Present's), and the student's home; then the class page's own
+ * lines (its class and roster, an extend's), the recap, the student panel, New code's Make new code,
+ * Reports, a session's report and its Questions; then a close (the class page's and Present's) and
+ * the slides (the slide's line, the card's, Present's and a student's, and a slide change's, Show
+ * slides' too); then the rest: the side panel's two lists and an ask (one of your questions, or one
+ * written), Your questions (its list and a save) and Your slides (its list and a stopped upload),
+ * New class's Create class, the invite code's own button, and a student's lesson.
  */
 const MOVED = [
   'app/classes/[id]/page.tsx',
   'components/ask-panel.tsx',
   'components/blocks.tsx',
-  'components/classes.tsx',
   'components/decks-panel.tsx',
   'components/home.tsx',
   'components/invite-code.tsx',

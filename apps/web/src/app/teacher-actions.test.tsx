@@ -23,7 +23,6 @@ import { type ApiClient, createApiClient } from '@/lib/api-client';
 
 import CallbackPage from './auth/callback/page';
 import ClassDetailPage from './classes/[id]/page';
-import ClassesPage from './classes/page';
 import HomePage from './page';
 
 /*
@@ -719,10 +718,10 @@ describe('a question asked and slides shown (portal_question_asked, portal_slide
   });
 });
 
-describe('Classes: a class made and a block registered (portal_class_created, _block_registered)', () => {
+describe('Home: a class made and a block registered (portal_class_created, _block_registered)', () => {
   async function classes() {
     const user = userEvent.setup();
-    open('/classes', <ClassesPage />);
+    open('/', <HomePage />);
     await screen.findByRole('heading', { level: 1, name: 'Classes' });
     await screen.findByText('No block registered yet.');
     return user;
@@ -743,7 +742,7 @@ describe('Classes: a class made and a block registered (portal_class_created, _b
 
     bali.now.refused.clear();
     await user.click(within(dialog).getByRole('button', { name: 'Try again' }));
-    await screen.findByRole('heading', { name: 'Period 4 Biology is ready' });
+    await screen.findByRole('heading', { name: 'Period 4 Biology' });
     expect(counted()).toEqual(['portal_class_created']);
     expect(countedAfter('POST /v1/classes')).toBe(true);
     expect(bali.unexpected).toEqual([]);
@@ -751,7 +750,7 @@ describe('Classes: a class made and a block registered (portal_class_created, _b
 
   it('counts a block once Bali has registered it, never one that failed', async () => {
     const user = await classes();
-    await user.type(screen.getByRole('textbox', { name: 'Block ID' }), 'BALI7Q2M4X');
+    await user.type(screen.getByRole('textbox', { name: 'Block code' }), 'BALI7Q2M4X');
     bali.now.refused.add('POST /v1/blocks');
     await user.click(screen.getByRole('button', { name: 'Register block' }));
     await screen.findByRole('alert');

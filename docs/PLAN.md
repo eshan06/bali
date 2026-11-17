@@ -175,7 +175,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO2** 👀 The top bar and the new look's shared pieces (#604; after LO1) — ✅ (#617; DECISIONS 2026-11-17); its in-between states on the canvas's BarStates (version 32); until LO3, a teacher with classes reaches New class at /classes by its address only
 
-- **LO3** 👀 Home, one page for your classes (#605; lane A; after LO2)
+- **LO3** 👀 Home, one page for your classes (#605; lane A; after LO2) — ✅ (#620, one PR, the conductor's call; DECISIONS 2026-11-17); its in-between states on the canvas's HomeMoments (version 37); Check on's rarer rows the owner's approval (2026-11-17); for the phase's end: 23 source-text tests left (Now), and the conductor's tidy-up: Home's phone title to LO4's `page-title-phone`, the unused `--color-ready`, `portal-bar.tsx`'s "until LO3"
 
 - **LO4** 👀 A class before it starts (#606; lane B; after LO2) — ✅ (#618; DECISIONS 2026-11-17); its in-between states on the canvas's ClassBeforeStates (version 35); left for a step at the phase's end: Try again, and Start while it sends, still v2's button (`TryAgain`, every rebuilt page); for Now at the phase's end: 26 source-text tests left (`join-code.test.ts` converted)
 

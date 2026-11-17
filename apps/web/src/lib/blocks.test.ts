@@ -102,10 +102,10 @@ describe('registerBlock', () => {
     });
   });
 
-  it('sends a teacher whose ID is taken back to the ID itself, the Classes home design’s words (PB3)', () => {
+  it('sends a teacher whose code is taken back to the code itself, the Classes home design’s words (PB3; "code" since LO3)', () => {
     // Nothing moves a block between teachers today, so no one can be asked to move it.
     expect(BLOCK_TAKEN).toBe(
-      'That block is registered to another teacher. Check the ID against the one written on your block.',
+      'That block is registered to another teacher. Check the code against the one written on your block.',
     );
     expect(BLOCK_TAKEN).not.toMatch(/[—–!]|move it/);
   });
