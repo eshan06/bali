@@ -582,7 +582,10 @@ describe('Reports in between (ReportsMoments, drawn first)', () => {
     const table = await screen.findByRole('table');
     expect(table.parentElement?.className.split(' ')).toContain('overflow-x-auto');
     expect(table.className.split(' ')).toEqual(
-      expect.arrayContaining(['max-[760px]:min-w-180', 'max-[760px]:[&_td]:whitespace-nowrap']),
+      expect.arrayContaining([
+        'max-[760px]:min-w-180',
+        'max-[760px]:[&_:is(th,td)]:whitespace-nowrap',
+      ]),
     );
   });
 });

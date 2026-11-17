@@ -215,7 +215,7 @@ function Ledger({
       <table
         id={id}
         aria-labelledby={labelledBy}
-        className={`${LEDGER} max-[760px]:min-w-180 max-[760px]:[&_td]:whitespace-nowrap`}
+        className={`${LEDGER} max-[760px]:min-w-180 max-[760px]:[&_:is(th,td)]:whitespace-nowrap`}
       >
         <thead>
           <tr>
