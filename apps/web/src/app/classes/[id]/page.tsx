@@ -358,7 +358,10 @@ export default function ClassDetailPage() {
   const toggled = useRef(false);
   useEffect(() => {
     if (toggled.current) {
-      const to = toggle.current ?? submitOf(startForm.current);
+      // The class page's Present is hidden on a phone (PhoneLive), so Present left there goes to
+      // the class's name, as no Start does.
+      const phone = window.matchMedia?.('(width < 760px)').matches === true;
+      const to = (present || !phone ? toggle.current : null) ?? submitOf(startForm.current);
       // No block yet, so no Start: the class's name.
       if (to) to.focus();
       else land(document, []);

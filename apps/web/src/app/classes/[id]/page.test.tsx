@@ -15,7 +15,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { DIALOG } from '@/components/join-code';
 import { type ApiClient, createApiClient, SAVE_TIMEOUT_MS } from '@/lib/api-client';
-import { CANT_REACH } from '@/lib/errors';
+import { CANT_REACH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
 import { captureApiFailure } from '@/lib/monitoring';
 
 import ClassDetailPage from './page';
@@ -88,9 +88,10 @@ const bali = vi.hoisted(() => {
   const unexpected: string[] = [];
   /**
    * Whether the class's session runs yet: none until a Start, when a test says so; whether a
-   * Start's answer waits for the test to give it (`starts`); and an extend's (`extending`).
+   * Start's answer waits for the test to give it (`starts`); and an extend's (`extending`); and
+   * whether a Start finds a session running already (`existing`).
    */
-  const now = { running: true, holdStart: false, holdExtend: false, block: true };
+  const now = { running: true, holdStart: false, holdExtend: false, block: true, existing: false };
   /**
    * What the session has open, as its read says it (L7, M6): a question and a slide, none unless a
    * test says so; and the teacher's decks, as `GET /v1/decks` lists them.
@@ -107,7 +108,8 @@ const bali = vi.hoisted(() => {
     }
     if (method === 'POST' && path === `/v1/classes/${CLASS}/sessions`) {
       now.running = true;
-      return [201, { outcome: 'created', session: snapshot.session, armedConverted: 0 }];
+      const outcome = now.existing ? 'existing' : 'created';
+      return [201, { outcome, session: snapshot.session, armedConverted: 0 }];
     }
     if (method === 'GET' && path === `/v1/classes/${CLASS}/roster`) return [200, roster];
     if (method === 'GET' && path === `/v1/sessions/${SESSION}`) {
@@ -263,6 +265,7 @@ afterEach(() => {
   bali.now.holdStart = false;
   bali.now.holdExtend = false;
   bali.now.block = true;
+  bali.now.existing = false;
   bali.lesson.question = null;
   bali.lesson.presentation = null;
   bali.lesson.decks = [];
@@ -412,6 +415,65 @@ describe('the live header (LO5; ClassLive, PhoneLive), and Present’s (ClassPre
     expect(screen.getByRole('banner').compareDocumentPosition(said)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
+  });
+});
+
+/*
+ * The rest of what the live page says under its header, and Present's (LO5's santa round 1): a
+ * Start that found a session already running, said quietly on the class page (LiveTopStates); an
+ * extend with no answer in Present, in v2's line with Try again; and Present left on a phone, where
+ * the class page draws no Present to land on (PhoneLive).
+ */
+describe('the live page’s other lines, and Present left on a phone (LO5)', () => {
+  it('says quietly that a session was already running, the length picked unused', async () => {
+    bali.now.running = false;
+    bali.now.existing = true;
+    const user = userEvent.setup();
+    render(<ClassDetailPage />);
+    await user.click(await screen.findByRole('button', { name: /^Start \d+-minute session$/ }));
+    const note = await screen.findByText(SESSION_ALREADY_RUNNING);
+    expect(note.getAttribute('role')).toBe('status');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('banner').compareDocumentPosition(note)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(bali.unexpected).toEqual([]);
+  });
+
+  it('says an extend with no answer in Present, Try again sending the same one again', async () => {
+    sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
+    bali.now.holdExtend = true;
+    const user = userEvent.setup();
+    render(<ClassDetailPage />);
+    await screen.findByText('Ana Rodríguez');
+    await user.click(screen.getByRole('button', { name: '+5 min' }));
+    await act(async () => {
+      bali.extending.shift()?.fail();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(screen.getByRole('alert').textContent).toBe(CANT_REACH);
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(extendsSent()).toHaveLength(2);
+    expect(extendsSent()[1]?.body).toEqual(extendsSent()[0]?.body);
+  });
+
+  it('puts focus on the class’s name as Present is left on a phone, where the page draws no Present', async () => {
+    sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(width < 760px)' }));
+    const user = userEvent.setup();
+    render(
+      <main>
+        <ClassDetailPage />
+      </main>,
+    );
+    await screen.findByText('Ana Rodríguez');
+    await user.click(screen.getByRole('button', { name: 'Present' }));
+    expect(screen.queryByText('Live · 1 of 1 joined')).toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole('heading', { level: 1, name: 'Biology, period 3' }),
+    );
+    vi.unstubAllGlobals();
+    vi.stubGlobal('ResizeObserver', NoLayout);
   });
 });
 
@@ -605,6 +667,22 @@ describe('a class live, an unlock lands (GA2)', () => {
     // Her tile says Unlocked, as the replay applies it, and doesn't pulse.
     expect(anasTile().textContent).toMatch(/Unlocked/);
     expect(anasTile().querySelector('.animate-softpulse')).toBeNull();
+  });
+
+  it('pulses her tile once for each live unlock: still once it has pulsed, again at the next', async () => {
+    await live();
+    await bring(unlocked(5));
+    const glow = () => anasTile().querySelector('.animate-softpulse');
+    const first = glow();
+    expect(first).not.toBeNull();
+    // Its end: jsdom has no AnimationEvent, so React listens for the prefixed name there.
+    act(() => {
+      first?.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
+    });
+    expect(glow()).toBeNull();
+    await bring(unlocked(6));
+    expect(glow()).not.toBeNull();
+    expect(glow()).not.toBe(first);
   });
 
   it('closes on Open student, the student’s panel opening from their tile', async () => {
