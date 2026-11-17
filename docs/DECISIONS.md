@@ -28,8 +28,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   (Questions' and Slides' layouts, the lesson's route), before any of the page is drawn or read.
 
   **A question or a slide open when a deploy turns lessons off** (the conductor's call; LO0's worker rated it rare): left
-  to the session's end, which closes it. The portal neither shows nor reads it meanwhile; the phones still show it, as
-  they show whatever a teacher sends.
+  to the session's end, which closes it. The portal shows none of it meanwhile, and the class page reads none of it; a
+  student's home still reads it, for the phone's chip alone. The phones still show it, as they show whatever a teacher
+  sends.
 
   **`.env.example` is left as it is:** it lists the API's variables, each checked as the API boots; the portal's live in
   `docs/WEB.md`'s table, `NEXT_PUBLIC_LESSONS` beside them.

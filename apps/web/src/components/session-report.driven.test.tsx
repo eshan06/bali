@@ -306,6 +306,35 @@ describe('a session’s report and its Questions card (L7c)', () => {
     expect(card()?.textContent).toContain('1 asked in this session');
   });
 
+  it('keeps what the card said while the page’s Try again reads its questions again, never Loading… in its place (ReportRetryStates)', async () => {
+    // Both read and both answered, the page's own failing; the questions' failure, or their read.
+    for (const first of [DOWN, [200, { questions: [ASKED] }] as [number, unknown]]) {
+      const said =
+        first === DOWN ? "Bali couldn't load this session's questions." : '1 asked in this session';
+      bali.reply = (path) =>
+        path === REPORT ? DOWN : path === QUESTIONS ? first : (PAGE[path] ?? null);
+      const user = userEvent.setup();
+      open();
+      await settle();
+      expect(screen.getByText("Couldn't load this session.")).toBeTruthy();
+      // The page's read again answers at once; its questions' read again is held.
+      bali.reply = (path) => PAGE[path] ?? null;
+      await user.click(screen.getByRole('button', { name: 'Try again' }));
+      await settle();
+      expect([REPORT, QUESTIONS].map(asked), said).toEqual([2, 2]);
+      expect(screen.getByRole('heading', { name: 'This session' })).toBeTruthy();
+      // Drawn while the questions' read is on its way: what the card last said stands.
+      expect(card()?.textContent, said).toContain(said);
+      expect(card()?.getAttribute('aria-busy'), said).toBe('false');
+      expect(within(card() as HTMLElement).queryByRole('status'), said).toBeNull();
+      await answer(QUESTIONS, 200, { questions: [ASKED] });
+      expect(card()?.textContent, said).toContain('1 asked in this session');
+      expect(screen.queryByText("Bali couldn't load this session's questions.")).toBeNull();
+      cleanup();
+      bali.calls.length = 0;
+    }
+  });
+
   it('reads its questions alone again by the card’s own Try again, held with its line kept, never Loading…; read, focus on the card’s title (ReportRetryStates)', async () => {
     const user = userEvent.setup();
     open();
