@@ -473,6 +473,33 @@ describe('POST /v1/taps', () => {
       expect(row).toMatchObject({ teacherId: x.teacher.id, consumedAt: null });
     });
 
+    it('names the session the tap is still live in, at a block removed mid-lesson', async () => {
+      // The teacher removes the block while the class runs: the retry of a
+      // tap that landed in it is told what was recorded while it is still true.
+      const { x, token, remove } = await movingBlock('tap-removed-live');
+      const lesson = await startSession(db, {
+        classId: x.klass.id,
+        startedAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 25 * 60_000),
+      });
+      const sent = { tagId: x.block.tagId, eventId: randomUUID() };
+      expect((await tap(token, sent)).body.outcome).toBe('joined');
+      await remove();
+
+      expect(await tap(token, sent)).toEqual({
+        status: 200,
+        body: {
+          outcome: 'replay',
+          session: {
+            id: lesson.session.id,
+            classId: x.klass.id,
+            endsAt: lesson.session.endsAt.toISOString(),
+          },
+          state: 'focused',
+        },
+      });
+    });
+
     it('answers a retry at a block removed and not registered again as its retry, and anything else there 404', async () => {
       const { x, y, token, remove } = await movingBlock('tap-removed');
       const landed = { tagId: x.block.tagId, eventId: randomUUID() };
@@ -840,6 +867,48 @@ describe.runIf(REAL_PG)(
 );
 
 describe.runIf(REAL_PG)('POST /v1/taps racing its block’s move (real Postgres, LO10a)', () => {
+  it('a retry at a block removed while its tap is still landing waits for that landing, never 404', async () => {
+    // The tap's first delivery read the tag before the removal and parks on
+    // the session's row, holding the tap's own lock; its retry reads the tag
+    // after, at no live block. Read without that lock, the landing's row is
+    // not there yet, and a phone whose tap landed would be told the block is
+    // unknown.
+    const x = await seedClassroom(db, 'tap-removed-landing');
+    const { session } = await startSession(db, {
+      classId: x.klass.id,
+      startedAt: new Date(Date.now() - 60_000),
+      endsAt: new Date(Date.now() + 25 * 60_000),
+    });
+    const token = await ctx.tokenFor(x.student.cognitoId);
+    const eventId = randomUUID();
+    const release = await hold(session.id);
+    const landing = tapIn(db, {
+      sessionId: session.id,
+      studentId: x.student.id,
+      eventId,
+      tagId: x.block.tagId,
+      deviceTime: new Date(),
+    });
+    let retry: ReturnType<typeof tap> | undefined;
+    try {
+      await parked(1, landing);
+      await db.update(blocks).set({ removedAt: new Date() }).where(eq(blocks.id, x.block.id));
+      retry = tap(token, { tagId: x.block.tagId, eventId });
+      await parked(2, retry);
+    } finally {
+      await release();
+    }
+    expect((await landing).outcome).toBe('joined');
+    expect(await retry).toEqual({
+      status: 200,
+      body: {
+        outcome: 'replay',
+        session: { id: session.id, classId: x.klass.id, endsAt: session.endsAt.toISOString() },
+        state: 'focused',
+      },
+    });
+  }, 20_000);
+
   /*
    * The move as the portal makes it, two requests: the old teacher removes
    * the block (LO10b's removal, its row written as that will write it), and

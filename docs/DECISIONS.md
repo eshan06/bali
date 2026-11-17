@@ -31,11 +31,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   The blocks are read only when the teachers differ, so a tap at a block that never moved pays nothing. The same id at a
   tag that teacher never held is still a client bug, `409`, as is another student's id and another kind's.
 
-  **The answers**, step 10's, as any retry gets them: on the join path, the session the tap is still live in, else
-  `replay` naming none; on the arm path `replay`, naming none, so the phone re-reads the truth; a waiting tap, its own
-  row's answer, `already_armed` while it waits. That row stays with the teacher it was made for and converts at their
-  Start: the follow-up's "consumes the stale X row and answers about the Y one" is set aside, since a retry is the tap
-  made at X's block, not a new one at Y's. `armTap`'s two 23505 recoveries read a row's owner by the same rule.
+  **The answers**, step 10's, as any retry gets them: a tap that landed, `replay` naming the session it is still live
+  in, else none, so the phone re-reads the truth; a waiting tap, its own row's answer, `already_armed` while it waits.
+  On every path, the arm path too (santa's round 1, both reviewers): it named none there, which a move makes wrong, since
+  the old teacher's class can still run with the student in it while nothing of the new teacher's does; `stillLive`
+  now answers for `tapIn` and the arm path alike, rule 4's "while that is still true". The waiting row stays with the
+  teacher it was made for and converts at their Start: the follow-up's "consumes the stale X row and answers about the
+  Y one" is set aside, since a retry is the tap made at X's block, not a new one at Y's. `armTap`'s two 23505
+  recoveries read a row's owner by the same rule.
 
   **A tag no live block holds** (the worker's call, the owner away): removed and not registered again, it was `404`,
   which the phone keeps retrying and shows, for a tap that landed. The route now asks the engine first
@@ -55,10 +58,13 @@ a real decision? Add a dated entry at the top: what was decided and why.
     phone offline across a removal and a registration, and the new teacher's class running with the student in it.
 
   **Tests:** PGlite (`transitions.test.ts`, "a retry after its block moved": both paths, a waiting tap, a tap at the
-  moved block for real beside it, the 409s that stay, and no live block); the route (`taps.test.ts`, "after its block
-  moved"); real Postgres: the route racing the move, its retry reading the tag before, between and after the removal and
-  the registration, three shapes of twelve rounds (`taps.test.ts`), and the 23505 recovery staged under a moved block
-  (`races.test.ts`). Each retry test fails on `main`'s rule, and each refusal kept fails on a rule that skips the tag.
+  moved block for real beside it, the session named while live, the 409s that stay, and no live block); the route
+  (`taps.test.ts`, "after its block moved"); real Postgres: the route racing the move, its retry reading the tag before,
+  between and after the removal and the registration, three shapes of twelve rounds, and a retry at a removed block
+  waiting out its tap still landing (`taps.test.ts`), and the 23505 recovery staged under a moved block
+  (`races.test.ts`). Each retry test fails on `main`'s rule, each refusal kept on a rule that skips the tag, and the
+  landing's test without `retryAtRemovedBlock`'s lock. A17's "an arm waits out the same tap still landing", heard
+  before the bell, now expects its replay to name the class the tap is live in.
 
 - **2026-11-17** — **LO5, live: the top of a class's page while its session runs rebuilt from ClassLive, the count of who
   is focused, Check on and the room; no lesson piece on the class page whichever way the switch is set; Present v2's until

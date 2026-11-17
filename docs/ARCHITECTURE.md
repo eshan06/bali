@@ -59,16 +59,15 @@ middle was considered and rejected — see below.)
     removed from the class), the retry is answered `replay` with no session (ruled
     2026-09-24, replacing 2026-09-22's `409`): recorded, with no window to shield to, so
     the phone deletes it and re-reads the truth — a `200` naming the old session would
-    keep a backgrounded phone shielded to a window that is over. On the arm path, and at a
-    tag no live block holds (step 9), it names none: the phone re-reads the truth. The
-    retry of a tap still waiting for Start (decision 5) is answered `already_armed`, so
-    the phone keeps showing "waiting for your teacher", its row left with the teacher it
-    waits for; one that finds a class running where its tag points now, the student in it,
-    joins it as a tap the server has not seen land does — after a block's move too, as a
-    tap first heard after the move would — and the row is declined at its teacher's Start
-    (`armed_tap_skipped`). The phone keeps a `409`'s record and keeps retrying it,
-    and shows it (rule 5) while re-reading the truth; the typed table is `tapDisposition`
-    in `@bali/shared`.
+    keep a backgrounded phone shielded to a window that is over. Every path answers it so,
+    the arm path and a tag no live block holds (step 9) included. The retry of a tap still
+    waiting for Start (decision 5) is answered `already_armed`, so the phone keeps showing
+    "waiting for your teacher", its row left with the teacher it waits for; one that finds a
+    class running where its tag points now, the student in it, joins it as a tap the server
+    has not seen land does — after a block's move too, as a tap first heard after the move
+    would — and the row is declined at its teacher's Start (`armed_tap_skipped`). The phone
+    keeps a `409`'s record and keeps retrying it, and shows it (rule 5) while re-reading the
+    truth; the typed table is `tapDisposition` in `@bali/shared`.
 11. Insert an event row so the teacher's live grid updates (see rule 6).
 
 **Why there's no queue between the API and the database.** A queue (usually Redis — a

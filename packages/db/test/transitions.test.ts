@@ -6112,6 +6112,64 @@ describe('a retry after its block moved (tap step 9; LO10a)', () => {
     expect(retried.session?.id).toBe(first.session.id);
   });
 
+  it('names that session on the arm path too, and at no live block, while the tap is still live in it', async () => {
+    // X's class still runs and the student is in it when X removes the block:
+    // the retry reaches the arm path (nothing of Y's runs) or, before anyone
+    // registers the tag again, no live block at all. Either way it is told
+    // what was recorded while it is still true (rule 4), as `tapIn` tells it.
+    const block = await aBlock('moved-arm-live');
+    const { session } = await startSession(db, {
+      classId: block.x.klass.id,
+      ...window('2026-01-01T09:00:00Z', 90),
+    });
+    const tap = block.tap('2026-01-01T09:01:00Z');
+    expect((await tapIn(db, { sessionId: session.id, ...tap })).outcome).toBe('joined');
+    const named = (answer: { session?: { id: string } | null; state?: string | null }) => ({
+      session: answer.session?.id,
+      state: answer.state,
+    });
+    const live = { session: session.id, state: 'focused' };
+
+    await block.remove();
+    const now = new Date('2026-01-01T09:30:00Z');
+    const atNoBlock = await retryAtRemovedBlock(db, { ...tap, now });
+    expect(atNoBlock).toMatchObject({ outcome: 'replay' });
+    expect(named(atNoBlock ?? {})).toEqual(live);
+
+    const yBlock = one(
+      await db
+        .insert(blocks)
+        .values({ tagId: tap.tagId, teacherId: block.y.teacher.id })
+        .returning(),
+    );
+    const armPath = await armTap(db, {
+      ...tap,
+      teacherId: block.y.teacher.id,
+      blockId: yBlock.id,
+      expiresAt: DAY_END,
+      now,
+    });
+    expect(armPath).toMatchObject({ outcome: 'replay' });
+    expect(named(armPath)).toEqual(live);
+
+    // Once that class is over it names none.
+    await endSession(db, {
+      sessionId: session.id,
+      at: new Date('2026-01-01T09:40:00Z'),
+      reason: 'ended',
+    });
+    const later = new Date('2026-01-01T09:45:00Z');
+    expect(
+      await armTap(db, {
+        ...tap,
+        teacherId: block.y.teacher.id,
+        blockId: yBlock.id,
+        expiresAt: DAY_END,
+        now: later,
+      }),
+    ).toEqual({ outcome: 'replay' });
+  });
+
   it('answers it replay on the arm path, arming nothing for the new teacher', async () => {
     const block = await aBlock('moved-arm');
     const tap = await landedAndEnded(block);

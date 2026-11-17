@@ -413,6 +413,29 @@ async function loadLiveParticipation(
 }
 
 /**
+ * Where a tap that landed in `sessionId` still stands: the session and the
+ * student's participation there, while it is still the truth (tap step 10,
+ * rule 4) — the session running at `now`, the participation live. Otherwise
+ * none, and its retry names no session. `held` is the session row a caller
+ * holds locked, read in place of a second snapshot when it is this one; any
+ * other is read unlocked, the session before the participation (`tapIn` says
+ * why), so a session ending just after is the next check-in's to tell.
+ */
+async function stillLive(
+  tx: Database,
+  sessionId: string,
+  studentId: string,
+  now: Date,
+  held?: SessionRow,
+): Promise<{ session: SessionRow; participation: ParticipationRow } | undefined> {
+  const session = held?.id === sessionId ? held : await loadSession(tx, sessionId);
+  const participation = await loadParticipation(tx, sessionId, studentId);
+  return session && sessionRunning(session, now) && participation && !participation.endedAt
+    ? { session, participation }
+    : undefined;
+}
+
+/**
  * End every live participation this student has in a session OTHER than
  * `exceptSessionId`, as `left_for_other_session` (decision 4), emitting the
  * switch-out event on each. Returns how many were ended. Both `tapIn` and the
@@ -895,6 +918,13 @@ export interface ArmTapResult {
    * waiting for it.
    */
   armedTapId?: string;
+  /**
+   * On that `replay` of a tap that landed, the session it is still live in and
+   * the student's state there, while that is the truth (tap step 10, rule 4,
+   * `stillLive`); absent otherwise, and on every other answer.
+   */
+  session?: SessionRow;
+  state?: ParticipationState;
 }
 
 type ArmedTapRow = typeof armedTaps.$inferSelect;
@@ -1042,6 +1072,24 @@ async function rowIsStale(
 async function answerOwnArmedTap(tx: Database, row: ArmedTapRow, now: Date): Promise<ArmTapResult> {
   const waiting = row.consumedAt === null && !(await rowIsStale(tx, row, now));
   return { outcome: waiting ? 'already_armed' : 'replay', armedTapId: row.id };
+}
+
+/**
+ * The `replay` of this student's tap that landed in `sessionId`, on the arm
+ * path: naming that session and their state there while it is still the truth
+ * (`stillLive`), as `tapIn`'s replay does; none once it is not, and the phone
+ * re-reads the truth.
+ */
+async function landedReplay(
+  tx: Database,
+  sessionId: string | null,
+  studentId: string,
+  now: Date,
+): Promise<ArmTapResult> {
+  const live = sessionId === null ? undefined : await stillLive(tx, sessionId, studentId, now);
+  return live
+    ? { outcome: 'replay', session: live.session, state: live.participation.state }
+    : { outcome: 'replay' };
 }
 
 /**
@@ -1217,12 +1265,18 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // to a teacher other than the one it landed under, and the scope reads the
     // tag to tell that honest retry from a spent id reused at another block:
     // the teacher it landed under held a block with this tag (`sameTap`), so
-    // it is answered `replay` as any retry here is, never the 409. Named in no
-    // session, as here it never is: the phone re-reads the truth, which names
-    // the session while the tap is still current in it.
+    // it is answered `replay` as any retry here is, never the 409. Its old
+    // teacher's class can still be running with the student live in it, since
+    // nothing of the new teacher's runs, so the replay names that session
+    // while it is the truth, as `tapIn`'s does (`landedReplay`).
     const recorded = firstOrUndefined(
       await tx
-        .select({ type: events.type, userId: events.userId, teacherId: classes.teacherId })
+        .select({
+          type: events.type,
+          sessionId: events.sessionId,
+          userId: events.userId,
+          teacherId: classes.teacherId,
+        })
         .from(events)
         .leftJoin(classes, eq(classes.id, events.classId))
         .where(eq(events.eventId, input.eventId))
@@ -1241,7 +1295,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       ) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
-      return { outcome: 'replay' };
+      return landedReplay(tx, recorded.sessionId, input.studentId, now);
     }
     // An answer's id, a saved question's or a deck's likewise: never this phone's tap (settled
     // 2026-10-10).
@@ -1464,11 +1518,12 @@ export interface RemovedBlockRetryInput {
  * the retry of a tap made at that block before its teacher removed it (tap step
  * 9; LO10): the same student's, on record under a teacher who held a block with
  * this tag (`sameTap`). Answered as the arm path answers a retry, since the tag
- * points at no one's class now: landed, `replay`, naming no session, so the
- * phone re-reads the truth; armed, as its row says (`answerOwnArmedTap`),
- * `already_armed` while it still waits for its teacher's Start. Anything else is
- * not this tap's retry, and is `undefined`: the route answers it as it answers
- * any tag no block holds, `404`, so nothing about whose an id is shows.
+ * points at no one's class now: landed, `replay`, naming the session while the
+ * tap is still live in it (`landedReplay`); armed, as its row says
+ * (`answerOwnArmedTap`), `already_armed` while it still waits for its teacher's
+ * Start. Anything else is not this tap's retry, and is `undefined`: the route
+ * answers it as it answers any tag no block holds, `404`, so nothing about
+ * whose an id is shows.
  */
 export async function retryAtRemovedBlock(
   db: Database,
@@ -1482,7 +1537,12 @@ export async function retryAtRemovedBlock(
     await lockTap(tx, input.eventId);
     const recorded = firstOrUndefined(
       await tx
-        .select({ type: events.type, studentId: events.userId, teacherId: classes.teacherId })
+        .select({
+          type: events.type,
+          sessionId: events.sessionId,
+          studentId: events.userId,
+          teacherId: classes.teacherId,
+        })
         .from(events)
         .leftJoin(classes, eq(classes.id, events.classId))
         .where(eq(events.eventId, input.eventId))
@@ -1490,7 +1550,7 @@ export async function retryAtRemovedBlock(
     );
     if (recorded) {
       const landed = recorded.type === 'tap_in' && (await sameTap(tx, recorded, tap));
-      return landed ? { outcome: 'replay' } : undefined;
+      return landed ? landedReplay(tx, recorded.sessionId, input.studentId, now) : undefined;
     }
     const armed = firstOrUndefined(
       await tx.select().from(armedTaps).where(eq(armedTaps.eventId, input.eventId)).limit(1),
@@ -2122,15 +2182,13 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
         // timed to land between them. The order costs nothing and is kept for
         // the reason above; the residual window after BOTH reads is not
         // reachable by any test here at all, only by the next check-in.
-        const recorded =
-          prior.sessionId === session.id ? session : await loadSession(tx, prior.sessionId);
-        const current = await loadParticipation(tx, prior.sessionId, input.studentId);
-        if (recorded && sessionRunning(recorded, now) && current && !current.endedAt) {
+        const live = await stillLive(tx, prior.sessionId, input.studentId, now, session);
+        if (live) {
           return {
             outcome: 'replay',
-            state: current.state,
-            participationId: current.id,
-            session: recorded,
+            state: live.participation.state,
+            participationId: live.participation.id,
+            session: live.session,
           };
         }
         // No longer current, it is this tap's retry under the teacher it was

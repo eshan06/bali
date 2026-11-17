@@ -36,6 +36,15 @@ function endOfDay(now: Date): Date {
   return end;
 }
 
+/** A session as an answer names it: the window a phone shields to, or none. */
+function sessionView(
+  session: { id: string; classId: string; endsAt: Date } | null | undefined,
+): TapResponse['session'] {
+  return session
+    ? { id: session.id, classId: session.classId, endsAt: session.endsAt.toISOString() }
+    : null;
+}
+
 /**
  * POST /v1/taps — the tap. Resolves the block to its teacher, then either joins
  * the running session the student is enrolled in (tapIn: joined/switched) or,
@@ -113,18 +122,14 @@ export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () 
         now,
       });
       if (!retry) throw ApiError.notFound('unknown block');
-      return { outcome: retry.outcome, session: null, state: null };
+      return {
+        outcome: retry.outcome,
+        session: sessionView(retry.session),
+        state: retry.state ?? null,
+      };
     }
     if (result && result.outcome !== 'not_enrolled') {
-      return {
-        outcome: result.outcome,
-        session: result.session && {
-          id: result.session.id,
-          classId: result.session.classId,
-          endsAt: result.session.endsAt.toISOString(),
-        },
-        state: result.state,
-      };
+      return { outcome: result.outcome, session: sessionView(result.session), state: result.state };
     }
 
     // Mapped, exactly like the tapIn call above. `armTap` refuses an event_id
@@ -154,6 +159,11 @@ export function registerTapsRoute(app: FastifyInstance, db: Database, clock: () 
         now,
       }),
     );
-    return { outcome: armed.outcome, session: null, state: null };
+    // A replay names the session its tap is still live in, an armed tap none.
+    return {
+      outcome: armed.outcome,
+      session: sessionView(armed.session),
+      state: armed.state ?? null,
+    };
   });
 }
