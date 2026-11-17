@@ -21,7 +21,9 @@ import { TryAgain } from './try-again';
  * LessonLive, LessonClosed, LessonStates' lines), rendered in each state: open under the small-group
  * guard and past it, closed with and without its answer shown, the bell's close, a close that failed,
  * results that can't refresh. Only totals: never a name, never who picked what. Its buttons are
- * pressed through the card's own element tree; the hook's wiring is read from the source.
+ * pressed through the card's own element tree; the hook's wiring is read from the source. The
+ * class page hearing the stream through its live grid is driven in app/classes/[id]/page.test.tsx
+ * (LO1).
  */
 const source = readFileSync(fileURLToPath(new URL('./question-card.tsx', import.meta.url)), 'utf8');
 
@@ -488,23 +490,6 @@ describe('its hook (L6’s logic, held for one session)', () => {
     );
     expect(hook).toMatch(
       /return \(\) => \{\s*window\.clearTimeout\(retry\.current\);\s*now\.current = \{ session: null, question: null \};/,
-    );
-  });
-
-  it('hears the stream through the class page’s live grid', () => {
-    const page = readFileSync(
-      fileURLToPath(new URL('../app/classes/[id]/page.tsx', import.meta.url)),
-      'utf8',
-    );
-    const grid = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
-    expect(page).toMatch(
-      /const \{ lesson, onEvent, ask, opening, forgetAsk, snapshot, reread \} = useLiveQuestion\(\s*live \? grid\.id : null,?\s*\);/,
-    );
-    // Beside the slide's (M6, part 2b-2), which hears its slide changes the same way.
-    expect(page).toMatch(/onEvent=\{onLessonEvent\}/);
-    expect(page).toMatch(/\(e: FeedEvent\) => \{\s*onEvent\(e\);\s*onSlideEvent\(e\);/);
-    expect(grid).toMatch(
-      /if \(endsSession\(e\)\) onEndedRef\.current\?\.\(sessionId\);\s*onEventRef\.current\?\.\(e\);/,
     );
   });
 

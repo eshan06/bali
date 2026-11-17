@@ -28,6 +28,7 @@ import { countAction } from '@/lib/actions';
 import { type ApiClient, UnauthorizedError } from '@/lib/api-client';
 import { endSession, getAccessToken, tookSignIn } from '@/lib/auth';
 import { errText } from '@/lib/errors';
+import { lessonsOn } from '@/lib/lessons';
 import { type Home, homeFor } from '@/lib/student-web';
 import { useApi } from '@/lib/use-api';
 
@@ -233,6 +234,8 @@ interface Item {
   Icon: LucideIcon;
   /** Pages under it at another path: a student's lessons under Your classes (W4). */
   under?: string;
+  /** A live lesson's page: listed only while the lessons switch is on (`lessonsOn`, LO1). */
+  lesson?: true;
 }
 
 /** Whose menu it is: a teacher's, or a student's who said 13+ in the app (W3). */
@@ -240,16 +243,17 @@ export type MenuRole = 'teacher' | 'student';
 
 /**
  * The menu's pages, each listed only once it exists, never as a dead or disabled link: a teacher's
- * Classes (PV16) is marked on a class's page too; a student's is Your classes alone (StudentHome),
- * its lessons under it (StudentLesson). Help sits under the gap, in both.
+ * Classes (PV16) is marked on a class's page too, and Questions and Slides are gone while lessons
+ * are off (LO1); a student's is Your classes alone (StudentHome), its lessons under it
+ * (StudentLesson). Help sits under the gap, in both.
  */
 const PAGES: Record<MenuRole, Item[]> = {
   teacher: [
     { href: '/', label: 'Home', Icon: House },
     { href: '/classes', label: 'Classes', Icon: LayoutGrid },
     { href: '/reports', label: 'Reports', Icon: ChartBar },
-    { href: '/questions', label: 'Questions', Icon: MessageCircleQuestionMark },
-    { href: '/slides', label: 'Slides', Icon: Presentation },
+    { href: '/questions', label: 'Questions', Icon: MessageCircleQuestionMark, lesson: true },
+    { href: '/slides', label: 'Slides', Icon: Presentation, lesson: true },
   ],
   student: [{ href: '/', label: 'Your classes', Icon: LayoutGrid, under: '/lessons' }],
 };
@@ -324,7 +328,7 @@ export function SideMenu({
         <Mark size={20} />
         Bali
       </Link>
-      {PAGES[role].map(link)}
+      {PAGES[role].filter((item) => !item.lesson || lessonsOn()).map(link)}
       <div className={GAP} />
       {link(HELP)}
       {name ? (

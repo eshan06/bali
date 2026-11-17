@@ -11,7 +11,9 @@ import { describe, expect, it } from 'vitest';
  * says only "Class is over" (PV1), the figures left to the recap. Present is kept for the browser
  * tab, so a reload or a return from Reports comes back in it. Read from the class page's source;
  * its header and counts are rendered in live-header.test.ts, its tiles in live-grid.test.ts, its
- * question in present-question.test.ts.
+ * question in present-question.test.ts. The page's own tree as Present turns on and off, its grid
+ * kept, and its question or slide in the tiles' place are driven in classes/[id]/page.test.tsx,
+ * with the lessons switch either way (LO1).
  */
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const page = read('./classes/[id]/page.tsx');
@@ -31,51 +33,10 @@ const ended = page.slice(
 );
 
 describe('the class page in Present while a session runs (ClassPresent)', () => {
-  it('is the class page’s own tree, one size up, so the grid never reboots as Present turns on', () => {
-    // React keeps a child by its place: the header, the read's failure, the said line, then the
-    // grid's section, in both views; inside it the counts' bar (none while Present shows a
-    // question or a slide), the class page's question card (never in Present), the grid, then
-    // Present's question in the tiles' place (L7, part 2), or else its slide (M6, part 2d).
-    expect(live).toMatch(
-      /<div className=\{present \? PRESENT_PAGE : 'relative flex flex-col gap-5\.5'\}>\s*\{\/\*[^]*?\*\/\}\s*<LiveHeader[^>]*present=\{present\}\s*>[^]*?<\/LiveHeader>\s*\{\/\*[^]*?\*\/\}\s*\{cantLoad\(error\)\}\s*\{\/\*[^]*?\*\/\}\s*\{said \? \([^]*?\) : null\}\s*\{\/\*[^]*?\*\/\}\s*<section\s+aria-label=\{projected \? undefined : 'Live grid'\}\s+className="flex flex-1 flex-col gap-5\.5"\s*>\s*\{\/\*[^]*?\*\/\}\s*\{projected \? null : \(\s*<div[^>]*>\s*\{counts \? <LiveCounts counts=\{counts\} present=\{present\} \/> : null\}\s*\{present \? null : presentToggle\(true\)\}\s*<\/div>\s*\)\}\s*\{\/\*[^]*?\*\/\}\s*\{present \? null : lesson\.question === null && slides\.slide !== null \? \(\s*<SlideCard[^]*?\/>\s*\) : \(\s*<QuestionCard[^]*?\/>\s*\)\}\s*<LiveGrid[^]*?\/>\s*\{\/\*[^]*?\*\/\}\s*\{projected && lesson\.question !== null \? <PresentQuestion id=\{id\} lesson=\{lesson\} \/> : null\}\s*\{projected && lesson\.question === null && slides\.slide !== null \? \(\s*<PresentSlide id=\{id\} lesson=\{slides\} slide=\{slides\.slide\} \/>\s*\) : null\}\s*<\/section>/,
-    );
-    // And the side panel only out of Present, as the student's panel (L7-1b), whatever it holds.
-    expect(page).toMatch(/const panel = present \? null : side;/);
-    expect(live).toMatch(
-      /\{panel === 'decks' \? \(\s*<DecksPanel[^]*?\{panel === 'ask' && !writing \? \(\s*<PickPanel[^]*?\{panel === 'ask' && writing \? \(\s*<AskPanel/,
-    );
-    const [grid] = tags('LiveGrid');
-    expect(grid).toMatch(/\bpresent=\{present\}/);
-    expect(grid).toMatch(/\blivePage\s/);
-    expect(grid).not.toMatch(/\bkey=/);
-  });
-
   it('keeps +5, +10 and End in its header, Present after them (the owner, 2026-10-12)', () => {
     expect(live).toMatch(
       /<LiveHeader[^>]*>\s*\{extend\}\s*\{end\('ml-2'\)\}\s*\{present \? presentToggle\(false, 'ml-2'\) : null\}\s*<\/LiveHeader>/,
     );
-  });
-
-  it('shows a question in the live grid’s place while one shows (L7, part 2; PresentQuestion, PresentAnswer)', () => {
-    // The class page's own question, open or closed until Done or the next: one live question, so
-    // the projector and the teacher's card never differ on which.
-    expect(page).toMatch(
-      /const projected = present && \(lesson\.question !== null \|\| slides\.slide !== null\);/,
-    );
-    // The grid stays, its stream with it (the question's close, the session's end, the counts in
-    // the header), its tiles giving way to the question; the counts' bar goes too, as
-    // PresentQuestion draws none; the section names no live grid while it holds a question.
-    const [grid] = tags('LiveGrid');
-    expect(grid).toMatch(/\btiles=\{!projected\}/);
-    expect(grid).toMatch(/\bonEvent=\{onLessonEvent\}/);
-    expect(tags('PresentQuestion')).toEqual(['<PresentQuestion id={id} lesson={lesson} />']);
-    // Never the class page's card or its side panel there: their controls and the teacher's live
-    // breakdown are the teacher's alone; nor its slide card (M6, part 2b-2), Present's slide being
-    // PresentSlide's (2d).
-    expect(live).toMatch(
-      /\{present \? null : lesson\.question === null && slides\.slide !== null \? \(\s*<SlideCard[^]*?\) : \(\s*<QuestionCard/,
-    );
-    expect(page).toMatch(/const panel = present \? null : side;/);
   });
 
   it('shows the slide in the live grid’s place while no question shows (M6, part 2d; PresentSlide)', () => {
@@ -96,23 +57,6 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     expect(page).toMatch(/const PRESENT_PAGE = '[^']*\bflex min-h-dvh flex-col\b/);
     expect(live).toMatch(
       /aria-label=\{projected \? undefined : 'Live grid'\}\s+className="flex flex-1 /,
-    );
-  });
-
-  it('shows the slide card in the question card’s place while no question shows, the question first (M6, part 2b-2)', () => {
-    // A question shows, open or closed until Done: the question card, as approved (the conductor's
-    // call, 2026-10-16); the slide card back after Done. One slot, so the grid never moves.
-    expect(live).toMatch(/lesson\.question === null && slides\.slide !== null \? \(\s*<SlideCard/);
-    const [card] = tags('SlideCard');
-    expect(card).toMatch(/\blesson=\{slides\}/);
-    expect(card).toMatch(/\bslide=\{slides\.slide\}/);
-    expect(card).toMatch(/\basking=\{panel === 'ask'\}/);
-    // Both cards hear the stream through the grid; the slide's state from the question's read.
-    expect(page).toMatch(
-      /const \{ slides, onEvent: onSlideEvent \} = useSlide\(live \? grid\.id : null, snapshot, reread\);/,
-    );
-    expect(page).toMatch(
-      /const onLessonEvent = useCallback\(\s*\(e: FeedEvent\) => \{\s*onEvent\(e\);\s*onSlideEvent\(e\);\s*\},\s*\[onEvent, onSlideEvent\],?\s*\);/,
     );
   });
 
