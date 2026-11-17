@@ -302,24 +302,6 @@ describe('the panel on the class page', () => {
     );
   });
 
-  it('never opens in Present, closes as it turns on, and opens on the live page alone', () => {
-    expect(grid).toMatch(/const selects = livePage && !present;/);
-    expect(grid).toMatch(
-      /const shown = selects && panel !== null \? students\[panel\.studentId\] : undefined;/,
-    );
-    expect(grid).toMatch(/\{shown \? \(\s*<StudentPanel\b/);
-    expect(grid).toMatch(
-      /useEffect\(\(\) => \{\s*if \(present\) setPanel\(null\);\s*\}, \[present\]\);/,
-    );
-    expect(grid).toMatch(/select=\{\s*selects\s*\?/);
-  });
-
-  it('takes focus into it as it opens, and gives it back to the student’s tile as it closes', () => {
-    expect(grid).toMatch(
-      /useEffect\(\(\) => \{\s*if \(panel !== null\) document\.getElementById\(`\$\{panelId\}-name`\)\?\.focus\(\);\s*\}, \[panel, panelId\]\);/,
-    );
-    expect(grid).toMatch(
-      /onClose=\{\(\) => \{\s*document\.getElementById\(tileId\(shown\.studentId\)\)\?\.focus\(\);\s*setPanel\(null\);/,
-    );
-  });
+  // That it opens on the live page alone, never in Present, closes as Present turns on, and takes
+  // focus in and gives it back, is driven in live-grid.driven.test.tsx since LO5.
 });

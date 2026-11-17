@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bellTime } from '../lib/session-controls';
 import type { GridDisplay } from '../lib/grid-state';
 import { stateCounts } from './live-grid';
-import { LiveCounts, LiveHeader, nextTick, shareLeft, timeLeft } from './live-header';
+import { LiveCounts, LiveHead, LiveHeader, nextTick, shareLeft, timeLeft } from './live-header';
 
 /*
  * A class's header while a session runs and its counts over the grid (PV7; ClassLive, and
@@ -140,6 +140,38 @@ describe('the live header (ClassLive)', () => {
       '<span class="font-num text-data-lg text-text-tertiary">…</span><span class="text-countdown-sub">\u00a0</span>',
     );
     expect(html).not.toContain('stroke-arc-fill');
+  });
+});
+
+describe('the class page’s live header in the lock-only look (LO5; ClassLive, LiveTopStates)', () => {
+  const head = (endsAt: string | null) =>
+    renderToStaticMarkup(
+      createElement(LiveHead, {
+        name: 'Biology, period 3',
+        joinCode: 'VMAF7E',
+        startedAt: endsAt ? STARTED : null,
+        endsAt,
+        children: createElement('button', { type: 'button' }, 'End session'),
+      }),
+    );
+
+  it('says the time left over "left", when it ends beside the join code', () => {
+    vi.useFakeTimers({ now: NOW });
+    const html = head(BELL);
+    expect(html).toContain(
+      `<span class="text-home-countdown tabular-nums">23:14</span><span class="text-countdown-sub text-text-tertiary">left</span>`,
+    );
+    expect(html).toContain(`<span>Ends <time dateTime="${BELL}">${bellTime(BELL)}</time></span>`);
+    expect(html).toMatch(/48" height="48"[^]*class="shrink-0 max-\[760px\]:size-11"/);
+  });
+
+  it('says … until the bell is known, and when it ends waits, its ring the track alone (LiveTopStates)', () => {
+    vi.useFakeTimers({ now: NOW });
+    const html = head(null);
+    expect(html).toContain('<span class="text-home-countdown text-text-tertiary">…</span>');
+    expect(html).not.toMatch(/Ends|<time/);
+    expect(html).not.toContain('stroke-arc-fill');
+    expect(html).toContain('Join code');
   });
 });
 

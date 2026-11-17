@@ -22,10 +22,6 @@ import { TryAgain } from './try-again';
  * read from the panel's own function; what needs the page or a press of the form, from the source.
  */
 const source = readFileSync(fileURLToPath(new URL('./ask-panel.tsx', import.meta.url)), 'utf8');
-const page = readFileSync(
-  fileURLToPath(new URL('../app/classes/[id]/page.tsx', import.meta.url)),
-  'utf8',
-);
 
 const IDLE: Opening = { busy: false, failure: null, from: null };
 const NO_ANSWER: Failure = { kind: 'failed', status: undefined, retryAfter: undefined };
@@ -643,67 +639,12 @@ describe('a failed ask (LessonStates)', () => {
   });
 });
 
-describe('on the class page', () => {
-  it('opens on your questions, and writes a new one from there', () => {
-    expect(page).toMatch(
-      /\{panel === 'ask' && !writing \? \(\s*<PickPanel[^]*?\/>\s*\) : null\}\s*\{panel === 'ask' && writing \? \(\s*<AskPanel[^]*?\/>\s*\) : null\}\s*<\/div>/,
-    );
-    expect(page).toMatch(/onWrite=\{\(\) => setWriting\(true\)\}/);
-    // Ask a question opens it, on whichever card shows (M6, part 2b-2).
-    expect(page.match(/onAsk=\{\(\) => setSide\('ask'\)\}/g)).toHaveLength(2);
-  });
-
-  it('asks through the live question either way; asked, the panel goes and focus goes to it', () => {
-    expect(page.match(/onAsk=\{ask\}/g)).toHaveLength(2);
-    expect(page).toMatch(
-      /const asked = \(\) => \{\s*if \(sideNow\.current === 'decks'\) return;\s*setSide\(null\);\s*window\.requestAnimationFrame\(\(\) => document\.getElementById\(`\$\{id\}-q`\)\?\.focus\(\)\);\s*\};/,
-    );
-    // The decks' panel, opened while an ask was on its way, keeps its place and its focus (santa's
-    // review): the panel open now, as the last render left it.
-    expect(page).toMatch(
-      /const sideNow = useRef\(side\);\s*useEffect\(\(\) => \{\s*sideNow\.current = side;\s*\}, \[side\]\);/,
-    );
-    // What was written goes once it is asked; a question picked leaves it as it was.
-    expect(page).toMatch(
-      /onAsked=\{\(\) => \{\s*setWriting\(false\);\s*setDraft\(NEW_DRAFT\);\s*asked\(\);\s*\}\}/,
-    );
-    expect(page).toMatch(/<PickPanel[^]*?onAsked=\{asked\}/);
-  });
-
-  it('Cancel drops what was written and its ask’s failure; Close and Escape keep both', () => {
-    expect(page).toMatch(
-      /onCancel=\{\(\) => \{\s*setWriting\(false\);\s*setDraft\(NEW_DRAFT\);\s*forgetAsk\(\);\s*closePanel\(\);/,
-    );
-    // The decks' panel closes the same way (M6, part 2c).
-    expect(page.match(/onClose=\{closePanel\}/g)).toHaveLength(3);
-    expect(page.match(/opening=\{opening\}/g)).toHaveLength(2);
-    // Focus back on Ask a question (Show slides for the decks), or on the question when one shows
-    // (opened from another tab).
-    expect(page).toMatch(
-      /const closePanel = \(\) => \{\s*setSide\(null\);\s*\(\s*document\.getElementById\(`\$\{id\}-\$\{side === 'decks' \? 'show' : 'ask'\}`\) \?\?\s*document\.getElementById\(`\$\{id\}-ask`\) \?\?\s*document\.getElementById\(`\$\{id\}-q`\)\s*\)\?\.focus\(\);/,
-    );
-    expect(source).toMatch(/if \(e\.key === 'Escape'\) onClose\(\);/);
-  });
-
+// The class page mounts neither panel since LO5: it is rebuilt from the lock-only canvas, which
+// draws no lesson piece (ARCHITECTURE, Web portal, decision 8). The panels keep their own tests.
+describe('the panel as it is written, its answers', () => {
   it('removing an answer moves focus to the one in its place, its button gone', () => {
     expect(source).toMatch(
       /window\.requestAnimationFrame\(\(\) =>\s*document\.getElementById\(`\$\{id\}-a\$\{Math\.min\(i, count - 2\)\}`\)\?\.focus\(\),\s*\);/,
-    );
-  });
-
-  it('shares the student panel’s place: one opening closes the other', () => {
-    // Either side panel (asking, the decks) closes a student's, and a student's closes either.
-    expect(page).toMatch(/asking=\{panel !== null\}\s*onStudentPanel=\{\(\) => setSide\(null\)\}/);
-    const grid = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
-    expect(grid).toMatch(
-      /useEffect\(\(\) => \{\s*if \(asking\) setPanel\(null\);\s*\}, \[asking\]\);/,
-    );
-    expect(grid).toMatch(/const open = \(studentId: string\) => \{\s*onStudentPanel\?\.\(\);/);
-  });
-
-  it('a new session starts with no panel, nothing written, and your questions first', () => {
-    expect(page).toMatch(
-      /useEffect\(\(\) => \{\s*setSide\(null\);\s*setWriting\(false\);\s*setDraft\(NEW_DRAFT\);\s*\}, \[grid\?\.id\]\);/,
     );
   });
 });

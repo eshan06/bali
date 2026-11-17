@@ -15,8 +15,10 @@ import { userEvent } from '@testing-library/user-event';
 import { type ReactNode, StrictMode } from 'react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { PickPanel } from '@/components/ask-panel';
 import { CountContext, useCountOpened } from '@/components/count';
 import { DecksPanel } from '@/components/decks-panel';
+import { isOpen, useLiveQuestion } from '@/components/question-card';
 import { SessionReportPage } from '@/components/session-report';
 import { Shell } from '@/components/shell';
 import { type ApiClient, createApiClient } from '@/lib/api-client';
@@ -665,12 +667,33 @@ describe('an opening, counted once (useCountOpened)', () => {
   });
 });
 
+/**
+ * Asking from the side panel, through the live question's own hook, as the class page did until
+ * LO5 rebuilt it with no lesson piece (ARCHITECTURE, Web portal, decision 8): the panel and the
+ * count are kept, behind the lessons switch, for a page that turns lessons back on.
+ */
+function Asking() {
+  const { lesson, ask, opening } = useLiveQuestion(bali.SESSION);
+  return (
+    <PickPanel
+      id="P"
+      openNow={isOpen(lesson)}
+      opening={opening}
+      onAsk={ask}
+      onAsked={() => undefined}
+      onWrite={() => undefined}
+      onClose={() => undefined}
+    />
+  );
+}
+
 describe('a question asked and slides shown (portal_question_asked, portal_slides_shown)', () => {
   it('counts a question once Bali has asked it, never one that failed', async () => {
-    const user = await classPage(true);
+    bali.now.running = true;
+    const user = userEvent.setup();
+    open(`/classes/${bali.CLASS}`, <Asking />);
     const ASK = `POST /v1/sessions/${bali.SESSION}/questions`;
-    await user.click(screen.getByRole('button', { name: 'Ask a question' }));
-    const panel = screen.getByRole('complementary', { name: 'Ask a question' });
+    const panel = await screen.findByRole('complementary', { name: 'Ask a question' });
     bali.now.refused.add(ASK);
     await user.click(await within(panel).findByRole('button', { name: 'Ask' }));
     await within(panel).findByRole('alert');

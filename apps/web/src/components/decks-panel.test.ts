@@ -16,14 +16,10 @@ import { TryAgain } from './try-again';
 /*
  * Show slides in the side panel (M6, part 2c; LessonDecks, LessonStates' lines and the
  * intermediate states LessonDecksStates draws), rendered in each state, its buttons pressed through
- * its own element tree; its read and the page's wiring are read from their source. Its title, its
- * line and its Close are driven in jsdom (`decks-panel.driven.test.tsx`).
+ * its own element tree; its read is read from its source. Its title, its line and its Close are
+ * driven in jsdom (`decks-panel.driven.test.tsx`).
  */
 const source = readFileSync(fileURLToPath(new URL('./decks-panel.tsx', import.meta.url)), 'utf8');
-const page = readFileSync(
-  fileURLToPath(new URL('../app/classes/[id]/page.tsx', import.meta.url)),
-  'utf8',
-);
 
 /** Markup as read: each tag a space, each run of spaces one. */
 const text = (html: string) =>
@@ -249,17 +245,8 @@ describe('the panel as Show slides opens it', () => {
 
   // A Show, through the slide's own change, is driven in decks-panel.driven.test.tsx since A3b.
 
-  it('is opened by Show slides on the card at rest, closed back to it, never in Present', () => {
-    expect(page).toMatch(/showing=\{panel === 'decks'\}\s*onShow=\{\(\) => setSide\('decks'\)\}/);
-    expect(page).toMatch(
-      /\{panel === 'decks' \? \(\s*<DecksPanel id=\{`\$\{id\}-panel`\} lesson=\{slides\} onShown=\{shown\} onClose=\{closePanel\} \/>\s*\) : null\}/,
-    );
-    expect(page).toMatch(/const panel = present \? null : side;/);
-    // Shown: the panel goes, focus to the slide card's title, or to the question shown first.
-    expect(page).toMatch(
-      /const shown = \(\) => \{\s*setSide\(null\);\s*window\.requestAnimationFrame\(\(\) =>\s*\(document\.getElementById\(`\$\{id\}-slides`\) \?\? document\.getElementById\(`\$\{id\}-q`\)\)\?\.focus\(\),\s*\);\s*\};/,
-    );
-  });
+  // The class page mounts it no more since LO5: rebuilt from the lock-only canvas, which draws no
+  // lesson piece (ARCHITECTURE, Web portal, decision 8).
 
   it('names no student: its file reads none', () => {
     expect(source).not.toMatch(/displayName|studentId|Student\b|responses/);

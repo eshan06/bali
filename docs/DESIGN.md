@@ -650,7 +650,17 @@ is ClassPage's: the well with the lengths and Start, the last session's line, th
 students with the join code behind Add students, its states as ClassStates and
 ClassBeforeStates draw them (drawn on the canvas first); the day a session ended,
 v2's recap card in the line's place until LO7; Try again, and Start while it
-sends, still v2's button until a step at the phase's end moves them.
+sends, still v2's button until a step at the phase's end moves them. Since LO5
+(2026-11-17) a class's page while its session runs is ClassLive's: its header
+with +5 and +10 as one pair, End session and Present, then over a hairline the
+count of who is focused, Check on (the state and the name only) and Everyone's
+tiles (the state and the name only, a Left state's icon its flag), its states as
+LiveStates and LiveTopStates draw them (drawn on the canvas first), the live
+feed's line with its dot held still; no lesson piece, whichever way the switch
+is set; the session list, the pop-ups, the student panel and the tab title as
+they were until LO6, and Present v2's until LO9. LO5 added `room-name` and
+`room-name-phone` (14.5/19 and 14/19, semibold: a tile's name in the room), in
+lane B's block.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the

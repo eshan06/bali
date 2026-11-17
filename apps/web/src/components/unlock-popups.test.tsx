@@ -5,9 +5,8 @@ import { userEvent } from '@testing-library/user-event';
 import { useReducer } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { Student, Students } from '../lib/grid-state';
+import { type Student, type Students, unlockNote } from '../lib/grid-state';
 import { bellTime } from '../lib/session-controls';
-import { Tile } from './live-grid';
 import {
   NO_POPUPS,
   type PopupAction,
@@ -213,7 +212,7 @@ describe('a pop-up, as ClassUnlock draws it', () => {
     expect(named('u3-0000-cccc', later)).toBe('Zuri Mensah used Emergency Unlock');
   });
 
-  it('says each reason as the student’s tile does, and none as the recap does', () => {
+  it('says each reason in the grid’s own words, and none as the recap does', () => {
     const line = (reason: UnlockReason | null) => {
       show([unlock('e1', { reason })]);
       const [, said = ''] = says(screen.getByRole('alert')).split('\n');
@@ -222,30 +221,20 @@ describe('a pop-up, as ClassUnlock draws it', () => {
     };
     expect(line(null)).toBe(`No reason given\u00a0· ${bellTime(AT)}`);
     for (const reason of UNLOCK_REASONS) {
-      render(
-        <ul>
-          <Tile
-            student={{
-              studentId: 'u1',
-              displayName: 'Ethan Park',
-              state: 'unlocked',
-              joinedAt: new Date(AT),
-              lastSeenAt: new Date(AT),
-              endedAt: null,
-              unlock: { eventId: 'e1', reason, at: new Date(AT) },
-              clockOff: false,
-            }}
-            now={new Date(AT)}
-            present={false}
-            pulse={false}
-          />
-        </ul>,
-      );
-      // The tile's line on a computer (its phone detail is the same words, hidden there).
-      const tiles = document.querySelector('li span.max-sm\\:hidden');
-      const said = tiles?.textContent;
-      cleanup();
-      expect(line(reason), reason).toBe(`${said}\u00a0· ${bellTime(AT)}`);
+      const student: Student = {
+        studentId: 'u1',
+        displayName: 'Ethan Park',
+        state: 'unlocked',
+        joinedAt: new Date(AT),
+        lastSeenAt: new Date(AT),
+        endedAt: null,
+        unlock: { eventId: 'e1', reason, at: new Date(AT) },
+        clockOff: false,
+      };
+      // The grid's own words for it (`unlockNote`), the class page's tiles' until LO5.
+      const note = unlockNote(student, 'unlocked') ?? '';
+      const said = note.charAt(0).toUpperCase() + note.slice(1);
+      expect(line(reason), reason).toBe(`${said}${String.fromCharCode(0xa0)}· ${bellTime(AT)}`);
     }
   });
 

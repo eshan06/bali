@@ -179,7 +179,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO4** 👀 A class before it starts (#606; lane B; after LO2) — ✅ (#618; DECISIONS 2026-11-17); its in-between states on the canvas's ClassBeforeStates (version 35); left for a step at the phase's end: Try again, and Start while it sends, still v2's button (`TryAgain`, every rebuilt page); for Now at the phase's end: 26 source-text tests left (`join-code.test.ts` converted)
 
-- **LO5** 👀 Live: the count, Check on, the room (#607; lane B; after LO4)
+- **LO5** 👀 Live: the count, Check on, the room (#607; lane B; after LO4) — ✅ (#619; DECISIONS 2026-11-17); its in-between states on the canvas's LiveTopStates (version 49); no lesson piece on the class page whichever way the switch is set, Present's question and slide kept until LO9; left for a step at the phase's end: Check on's rows counted twice, `checkOn` here and lane A's in `home.tsx`, to fold into one; for Now at the phase's end: 23 source-text tests left after LO3 (none converted whole here)
 
 - **LO6** 👀 Live: the session list, the pop-ups, the student panel, the tab title (#608; lane B; after LO5)
 

@@ -8,12 +8,12 @@ import { fileURLToPath } from 'node:url';
 
 import { staleness, staleWords, type Student } from '../lib/grid-state';
 import {
-  COLUMNS,
   FIRST_CONNECT_MS,
   type GridNow,
   healthOf,
   LiveGrid,
   PRESENT_COLUMNS,
+  ROOM,
   stateCounts,
   Tile,
 } from './live-grid';
@@ -22,13 +22,13 @@ import {
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: () => undefined, push: () => undefined }),
 }));
-import { CLOCK_OFF } from './student-panel';
 
 /*
- * A student's tile on the live grid (PV8; ClassStates' twelve, ClassLive, PhoneClassLive at 390 px
- * and ClassPresent's), rendered: tinted in its state, every one the same size, the state's icon,
- * the name, the state's words and one line: an unlock's reason, "last seen" or Clock off. That
- * Present never says the reason or Clock off is driven in `live-grid.driven.test.tsx`.
+ * A student's tile in Present (ClassPresent), v2's until LO9, rendered: tinted in its state, every
+ * one the same size, the state's icon, the name, the state's words and one line, "last seen" or a
+ * protection off's unlock, never the reason or Clock off. The room's tiles on the class page, the
+ * lock-only look's since LO5, and that Present never says the reason or Clock off are driven in
+ * `live-grid.driven.test.tsx`.
  */
 const NOW = new Date('2026-10-07T14:30:00.000Z');
 const ago = (s: number) => new Date(NOW.getTime() - s * 1000);
@@ -48,8 +48,8 @@ function student(over: Partial<Student> = {}): Student {
 }
 const unlocked = (reason: UnlockReason | null) => ({ eventId: 'v1', reason, at: ago(60) });
 
-const render = (s: Student, present = false, pulse = false) =>
-  renderToStaticMarkup(createElement(Tile, { student: s, now: NOW, present, pulse }));
+const render = (s: Student, pulse = false) =>
+  renderToStaticMarkup(createElement(Tile, { student: s, now: NOW, present: true, pulse }));
 const source = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
 
 /**
@@ -61,14 +61,10 @@ const text = (html: string) =>
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-/** A tile's one detail on a phone, its dot hidden from screen readers, hidden on a computer. */
-const PHONE = /<span class="sm:hidden"><span aria-hidden="true">\u00a0· <\/span>([^<]*)<\/span>/;
 /** The tile's parts: its classes, its words' three spans (name, state, line) and its icons' sizes. */
 function parts(html: string) {
   const tile = /<li class="flex min-w-0"><div class="([^"]*)"/.exec(html)?.[1]?.split(' ') ?? [];
-  const words = /<span class="flex min-w-0 flex-col[^"]*">([^]*)<\/span><\/div><\/li>$/.exec(
-    html,
-  )?.[1];
+  const words = /<span class="flex min-w-0 flex-col">([^]*)<\/span><\/div><\/li>$/.exec(html)?.[1];
   const spans = [
     ...(words ?? '').matchAll(
       /<span class="(block truncate[^"]*)">([^]*?)<\/span>(?=<span class="block truncate|$)/g,
@@ -77,8 +73,7 @@ function parts(html: string) {
   const [name, state, line] = spans.map((m) => ({
     classes: m[1]?.split(' ') ?? [],
     html: m[2] ?? '',
-    // The phone's one detail, hidden on a computer, left out of what a computer shows.
-    words: text((m[2] ?? '').replace(PHONE, ' ')),
+    words: text(m[2] ?? ''),
   }));
   const icons = [...html.matchAll(/<svg[^>]*\swidth="(\d+)"[^>]*class="([^"]*)"/g)].map((m) => ({
     size: Number(m[1]),
@@ -87,33 +82,30 @@ function parts(html: string) {
   return { tile, name, state, line, icons };
 }
 
-describe('a tile on the live grid (PV8)', () => {
-  it('draws ClassStates’ twelve tiles in their words, each with at most one line', () => {
+describe('a tile in Present (ClassPresent), v2’s until LO9', () => {
+  it('says the state and one line, "last seen" or a protection off’s unlock, never the reason or Clock off', () => {
     const tiles: [Partial<Student>, string, string | undefined][] = [
       [{}, 'Focused', undefined],
       [
         { state: 'unlocked', unlock: unlocked('bathroom'), lastSeenAt: ago(330) },
         'Unlocked',
-        'Bathroom · last seen 5 min ago',
+        'last seen 5 min ago',
       ],
-      [{ state: 'protection_off' }, 'Protection off', undefined],
       [
         { state: 'protection_off', unlock: unlocked('nurse'), lastSeenAt: ago(330) },
         'Protection off',
-        'Unlocked · nurse · last seen 5 min ago',
+        'Unlocked · last seen 5 min ago',
       ],
       [{ lastSeenAt: ago(330) }, 'Silent · 5 min', undefined],
       [{ endedAt: ago(60) }, 'Left', undefined],
       [
         { state: 'unlocked', unlock: unlocked('other'), endedAt: ago(60) },
         'Left · unlocked',
-        'Other reason',
+        undefined,
       ],
-      [{ state: 'protection_off', endedAt: ago(60) }, 'Left · protection off', undefined],
       [{ state: null }, 'Not here', undefined],
       [{ state: 'mystery' as Student['state'] }, 'Unknown · refresh', undefined],
-      [{ clockOff: true }, 'Focused', 'Clock off'],
-      [{ state: 'unlocked', unlock: unlocked('nurse') }, 'Unlocked', 'Nurse'],
+      [{ clockOff: true }, 'Focused', undefined],
     ];
     for (const [over, state, line] of tiles) {
       const tile = parts(render(student(over)));
@@ -123,166 +115,9 @@ describe('a tile on the live grid (PV8)', () => {
     }
   });
 
-  it('says Clock off with its tooltip in the panel’s words (the owner, 2026-10-14), after the reason and "last seen"', () => {
-    const html = render(
-      student({
-        state: 'unlocked',
-        unlock: unlocked('nurse'),
-        lastSeenAt: ago(130),
-        clockOff: true,
-      }),
-    );
-    expect(parts(html).line?.words).toBe('Nurse · last seen 2 min ago · Clock off');
-    expect(html).toContain(
-      '<span title="This phone&#x27;s clock is off, so its times may be off too.">Clock off</span>',
-    );
-    expect(CLOCK_OFF).toBe("This phone's clock is off, so its times may be off too.");
-  });
-
-  it('draws no line for a phone heard from in the last minute', () => {
-    expect(parts(render(student())).line).toBeUndefined();
-    expect(
-      parts(render(student({ state: 'unlocked', unlock: unlocked(null) }))).line,
-    ).toBeUndefined();
-  });
-
-  it('fills each tile with its state’s tint, Silent’s and Unknown’s edge dashed (Q3 A)', () => {
-    const tone = (over: Partial<Student>) => parts(render(student(over))).tile;
-    const cases: [Partial<Student>, string, boolean][] = [
-      [{}, 'bg-state-focused-bg', false],
-      [{ state: 'unlocked', unlock: unlocked(null) }, 'bg-state-emergency-bg', false],
-      [{ state: 'protection_off' }, 'bg-state-revoked-bg', false],
-      [{ lastSeenAt: ago(330) }, 'bg-state-ended-bg', true],
-      [{ endedAt: ago(60) }, 'bg-state-ended-bg', false],
-      // Left while unlocked: orange, as ClassLive draws it (the owner, 2026-10-14).
-      [
-        { state: 'unlocked', unlock: unlocked(null), endedAt: ago(60) },
-        'bg-state-emergency-bg',
-        false,
-      ],
-      [{ state: 'protection_off', endedAt: ago(60) }, 'bg-state-revoked-bg', false],
-      [{ state: null }, 'bg-state-notjoined-bg', false],
-      [{ state: 'mystery' as Student['state'] }, 'bg-state-nodevice-bg', true],
-    ];
-    for (const [over, fill, dashed] of cases) {
-      const classes = tone(over);
-      expect(classes, fill).toContain(fill);
-      expect(classes.includes('border-dashed'), fill).toBe(dashed);
-      expect(classes, fill).toContain(dashed ? 'border-border-strong' : 'border-transparent');
-    }
-  });
-
-  it('is one size, as ClassStates draws it: 84 px tall, 12 × 14 px in, a 20 px icon, 14 px corners', () => {
-    const tile = parts(render(student({ state: 'unlocked', unlock: unlocked('nurse') })));
-    expect(tile.tile).toEqual(
-      expect.arrayContaining([
-        'grid',
-        'h-21',
-        'grid-cols-[20px_minmax(0,1fr)]',
-        'gap-x-2.5',
-        'px-3.5',
-        'py-3',
-        'items-start',
-        'rounded-md',
-        'border-[1.5px]',
-      ]),
-    );
-    expect(tile.icons[0]).toEqual({
-      size: 20,
-      classes: expect.arrayContaining(['mt-px']) as unknown,
-    });
-    // The name 15/20, the state 13/18 semibold, the line 12.5/17 medium: each cut short, never
-    // wrapped, so no tile grows.
-    expect(tile.name?.classes).toEqual(expect.arrayContaining(['truncate', 'text-tile-name']));
-    expect(tile.state?.classes).toEqual(
-      expect.arrayContaining(['truncate', 'text-caption', 'font-semibold']),
-    );
-    // In sentence case, as PV4 drew the chip: no capitals by a class.
-    expect(tile.state?.classes).not.toContain('uppercase');
-    expect(tile.line?.classes).toEqual(expect.arrayContaining(['truncate', 'text-tile-line']));
-  });
-
-  it('draws a Left state’s flag before its words, the state’s own icon at the side', () => {
-    const html = render(student({ state: 'unlocked', unlock: unlocked(null), endedAt: ago(60) }));
-    const tile = parts(html);
-    // The lock at the side (20 px); before the words, on a phone only, the lock again, then the
-    // flag (13 px), the lock first as PhoneClassLive draws "Left · unlocked".
-    expect(tile.icons.map((icon) => icon.size)).toEqual([20, 13, 13]);
-    expect(html).toMatch(/<svg[^>]*width="20"[^>]*class="lucide lucide-lock-open/);
-    expect(tile.state?.html).toMatch(
-      /^<svg[^>]*class="lucide lucide-lock-open[^"]*"[^]*?<\/svg><svg[^>]*class="lucide lucide-flag[^"]*"[^]*?<\/svg>Left/,
-    );
-    expect(tile.icons[1]?.classes).toContain('sm:hidden');
-    expect(tile.icons[2]?.classes).not.toContain('sm:hidden');
-    // A plain Left: its flag at the side, none before its words but the phone's.
-    const left = parts(render(student({ endedAt: ago(60) })));
-    expect(left.icons.map((icon) => icon.size)).toEqual([20, 13]);
-    expect(left.icons[1]?.classes).toContain('sm:hidden');
-  });
-
-  it('is short on a phone, as PhoneClassLive draws it: no icon at the side, the line after the state', () => {
-    const html = render(student({ state: 'unlocked', unlock: unlocked('bathroom') }));
-    const tile = parts(html);
-    expect(tile.tile).toEqual(
-      expect.arrayContaining([
-        'max-sm:flex',
-        'max-sm:flex-col',
-        'max-sm:h-auto',
-        'max-sm:px-3',
-        'max-sm:py-2.5',
-      ]),
-    );
-    expect(tile.icons[0]?.classes).toContain('max-sm:hidden');
-    // The state's icon before its words, and its one detail run on after them, nothing cut; the
-    // computer's line hidden there.
-    expect(tile.icons[1]?.classes).toContain('sm:hidden');
-    expect(tile.state?.classes).toEqual(
-      expect.arrayContaining(['max-sm:inline', 'max-sm:whitespace-normal']),
-    );
-    expect(tile.line?.classes).toEqual(
-      expect.arrayContaining(['max-sm:inline', 'max-sm:whitespace-normal']),
-    );
-    expect(PHONE.exec(tile.line?.html ?? '')?.[1]).toBe('Bathroom');
-    expect(tile.line?.html.replace(PHONE, '')).toBe('<span class="max-sm:hidden">Bathroom</span>');
-    expect(tile.name?.classes).toContain('max-sm:whitespace-normal');
-  });
-
-  it('says one detail at most on a phone, as PhoneClassLive draws it (the owner, 2026-10-14)', () => {
-    // An Unlocked tile's reason and a Focused tile's Clock off; "last seen", protection off's
-    // unlock and a Left tile's reason stay on a computer, for the student's panel (PV11).
-    const phone = (over: Partial<Student>) => PHONE.exec(render(student(over)))?.[1];
-    const cases: [Partial<Student>, string | undefined][] = [
-      [{ state: 'unlocked', unlock: unlocked('bathroom'), lastSeenAt: ago(330) }, 'Bathroom'],
-      [{ state: 'unlocked', unlock: unlocked('nurse'), clockOff: true }, 'Nurse'],
-      [{ state: 'unlocked', unlock: unlocked('other') }, 'Other reason'],
-      [{ clockOff: true }, 'Clock off'],
-      [{ state: 'unlocked', unlock: unlocked(null), lastSeenAt: ago(330) }, undefined],
-      [{ state: 'protection_off', unlock: unlocked('nurse'), lastSeenAt: ago(330) }, undefined],
-      [{ state: 'unlocked', unlock: unlocked('other'), endedAt: ago(60) }, undefined],
-      [{ lastSeenAt: ago(330), clockOff: true }, undefined],
-      [{ state: 'protection_off', clockOff: true }, undefined],
-    ];
-    for (const [over, detail] of cases) expect(phone(over), JSON.stringify(over)).toBe(detail);
-    // The computer's whole line is still there, hidden on a phone alone.
-    const html = render(
-      student({ state: 'unlocked', unlock: unlocked(null), lastSeenAt: ago(330) }),
-    );
-    expect(parts(html).line?.html).toBe('<span class="max-sm:hidden">last seen 5 min ago</span>');
-    // Present has no phone layout: its line is the same at every width.
-    const seen = render(
-      student({ state: 'unlocked', unlock: unlocked('bathroom'), lastSeenAt: ago(330) }),
-      true,
-    );
-    expect(parts(seen).line?.words).toBe('last seen 5 min ago');
-    expect(seen).not.toMatch(/sm:hidden/);
-  });
-
-  it('is one size up in Present, as ClassPresent draws it: 100 px tall, 12 × 18 px in, a 24 px icon', () => {
+  it('is one size up, as ClassPresent draws it: 100 px tall, 12 × 18 px in, a 24 px icon', () => {
     const tile = parts(
-      render(
-        student({ state: 'unlocked', unlock: unlocked('bathroom'), lastSeenAt: ago(330) }),
-        true,
-      ),
+      render(student({ state: 'unlocked', unlock: unlocked('bathroom'), lastSeenAt: ago(330) })),
     );
     expect(tile.tile).toEqual(
       expect.arrayContaining([
@@ -292,100 +127,39 @@ describe('a tile on the live grid (PV8)', () => {
         'gap-x-3',
         'px-4.5',
         'py-3',
+        'rounded-md',
+        'border-[1.5px]',
       ]),
     );
-    expect(tile.tile.some((c) => c.startsWith('max-sm:'))).toBe(false);
     expect(tile.icons).toEqual([
       { size: 24, classes: expect.arrayContaining(['mt-px']) as unknown },
     ]);
     expect(tile.name?.classes).toContain('text-present-tile-name');
     expect(tile.state?.classes).toContain('text-present-tile-state');
-    expect(tile.state?.classes).not.toContain('uppercase');
     expect(tile.line?.classes).toEqual(expect.arrayContaining(['text-body', 'font-medium']));
-    // A Left state's flag at 16 px.
-    const left = parts(render(student({ state: 'protection_off', endedAt: ago(60) }), true));
+    // A Left state's flag at 16 px, before its words, the state's own icon at the side.
+    const left = parts(render(student({ state: 'protection_off', endedAt: ago(60) })));
     expect(left.icons.map((icon) => icon.size)).toEqual([24, 16]);
-  });
-
-  it('breaks a long state after its dot on a phone, never before it (the owner’s ruling)', () => {
-    const html = render(student({ state: 'protection_off', endedAt: ago(60) }));
-    expect(parts(html).state?.html).toMatch(/Left\u00a0· protection off$/);
+    expect(left.state?.html).toMatch(/Left\u00a0· protection off$/);
   });
 
   it('pulses the whole tile (bali-softpulse) when the stream brings its unlock', () => {
     const html = (pulse: boolean) =>
-      render(student({ state: 'unlocked', unlock: unlocked('nurse') }), false, pulse);
-    // On a layer at the tile's own edge, first in it, hidden from screen readers and clicks, so the
-    // tile itself, a button that may hold focus, never redraws as a new unlock restarts it.
+      render(student({ state: 'unlocked', unlock: unlocked('nurse') }), pulse);
     expect(html(true)).toMatch(
       /^<li class="flex min-w-0"><div class="[^"]*\brelative\b[^"]*"><span aria-hidden="true" class="pointer-events-none absolute -inset-\[1\.5px\] animate-softpulse rounded-md"><\/span><svg/,
     );
     expect(html(false)).not.toContain('animate-softpulse');
-    expect(source).toMatch(
-      /\{pulse \? \(\s*<span\s+key=\{s\.unlock\?\.eventId\}\s+aria-hidden="true"\s+onAnimationEnd=\{onPulseEnd\}/,
-    );
   });
 });
 
-describe('a tile on the class page while a session runs (PV11b; ClassStates)', () => {
-  const tile = (selected: boolean, over: Partial<Student> = {}) =>
-    renderToStaticMarkup(
-      createElement(Tile, {
-        student: student(over),
-        now: NOW,
-        present: false,
-        pulse: false,
-        select: { id: 'g-tile-u1', panel: 'g-panel', selected, onSelect: () => undefined },
-      }),
-    );
-
-  it('is a button that opens the student’s panel, in the tile’s own look', () => {
-    const html = tile(false);
-    const [, attributes = '', classes = ''] =
-      /^<li class="flex min-w-0"><button ([^>]*?)class="([^"]*)">/.exec(html) ?? [];
-    expect(attributes).toBe('type="button" id="g-tile-u1" aria-expanded="false" ');
-    // The tile's own classes, its words left-aligned, and a pointer.
-    const plain = parts(render(student())).tile;
-    expect(plain).toContain('text-left');
-    expect(classes.split(' ')).toEqual([...plain, 'cursor-pointer']);
-    // Its name is its words, as the tile's.
-    expect(text(html)).toBe('Jaylen Brooks Focused');
-  });
-
-  it('is marked while its panel is open, as v2.css marks `.tile.is-selected`: the focus ring’s look', () => {
-    const html = tile(true, { state: 'unlocked', unlock: unlocked('nurse') });
-    expect(html).toMatch(
-      /^<li class="flex min-w-0 rounded-md ring-2 ring-focus-ring ring-offset-2 ring-offset-surface-page"><button type="button" id="g-tile-u1" aria-expanded="true" aria-controls="g-panel" /,
-    );
-    // Closed, it names no panel: none is there.
-    expect(tile(false)).not.toContain('aria-controls');
-  });
-
-  it('stays a tile alone in Present and under How it ended, where no panel opens', () => {
-    for (const present of [true, false]) {
-      const html = render(student(), present);
-      expect(html).toMatch(/^<li class="flex min-w-0"><div /);
-      expect(html).not.toMatch(/<button|aria-expanded|tabindex/);
-    }
-  });
-});
-
-describe('the grid’s columns', () => {
-  const classes = COLUMNS.split(' ');
-
-  it('fits four at the desktop width, beside the side menu, 10 px apart', () => {
-    // The class page's column at 1440 px: 1440 less the menu's 216 px and the page's two 36 px
-    // gutters, the tiles 10 px apart, each at least 250 px (ClassLive).
-    const min = Number(/minmax\(min\((\d+)px/.exec(COLUMNS)?.[1]);
-    expect(min).toBe(250);
-    expect(classes).toContain('gap-2.5');
-    expect(Math.floor((1440 - 216 - 2 * 36 + 10) / (min + 10))).toBe(4);
-  });
-
-  it('is two columns on a phone, 8 px apart, every tile as tall as the tallest', () => {
-    expect(classes).toEqual(
-      expect.arrayContaining(['max-sm:grid-cols-2', 'max-sm:auto-rows-fr', 'max-sm:gap-2']),
-    );
+describe('the room’s columns', () => {
+  it('fits as many tiles as the room holds, each at least 178 px, 8 px apart; two on a phone (LO5)', () => {
+    expect(ROOM.split(' ')).toEqual([
+      'grid-cols-[repeat(auto-fill,minmax(min(178px,100%),1fr))]',
+      'gap-2',
+      'max-[760px]:grid-cols-2',
+    ]);
   });
 
   it('keeps Present’s four from a 56 rem grid, 12 px apart, so a 1024 px projector still shows four', () => {
@@ -510,9 +284,6 @@ describe('the grid’s lines on the class page while a session runs (PV7)', () =
     // grid's health is said alone, so a lost stream is still the pill over the question.
     expect(source).toMatch(/tiles = true,/);
     expect(source).toMatch(
-      /if \(!students\) \{\s*return tiles \? \(\s*<p role="status" className="text-body text-text-secondary">\s*Loading grid…\s*<\/p>\s*\) : null;\s*\}/,
-    );
-    expect(source).toMatch(
       /if \(!tiles\) return health;\s*const rows = Object\.values\(students\);/,
     );
     const error = source.indexOf('if (error) {');
@@ -523,19 +294,19 @@ describe('the grid’s lines on the class page while a session runs (PV7)', () =
   });
 
   it('draws no tile and no loading line while the question has its place, and both otherwise', () => {
-    const before = (tiles: boolean) =>
-      renderToStaticMarkup(createElement(LiveGrid, { sessionId: 's1', tiles }));
-    expect(before(false)).toBe('');
+    const before = (tiles: boolean, present = false) =>
+      renderToStaticMarkup(createElement(LiveGrid, { sessionId: 's1', tiles, present }));
+    expect(before(false, true)).toBe('');
+    // The class page's room says its session is being read (LiveTopStates); Present, its grid.
     expect(before(true)).toBe(
+      '<p role="status" class="text-body text-text-secondary">Loading this session…</p>',
+    );
+    expect(before(true, true)).toBe(
       '<p role="status" class="text-body text-text-secondary">Loading grid…</p>',
     );
   });
 
-  it('asks a grid that didn’t load to try again with a small button there, as ClassStates does', () => {
-    expect(source).toMatch(
-      /<TryAgain onRetry=\{retry\} held=\{retrying\} then=\{\[\]\} size=\{livePage \? 'sm' : 'md'\}>\s*<p role="alert" className="text-body">\s*\{error\}\s*<\/p>\s*<\/TryAgain>/,
-    );
-  });
+  // A grid that didn't load, said with Try again, is driven in live-grid.driven.test.tsx (LO5).
 
   it('keeps its failure said while Try again reads it again, Try again held, focus then on the page’s heading (ClassRetryStates)', () => {
     // Try again's boot: held until it answers, its failure never cleared as it starts, which

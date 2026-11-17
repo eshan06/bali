@@ -33,11 +33,8 @@ const ended = page.slice(
 );
 
 describe('the class page in Present while a session runs (ClassPresent)', () => {
-  it('keeps +5, +10 and End in its header, Present after them (the owner, 2026-10-12)', () => {
-    expect(live).toMatch(
-      /<LiveHeader[^>]*>\s*\{extend\}\s*\{end\('ml-2'\)\}\s*\{present \? presentToggle\(false, 'ml-2'\) : null\}\s*<\/LiveHeader>/,
-    );
-  });
+  // +5, +10 and End kept in its header, Present after them (the owner, 2026-10-12), is driven in
+  // classes/[id]/page.test.tsx since LO5.
 
   it('shows the slide in the live grid’s place while no question shows (M6, part 2d; PresentSlide)', () => {
     // The session's own slide, through the class page's own hook: Present and the teacher's card
@@ -55,44 +52,23 @@ describe('the class page in Present while a session runs (ClassPresent)', () => 
     // Its section fills the rest of Present's page, at least the screen's height, so the slide's
     // frame takes what the header leaves (present-slide.test.ts).
     expect(page).toMatch(/const PRESENT_PAGE = '[^']*\bflex min-h-dvh flex-col\b/);
-    expect(live).toMatch(
-      /aria-label=\{projected \? undefined : 'Live grid'\}\s+className="flex flex-1 /,
-    );
   });
 
   it('closes and puts away its question there, Done sending focus to Present in the header (L7, part 3)', () => {
     // PresentQuestion's foot holds Close, Close and show answer and Done (present-question.test.ts);
-    // Done leaves the live grid, and focus goes on to the toggle, the header's last control.
-    const toggle = page.slice(page.indexOf('const presentToggle'));
-    expect(toggle).toMatch(
-      /^const presentToggle = \(beside = false, className = ''\) => \(\s*<Button\s+ref=\{toggle\}\s+id=\{`\$\{id\}-present`\}/,
-    );
+    // Done leaves the live grid, and focus goes on to the toggle, the header's last control (driven
+    // in classes/[id]/page.test.tsx).
     expect(read('../components/present-question.tsx')).toMatch(
       /doneButton\(lesson, `\$\{id\}-present`, `\$\{id\}-done`\)/,
     );
-    // Ask another question stays on the class page: its panel lists the saved questions with their
-    // answers, which the room must never see.
-    expect(page).toMatch(/const panel = present \? null : side;/);
   });
 
   it('never shows the panel of your questions, which names their correct answers (the owner, 2026-10-15)', () => {
-    // L7b, part 2: the panel lists the teacher's questions with each one's correct answer, so
-    // it is drawn only while `panel` holds, which Present never does, both its views alike; and
-    // nothing Present draws in its place reads the teacher's questions. Nor the decks' (M6, part
-    // 2c): the teacher's to pick, never the room's.
-    expect(page).toMatch(/const panel = present \? null : side;/);
-    for (const [name, when] of [
-      ['PickPanel', "{panel === 'ask' && !writing ? ("],
-      ['AskPanel', "{panel === 'ask' && writing ? ("],
-      ['DecksPanel', "{panel === 'decks' ? ("],
-    ]) {
-      const at = [...page.matchAll(new RegExp(`<${name}\\b`, 'g'))].map((m) => m.index);
-      expect(at, name).toHaveLength(1);
-      // Drawn right inside its own `panel` branch, and nowhere else.
-      const before = page.slice(0, at[0]);
-      expect(before.slice(before.lastIndexOf('{panel')).trimEnd(), name).toBe(when);
-    }
-    expect(ended).not.toMatch(/AskPanel|PickPanel|DecksPanel|saved-questions/);
+    // L7b, part 2: the panel lists the teacher's questions with each one's correct answer. The
+    // class page is rebuilt from the lock-only canvas since LO5, which draws no lesson piece, so it
+    // mounts neither that panel nor the decks' (M6, part 2c), in Present or out of it; and nothing
+    // Present draws in the grid's place reads the teacher's questions.
+    expect(page).not.toMatch(/AskPanel|PickPanel|DecksPanel|ask-panel|decks-panel|saved-questions/);
     for (const part of ['present-question', 'present-slide', 'live-header', 'live-grid']) {
       expect(read(`../components/${part}.tsx`), part).not.toMatch(
         /ask-panel|decks-panel|saved-questions|PickPanel|PickView|DecksPanel/,
