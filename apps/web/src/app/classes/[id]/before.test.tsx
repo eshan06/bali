@@ -13,8 +13,9 @@ import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CountContext } from '@/components/count';
 import { type ApiClient, createApiClient } from '@/lib/api-client';
-import { CANT_REACH, NOT_A_BLOCK_ID, NOT_A_SESSION_LENGTH } from '@/lib/errors';
+import { ACCOUNT_DELETED, CANT_REACH, NOT_A_BLOCK_ID, NOT_A_SESSION_LENGTH } from '@/lib/errors';
 import { bellTime } from '@/lib/session-controls';
 
 import ClassDetailPage from './page';
@@ -51,6 +52,8 @@ const bali = vi.hoisted(() => {
     students: [ana, marcus] as RosterStudent[],
     /** Whether the teacher has a block. */
     block: true,
+    /** The teacher's account deleted on its way: a register refused for good. */
+    accountDeleted: false,
     /** The class's last session over, and its report's who joined and unlocks; none by default. */
     last: null as SessionReportSummary | null,
     joined: [] as ReportStudent[],
@@ -82,10 +85,17 @@ const bali = vi.hoisted(() => {
           : [],
       },
     ],
-    'POST /v1/blocks': (body) => [
-      201,
-      { id: 'b2', tagId: (body as { tagId: string }).tagId, createdAt: new Date().toISOString() },
-    ],
+    'POST /v1/blocks': (body) =>
+      now.accountDeleted
+        ? [409, { error: { code: 'conflict', reason: 'account_deleted', message: 'deleted' } }]
+        : [
+            201,
+            {
+              id: 'b2',
+              tagId: (body as { tagId: string }).tagId,
+              createdAt: new Date().toISOString(),
+            },
+          ],
     [`GET ${reports}?limit=1`]: () => [
       200,
       { sessions: now.last ? [now.last] : [], nextBefore: null },
@@ -162,6 +172,7 @@ afterEach(() => {
   Object.assign(bali.now, {
     students: [bali.ana, bali.marcus],
     block: true,
+    accountDeleted: false,
     last: null,
     joined: [],
     unlocks: [],
@@ -219,7 +230,11 @@ describe('a class before it starts (ClassPage)', () => {
     open();
     const loading = await screen.findByRole('status');
     expect(loading.textContent).toBe('Loading…');
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('…');
+    const held = screen.getByRole('heading', { level: 1 });
+    expect(held.textContent).toBe('…');
+    // In the captions' ink, its line's place held, so nothing moves as the class lands.
+    expect(held.className).toMatch(/\btext-text-tertiary\b/);
+    expect(held.nextElementSibling?.textContent).toBe(String.fromCharCode(160));
     expect(screen.queryByText('Session length')).toBeNull();
     expect(screen.queryByRole('button', { name: START })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Students' })).toBeNull();
@@ -246,6 +261,9 @@ describe('a class before it starts (ClassPage)', () => {
         .map((r) => (r as HTMLInputElement).value),
     ).toEqual(['25', '50', '75', 'other']);
     expect(within(well).getByRole('radio', { name: '50 min' })).toHaveProperty('checked', true);
+    // The radio is clipped away, so its segment draws the focus ring.
+    const segment = within(well).getByRole('radio', { name: '50 min' }).closest('label');
+    expect(segment?.className).toMatch(/\bhas-focus-visible:outline-2\b/);
     expect(well.contains(start)).toBe(true);
     expect(screen.queryByText(/stayed focused|nobody joined/)).toBeNull();
     // The students: their count and names, the join code behind Add students.
@@ -271,6 +289,32 @@ describe('a class before it starts (ClassPage)', () => {
     expect(screen.queryByText('VMAF7E', { ignore: 'dialog *' })).toBeNull();
     expect(document.activeElement).toBe(add);
     expect(bali.unexpected).toEqual([]);
+  });
+
+  it('says one student as one', async () => {
+    bali.now.students = [bali.ana];
+    open();
+    await screen.findByRole('button', { name: 'Start 50-minute session' });
+    expect(name().nextElementSibling?.textContent).toBe('1 student');
+  });
+
+  it('never says the class didn’t load for its roster’s failure while the class is on its way', async () => {
+    bali.now.hold = CLASS_KEY;
+    bali.now.down.add(`GET /v1/classes/${bali.CLASS}/roster`);
+    open();
+    await vi.waitFor(() => expect(posted(`GET /v1/classes/${bali.CLASS}/roster`)).toHaveLength(1));
+    await settle();
+    // Only the class's own read fails the class: its place still says Loading…, nothing alerts.
+    expect(screen.getByRole('status').textContent).toBe('Loading…');
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    await act(async () => {
+      bali.holding.shift()?.();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    // Read, the class shows, and the roster's failure is said under its header.
+    await screen.findByRole('button', { name: 'Start 50-minute session' });
+    expect(screen.getByRole('alert').textContent).toBe(`Couldn't load this class. ${CANT_REACH}`);
   });
 
   it('shows a new class’s join code at once, no Add students, and says it has no students yet', async () => {
@@ -388,6 +432,32 @@ describe('a class before it starts, no block yet (ClassStates)', () => {
       { tagId: 'T7XK2M9QPF' },
     ]);
     expect(bali.unexpected).toEqual([]);
+  });
+
+  it('counts a block once Bali has registered it, never one refused', async () => {
+    bali.now.block = false;
+    const count = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <CountContext.Provider value={count}>
+        <main>
+          <ClassDetailPage />
+        </main>
+      </CountContext.Provider>,
+    );
+    const code = await screen.findByRole('textbox', { name: 'Block code' });
+    await user.type(code, 'T7XK2M9QPF');
+    // Refused for the account (deleted on its way): said, final, Register block kept, no count.
+    bali.now.accountDeleted = true;
+    await user.click(button('Register block'));
+    expect((await screen.findByRole('alert')).textContent).toBe(ACCOUNT_DELETED);
+    expect(button('Register block')).toBeDefined();
+    expect(count).not.toHaveBeenCalled();
+
+    bali.now.accountDeleted = false;
+    await user.click(button('Register block'));
+    await screen.findByRole('button', { name: 'Start 50-minute session' });
+    expect(count.mock.calls).toEqual([['portal_block_registered']]);
   });
 
   it('offers Start when Bali couldn’t list the blocks: a session starts without one', async () => {

@@ -387,7 +387,12 @@ export default function ClassDetailPage() {
   const startForm = useRef<HTMLFormElement>(null);
   const toggled = useRef(false);
   useEffect(() => {
-    if (toggled.current) (toggle.current ?? submitOf(startForm.current))?.focus();
+    if (toggled.current) {
+      const to = toggle.current ?? submitOf(startForm.current);
+      // No block yet, so no Start: the class's name.
+      if (to) to.focus();
+      else land(document, []);
+    }
     toggled.current = false;
   }, [present]);
   // Extend (P10): the last attempt whose answer never came, resent by Try again; and what is said
@@ -594,14 +599,16 @@ export default function ClassDetailPage() {
     const next = await readLast(api, classId);
     if (lastReads.current === mine) setLast(next);
   }, [api, classId]);
+  // Never in Present, whose page after the bell says only that class is over.
+  const showsLast = before && !present;
   useEffect(() => {
-    if (!before) return;
+    if (!showsLast) return;
     void readLastSession();
     return () => {
       lastReads.current += 1;
       setLast({ kind: 'finding' });
     };
-  }, [before, readLastSession]);
+  }, [showsLast, readLastSession]);
 
   // The class's last pick on this computer, and Present as this tab left it, read once the page is
   // in the browser (never at render, where the server has no storage), so before the class's read

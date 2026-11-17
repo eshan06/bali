@@ -90,7 +90,7 @@ const bali = vi.hoisted(() => {
    * Whether the class's session runs yet: none until a Start, when a test says so; whether a
    * Start's answer waits for the test to give it (`starts`); and an extend's (`extending`).
    */
-  const now = { running: true, holdStart: false, holdExtend: false };
+  const now = { running: true, holdStart: false, holdExtend: false, block: true };
   /**
    * What the session has open, as its read says it (L7, M6): a question and a slide, none unless a
    * test says so; and the teacher's decks, as `GET /v1/decks` lists them.
@@ -128,9 +128,11 @@ const bali = vi.hoisted(() => {
       return [200, results];
     }
     if (method === 'GET' && path === '/v1/decks') return [200, { decks: lesson.decks }];
-    // The teacher's blocks: one, so the page before a session offers Start (LO4).
+    // The teacher's blocks: one, so the page before a session offers Start (LO4), unless a test
+    // says none.
     if (method === 'GET' && path === '/v1/blocks') {
-      return [200, { blocks: [{ id: 'b1', tagId: 'T7XK2M9QPF', createdAt: klass.createdAt }] }];
+      const block = { id: 'b1', tagId: 'T7XK2M9QPF', createdAt: klass.createdAt };
+      return [200, { blocks: now.block ? [block] : [] }];
     }
     if (method === 'GET' && path === '/v1/saved-questions') return [200, { savedQuestions: [] }];
     if (method === 'POST' && path === `/v1/sessions/${SESSION}/extend`) return [409, tooLong];
@@ -260,6 +262,7 @@ afterEach(() => {
   bali.now.running = true;
   bali.now.holdStart = false;
   bali.now.holdExtend = false;
+  bali.now.block = true;
   bali.lesson.question = null;
   bali.lesson.presentation = null;
   bali.lesson.decks = [];
@@ -676,6 +679,52 @@ describe('Present’s toggle, focus following it (PV9)', () => {
     const start = await screen.findByRole('button', { name: 'Start 50-minute session' });
     expect(document.activeElement).toBe(start);
     expect(bali.unexpected).toEqual([]);
+  });
+
+  it('takes no focus as the page comes back in Present: only a press moves it', async () => {
+    sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
+    render(
+      <main>
+        <ClassDetailPage />
+      </main>,
+    );
+    await screen.findByText('Ana Rodríguez');
+    expect(screen.getByRole('button', { name: 'Present' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('goes to the class’s name as Present is left after the bell with no block, so no Start', async () => {
+    bali.now.block = false;
+    sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
+    const user = userEvent.setup();
+    render(
+      <main>
+        <ClassDetailPage />
+      </main>,
+    );
+    await screen.findByText('Ana Rodríguez');
+    await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
+    bali.now.running = false;
+    await act(async () => {
+      bali.streams[0]?.onEvent({
+        seq: 5,
+        eventId: '019a0000-0000-7000-8000-000000000e05',
+        type: 'session_ended',
+        userId: null,
+        occurredAt: new Date().toISOString(),
+        payload: {},
+      });
+      await Promise.resolve();
+    });
+    await screen.findByRole('heading', { name: 'Class is over' });
+    await user.click(screen.getByRole('button', { name: 'Present' }));
+    await screen.findByRole('heading', { name: 'Register your block first' });
+    expect(document.activeElement).toBe(
+      screen.getByRole('heading', { level: 1, name: 'Biology, period 3' }),
+    );
   });
 });
 

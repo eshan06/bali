@@ -142,8 +142,26 @@ describe('the join code before a session (ClassPage, ClassStates)', () => {
     expect(button('Copy code').querySelector('.lucide-copy')).not.toBeNull();
     expect(button('New code').getAttribute('aria-haspopup')).toBe('dialog');
     expect(screen.queryByRole('alert')).toBeNull();
+    // Copied and a new code are said from regions mounted while empty, so a screen reader hears
+    // them land.
+    const said = screen.getAllByRole('status');
+    expect(said.map((s) => s.textContent)).toEqual(['', '']);
+    expect(said.some((s) => s.className === 'sr-only')).toBe(true);
     // New code's confirm is there closed: only showModal opens it, so the page behind is inert.
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('forgets a Copied still showing as the page goes', async () => {
+    userEvent.setup();
+    vi.useFakeTimers();
+    const { unmount } = render(<Page />);
+    fireEvent.click(button('Copy code'));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(button('Copied')).toBeDefined();
+    const clear = vi.spyOn(window, 'clearTimeout');
+    unmount();
+    expect(clear).toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('says Copied for a few seconds, a screen reader told too; refused, how to copy it by hand', async () => {
@@ -212,6 +230,39 @@ describe('New code’s confirm, a dialog (ClassFlows)', () => {
     expect(code().textContent).toBe('K7M2PQ');
     expect(screen.getByText(NEW_CODE_MADE).getAttribute('role')).toBe('status');
     expect(document.activeElement).toBe(button('New code'));
+  });
+
+  it('forgets Copy code’s answer about the old code once a new one is made', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValueOnce(new Error('denied'));
+    render(<Page />);
+    await user.click(button('Copy code'));
+    expect(screen.getByRole('alert').textContent).toBe(CANT_COPY);
+    await user.click(button('New code'));
+    await user.click(inConfirm('Make new code'));
+    await answer(MINT, { ...KLASS, joinCode: 'K7M2PQ' });
+    expect(code().textContent).toBe('K7M2PQ');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(button('Copy code')).toBeDefined();
+  });
+
+  it('opens again to say a mint that failed after Chrome’s second Escape closed it while Making…', async () => {
+    const user = userEvent.setup();
+    render(<Page />);
+    await user.click(button('New code'));
+    await user.click(inConfirm('Make new code'));
+    // Chrome's second Escape with no click between: a `cancel` that can't be held, then closed.
+    await act(async () => {
+      const dialog = confirm() as HTMLDialogElement;
+      dialog.dispatchEvent(new Event('cancel'));
+      dialog.close();
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await answer(MINT, null);
+    await answer(READ, KLASS);
+    expect(within(confirm()).getByRole('alert').textContent).toBe(CANT_REACH);
+    expect(inConfirm('Try again')).toBeDefined();
   });
 
   it('says a mint with no answer in the dialog, Try again sending it again; cancelled, the class read once more', async () => {
