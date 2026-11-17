@@ -185,7 +185,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO7** 👀 The recap (#609; lane B; after LO6)
 
-- **LO8** 👀 Reports and the CSV (#610; lane A; after LO3) — ✅ (#623, one PR, the conductor's call; DECISIONS 2026-11-17); its in-between states and the CSV's columns on the canvas's ReportsMoments (version 55); ten sessions a page, each one's whole-time count read by the portal (a count on R3's rows, additive, a possible later step); for the phase's tidy-up: v2's `text-pill` and `text-bar-row` unused; for Now at the phase's end: 21 source-text tests left (`reports-list.test.ts` converted)
+- **LO8** 👀 Reports and the CSV (#610; lane A; after LO3) — ✅ (#624, one PR, the conductor's call; DECISIONS 2026-11-17); its in-between states and the CSV's columns on the canvas's ReportsMoments (version 55); ten sessions a page, each one's whole-time count read by the portal (a count on R3's rows, additive, a possible later step); for the phase's tidy-up: v2's `text-pill` and `text-bar-row` unused; for Now at the phase's end: 21 source-text tests left (`reports-list.test.ts` converted)
 
 - **LO9** 👀 Present (#611; lane B; after LO7)
 
