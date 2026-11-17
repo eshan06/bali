@@ -677,7 +677,9 @@ Teacher app and web portal:
   record), four at most (`ACTIVITY_LIMIT`, the board's count); no paging and no query. A student is
   `403`. Home reads it again every 15 s while it shows it (PV17c-1), so the route reads only those
   three kinds and the reasons' changes of today's sessions, all the report's listing needs: the
-  same answer, at a few events a read.
+  same answer, at a few events a read. *Since LO3 (2026-11-17) the portal reads it no more:* the
+  lock-only canvas's Home draws no Recent activity (Web portal, decision 7's amendment). The route
+  stays, additive-only.
 - `POST /v1/me/actions` — a teacher's action in the portal, counted for PostHog (added 2026-11-05,
   A3a, additive): `{ event, eventId }`, answered `{}` whether PostHog is on or off; a student or an
   account with no row `403`. "Analytics (PostHog)" has the rest.

@@ -175,7 +175,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO2** 👀 The top bar and the new look's shared pieces (#604; after LO1) — ✅ (#617; DECISIONS 2026-11-17); its in-between states on the canvas's BarStates (version 32); until LO3, a teacher with classes reaches New class at /classes by its address only
 
-- **LO3** 👀 Home, one page for your classes (#605; lane A; after LO2)
+- **LO3** 👀 Home, one page for your classes (#605; lane A; after LO2) — built on `feat/lo3-home`, its in-between states on the canvas's HomeMoments (version 37; DECISIONS 2026-11-17); stopped at santa's size check (1,660 lines, 921 of them v2's code removed), the conductor's call: one PR or a split; for Now at the phase's end: 24 source-text tests left
 
 - **LO4** 👀 A class before it starts (#606; lane B; after LO2)
 
