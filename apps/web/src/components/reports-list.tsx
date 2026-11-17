@@ -1,30 +1,30 @@
 'use client';
 
 import type { SessionReportSummary } from '@bali/shared';
+import { CircleAlert, Download } from 'lucide-react';
 import Link from 'next/link';
 import { useId } from 'react';
 
-import { CARD_ALONE } from '@/components/card';
+import { LockButton } from '@/components/button';
+import { LEDGER, LEDGER_CELL, LEDGER_HEAD, LEDGER_SUB } from '@/components/card';
+import { OOPS, WAIT_LINE } from '@/components/classes';
 import { TryAgain } from '@/components/try-again';
-import { sessionWhen } from '@/lib/recap';
-import { type ReadAt, reportPath, type SessionList, sessionRow } from '@/lib/reports';
+import { csvName, saveFile, sessionsCsv } from '@/lib/report-csv';
+import {
+  focusBar,
+  focusShare,
+  type ReadAt,
+  reportPath,
+  type SessionList,
+  sessionRow,
+} from '@/lib/reports';
 
-/** The figures' names, in the columns' order, after the session's own. */
-export const COLUMNS = [
-  'Joined',
-  'Focus time',
-  'Average',
-  'Silent',
-  'Unlocks',
-  'Protection off',
-] as const;
-
-/** A section's name over its part, v2.css's `.wlabel`, 12 px above it. */
-export const LABEL = 'mb-3 text-section-label text-text-tertiary uppercase';
-/**
- * v2.css's `.wtable` (Reports', and a session's Unlocks on its own page, PV14): its head grey, each
- * cell 16 px in, a hairline under every row but the last, in a box that scrolls sideways.
+/*
+ * v2.css's `.wtable`, which a session's own page keeps for its Unlocks until LO7 redraws it: a
+ * section's name over its part, 12 px above it; the table's head grey, each cell 16 px in, a
+ * hairline under every row but the last, in a box that scrolls sideways.
  */
+export const LABEL = 'mb-3 text-section-label text-text-tertiary uppercase';
 export const HEAD =
   'border-b border-border-default bg-surface-sunken px-4 py-2.75 text-section-label whitespace-nowrap text-text-tertiary uppercase';
 export const CELL = 'border-b border-border-default px-4 py-3 align-middle text-cell';
@@ -32,35 +32,24 @@ export const FIGURE = `${CELL} text-right whitespace-nowrap`;
 export const TABLE_BOX =
   'overflow-x-auto rounded-frame border border-border-default bg-surface-card';
 
-/**
- * A session's average focus as its bar (Reports): out of its length, its start to its end rounded
- * to whole minutes as R2 rounds the average; null when nobody joined, who have no average.
- */
-export function focusBar(
-  session: SessionReportSummary,
-  locale?: string,
-): { words: string; percent: number } | null {
-  const average = session.averageFocusMinutes;
-  if (average === null) return null;
-  const end = Date.parse(session.endedAt ?? session.endsAt);
-  const length = Math.round((end - Date.parse(session.startedAt)) / 60_000);
-  const n = new Intl.NumberFormat(locale);
-  return {
-    words: `${n.format(average)} of ${n.format(length)} min`,
-    percent: length > 0 ? Math.min(100, (average / length) * 100) : 0,
-  };
-}
+/** The sessions' figures, in their columns' order after the session's own (Reports). */
+const COLUMNS = [
+  'Joined',
+  'Focused the whole time',
+  'Average time focused',
+  'Emergency unlocks',
+  'Protection off',
+] as const;
 
 /**
- * The Reports page as its state draws it (Reports, ReportStates): the heading and its framing line
- * in italic, the class picked with pills, then that class's sessions, newest first, as a table in a
- * box that scrolls sideways, each a link to its own page (PV14), with Show earlier, beside each
- * session's average focus as a bar. Every state with its words: loading, couldn't load with Try
- * again, none yet, the place lost, and earlier sessions that didn't load. A failure stays said
- * while its Try again reads, Try again held, never Loading… in its place; read, focus on the
- * sessions' label, or Show earlier, as ReportRetryStates says: Show earlier is its own Try again,
- * one button throughout, so focus stays on it, and once it goes with the last page, on the
- * sessions' label. `classes` is null until the account is read.
+ * Reports as its state draws it (Reports, HomeStates, PhonePages; its other moments on
+ * ReportsMoments, drawn first): the heading; a tab per class, the one picked marked; the share of
+ * the listed sessions' class time spent focused, with Download CSV; then those sessions, newest
+ * first, in a ledger that scrolls sideways on a phone, each a link to its own page, with Show
+ * earlier. Every state with its words: loading, couldn't load with Try again, none yet, the place
+ * lost, and earlier sessions that didn't load. A failure stays said while its Try again reads, Try
+ * again held; read, focus on the sessions' table, or on Show earlier, its own Try again, one button
+ * throughout, until it goes with the last page. `classes` is null until the account is read.
  */
 export function ReportsView({
   classes,
@@ -74,180 +63,181 @@ export function ReportsView({
   onRead: (at: ReadAt) => void;
 }) {
   const sessionsId = useId();
+  const tableId = useId();
+  const failed = list.failure?.at === 'newest' ? list.failure : null;
   // Show earlier's read that failed, said before its button, which then says Try again.
   const earlier = list.failure?.at === 'earlier' ? list.failure : null;
   const loading = classId !== null && list.reading === 'newest' && list.failure === null;
   const none =
     (classes !== null && classId === null) ||
     (list.loaded && list.sessions.length === 0 && list.nextBefore === null);
+  const listed = !loading && list.sessions.length > 0;
   return (
-    <div className="flex flex-col gap-5.5">
-      <header>
-        <h1 className="text-page-title">Reports</h1>
-        {/* The italic class alone: `font-sans` would set the upright face, slanted (PV4). */}
-        <p className="text-body text-text-secondary italic">
-          Patterns are conversation starters, not verdicts.
-        </p>
-      </header>
-
-      {classes?.length ? (
-        <nav aria-label="Class" className="flex flex-wrap gap-2">
-          {classes.map(({ id, name }) => (
-            <Link
-              key={id}
-              href={`/reports?class=${encodeURIComponent(id)}`}
-              aria-current={id === classId ? 'page' : undefined}
-              className="rounded-full border border-border-strong bg-surface-card px-3.5 py-1.5 text-pill text-text-secondary aria-[current=page]:border-surface-brand aria-[current=page]:bg-surface-brand aria-[current=page]:font-semibold aria-[current=page]:text-text-on-brand"
-            >
-              {name}
-            </Link>
-          ))}
-        </nav>
-      ) : null}
-
-      <div>
-        {/* Mounted throughout, so a screen reader hears what it comes to say. */}
-        <div role="status">
-          {loading ? (
-            <p className="text-body text-text-secondary">Loading sessions…</p>
-          ) : list.restarted ? (
-            <p className="mb-5.5 rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body">
-              Bali lost your place in the list, so it starts again from the newest session.
-            </p>
-          ) : null}
-        </div>
-
-        {list.failure?.at === 'newest' ? (
-          <div className={CARD_ALONE}>
+    <div className="flex flex-col gap-10 text-body max-[760px]:gap-8">
+      <h1 className="text-page-title max-[760px]:text-page-title-phone">Reports</h1>
+      <div className="flex flex-col gap-4">
+        {classes?.length ? <ClassTabs classes={classes} classId={classId} /> : null}
+        {loading ? (
+          <p role="status" className={WAIT_LINE}>
+            Loading sessions…
+          </p>
+        ) : null}
+        {failed ? (
+          <div className={OOPS}>
             <TryAgain
-              size="md"
               onRetry={() => onRead('newest')}
               held={list.reading === 'newest'}
-              then={[sessionsId]}
-              className="mt-3.5"
+              then={[tableId]}
             >
-              <p role="alert" className="text-body">
-                <span className="block font-semibold">Couldn&apos;t load the sessions.</span>
-                <span className="text-text-secondary">{list.failure.message}</span>
+              <p role="alert" className="flex items-center gap-3">
+                <CircleAlert size={18} aria-hidden="true" className="shrink-0" />
+                Couldn&apos;t load the sessions. {failed.message}
               </p>
             </TryAgain>
           </div>
         ) : null}
-
-        {none ? (
-          <p className="flex flex-col text-body text-text-secondary">
-            <span className="font-semibold text-text-primary">No reports yet.</span>
-            <span>When a session ends, its report shows here.</span>
-          </p>
-        ) : null}
-
-        {!loading && list.sessions.length > 0 ? (
-          <div className="flex flex-wrap items-start gap-5">
-            <section
-              aria-labelledby={sessionsId}
-              className="flex min-w-0 flex-[999_1_520px] flex-col gap-5"
-            >
-              <h2 id={sessionsId} className={LABEL}>
-                Sessions · {list.className}
-              </h2>
-              <SessionsTable classId={classId ?? ''} sessions={list.sessions} />
-              {list.nextBefore === null ? null : (
-                // Show earlier, and its Try again once a read of it failed, the line before it: one
-                // button throughout, held as Loading… while it reads, so focus stays on it; gone
-                // with the last page, it lands focus on the sessions' label, as Try again does.
-                <div
-                  className={earlier ? 'mt-3 flex flex-wrap items-center gap-x-4 gap-y-3' : 'mt-3'}
-                >
-                  <TryAgain
-                    onRetry={() => onRead('earlier')}
-                    held={list.reading === 'earlier'}
-                    blocked={list.reading !== null}
-                    then={[sessionsId]}
-                    send={{
-                      words: 'Show earlier',
-                      sending: 'Loading…',
-                      failed: earlier !== null,
-                    }}
-                  >
-                    {earlier ? (
-                      <p role="alert" className="text-body">
-                        Couldn&apos;t load earlier sessions. {earlier.message}
-                      </p>
-                    ) : null}
-                  </TryAgain>
-                </div>
-              )}
-            </section>
-            <FocusBars sessions={list.sessions} />
-          </div>
-        ) : null}
+        {none ? <p className={WAIT_LINE}>When a session ends, its report shows here.</p> : null}
+        {listed ? <Share name={list.className ?? ''} list={list} /> : null}
       </div>
+
+      {listed ? (
+        <section aria-labelledby={sessionsId} className="flex flex-col gap-4">
+          <h2 id={sessionsId} className="sr-only">
+            Sessions, newest first
+          </h2>
+          {list.restarted ? (
+            <p role="status" className={WAIT_LINE}>
+              Bali lost your place in the list, so it starts again from the newest session.
+            </p>
+          ) : null}
+          <Ledger id={tableId} labelledBy={sessionsId} classId={classId ?? ''} list={list} />
+          {list.nextBefore === null ? null : (
+            // Show earlier, and its Try again once a read of it failed, the line before it: one
+            // button throughout, held as Loading… while it reads, so focus stays on it; gone with
+            // the last page, it lands focus on the table.
+            <div className={earlier ? 'flex flex-wrap items-center gap-x-4 gap-y-3' : undefined}>
+              <TryAgain
+                onRetry={() => onRead('earlier')}
+                held={list.reading === 'earlier'}
+                blocked={list.reading !== null}
+                then={[tableId]}
+                send={{ words: 'Show earlier', sending: 'Loading…', failed: earlier !== null }}
+              >
+                {earlier ? (
+                  <p role="alert">Couldn&apos;t load earlier sessions. {earlier.message}</p>
+                ) : null}
+              </TryAgain>
+            </div>
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }
 
 /**
- * The sessions as v2.css's table, in a box that scrolls sideways when the page is narrower than
- * it (DESIGN.md §8), each session a link to its own page (PV14): its day, underlined on hover, over
- * its times, the two the link's words.
+ * The classes as tabs (lock.css's `.tabs`), the one picked marked by its ink and its rule, never by
+ * colour alone; scrolling sideways when they outrun the page, with room in the box for the focus
+ * ring.
  */
-export function SessionsTable({
+function ClassTabs({
+  classes,
   classId,
-  sessions,
 }: {
-  classId: string;
-  sessions: SessionReportSummary[];
+  classes: { id: string; name: string }[];
+  classId: string | null;
 }) {
   return (
-    <div className={TABLE_BOX}>
-      <table aria-label="Sessions, newest first" className="w-full border-collapse">
+    <nav aria-label="Class" className="-m-1 overflow-x-auto p-1">
+      <div className="flex w-max min-w-full gap-1 border-b border-border-default">
+        {classes.map(({ id, name }) => (
+          <Link
+            key={id}
+            href={`/reports?class=${encodeURIComponent(id)}`}
+            aria-current={id === classId ? 'page' : undefined}
+            className="-mb-px inline-flex min-h-10 items-center border-b-2 border-transparent px-3 text-nav whitespace-nowrap text-text-secondary hover:text-text-primary aria-[current=page]:border-text-primary aria-[current=page]:text-text-primary"
+          >
+            {name}
+          </Link>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+/**
+ * The share of the listed sessions' class time spent focused (`focusShare`), with Download CSV
+ * beside it, which saves those sessions' totals (`sessionsCsv`); no share when nobody joined any,
+ * the button alone (ReportsMoments).
+ */
+function Share({ name, list }: { name: string; list: SessionList }) {
+  const share = focusShare(list.sessions);
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+      {share === null ? null : (
+        <p className="flex flex-wrap items-baseline gap-x-3">
+          <span className="text-share tabular-nums">
+            {new Intl.NumberFormat(undefined, { style: 'percent' }).format(share / 100)}
+          </span>
+          <span className="text-count-of text-text-secondary max-[760px]:text-count-of-phone">
+            of class time spent focused
+          </span>
+        </p>
+      )}
+      <LockButton
+        variant="secondary"
+        onClick={() => saveFile(csvName(name), sessionsCsv(name, list))}
+      >
+        <Download size={16} aria-hidden="true" />
+        Download CSV
+      </LockButton>
+    </div>
+  );
+}
+
+/**
+ * The sessions (lock.css's `.ledger`), a box of their own that scrolls sideways when the page is
+ * narrower than they are: under 760 px at least 720 px wide, each cell on one line (PhonePages).
+ */
+function Ledger({
+  id,
+  labelledBy,
+  classId,
+  list,
+}: {
+  id: string;
+  labelledBy: string;
+  classId: string;
+  list: SessionList;
+}) {
+  return (
+    <div className="-m-1 overflow-x-auto p-1">
+      <table
+        id={id}
+        aria-labelledby={labelledBy}
+        className={`${LEDGER} max-[760px]:min-w-180 max-[760px]:[&_td]:whitespace-nowrap`}
+      >
         <thead>
           <tr>
-            <th scope="col" className={`${HEAD} text-left`}>
+            <th scope="col" className={LEDGER_HEAD}>
               Session
             </th>
-            {COLUMNS.map((name) => (
-              <th key={name} scope="col" className={`${HEAD} text-right`}>
-                {name}
+            {COLUMNS.map((column) => (
+              <th key={column} scope="col" className={`${LEDGER_HEAD} text-right`}>
+                {column}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="[&>tr:last-child>*]:border-b-0">
-          {sessions.map((session) => {
-            const row = sessionRow(session);
-            return (
-              <tr key={session.id}>
-                <th scope="row" className={`${CELL} text-left font-normal whitespace-nowrap`}>
-                  <Link
-                    href={reportPath(classId, session.id)}
-                    className="group block rounded-sm text-left"
-                  >
-                    <span className="block font-semibold underline-offset-2 group-hover:underline">
-                      {row.day}
-                      <span className="sr-only">,</span>
-                    </span>
-                    <span className="block text-cell-sub text-text-tertiary">{row.times}</span>
-                  </Link>
-                </th>
-                {row.figures ? (
-                  <>
-                    <td className={FIGURE}>{row.figures.joined}</td>
-                    <td className={FIGURE}>{row.figures.focus} min</td>
-                    <td className={FIGURE}>{row.figures.average} min</td>
-                    <td className={FIGURE}>{row.figures.silent} min</td>
-                  </>
-                ) : (
-                  // No zeros for a session nobody joined, as its recap says (R5).
-                  <td colSpan={4} className={`${CELL} text-text-secondary`}>
-                    Nobody joined
-                  </td>
-                )}
-                <td className={FIGURE}>{row.unlocks}</td>
-                <td className={FIGURE}>{row.protectionOffs}</td>
-              </tr>
-            );
-          })}
+        <tbody>
+          {list.sessions.map((session) => (
+            <SessionRow
+              key={session.id}
+              classId={classId}
+              session={session}
+              whole={list.wholeTime[session.id]}
+            />
+          ))}
         </tbody>
       </table>
     </div>
@@ -255,46 +245,62 @@ export function SessionsTable({
 }
 
 /**
- * Each session's average focus as a bar out of its length, newest first as the table is; a
- * session nobody joined has none. Nothing at all when no session has one.
+ * A session's row: its day, a link to its own page with its times under it, then its figures, its
+ * average focus as words over a bar out of its length; Nobody joined across the three a session
+ * nobody joined has none of, never zeros (R5).
  */
-export function FocusBars({ sessions }: { sessions: SessionReportSummary[] }) {
-  const headingId = useId();
-  const bars = sessions.flatMap((session) => {
-    const bar = focusBar(session);
-    return bar ? [{ session, bar }] : [];
-  });
-  if (bars.length === 0) return null;
+function SessionRow({
+  classId,
+  session,
+  whole,
+}: {
+  classId: string;
+  session: SessionReportSummary;
+  /** How many stayed focused the whole time, once counted. */
+  whole: number | undefined;
+}) {
+  const row = sessionRow(session);
+  const bar = focusBar(session);
+  const figure = `${LEDGER_CELL} text-right tabular-nums`;
   return (
-    <section aria-labelledby={headingId} className="flex min-w-0 flex-[1_1_320px] flex-col gap-5">
-      <h2 id={headingId} className={LABEL}>
-        Average focus per session
-      </h2>
-      <div className={CARD_ALONE}>
-        <ul className="grid grid-cols-[116px_minmax(0,1fr)_minmax(70px,max-content)] gap-3 text-bar-row">
-          {bars.map(({ session, bar }) => (
-            <li key={session.id} className="col-span-3 grid grid-cols-subgrid items-center">
-              <span>
-                {sessionWhen(session).day}
-                <span className="sr-only">,</span>
-              </span>
+    <tr>
+      <th scope="row" className={`${LEDGER_CELL} text-left font-normal`}>
+        <Link href={reportPath(classId, session.id)} className="group block rounded-xs">
+          <span className="font-semibold text-text-primary underline-offset-3 group-hover:underline">
+            {row.day}
+            <span className="sr-only">,</span>
+          </span>
+          <span className={LEDGER_SUB}>{row.times}</span>
+        </Link>
+      </th>
+      {row.figures && bar ? (
+        <>
+          <td className={figure}>{row.figures.joined}</td>
+          <td className={figure}>
+            {whole === undefined ? null : new Intl.NumberFormat().format(whole)}
+          </td>
+          <td className={figure}>
+            <span className="flex items-center justify-end gap-3">
+              {bar.words}
               <span
                 aria-hidden="true"
-                className="h-2.5 overflow-hidden rounded-full bg-surface-sunken"
+                className="h-1.5 w-22 shrink-0 overflow-hidden rounded-full bg-surface-sunken"
               >
                 <span
-                  className="block h-full rounded-full bg-surface-brand"
+                  className="block h-full rounded-full bg-arc-fill"
                   style={{ width: `${bar.percent}%` }}
                 />
               </span>
-              <span className="text-right text-text-secondary">{bar.words}</span>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-3.5 text-caption text-text-tertiary">
-          Out of each session&apos;s length. Averages only: Bali never ranks students.
-        </p>
-      </div>
-    </section>
+            </span>
+          </td>
+        </>
+      ) : (
+        <td colSpan={3} className={`${LEDGER_CELL} text-text-secondary`}>
+          Nobody joined
+        </td>
+      )}
+      <td className={figure}>{row.unlocks}</td>
+      <td className={figure}>{row.protectionOffs}</td>
+    </tr>
   );
 }
