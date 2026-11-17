@@ -8,6 +8,47 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-17** — **LO5, live: the top of a class's page while its session runs rebuilt from ClassLive, the count of who
+  is focused, Check on and the room; no lesson piece on the class page whichever way the switch is set; Present v2's until
+  LO9; one PR (the worker's calls, awaiting the owner's look; LO5, #607).**
+
+  **What the page shows** (ClassLive, LiveStates, PhoneLive; its in-between states on the canvas's LiveTopStates, drawn
+  first, version 49): the header, the ring, the name over "Ends 9:55 AM" and the join code, the time left over "left", +5
+  and +10 as one pair, End session and Present, which a phone never shows; then over a hairline the count, "24 of 28
+  focused", Check on and Everyone's tiles. The session list on the right is LO6's, so until it lands the count and the room
+  take the page's width.
+
+  **Check on** (the owner's ruling of 2026-11-16: the state and the name only): a row per state in its tile's chip, in
+  Home's order (LO3, HomeMoments), the unlocks first; each name opens the student's panel, today's until LO6, and focus
+  comes back to that name as it closes. **Open** (the worker's call): at the end of a row of one student, as ClassLive draws
+  it on its rows of one and not on Not here's two; none on a phone (PhoneLive). Its rows are counted by `checkOn` in
+  `live-grid.tsx`, Home's the same rules in lane A's `home.tsx`: one for the phase's end to fold into the other.
+
+  **The tiles** (ClassLive, LiveStates' rare tiles): the state and the name, nothing else, so an unlock's reason, "last
+  seen" and Clock off are the student panel's alone on the class page now; a Left state's icon is its flag, the colour and
+  the words saying "unlocked", as the rare tiles draw it. A tile's name takes two sizes of its own, `room-name` and
+  `room-name-phone` (14.5/19 and 14/19), in lane B's `@theme` block.
+
+  **The live feed lost or quiet** (the worker's call): LiveStates draws a spinner; the line's dot holds still instead, as
+  Home's does (HomeMoments), since DESIGN.md §7 lets nothing loop but `bali-softpulse`. The quiet feed, which no board drew,
+  says today's words in the same line (LiveTopStates). The count and Check on fade and the names go plain; the room doesn't.
+
+  **No lesson piece** (ARCHITECTURE, Web portal, decision 8: a page rebuilt from the lock-only canvas shows none either
+  way): the Questions and slides card and both side panels leave the class page, their code and their own tests kept;
+  `teacher-actions.test.tsx` counts a question asked through the panel on its own. Present still shows a question or a
+  slide with lessons on until LO9, and the page reads a lesson only while Present is on.
+
+  **Left for LO6** (its boards): Check on's row glowing as an unlock lands, the session list, the pop-ups' and the student
+  panel's new look, and the tab title. **Present** keeps v2's header, counts and tiles until LO9.
+
+  **One PR** (the worker's call, by the conductor's rule for LO2–LO4): about 1,130 changed lines without tests, over
+  santa's 400; the tiles alone could go first, but the header with the page's rewiring and the count with Check on would
+  each still be over 400, and the three share one render branch and one grid.
+
+  **Tests:** driven (`live-grid.driven.test.tsx`, `classes/[id]/page.test.tsx`); the pins of the live part in
+  `class-page.test.ts`, `present.test.ts`, `live-grid.test.ts`, `student-panel.test.ts`, `ask-panel.test.ts` and
+  `decks-panel.test.ts` are converted or gone with what they pinned; none leaves the source-text list whole (26 left).
+
 - **2026-11-17** — **LO4, a class before it starts: the class page with no session running rebuilt from ClassPage; the
   start waits for a block; the last session's line, and v2's recap card the day a session ended until LO7; one PR (the
   worker's calls and the conductor's, awaiting the owner's look; LO4, #606).**
