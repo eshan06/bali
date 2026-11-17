@@ -8,6 +8,34 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-16** — **The lessons switch, built: `NEXT_PUBLIC_LESSONS`, on unless it says off; off, the portal shows and
+  reads nothing of a live lesson, and a lesson page's address goes to `/` (LO1, the conductor's call and this step's).**
+
+  **What off does** (ARCHITECTURE, Web portal, decision 8): `lessonsOn()` (`apps/web/src/lib/lessons.ts`) is false only
+  for `off`, its case and the spaces around it aside, so an unset variable, every build before it, keeps lessons on. A
+  teacher's menu loses Questions and Slides; the class page loses its Questions and slides card and its side panels, and
+  Present always shows the room; a session's report loses its Questions card; a student's home loses Open the lesson and
+  its line on slides and questions, which would promise what never comes. The class page's two lesson hooks follow no
+  session then, so it reads no question, no totals and no deck, rather than reading them to hide them; a report reads no
+  questions. The student home's live card keeps the phone's chip, the student's own phone, which the lesson's read
+  carries: alone at the card's right it looked right at 1280 px, so no in-between state was drawn.
+
+  **A lesson page reached by its address** (the conductor's call: somewhere honest, the plainest): Your questions, Your
+  slides and a student's lesson answer `307` to `/`, a teacher's Home or a student's Your classes, from the server
+  (Questions' and Slides' layouts, the lesson's route), before any of the page is drawn or read.
+
+  **A question or a slide open when a deploy turns lessons off** (the conductor's call; LO0's worker rated it rare): left
+  to the session's end, which closes it. The portal neither shows nor reads it meanwhile; the phones still show it, as
+  they show whatever a teacher sends.
+
+  **`.env.example` is left as it is:** it lists the API's variables, each checked as the API boots; the portal's live in
+  `docs/WEB.md`'s table, `NEXT_PUBLIC_LESSONS` beside them.
+
+  **Tests:** each piece is tested both ways where it is drawn, driving the page. The source-text checks the switch broke
+  became driven tests (CLAUDE.md, Working rules): three of `app/present.test.ts`'s and one of
+  `components/question-card.test.ts`'s, now in `app/classes/[id]/page.test.tsx`; and all three of
+  `components/session-report.test.ts`'s, now in `session-report.driven.test.tsx`, so that file leaves the list, 27 left.
+
 - **2026-11-16** — **Bali's teacher portal becomes a phone lock only: questions and slides are switched off in the portal
   but kept in the code, the portal is rebuilt from the approved canvas "Bali portal, lock only", and the conductor may run
   two workers at once on a phase's lanes (the owner; LO0, #614, the docs of PLAN's Lock-only portal phase).**

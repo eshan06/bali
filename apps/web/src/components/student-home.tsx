@@ -4,6 +4,7 @@ import type { MeResponse } from '@bali/shared';
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 
+import { lessonsOn } from '@/lib/lessons';
 import {
   followLesson,
   homeClasses,
@@ -30,7 +31,8 @@ const UNREAD: LessonState = { presentation: null, problem: null, asOf: null };
  * A class in session (StudentHome's live card): the ring, the share of the session left; the name
  * over its teacher and "in class now", right under it as the board renders it; the time left on
  * this computer's clock to the server's bell, the bell under it; then Open the lesson, to its page
- * (W4), and the student's own phone, from the lesson's own read, as the lesson page reads it, never
+ * (W4), none with lessons off (LO1), and the student's own phone, from the lesson's own read, as
+ * the lesson page reads it, never
  * a one-time `/v1/me` (decision 13: never greener than the teacher's grid), its states as
  * StudentChipStates draws them (drawn first); while its reads fail before one answers, Checking…
  * over the lesson page's can't-reach line (StudentChipUnreached, drawn first). A read saying the
@@ -66,9 +68,11 @@ function LiveCard({ live, onGone }: { live: InSession; onGone: () => void }) {
         now={now}
       />
       <div className="flex flex-wrap items-center gap-2.5">
-        <Link href={`/lessons/${live.id}/${sessionId}`} className={buttonClass('primary')}>
-          Open the lesson
-        </Link>
+        {lessonsOn() ? (
+          <Link href={`/lessons/${live.id}/${sessionId}`} className={buttonClass('primary')}>
+            Open the lesson
+          </Link>
+        ) : null}
         <YourPhone chip={phoneChip(lesson, new Date(now))} asOf={lesson.asOf} className="ml-auto" />
       </div>
       {unreached(lesson) ? <CantReach /> : null}
@@ -102,7 +106,8 @@ function ClassRows({ classes }: { classes: StudentClass[] }) {
 }
 
 /**
- * A student's home (W3; StudentHome, StudentHomeEmpty): each class in session on a live card, then
+ * A student's home (W3; StudentHome, StudentHomeEmpty): its title, over the line on slides and
+ * questions only while lessons are on (LO1); each class in session on a live card, then
  * the rest, under "Other classes" only beside a live card; with none yet, the empty card and a
  * teacher's way to the invite page (decision 13). `failed`: the account's last read failed, said as
  * StudentStates draws it, Try again reading it again (`onRefresh`). At its bell by this computer's
@@ -158,9 +163,11 @@ export function StudentHome({
     <div className="flex flex-col gap-5.5">
       <div>
         <h1 className="text-page-title">Your classes</h1>
-        <p className="mt-0.5 text-meta text-text-secondary">
-          Your teacher&apos;s slides and questions show up here during class.
-        </p>
+        {lessonsOn() ? (
+          <p className="mt-0.5 text-meta text-text-secondary">
+            Your teacher&apos;s slides and questions show up here during class.
+          </p>
+        ) : null}
       </div>
 
       {failed ? (

@@ -16,6 +16,7 @@ import { NAV_LINK } from '@/components/text-link';
 import { TryAgain } from '@/components/try-again';
 import { reasonWords } from '@/components/unlock-popups';
 import { getAccessToken } from '@/lib/auth';
+import { lessonsOn } from '@/lib/lessons';
 import { nameOf, sessionWhen } from '@/lib/recap';
 import {
   readSessionPage,
@@ -30,7 +31,7 @@ import { useApi } from '@/lib/use-api';
  * A session's report on its own page (PV14): read as it opens, and again by Try again, its class
  * named as the shell's one read of the account names it (none when the class isn't the teacher's).
  * Its questions (L7c) are read beside it, and again by the page's Try again or the card's own, each
- * failure said until its read again answers (ReportRetryStates).
+ * failure said until its read again answers (ReportRetryStates); with lessons off (LO1), never.
  */
 export function SessionReportPage({ classId, sessionId }: { classId: string; sessionId: string }) {
   const api = useApi();
@@ -57,9 +58,10 @@ export function SessionReportPage({ classId, sessionId }: { classId: string; ses
 
   // The Questions card's own read, at once with the page's, and again by either Try again: its
   // failure is the card's alone, and only the newest read's answer is drawn, never a slow one's
-  // over a read since (santa's review).
+  // over a read since (santa's review). None with lessons off (LO1), where the card is gone.
   const asked = useRef(0);
   const readQuestions = useCallback(async () => {
+    if (!lessonsOn()) return;
     const mine = ++asked.current;
     const next = await readSessionQuestions(api, classId, sessionId);
     if (asked.current === mine) setQuestions(next);
@@ -92,7 +94,8 @@ export function SessionReportPage({ classId, sessionId }: { classId: string; ses
  * "Couldn't load this session."; ReportPageStates and ReportPhone, intermediate states drawn on the
  * canvas first): the way back to Reports with its class picked, then the session's day over its
  * times, its recap card ("This session", the class page's recap), its Unlocks table, none when
- * there were none, as the card says, and its Questions card (L7c), none when it asked none.
+ * there were none, as the card says, and its Questions card (L7c), none when it asked none, nor
+ * with lessons off (LO1).
  */
 export function SessionReport({
   classId,
@@ -138,7 +141,9 @@ export function SessionReport({
       ) : (
         <>
           <Report page={page} />
-          <ReportQuestions questions={questions} onRetry={onRetryQuestions} />
+          {lessonsOn() ? (
+            <ReportQuestions questions={questions} onRetry={onRetryQuestions} />
+          ) : null}
         </>
       )}
     </div>

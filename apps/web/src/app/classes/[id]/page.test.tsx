@@ -1,5 +1,14 @@
 // @vitest-environment jsdom
-import type { ClassDetail, FeedEvent, RosterResponse, SessionSnapshot } from '@bali/shared';
+import type {
+  ClassDetail,
+  Deck,
+  FeedEvent,
+  QuestionResults,
+  RosterResponse,
+  SessionPresentation,
+  SessionSnapshot,
+  TeacherQuestion,
+} from '@bali/shared';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -82,6 +91,15 @@ const bali = vi.hoisted(() => {
    * Start's answer waits for the test to give it (`starts`); and an extend's (`extending`).
    */
   const now = { running: true, holdStart: false, holdExtend: false };
+  /**
+   * What the session has open, as its read says it (L7, M6): a question and a slide, none unless a
+   * test says so; and the teacher's decks, as `GET /v1/decks` lists them.
+   */
+  const lesson = {
+    question: null as TeacherQuestion | null,
+    presentation: null as SessionPresentation | null,
+    decks: [] as Deck[],
+  };
   const starts: (() => void)[] = [];
   const answer = (method: string, path: string): [number, unknown] => {
     if (method === 'GET' && path === `/v1/classes/${CLASS}`) {
@@ -92,7 +110,25 @@ const bali = vi.hoisted(() => {
       return [201, { outcome: 'created', session: snapshot.session, armedConverted: 0 }];
     }
     if (method === 'GET' && path === `/v1/classes/${CLASS}/roster`) return [200, roster];
-    if (method === 'GET' && path === `/v1/sessions/${SESSION}`) return [200, snapshot];
+    if (method === 'GET' && path === `/v1/sessions/${SESSION}`) {
+      return [200, { ...snapshot, question: lesson.question, presentation: lesson.presentation }];
+    }
+    // The live lesson's own reads (L7, M6): the open question's totals, none answered yet; the
+    // teacher's decks; and their questions, which the side panel lists.
+    const q = lesson.question;
+    if (method === 'GET' && q && path === `/v1/questions/${q.id}/results`) {
+      const results: QuestionResults = {
+        answered: 0,
+        eligible: 1,
+        open: q.open,
+        correctOption: q.correctOption,
+        revealed: q.revealed,
+        counts: null,
+      };
+      return [200, results];
+    }
+    if (method === 'GET' && path === '/v1/decks') return [200, { decks: lesson.decks }];
+    if (method === 'GET' && path === '/v1/saved-questions') return [200, { savedQuestions: [] }];
     if (method === 'POST' && path === `/v1/sessions/${SESSION}/extend`) return [409, tooLong];
     // The student panel's read of the session's moments (PV11a): none yet.
     const moments = new RegExp(`^/v1/sessions/${SESSION}/events\\?after=(\\d+)$`).exec(path);
@@ -149,6 +185,7 @@ const bali = vi.hoisted(() => {
     SESSION,
     endsAt,
     now,
+    lesson,
     starts,
     sent,
     unexpected,
@@ -181,6 +218,21 @@ vi.mock('@/lib/sse-client', () => ({
   },
 }));
 vi.mock('@/lib/monitoring', () => ({ captureApiFailure: vi.fn() }));
+// A slide's deck never finishes loading here, so its frame says so and draws nothing: loading and
+// drawing one are `deck-pdf`'s own tests' and `slide-card`'s.
+vi.mock('@/lib/deck-pdf', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/deck-pdf')>()),
+  loadDeck: () => new Promise(() => undefined),
+}));
+
+/** The browser's ResizeObserver, which jsdom lacks: it lays nothing out, so it reports no size. */
+class NoLayout {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+beforeAll(() => vi.stubGlobal('ResizeObserver', NoLayout));
+afterAll(() => vi.unstubAllGlobals());
 
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -204,6 +256,10 @@ afterEach(() => {
   bali.now.running = true;
   bali.now.holdStart = false;
   bali.now.holdExtend = false;
+  bali.lesson.question = null;
+  bali.lesson.presentation = null;
+  bali.lesson.decks = [];
+  vi.unstubAllEnvs();
   bali.starts.length = 0;
   bali.sent.length = 0;
   bali.unexpected.length = 0;
@@ -851,4 +907,229 @@ describe('End session asks first, in a dialog (GA6)', () => {
       expect(endsSent()).toEqual([]);
     });
   }
+});
+
+/*
+ * The live lesson on the class page (L7, M6) as a teacher meets it, and the lessons switch (LO1;
+ * ARCHITECTURE, Web portal, decision 8). With lessons on: the Questions and slides card between
+ * the counts and the grid, a question asked in it as the stream names it, the slide card in its
+ * place while a slide shows and no question does, the question first; in Present the question, or
+ * else the slide, in the tiles' place, the grid kept underneath with its one stream, never the
+ * card or a side panel. With lessons off: none of it, and nothing of a lesson read, a question or a
+ * slide left open before it went off included; Present shows the room. Converted from the source
+ * text of `app/present.test.ts` and `components/question-card.test.ts` (LO1).
+ */
+describe('the live lesson on the class page, lessons on and off (L7, M6; LO1)', () => {
+  const QUESTION: TeacherQuestion = {
+    id: '019a0000-0000-7000-8000-00000000a001',
+    prompt: 'Which value of x solves x² − 5x + 6 = 0?',
+    options: ['x = 1', 'x = 2', 'x = 4', 'x = 6'],
+    correctOption: 1,
+    revealed: false,
+    open: true,
+  };
+  const DECK: Deck = {
+    id: '019a0000-0000-7000-8000-00000000d001',
+    title: 'Factoring quadratics',
+    status: 'ready',
+    bytes: 1_048_576,
+    sha256: 'a'.repeat(64),
+    pageCount: 12,
+    rejection: null,
+    createdAt: '2026-10-06T15:00:00.000Z',
+  };
+  /** Its first page, shown by the slide change `SHOWN`. */
+  const SHOWN = '019a0000-0000-7000-8000-00000000e001';
+  const SLIDE = { deckId: DECK.id, sha256: DECK.sha256, page: 1, pageCount: 12 };
+
+  /** The stream's word of a lesson's change, its `seq` past the read's newest (4). */
+  const said = (seq: number, type: 'question_opened' | 'slide_shown', payload: object) => ({
+    seq,
+    eventId: `019a0000-0000-7000-8000-00000000e${String(seq).padStart(3, '0')}`,
+    type,
+    userId: null,
+    occurredAt: new Date().toISOString(),
+    payload,
+  });
+  const bring = (e: FeedEvent) =>
+    act(async () => {
+      bali.streams[0]?.onEvent(e);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+  /** Every answer the page has asked for so far, in and drawn. */
+  const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+
+  /** The page live, its reads in and its stream open, Present on or off as this tab left it. */
+  async function live(present = false) {
+    if (present) sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
+    const user = userEvent.setup();
+    render(
+      <main>
+        <ClassDetailPage />
+      </main>,
+    );
+    await screen.findByRole('heading', { level: 1, name: 'Biology, period 3' });
+    await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
+    await settle();
+    return user;
+  }
+  const present = () => screen.getByRole('button', { name: 'Present' });
+  const counts = () => screen.queryByRole('list', { name: 'The class right now' });
+  const theCard = () => screen.queryByRole('region', { name: 'Questions and slides' });
+  /** The session's reads: the grid's snapshot, and the lesson's of what it has open. */
+  const sessionReads = () =>
+    bali.sent.filter(
+      ({ method, path }) => method === 'GET' && path === `/v1/sessions/${bali.SESSION}`,
+    ).length;
+
+  describe('with lessons on', () => {
+    it('shows the Questions and slides card between the counts and the grid, and the question the stream names in it (L7)', async () => {
+      await live();
+      const card = theCard();
+      const tile = screen.getByRole('button', { name: /^Ana Rodríguez/ });
+      expect(counts()?.compareDocumentPosition(card as Node)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      expect(card?.compareDocumentPosition(tile)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      // The grid's read of the session, and the lesson's for what it has open: nothing yet.
+      expect(sessionReads()).toBe(2);
+
+      // Asked from another tab: the stream names it, and the page reads the session for its words.
+      bali.lesson.question = QUESTION;
+      await bring(said(5, 'question_opened', { question_id: QUESTION.id }));
+      expect(await screen.findByRole('heading', { name: QUESTION.prompt })).toBeTruthy();
+      expect(screen.getByText('Question · open')).toBeTruthy();
+      expect(theCard()).toBeNull();
+      expect(sessionReads()).toBe(3);
+      // Its totals, read once it shows: none answered yet, of everyone who could.
+      expect(await screen.findByText('of 1 answered')).toBeTruthy();
+      expect(bali.unexpected).toEqual([]);
+    });
+
+    it('in Present, shows the question in the tiles’ place, the grid kept underneath, never the class page’s card (L7, part 2; PresentQuestion)', async () => {
+      bali.lesson.question = QUESTION;
+      const user = await live(true);
+      const shown = await screen.findByRole('region', { name: QUESTION.prompt });
+      expect(within(shown).getByText('Question')).toBeTruthy();
+      expect(within(shown).getByText('Answer in Bali on your phone.')).toBeTruthy();
+      // In the tiles' place: no tile, no counts' bar, no card of the class page's.
+      expect(screen.queryByText('Ana Rodríguez')).toBeNull();
+      expect(counts()).toBeNull();
+      expect(screen.queryByText('Question · open')).toBeNull();
+
+      // Out of Present: the card holds the question, the tiles are back, the grid never reopened.
+      await user.click(present());
+      expect(screen.getByText('Question · open')).toBeTruthy();
+      expect(screen.getByText('Ana Rodríguez')).toBeTruthy();
+      expect(bali.streams).toHaveLength(1);
+      expect(bali.unexpected).toEqual([]);
+    });
+
+    it('turns Present on and off with the grid kept, one stream throughout, a side panel open only out of Present (PV9; L7-1b)', async () => {
+      const user = await live();
+      await user.click(screen.getByRole('button', { name: 'Show slides' }));
+      expect(await screen.findByRole('complementary', { name: 'Show slides' })).toBeTruthy();
+
+      await user.click(present());
+      // The projector: the room, never the teacher's panel or the class page's card.
+      expect(present().getAttribute('aria-pressed')).toBe('true');
+      expect(screen.queryByRole('complementary')).toBeNull();
+      expect(theCard()).toBeNull();
+      expect(screen.getByText('Ana Rodríguez')).toBeTruthy();
+      expect(counts()).not.toBeNull();
+
+      await user.click(present());
+      expect(screen.getByRole('complementary', { name: 'Show slides' })).toBeTruthy();
+      expect(theCard()).not.toBeNull();
+      expect(bali.streams).toHaveLength(1);
+      expect(bali.unexpected).toEqual([]);
+    });
+
+    it('shows the slide card in the question card’s place while a slide shows, the stream’s turn reaching it; in Present the slide in the tiles’ place (M6)', async () => {
+      bali.lesson.decks = [DECK];
+      bali.lesson.presentation = { slide: SLIDE, eventId: SHOWN };
+      const user = await live();
+      const card = await screen.findByRole('region', { name: DECK.title });
+      expect(within(card).getByText('Slides · showing')).toBeTruthy();
+      const page = () => within(card).getByText('of 12').previousElementSibling?.textContent;
+      expect(page()).toBe('1');
+      expect(theCard()).toBeNull();
+      // Its Ask a question opens the side panel, which it then controls.
+      const ask = within(card).getByRole('button', { name: 'Ask a question' });
+      await user.click(ask);
+      expect(ask.getAttribute('aria-expanded')).toBe('true');
+      expect(await screen.findByRole('complementary', { name: 'Ask a question' })).toBeTruthy();
+
+      // Another tab turns the page: the stream says so, and the card follows.
+      await bring(said(5, 'slide_shown', { deck_id: DECK.id, page: 2 }));
+      expect(page()).toBe('2');
+
+      // In Present: the slide in the tiles' place, its title and page under it; no panel there.
+      await user.click(present());
+      expect(screen.getByRole('region', { name: `${DECK.title} · 2 of 12` })).toBeTruthy();
+      expect(screen.queryByText('Slides · showing')).toBeNull();
+      expect(screen.queryByText('Ana Rodríguez')).toBeNull();
+      expect(screen.queryByRole('complementary')).toBeNull();
+      expect(bali.streams).toHaveLength(1);
+      expect(bali.unexpected).toEqual([]);
+    });
+
+    it('shows the question, never the slide, while both show, on the class page and in Present: the question first (the conductor’s call, 2026-10-16)', async () => {
+      bali.lesson.question = QUESTION;
+      bali.lesson.decks = [DECK];
+      bali.lesson.presentation = { slide: SLIDE, eventId: SHOWN };
+      const user = await live();
+      expect(await screen.findByText('Question · open')).toBeTruthy();
+      expect(screen.queryByText('Slides · showing')).toBeNull();
+      await user.click(present());
+      expect(screen.getByText('Answer in Bali on your phone.')).toBeTruthy();
+      expect(screen.queryByRole('region', { name: `${DECK.title} · 1 of 12` })).toBeNull();
+    });
+  });
+
+  describe('with lessons off (LO1)', () => {
+    it('shows no Questions and slides card and none of its controls: the counts, then the room', async () => {
+      vi.stubEnv('NEXT_PUBLIC_LESSONS', 'off');
+      await live();
+      expect(theCard()).toBeNull();
+      for (const name of ['Ask a question', 'Show slides']) {
+        expect(screen.queryByRole('button', { name }), name).toBeNull();
+      }
+      for (const name of ['+5 min', '+10 min', 'End session', 'Present']) {
+        expect(screen.getByRole('button', { name }), name).toBeTruthy();
+      }
+      // Nothing between the counts' row and the grid.
+      const tile = screen.getByRole('button', { name: /^Ana Rodríguez/ });
+      expect(counts()?.parentElement?.nextElementSibling?.contains(tile)).toBe(true);
+      expect(bali.unexpected).toEqual([]);
+    });
+
+    it('reads nothing of a lesson and shows none, a question and a slide left open before it went off included, in Present too', async () => {
+      vi.stubEnv('NEXT_PUBLIC_LESSONS', 'off');
+      bali.lesson.question = QUESTION;
+      bali.lesson.decks = [DECK];
+      bali.lesson.presentation = { slide: SLIDE, eventId: SHOWN };
+      const user = await live(true);
+      // Present opens on the room, the counts over it: no question or slide in the tiles' place.
+      expect(screen.getByText('Ana Rodríguez')).toBeTruthy();
+      expect(counts()).not.toBeNull();
+      expect(screen.queryByText(QUESTION.prompt)).toBeNull();
+      expect(screen.queryByText(/of 12/)).toBeNull();
+
+      // The stream names a question and a slide change: neither is read, nor shown.
+      await bring(said(5, 'question_opened', { question_id: QUESTION.id }));
+      await bring(said(6, 'slide_shown', { deck_id: DECK.id, page: 2 }));
+      await user.click(present());
+      expect(screen.queryByText(QUESTION.prompt)).toBeNull();
+      expect(screen.queryByText('Slides · showing')).toBeNull();
+      expect(theCard()).toBeNull();
+      // The session read once, the grid's own; no question's totals, decks or questions asked.
+      expect(sessionReads()).toBe(1);
+      expect(
+        bali.sent.filter(({ path }) => /^\/v1\/(questions|decks|saved-questions)\b/.test(path)),
+      ).toEqual([]);
+      expect(bali.streams).toHaveLength(1);
+      expect(bali.unexpected).toEqual([]);
+    });
+  });
 });

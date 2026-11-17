@@ -33,6 +33,7 @@ import { land, TryAgain } from '@/components/try-again';
 import { SAVE_TIMEOUT_MS } from '@/lib/api-client';
 import { getAccessToken } from '@/lib/auth';
 import { errText, NOT_A_SESSION_LENGTH, SESSION_ALREADY_RUNNING } from '@/lib/errors';
+import { lessonsOn } from '@/lib/lessons';
 import { failureOf, type QuestionDraft } from '@/lib/live-question';
 import {
   DEFAULT_MINUTES,
@@ -97,7 +98,8 @@ const students = (count: number) => `${count} ${count === 1 ? 'student' : 'stude
  * screen; a question there in the grid's place, totals only (L7, part 2; PresentQuestion,
  * PresentAnswer), closed and put away there too (L7, part 3; PresentQuestionControls,
  * PresentAnswerControls); after the bell there "Class is over" alone (PresentEnded, as PV1
- * approved), the figures left to the recap. Each failure is said where it happened. It sits in the
+ * approved), the figures left to the recap. With lessons off (LO1), no question or slide, on the
+ * page or in Present. Each failure is said where it happened. It sits in the
  * shell's frame beside the side menu (PV5), which sets its width and gutters; in Present the shell
  * draws neither, and the page sets its own (`PRESENT_PAGE`).
  */
@@ -185,15 +187,21 @@ export default function ClassDetailPage() {
   // The live question (L7): its card over the grid, and asking one in the side panel, where a
   // student's panel shows: one of the teacher's questions picked (L7b, part 2; LessonAsk), or one
   // written there (LessonWrite), what is written kept until it is asked or cancelled. A new session
-  // starts with neither.
+  // starts with neither. With lessons off (LO1) neither hook follows the session, so nothing of a
+  // lesson is read, its card is gone, and Present always shows the room.
+  const lessons = lessonsOn();
   const live = klass !== null && grid !== null && !grid.over;
   const { lesson, onEvent, ask, opening, forgetAsk, snapshot, reread } = useLiveQuestion(
-    live ? grid.id : null,
+    live && lessons ? grid.id : null,
   );
   // What the session shows (M6, part 2b): from the question's read of the session, the stream and
   // this tab's own changes, its card in the question card's place while no question shows, the
   // question first (the conductor's call, 2026-10-16), the slide card back after Done.
-  const { slides, onEvent: onSlideEvent } = useSlide(live ? grid.id : null, snapshot, reread);
+  const { slides, onEvent: onSlideEvent } = useSlide(
+    live && lessons ? grid.id : null,
+    snapshot,
+    reread,
+  );
   const onLessonEvent = useCallback(
     (e: FeedEvent) => {
       onEvent(e);
@@ -705,9 +713,9 @@ export default function ClassDetailPage() {
             {present ? null : presentToggle(true)}
           </div>
         )}
-        {/* The live question between the counts and the grid (LessonClass), never in Present; the
-            slide shown in its place while no question shows (LessonSlide). */}
-        {present ? null : lesson.question === null && slides.slide !== null ? (
+        {/* The live question between the counts and the grid (LessonClass), never in Present, nor
+            with lessons off; the slide shown in its place while no question shows (LessonSlide). */}
+        {present || !lessons ? null : lesson.question === null && slides.slide !== null ? (
           <SlideCard
             id={id}
             lesson={slides}
