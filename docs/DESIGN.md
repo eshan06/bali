@@ -64,7 +64,9 @@ screen designs win over both for the screens they draw: D1 for the student app
 question, the intro, the gap's fallback, Your name and Home in no class (the owner, 2026-10-06
 and 2026-10-07; drawn in D1's look), with a teacher's account's screen drawn there as intermediate
 states of sign-in (its Teacher row, 2026-11-07), and for
-the portal and the student web the canvas below. The
+the portal and the student web the canvases below: the lock-only canvas, since
+2026-11-16, for the pages it draws, each once its step lands, and v2's for the
+rest. The
 [Bali sign-in redesign](https://claude.ai/artifact/XJomxBFajxnK5yHjEC32HB) (the owner, 2026-11-12)
 wins over those two for the app's Sign in screen and the portal's sign-in page, each opening
 Cognito's managed login: both are built from it (2026-11-12); its boards of AWS's page draw
@@ -73,7 +75,32 @@ it is the owner's call, never a side effect of a PR: every user-facing screen
 is designed in Claude Design and approved by the owner before it is built
 (CLAUDE.md, Working rules).
 
-**The portal's approved design** (the owner, 2026-10-12; `docs/DECISIONS.md`):
+**The teacher portal's approved design since 2026-11-16** (the owner's
+approval; `docs/DECISIONS.md`, 2026-11-16):
+[Bali portal, lock only](https://claude.ai/artifact/6edxfannfGQKbSnrZkyXC2),
+version 27, Bali as a phone lock with no questions or slides. Its boards
+(`project/*.dc.html`): Main and HomeIdle (Home, one page for the classes, with a
+class live and with none), HomeStates (Home's in-between states, and Reports
+with nothing yet), ClassPage, ClassStates and ClassFlows (a
+class before it starts, and the smaller flows: New class, a class just made, New
+code, Your block, Remove a lost block), ClassLive, LiveStates, ClassStudent and
+PhoneLive (a class live), ClassEnded and ClassEndedOpen (after the bell),
+Reports, Present, StudentWeb (a student's home with lessons off) and PhonePages
+(on a phone); ClassBefore is the old page of a class before it starts, kept for
+comparison and never built. Its look is the canvas's `project/lock.css` (§1, The
+lock-only look). It is built in PLAN's Lock-only portal steps, each teacher page
+keeping v2's look until its step lands. Sign-in, the invite page and Help are not
+redrawn: they keep today's approved designs and words, the sign-in redesign's for
+sign-in and v2's boards for the other two. Its teacher pages draw no lesson
+pieces, so a teacher page rebuilt from it shows none whichever way the lessons
+switch is set (ARCHITECTURE, Web portal, decision 8); fitting them into its
+pages, to turn lessons back on, takes one design pass and one step. An
+intermediate state of one of its screens that no board draws is drawn on this
+canvas first, as below.
+
+**v2's canvas, the portal's approved design before the lock-only canvas** (the
+owner, 2026-10-12; `docs/DECISIONS.md`), and still the design of what that
+canvas doesn't redraw:
 [Bali portal in v2's look](https://claude.ai/artifact/PxWUcuMvv2CGngMqAtqvq4),
 53 boards (`project/*.dc.html`) and its look, `project/v2.css`, built on the
 Bali Design System's tokens: Home, Classes, a class (before a session, live,
@@ -589,6 +616,21 @@ redesign's board (the owner's approval, 2026-11-12), built as drawn the same way
 semibold; the radius `sign-in` (28: the card); the shadow `shadow-sign-in` (0 8px 24px, the
 shadows' warm black at 6 %: the card's); the colour `art-panel` (green-50: the art's panel); and
 `Button`'s `size="pill"` (52 px, `radius-full`, 24 px in, `button-lg`: its Sign in).
+
+**The lock-only look, for the teacher's pages** (the owner's approval,
+2026-11-16; Sources): the lock-only canvas's `project/lock.css`, as its boards
+draw it, light only. It is drawn on the Bali Design System's tokens, in
+Instrument Sans (JetBrains Mono for codes), with hallmark's rules (no eyebrows,
+no tracked capitals, no dotted meta lines, no cards on cards) and Emil
+Kowalski's motion (a press scales to 0.97, the student panel slides in on a
+drawer curve, nothing moves for show, and nothing moves under reduced motion).
+A top bar holds Classes, Reports, Help and the account in place of the side
+menu, the live class riding in it on every other page, and Home and Classes are
+one page. It is built with the portal's own tokens and components, never by
+copying `lock.css`: a value it draws that the tokens lack joins as a named
+portal token that `tokens.test.ts` pins, as v2's did (Its call). Each teacher
+page keeps v2's look, above, until its LO step lands; sign-in, the invite page
+and Help keep theirs.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the

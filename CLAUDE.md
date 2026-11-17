@@ -63,7 +63,17 @@ Applies to anything: a new phase, a new feature, a fix the owner asks for.
    approve a plan. **One step, one fresh worker, one PR:** the planning
    session hands each step to a new worker sub-agent, one at a time, and never
    writes code itself (the procedure is the last section of
-   `.claude/commands/plan.md`). Steps 3–6 are the worker's job; a trivial
+   `.claude/commands/plan.md`). It may run **two workers at once**, never
+   more (the owner, 2026-11-16), only on steps whose own files don't overlap
+   (a phase's lanes), each in its own worktree: each step's PLAN.md line is
+   written up front, and a worker changes only its own line; when the other
+   lane's PR merges, a worker brings its branch up to date with `main` and
+   pushes (`main` requires it), and a conflict on that catch-up in a file
+   both lanes edit (`docs/DECISIONS.md`'s entries, a shared list such as
+   `source-text-tests.test.ts`'s) keeps both sides' changes. Such a phase has
+   a tracker issue and an issue per step: a worker comments on its issue when
+   it starts and if it parks, and its PR closes the issue. Every check and
+   both reviewers stay. Steps 3–6 are the worker's job; a trivial
    task with no plan is done by the session itself. Message the
    owner only for: parked steps, device checkpoints (anything needing a
    physical iPhone), genuine scope or architecture decisions the docs don't
