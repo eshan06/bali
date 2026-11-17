@@ -17,12 +17,13 @@ import {
 } from './unlock-popups';
 
 /*
- * The unlock pop-ups (PV10; ClassUnlock, ClassUnlocks, placed as GA2's boards draw them): an unlock
- * the stream brings opens one, newest on top, beside its tile's pulse, and it stays until it is
- * closed; never on the projector. An unlock is the one event a teacher must never miss: no pop-up
- * swallows or hides another, and one already shown never opens again when the stream replays its
- * unlock. Driven here in a page (jsdom, Testing Library: the owner's decision of 2026-10-22); how
- * the class page places them, over the grid alone, is its own test (`app/classes/[id]/page.test.tsx`).
+ * The unlock pop-ups (PV10, ClassUnlock; in the lock-only look since LO6, ClassLive, LiveStates' An
+ * unlock lands, LiveListStates): an unlock the stream brings opens one, newest on top, beside its
+ * tile's pulse, and it stays until it is closed; never on the projector. An unlock is the one event
+ * a teacher must never miss: no pop-up swallows or hides another, and one already shown never opens
+ * again when the stream replays its unlock. Driven here in a page (jsdom, Testing Library: the
+ * owner's decision of 2026-10-22); how the class page places them, over the room alone, is its own
+ * test (`app/classes/[id]/page.test.tsx`).
  */
 
 afterEach(() => {
@@ -152,13 +153,8 @@ describe('what the stream tells the pop-ups', () => {
 
 /** An element's classes. */
 const classes = (el: Element | null | undefined) => [...(el?.classList ?? [])];
-/** What an element says, each of its parts a line of its own; the no-break spaces kept. */
-const says = (el: Element) =>
-  el.children.length === 0
-    ? (el.textContent ?? '')
-    : Array.from(el.children, (part) => part.textContent ?? '').join('\n');
 
-describe('a pop-up, as ClassUnlock draws it', () => {
+describe('a pop-up, as ClassLive draws it', () => {
   const show = (
     unlocks: Unlock[],
     students: Students = STUDENTS,
@@ -189,12 +185,24 @@ describe('a pop-up, as ClassUnlock draws it', () => {
   it('says who used Emergency Unlock, their reason and when, as an alert a screen reader says', () => {
     show([unlock('e1')]);
     const alert = screen.getByRole('alert');
-    expect(says(alert)).toBe(`Ethan Park used Emergency Unlock\nNurse\u00a0· ${bellTime(AT)}`);
-    // The title 15/20 semibold, the line 13/18 in the secondary ink, 2 px under it.
     const [title, line] = Array.from(alert.children);
+    expect(title?.textContent).toBe('Ethan Park used Emergency Unlock');
+    // The reason and the time apart, 12 px between them and no dot (lock.css's `.pp-why`).
+    expect(Array.from(line?.children ?? [], (part) => part.textContent)).toEqual([
+      'Nurse',
+      bellTime(AT),
+    ]);
+    // The title 15/20 semibold, the line 13.5/19 in the secondary ink, 2 px under it.
     expect(title?.id).toBe('unlock-e1');
     expect(classes(title)).toEqual(['text-tile-name', 'wrap-break-word']);
-    expect(classes(line)).toEqual(['mt-0.5', 'text-caption', 'text-text-secondary']);
+    expect(classes(line)).toEqual([
+      'mt-0.5',
+      'flex',
+      'flex-wrap',
+      'gap-x-3',
+      'text-meta',
+      'text-text-secondary',
+    ]);
   });
 
   it('names the student as their tile does now: no name, or not on the grid yet, by their id', () => {
@@ -213,13 +221,15 @@ describe('a pop-up, as ClassUnlock draws it', () => {
   });
 
   it('says each reason in the grid’s own words, and none as the recap does', () => {
+    /** The reason and the time, as the pop-up's line says them. */
     const line = (reason: UnlockReason | null) => {
       show([unlock('e1', { reason })]);
-      const [, said = ''] = says(screen.getByRole('alert')).split('\n');
+      const said = screen.getByRole('alert').lastElementChild;
+      const parts = Array.from(said?.children ?? [], (part) => part.textContent);
       cleanup();
-      return said;
+      return parts;
     };
-    expect(line(null)).toBe(`No reason given\u00a0· ${bellTime(AT)}`);
+    expect(line(null)).toEqual(['No reason given', bellTime(AT)]);
     for (const reason of UNLOCK_REASONS) {
       const student: Student = {
         studentId: 'u1',
@@ -234,7 +244,7 @@ describe('a pop-up, as ClassUnlock draws it', () => {
       // The grid's own words for it (`unlockNote`), the class page's tiles' until LO5.
       const note = unlockNote(student, 'unlocked') ?? '';
       const said = note.charAt(0).toUpperCase() + note.slice(1);
-      expect(line(reason), reason).toBe(`${said}${String.fromCharCode(0xa0)}· ${bellTime(AT)}`);
+      expect(line(reason), reason).toEqual([said, bellTime(AT)]);
     }
   });
 
@@ -268,9 +278,9 @@ describe('a pop-up, as ClassUnlock draws it', () => {
     // Close: the X, its icon alone.
     expect(classes(closeIt.querySelector('svg'))).toContain('lucide-x');
     expect(closeIt.textContent).toBe('');
-    // v2.css's `.t-act`: 13/18 semibold in orange-700, 8 px under the words.
+    // lock.css's `.pp-open`: 13.5/19 semibold in the unlock's ink, 8 px under the words.
     expect(classes(openStudent)).toEqual(
-      expect.arrayContaining(['mt-2', 'text-caption', 'font-semibold', 'text-unlock-link']),
+      expect.arrayContaining(['mt-2', 'text-meta', 'font-semibold', 'text-state-emergency-fg']),
     );
 
     await user.click(openStudent);
@@ -288,29 +298,26 @@ describe('a pop-up, as ClassUnlock draws it', () => {
     ]);
   });
 
-  it('is v2.css’s `.toast`: white, a 3 px orange top edge, 14 px corners, shadow-3, the lock in its well', () => {
+  it('is lock.css’s `.popup`: white, a strong hairline, 12 px corners, shadow-3, dropping in, the lock in its well', () => {
     show([unlock('e1')]);
     const [popup] = popups();
     expect(classes(popup)).toEqual(
       expect.arrayContaining([
         'pointer-events-auto',
         'grid',
-        'grid-cols-[36px_minmax(0,1fr)_auto]',
+        'grid-cols-[36px_minmax(0,1fr)_32px]',
         'items-start',
         'gap-3',
-        'rounded-md',
+        'rounded-frame',
         'border',
-        'border-border-default',
-        'border-t-3',
-        'border-t-unlock-edge',
+        'border-border-strong',
         'bg-surface-card',
+        'p-4',
         'shadow-3',
-        'pt-3.5',
-        'pr-2.5',
-        'pb-3.5',
-        'pl-4',
+        'pop-in',
       ]),
     );
+    expect(classes(popup)).not.toContain('border-t-unlock-edge');
     const well = popup?.firstElementChild;
     expect(classes(well)).toEqual([
       'grid',
@@ -322,20 +329,19 @@ describe('a pop-up, as ClassUnlock draws it', () => {
     ]);
     expect(classes(well?.querySelector('svg'))).toContain('lucide-lock-open');
     expect(well?.querySelector('svg')?.getAttribute('width')).toBe('18');
-    // Close 32 px, 6 px up, in the tertiary ink, grey on hover as the menu's Sign out.
+    // Close, lock.css's `.icon-btn`: 32 px in the secondary ink, grey on hover as the bar's Sign out.
     expect(classes(screen.getByRole('button', { name: /^Close / }))).toEqual(
       expect.arrayContaining([
         'size-8',
-        '-mt-1.5',
         'rounded-item',
-        'text-text-tertiary',
+        'text-text-secondary',
         'hover:bg-surface-sunken',
         'hover:text-text-primary',
       ]),
     );
   });
 
-  it('stacks several, newest on top, over the grid’s top right, in view as it scrolls (GA2)', () => {
+  it('stacks several, newest on top, over the room’s top right, in view as it scrolls (GA2)', () => {
     show([
       unlock('c'),
       unlock('b', { studentId: 'u2-0000-bbbb', reason: null }),
@@ -349,31 +355,36 @@ describe('a pop-up, as ClassUnlock draws it', () => {
     ]);
     const stack = boxes[0]?.parentElement;
     const layer = stack?.parentElement;
-    // The layer over the tiles' own box, out to the frame (36 px, 16 on a phone), from its top to
-    // its bottom: it takes no clicks but the pop-ups'.
+    // The layer over the room's own box (ClassLive's `.popups`): 12 px over its top and out 12 px
+    // past its right, inside the page's 40 px margin; on a phone 8 px over its top and no wider
+    // than the room, so none is ever cut at the window's edge (LO2's 2 px at 640 to 759 px). It
+    // takes no clicks but the pop-ups'.
     expect(classes(layer).sort()).toEqual(
       [
         'pointer-events-none',
         'absolute',
-        '-inset-x-9',
-        'inset-y-0',
+        '-top-3',
+        '-right-3',
+        'bottom-0',
+        'left-0',
         'z-20',
-        'max-sm:-inset-x-4',
+        'max-[760px]:-top-2',
+        'max-[760px]:right-0',
       ].sort(),
     );
-    // At the grid's top, no margin over it, 18 px from the frame's right, 380 px wide at most, 10 px
-    // apart; 18 px from the window's top once the grid scrolls (v2.css's `.toast`).
+    // At the layer's top right, 380 px wide at most, the room's width on a phone, 10 px apart; 18 px
+    // from the window's top once the room scrolls (GA2).
     expect(classes(stack).sort()).toEqual(
       [
         'sticky',
         'top-4.5',
-        'mr-4.5',
         'ml-auto',
         'flex',
         'w-95',
-        'max-w-[calc(100%-36px)]',
+        'max-w-full',
         'flex-col',
         'gap-2.5',
+        'max-[760px]:w-full',
       ].sort(),
     );
   });

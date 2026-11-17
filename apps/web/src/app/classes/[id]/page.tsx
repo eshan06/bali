@@ -345,6 +345,9 @@ export default function ClassDetailPage() {
   // The projector view (DESIGN.md §5), toggled in the grid's header and kept for this tab, so a
   // reload or a return from Reports comes back in it; a new tab or window opens without it.
   const [present, setPresent] = useState(false);
+  // The student a name in Home's Check on asked for (`?student=`, LO3), whose panel the live grid
+  // opens once it has them (LO6).
+  const [opening, setOpening] = useState<string | null>(null);
   // On the projector, no menu: the shell draws none while Present is on.
   usePresenting(present);
   // A teacher's Start, End, extend and Present, each counted once it has happened (A3b).
@@ -539,17 +542,24 @@ export default function ClassDetailPage() {
   // in the browser (never at render, where the server has no storage), so before the class's read
   // can show a grid or the recap; a length that isn't a preset reopens Other with it. Opened from
   // Home's Present (`?present`, Main), Present is on and kept for the tab as its toggle keeps it, and
-  // the address forgets it, so a reload or a way back opens as the tab left it.
+  // the address forgets it, so a reload or a way back opens as the tab left it. Opened from a name
+  // in Home's Check on (`?student=`, LO3), that student's panel opens once the grid has them, and the
+  // address forgets them the same way, so a reload opens the page alone.
   useEffect(() => {
     const remembered = pickFor(rememberedMinutes(classId));
     setPick(remembered.pick);
     setOther(remembered.other);
+    const asked = new URLSearchParams(window.location.search).get('student');
     const fromHome = new URLSearchParams(window.location.search).has('present');
     if (fromHome) {
       rememberPresent(classId, true);
       window.history.replaceState(null, '', `/classes/${classId}`);
     }
     setPresent(fromHome || rememberedPresent(classId));
+    if (asked !== null) {
+      setOpening(asked);
+      window.history.replaceState(null, '', `/classes/${classId}`);
+    }
   }, [classId]);
 
   // The grid says when the server marks its session over (the bell's sweep, an End from another
@@ -846,6 +856,20 @@ export default function ClassDetailPage() {
   );
   // The live grid counted, once its session's grid is read.
   const counts = grid !== null && counted?.session === grid.id ? counted.counts : null;
+  // The tab's title while the session runs (LiveStates' An unlock lands; LiveListStates): how many
+  // students to check on, before the class's name, so the count shows from another tab; nobody to
+  // check on, or the grid not read yet, the name alone. The title before it comes back as the
+  // session's live page goes.
+  const toCheck = counts === null ? 0 : counts.total - counts.counts.focused;
+  const liveName = live ? klass.name : null;
+  useEffect(() => {
+    if (liveName === null) return;
+    const was = document.title;
+    document.title = toCheck > 0 ? `(${toCheck}) ${liveName}` : liveName;
+    return () => {
+      document.title = was;
+    };
+  }, [liveName, toCheck]);
 
   // Present's line after the bell, with no session running: "28 students · no session running".
   const noSession = roster
@@ -959,8 +983,11 @@ export default function ClassDetailPage() {
         {/* Present's counts over the grid (ClassPresent), none while the question or the slide
             shows in the grid's place (PresentQuestion, PresentSlide). */}
         {present && !projected && counts ? <LiveCounts counts={counts} present /> : null}
+        {/* One grid a session: its log and its stream are that session's alone. */}
         <LiveGrid
+          key={grid.id}
           sessionId={grid.id}
+          opening={opening}
           onEnded={onEnded}
           onSession={onSession}
           onCounts={onCounts}

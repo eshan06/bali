@@ -641,12 +641,16 @@ describe('a class live, an unlock lands (GA2)', () => {
     expect(alert.textContent).toMatch(/^Ana Rodríguez used Emergency Unlock/);
     // Beside her tile's pulse (bali-softpulse), which the same live unlock starts.
     expect(anasTile().querySelector('.animate-softpulse')).not.toBeNull();
-    // The pop-ups' layer, and the positioned box it is laid over: the tiles' own.
+    // The pop-ups' layer, and the positioned box it is laid over: the tiles' own, to its foot.
     const layer = alert.closest('.absolute');
     const box = layer?.parentElement;
-    expect(layer?.classList.contains('inset-y-0')).toBe(true);
+    expect(layer?.classList.contains('bottom-0')).toBe(true);
     expect(box?.classList.contains('relative')).toBe(true);
     expect(box?.contains(anasTile())).toBe(true);
+    // Never over the session list beside the room, which keeps the unlock as a line of its own.
+    const list = screen.getByRole('complementary', { name: 'This session' });
+    expect(box?.contains(list)).toBe(false);
+    expect(within(list).getByText('Ana Rodríguez used Emergency Unlock')).toBeTruthy();
     // Every control of the header, and Check on's, is outside that box, before it: her name in
     // Check on and its Open, now she is unlocked.
     const checkOn = screen.getByRole('region', { name: '0 of 1 focused' });
@@ -668,7 +672,8 @@ describe('a class live, an unlock lands (GA2)', () => {
   it('opens none for an unlock its read already held, as the stream’s first connect replays it', async () => {
     await live();
     await bring(unlocked(4));
-    expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
+    // No pop-up, an alert: the session list keeps it as a line all the same.
+    expect(screen.queryByRole('alert')).toBeNull();
     // Her tile says Unlocked, as the replay applies it, and doesn't pulse.
     expect(anasTile().textContent).toMatch(/Unlocked/);
     expect(anasTile().querySelector('.animate-softpulse')).toBeNull();
@@ -697,8 +702,14 @@ describe('a class live, an unlock lands (GA2)', () => {
     await live();
     await bring(unlocked(5));
     await user.click(await screen.findByRole('button', { name: 'Open student' }));
-    expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(anasTile().getAttribute('aria-expanded')).toBe('true');
+    // Her panel, focus on her name, her unlock there with its reason, from the session's log.
+    const panel = screen.getByRole('complementary', { name: 'Ana Rodríguez' });
+    expect(document.activeElement).toBe(within(panel).getByRole('heading', { level: 2 }));
+    expect(within(panel).getByText('Used Emergency Unlock').textContent).toBe(
+      'Used Emergency UnlockNurse',
+    );
   });
 
   // The last one closed, nothing takes its Close's place: focus goes to the tile of the student it
@@ -714,7 +725,7 @@ describe('a class live, an unlock lands (GA2)', () => {
         close.focus();
         await user.keyboard('{Enter}');
       }
-      expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
       expect(document.activeElement).toBe(anasTile());
     });
   }
@@ -726,6 +737,98 @@ describe('a class live, an unlock lands (GA2)', () => {
     await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
     await bring(unlocked(5));
     expect(screen.queryByText(/used Emergency Unlock/)).toBeNull();
+  });
+});
+
+/*
+ * While a session runs, the tab's title counts who to check on before the class's name, so the
+ * count shows from another tab (LiveStates' An unlock lands; LiveListStates); and a name in Home's
+ * Check on (`?student=`, LO3) opens that student's panel, the address forgetting it (LO6).
+ */
+describe('a class live: the tab’s title, and a name from Home’s Check on (LO6)', () => {
+  const TITLE = 'Bali teacher portal';
+  /** The page, its grid read and its stream open. */
+  async function live() {
+    render(<ClassDetailPage />);
+    await screen.findByRole('button', { name: /^Ana Rodríguez/ });
+    await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
+  }
+  /** An event of Ana's, or the session's own, as the stream brings it: past the read's newest (4). */
+  const event = (seq: number, type: FeedEvent['type'], payload: unknown = null): FeedEvent => ({
+    seq,
+    eventId: `019a0000-0000-7000-8000-0000000002${String(seq).padStart(2, '0')}`,
+    type,
+    userId: type.startsWith('session_') ? null : 'u-ana',
+    occurredAt: new Date().toISOString(),
+    payload,
+  });
+  const bring = async (e: FeedEvent) => {
+    await act(async () => {
+      bali.streams[0]?.onEvent(e);
+      await Promise.resolve();
+    });
+  };
+  beforeEach(() => {
+    document.title = TITLE;
+  });
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('counts who to check on before the class’s name, the name alone with nobody to check on', async () => {
+    await live();
+    expect(document.title).toBe('Biology, period 3');
+    await bring(event(5, 'unlock', { reason: 'nurse' }));
+    expect(document.title).toBe('(1) Biology, period 3');
+    await bring(event(6, 'refocus'));
+    expect(document.title).toBe('Biology, period 3');
+    // The session over, the page after the bell: the title it had before.
+    await bring(event(7, 'session_ended'));
+    await vi.waitFor(() => expect(document.title).toBe(TITLE));
+  });
+
+  it('keeps the tab’s own title while no session runs', async () => {
+    bali.now.running = false;
+    render(<ClassDetailPage />);
+    await screen.findByRole('button', { name: /^Start/ });
+    expect(document.title).toBe(TITLE);
+  });
+
+  it('opens the panel of the student Home’s Check on named, focus on their name, the address forgetting them', async () => {
+    window.history.replaceState(null, '', `/classes/${bali.CLASS}?student=u-ana`);
+    await live();
+    const panel = await screen.findByRole('complementary', { name: 'Ana Rodríguez' });
+    expect(document.activeElement).toBe(within(panel).getByRole('heading', { level: 2 }));
+    expect(`${window.location.pathname}${window.location.search}`).toBe(`/classes/${bali.CLASS}`);
+    // Asked once: closed, it stays closed.
+    await userEvent
+      .setup()
+      .click(within(panel).getByRole('button', { name: "Close Ana Rodríguez's panel" }));
+    expect(screen.queryByRole('complementary', { name: 'Ana Rodríguez' })).toBeNull();
+  });
+
+  it('opens none for a name no student on the grid has, and forgets it all the same', async () => {
+    for (const asked of ['u-nobody', '__proto__', 'toString']) {
+      window.history.replaceState(null, '', `/classes/${bali.CLASS}?student=${asked}`);
+      await live();
+      // The session list alone: no student's panel.
+      expect(
+        screen.getAllByRole('complementary').map((aside) => aside.getAttribute('aria-labelledby')),
+      ).toEqual([expect.stringMatching(/-log$/)]);
+      expect(window.location.search, asked).toBe('');
+      cleanup();
+      bali.streams.length = 0;
+    }
+  });
+
+  it('opens none in Present, the projector the class can see', async () => {
+    sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
+    window.history.replaceState(null, '', `/classes/${bali.CLASS}?student=u-ana`);
+    render(<ClassDetailPage />);
+    await screen.findByText('Ana Rodríguez');
+    await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
+    expect(screen.queryByRole('complementary')).toBeNull();
+    expect(window.location.search).toBe('');
   });
 });
 

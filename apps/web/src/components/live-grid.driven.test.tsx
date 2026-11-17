@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  type FeedEvent,
   type SessionSnapshot,
   type SnapshotStudent,
   UNLOCK_REASONS,
@@ -11,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NetworkError } from '@/lib/api-client';
 import { CANT_REACH } from '@/lib/errors';
+import { bareTime } from '@/lib/recap';
 
 import { LiveGrid, LockChip } from './live-grid';
 
@@ -246,7 +248,7 @@ describe('the room on the class page (LO5; ClassLive, LiveStates’ rare tiles)'
 
   it('has no room for a class nobody has joined, Check on saying so under 0 of 0', async () => {
     await open(false, []);
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('0 of 0 focused');
+    expect(screen.getAllByRole('heading', { level: 2 })[0]?.textContent).toBe('0 of 0 focused');
     expect(screen.getByText('No students yet.')).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'Everyone' })).toBeNull();
   });
@@ -345,7 +347,7 @@ describe('the count and Check on (LO5; ClassLive, LiveStates, LiveTopStates)', (
     expect(name.getAttribute('aria-expanded')).toBe('true');
     expect(name.getAttribute('aria-controls')).toBe(panel.id);
     await user.click(within(panel).getByRole('button', { name: "Close Ethan Park's panel" }));
-    expect(screen.queryByRole('complementary')).toBeNull();
+    expect(screen.queryByRole('complementary', { name: 'Ethan Park' })).toBeNull();
     expect(document.activeElement).toBe(name);
 
     // Its Open the same, focus back on Open; a tile's own back on the tile.
@@ -366,6 +368,7 @@ describe('the count and Check on (LO5; ClassLive, LiveStates, LiveTopStates)', (
     await user.click(within(tile('Ana Rodríguez')).getByRole('button'));
     expect(screen.getByRole('complementary', { name: 'Ana Rodríguez' })).toBeTruthy();
     view.rerender(<LiveGrid sessionId="S" livePage present />);
+    // No panel, and no session list either: Present keeps v2's room until LO9.
     expect(screen.queryByRole('complementary')).toBeNull();
     // A tile alone there, never a button; no Check on, which the page draws.
     expect(screen.queryByRole('button')).toBeNull();
@@ -387,6 +390,238 @@ describe('the count and Check on (LO5; ClassLive, LiveStates, LiveTopStates)', (
     await answerRead(snapshotOf([student('Ana Rodríguez')]));
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByRole('region', { name: '1 of 1 focused' })).toBeTruthy();
+  });
+});
+
+/** An event of the session as Bali records it, `seconds` ago: Ana's, someone's, or the session's. */
+function feed(
+  seq: number,
+  type: FeedEvent['type'],
+  userId: string | null,
+  seconds: number,
+  payload: unknown = null,
+): FeedEvent {
+  return { seq, eventId: `ev-${seq}`, type, userId, occurredAt: ago(seconds), payload };
+}
+
+/** The session's log read on its way (`/events`), answered page by page, or with no answer. */
+async function answerLog(events: FeedEvent[] | 'none') {
+  await act(async () => {
+    const take = (path: string) => {
+      const read = bali.reads.find((r) => r.path === path);
+      if (!read) throw new Error(`no read of ${path} on its way`);
+      bali.reads.splice(bali.reads.indexOf(read), 1);
+      return read;
+    };
+    const first = take('/v1/sessions/S/events?after=0');
+    if (events === 'none') first.fail(new NetworkError());
+    else first.answer({ events, nextAfter: events.at(-1)?.seq ?? 0 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const last = events === 'none' ? 0 : (events.at(-1)?.seq ?? 0);
+    if (last > 0)
+      take(`/v1/sessions/S/events?after=${last}`).answer({ events: [], nextAfter: last });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+/** The stream's event, brought as the stream would bring it. */
+async function bring(e: FeedEvent) {
+  const stream = bali.streams[0] as { onEvent: (e: FeedEvent) => void } | undefined;
+  if (!stream) throw new Error('no stream');
+  await act(async () => {
+    stream.onEvent(e);
+    await Promise.resolve();
+  });
+}
+
+/** The session list's lines, as a teacher reads them: the time, then what happened. */
+const lines = () => {
+  const list = screen.getByRole('complementary', { name: 'This session' });
+  return Array.from(list.querySelectorAll('ol > li'), (li) =>
+    Array.from(li.children, (part) => part.textContent ?? '')
+      .filter(Boolean)
+      .join(' '),
+  );
+};
+const time = (seconds: number) => bareTime(Date.parse(ago(seconds)));
+
+describe('the session list (LO6; ClassLive, PhoneLive, LiveListStates)', () => {
+  const class3 = [
+    student('Ethan Park', { state: 'unlocked', unlock: unlock('Ethan Park', 'nurse') }),
+    student('Tomás Herrera', { lastSeenAt: ago(330) }),
+    student('Ana Rodríguez'),
+  ];
+
+  it('reads the session’s log once the grid is, and lists a line per moment, newest first', async () => {
+    render(<LiveGrid sessionId="S" livePage />);
+    // Nothing of the log before the grid's own read answers.
+    expect(bali.reads.map((r) => r.path)).toEqual(['/v1/sessions/S']);
+    await answerRead(snapshotOf(class3));
+    const list = screen.getByRole('complementary', { name: 'This session' });
+    expect(within(list).getByRole('heading', { level: 2 }).textContent).toBe('This session');
+    expect(within(list).getByText('Loading this session…')).toBeTruthy();
+    await answerLog([
+      feed(1, 'session_started', null, 1500),
+      feed(2, 'tap_in', 'u-Ethan Park', 1440),
+      feed(3, 'tap_in', 'u-Tomás Herrera', 1430),
+      feed(4, 'went_silent', 'u-Tomás Herrera', 240),
+      feed(5, 'unlock', 'u-Ethan Park', 60, { reason: 'nurse' }),
+    ]);
+    // Each student named as their tile names them; no tap-in, and no reason: the panel has it.
+    expect(lines()).toEqual([
+      `${time(60)} Ethan Park used Emergency Unlock`,
+      `${time(240)} Tomás Herrera went silent`,
+      `${time(1500)} Session started`,
+    ]);
+    // Its own column beside the count and the room, 340 px and 48 px off; under them under 1024 px,
+    // 40 px down, where the room would narrow to a tile or two a row, and on a phone 32 px down.
+    const grid = list.parentElement;
+    expect(Array.from(grid?.classList ?? [])).toEqual(
+      expect.arrayContaining([
+        'grid',
+        'grid-cols-[minmax(0,1fr)_340px]',
+        'gap-12',
+        'max-lg:grid-cols-1',
+        'max-[760px]:gap-8',
+        'min-[760px]:max-lg:gap-10',
+      ]),
+    );
+    expect(
+      grid?.firstElementChild?.contains(screen.getByRole('region', { name: 'Everyone' })),
+    ).toBe(true);
+  });
+
+  it('adds what the stream brings as it lands, the unlock on top, and keeps it once they are back', async () => {
+    await open(false, class3);
+    await answerLog([feed(1, 'session_started', null, 1500)]);
+    await bring(feed(13, 'unlock', 'u-Ana Rodríguez', 20, { reason: 'bathroom' }));
+    expect(lines()[0]).toBe(`${time(20)} Ana Rodríguez used Emergency Unlock`);
+    await bring(feed(14, 'refocus', 'u-Ana Rodríguez', 5));
+    expect(lines()).toEqual([
+      `${time(5)} Ana Rodríguez was back in focus`,
+      `${time(20)} Ana Rodríguez used Emergency Unlock`,
+      `${time(1500)} Session started`,
+    ]);
+    // An event the read and the stream both bring is one line.
+    await bring(feed(1, 'session_started', null, 1500));
+    expect(lines()).toHaveLength(3);
+  });
+
+  it('says a log that didn’t load, with Try again, which reads it again, focus then on the list’s title', async () => {
+    const user = userEvent.setup();
+    await open(false, class3);
+    await answerLog('none');
+    const list = screen.getByRole('complementary', { name: 'This session' });
+    expect(within(list).getByRole('alert').textContent).toBe(
+      `Couldn't load this session. ${CANT_REACH}`,
+    );
+    const again = within(list).getByRole('button', { name: 'Try again' });
+    await user.click(again);
+    // Held while it reads, its line kept.
+    expect(again.getAttribute('aria-busy')).toBe('true');
+    expect(within(list).getByRole('alert')).toBeTruthy();
+    await answerLog([feed(1, 'session_started', null, 1500)]);
+    expect(within(list).queryByRole('alert')).toBeNull();
+    expect(lines()).toEqual([`${time(1500)} Session started`]);
+    await act(() => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined))));
+    expect(document.activeElement).toBe(within(list).getByRole('heading', { level: 2 }));
+  });
+
+  it('reads no log for Home’s card, which shows no list', async () => {
+    render(
+      <LiveGrid
+        sessionId="S"
+        card={(grid) => <p>{grid.students === null ? 'unread' : 'read'}</p>}
+      />,
+    );
+    await answerRead(snapshotOf(class3));
+    expect(screen.getByText('read')).toBeTruthy();
+    expect(bali.reads.map((r) => r.path)).not.toContain('/v1/sessions/S/events?after=0');
+  });
+});
+
+describe('the student panel from the session’s log (LO6; ClassStudent)', () => {
+  it('reads no more than the list’s log: every panel waits for it, then says its student’s moments', async () => {
+    const user = userEvent.setup();
+    await open(false, [
+      student('Ethan Park', { state: 'unlocked', unlock: unlock('Ethan Park', 'nurse') }),
+      student('Ana Rodríguez'),
+    ]);
+    await user.click(within(tile('Ethan Park')).getByRole('button'));
+    const panel = screen.getByRole('complementary', { name: 'Ethan Park' });
+    expect(within(panel).getByText('Loading this session…')).toBeTruthy();
+    await answerLog([
+      feed(1, 'session_started', null, 1500),
+      feed(2, 'tap_in', 'u-Ethan Park', 1440),
+      feed(3, 'unlock', 'u-Ethan Park', 60, { reason: 'nurse' }),
+    ]);
+    expect(within(panel).getByText('Tapped in and focused')).toBeTruthy();
+    expect(within(panel).getByText('Used Emergency Unlock').textContent).toBe(
+      'Used Emergency UnlockNurse',
+    );
+    // Another student's panel reads nothing more.
+    await user.click(within(tile('Ana Rodríguez')).getByRole('button'));
+    expect(screen.getByRole('complementary', { name: 'Ana Rodríguez' })).toBeTruthy();
+    expect(bali.reads).toEqual([]);
+  });
+
+  it('marks the open student’s tile with a solid edge in the primary ink, never a ring', async () => {
+    const user = userEvent.setup();
+    await open(false, [student('Tomás Herrera', { lastSeenAt: ago(330) })]);
+    const button = within(tile('Tomás Herrera')).getByRole('button');
+    expect(Array.from(button.classList)).toEqual(
+      expect.arrayContaining(['aria-expanded:border-solid', 'aria-expanded:border-text-primary']),
+    );
+    await user.click(button);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(Array.from(tile('Tomás Herrera').classList)).toEqual(['flex', 'min-w-0']);
+  });
+
+  it('opens the student Home’s Check on named once the grid is read, once, and never in Present', async () => {
+    const view = render(<LiveGrid sessionId="S" livePage opening="u-Ana Rodríguez" />);
+    await answerRead(snapshotOf([student('Ana Rodríguez'), student('Omar Siddiqui')]));
+    const panel = screen.getByRole('complementary', { name: 'Ana Rodríguez' });
+    expect(document.activeElement).toBe(within(panel).getByRole('heading', { level: 2 }));
+    view.unmount();
+
+    for (const opening of ['u-nobody', '__proto__', 'constructor']) {
+      render(<LiveGrid sessionId="S" livePage opening={opening} />);
+      await answerRead(snapshotOf([student('Ana Rodríguez')]));
+      expect(screen.queryByRole('complementary', { name: /Ana|nobody/ }), opening).toBeNull();
+      cleanup();
+      bali.reads.length = 0;
+    }
+
+    render(<LiveGrid sessionId="S" livePage present opening="u-Ana Rodríguez" />);
+    await answerRead(snapshotOf([student('Ana Rodríguez')]));
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
+});
+
+describe('Check on as an unlock lands (LO6; LiveStates’ An unlock lands)', () => {
+  it('glows the unlock’s row twice with its tile, then holds it still', async () => {
+    await open(false, [student('Ana Rodríguez'), student('Omar Siddiqui')]);
+    await bring(feed(13, 'unlock', 'u-Ana Rodríguez', 1, { reason: 'nurse' }));
+    const row = screen.getByText('Check on 1').nextElementSibling?.firstElementChild;
+    const glow = row?.querySelector('.animate-softpulse');
+    expect(glow?.getAttribute('aria-hidden')).toBe('true');
+    expect(Array.from(glow?.classList ?? [])).toEqual(
+      expect.arrayContaining(['absolute', 'inset-0', 'rounded-sm', 'pointer-events-none']),
+    );
+    // Its tile's glow ends: so does the row's, from the same unlock.
+    const tileGlow = tile('Ana Rodríguez').querySelector('.animate-softpulse');
+    act(() => {
+      tileGlow?.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
+    });
+    expect(row?.querySelector('.animate-softpulse')).toBeNull();
+    // An unlock the read already held, replayed by the stream's first connect, glows nothing.
+    cleanup();
+    bali.streams.length = 0;
+    await open(false, [
+      student('Ana Rodríguez', { state: 'unlocked', unlock: unlock('Ana Rodríguez', 'nurse') }),
+    ]);
+    await bring(feed(12, 'unlock', 'u-Ana Rodríguez', 60, { reason: 'nurse' }));
+    expect(document.querySelector('.animate-softpulse')).toBeNull();
   });
 });
 

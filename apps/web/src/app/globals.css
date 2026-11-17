@@ -565,4 +565,35 @@
   --text-room-name-phone--font-weight: 600;
 }
 
+/* A time in a log, the session list's and the student panel's (LO6; lock.css's `.log .when`): a
+   size the scale lacks, pinned in tokens.test.ts with the lock-only look's others. */
+@theme {
+  --text-log-time: 13px;
+  --text-log-time--line-height: 20px;
+  --text-log-time--font-weight: 400;
+}
+
+/* The student panel sliding in on the drawer curve, 24 px over 280 ms, and an unlock's pop-up
+   dropping in 6 px over 200 ms, each as it first shows (LO6; lock.css's `.panel` and `.popup`,
+   Emil Kowalski's curves inside DESIGN.md §7's budget); nothing moves under reduced motion, the
+   base layer's rule. */
+@utility drawer-in {
+  transition:
+    transform 280ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  @starting-style {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+@utility pop-in {
+  transition:
+    transform 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    opacity 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  @starting-style {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+}
+
 /* End of lane B */

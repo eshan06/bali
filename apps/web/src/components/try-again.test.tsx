@@ -630,8 +630,9 @@ describe('every read’s Try again in the portal is this one', () => {
  * Home whole (the account's line, a live class's well, Last session, your block and Register
  * block; Classes' page went into it in LO3, and its file draws no Try again since), the live grid's
  * own line (the class page's and Present's), and the student's home; then the class page's own
- * lines (its class and roster, an extend's), the recap, the student panel, New code's Make new code,
- * Reports, a session's report and its Questions; then a close (the class page's and Present's) and
+ * lines (its class and roster, an extend's), the recap, New code's Make new code, Reports, a
+ * session's report and its Questions (the student panel's went into the live grid's `Oops` line with
+ * the session list's in LO6, so its file holds none); then a close (the class page's and Present's) and
  * the slides (the slide's line, the card's, Present's and a student's, and a slide change's, Show
  * slides' too); then the rest: the side panel's two lists and an ask (one of your questions, or one
  * written), Your questions (its list and a save) and Your slides (its list and a stopped upload),
@@ -658,7 +659,6 @@ const MOVED = [
   'components/slides.tsx',
   'components/student-home.tsx',
   'components/student-lesson.tsx',
-  'components/student-panel.tsx',
 ];
 
 /**
