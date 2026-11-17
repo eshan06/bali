@@ -20,17 +20,20 @@ a real decision? Add a dated entry at the top: what was decided and why.
   retired pages do, so New class lives on Home and nothing is reached by its address alone any more.
 
   **A class live:** the class page's own grid (its snapshot, its live feed and its 15 s read, as v2's Home card was),
-  counted "24 of 28 focused", and Check on: everyone the grid shows who isn't focused, the count the board draws (28
-  − 24 = 4), a row per state in its tile's chip and words, Silent's by its minutes, the unlocks first, then
-  protection off, Silent, Not here, Left and Unknown. The rows past the board's three states (Protection off, Left,
-  Left · unlocked or protection off, Unknown) are the conductor's call (2026-11-17), awaiting the owner's look, drawn
-  on HomeMoments: no student who needs checking drops off Home, where leaving them out would hide the red state from
-  "who to check on" while the count still counted it. They show only what the room's tiles already show, by name.
+  counted "24 of 28 focused", and Check on: the board's three states, a row each in its tile's chip and words,
+  Unlocked first, then Silent by its minutes, then Not here. **Check on's rarer rows wait for the owner:** the
+  conductor asked (2026-11-17) for a row for everyone else not focused too (Protection off, Left, Left · unlocked or
+  protection off, Unknown), so that no student who needs checking drops off Home. They would be new facts shown about
+  a student on Home, which no approved board shows there, and CLAUDE.md holds those for the owner's approval however
+  they are asked for (santa's reviewer found it), so they are drawn on HomeMoments as a proposal and not built. Until
+  the owner rules, such a student counts against the focused count ("27 of 28") and shows in the room, and an approval
+  is a small follow-up. "Everyone's focused." (LiveStates) shows only when everyone is.
   A name links to `/classes/<id>?student=<id>`: the class page can open that
-  student's record from it once LO6 (the student panel) reads it; until then it opens the class's page. Everyone
-  focused says LiveStates' "Everyone's focused."; a class with nobody enrolled ClassStates' "No students yet.".
+  student's record from it once LO6 (the student panel) reads it; until then it opens the class's page. A class with
+  nobody enrolled says ClassStates' "No students yet.".
   Loading, a read that failed, and the feed dropped (LiveStates' faded count, its line over it, a still dot where
-  LiveStates draws a spinner: nothing loops, DESIGN.md §7) are HomeMoments'. Two classes live: a well each.
+  LiveStates draws a spinner: nothing loops, DESIGN.md §7) are HomeMoments'. Two classes live: a well each. A
+  session that ends while Home is open loses its well and its row's Live at once.
 
   **Last session:** its figures counted as the recap counts them (`recapGroups`), from the recap's own three reads
   (`readSessionPage`: the report, the session's events and the roster, where v2's card read the report alone), so

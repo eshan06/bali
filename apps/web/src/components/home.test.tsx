@@ -229,8 +229,8 @@ const checks = (well: HTMLElement) =>
       ),
     );
 
-/** Monday, October 12, 2026, 2:30 PM UTC: a day the same in UTC and in the Americas. */
-const DAY = Date.parse('2026-10-12T14:30:00.000Z');
+/** Monday, October 12, 2026, 12:30 PM UTC: the same day everywhere from UTC−11 to UTC+11. */
+const DAY = Date.parse('2026-10-12T12:30:00.000Z');
 
 describe('Home’s head (Main, HomeIdle, PhonePages)', () => {
   it('is Classes, focusable for a redeem, over today’s date, with New class, which opens its dialog', async () => {
@@ -300,8 +300,8 @@ describe('Home’s failure line, another way (HomeMoments)', () => {
 
 describe('Your classes (Main, HomeIdle)', () => {
   it('lists each class once, in the account’s order: its name to its page, its students, its last session and Start…', () => {
-    const morning = '2026-10-12T13:05:00.000Z';
-    const friday = '2026-10-09T15:00:00.000Z';
+    const morning = '2026-10-12T12:05:00.000Z';
+    const friday = '2026-10-09T12:00:00.000Z';
     home(
       [
         taught('c1', 'Period 1 Biology', { last: morning }),
@@ -465,6 +465,11 @@ describe('a class live (Main; HomeMoments)', () => {
     await give('GET /v1/sessions/S', snapshot(MAIN, {}, true));
     expect(screen.queryByRole('region', { name: 'Biology, period 3' })).toBeNull();
     expect(onRead).toHaveBeenCalledOnce();
+    // Its row too, at once, before the classes are read again: Start…, not "Live until".
+    const row = screen.getAllByRole('row')[1];
+    expect(row.className).not.toContain('bg-live-fill');
+    expect(row.textContent).not.toMatch(/Live until/);
+    expect(within(row).getByRole('link', { name: 'Start…' })).toBeDefined();
     cleanup();
     bali.routes.set('GET /v1/sessions/S', () => [
       200,
@@ -551,7 +556,7 @@ describe('a live well’s rarer moments (LiveWellView; HomeMoments)', () => {
     expect(screen.queryByRole('heading', { level: 3 })).toBeNull();
   });
 
-  it('lists Check on’s rarer rows in the unlocks’, protection off’s, Silent’s, Not here’s, then Left’s order, a silence of another length its own row', () => {
+  it('lists the board’s three states alone, Unlocked, Silent and Not here, a silence of another length its own row; protection off, Left and Unknown wait for the owner’s approval', () => {
     const at = new Date(NOW);
     const rows = checkOn(
       fromSnapshot(
@@ -588,13 +593,60 @@ describe('a live well’s rarer moments (LiveWellView; HomeMoments)', () => {
     );
     expect(rows.map((r) => [r.words, ...r.students.map((s) => s.displayName)])).toEqual([
       ['Unlocked', 'Ethan'],
-      ['Left · unlocked', 'Mateo'],
-      ['Protection off', 'Amara'],
       ['Silent · 5 min', 'Tomás', 'Noor'],
       ['Silent · 9 min', 'Wei'],
       ['Not here', 'Zuri'],
-      ['Left', 'Caleb'],
     ]);
+  });
+
+  it('never says everyone’s focused while one isn’t, a student in a state with no row counted all the same', () => {
+    well(
+      grid({
+        students: fromSnapshot(
+          snapshot([student('Ana'), student('Amara', { state: 'protection_off' })]),
+        ),
+      }),
+    );
+    expect(screen.getByText('of 2 focused').previousElementSibling?.textContent).toBe('1');
+    expect(screen.queryByText("Everyone's focused.")).toBeNull();
+    expect(screen.queryByRole('heading', { level: 3 })).toBeNull();
+    cleanup();
+    well(
+      grid({
+        students: fromSnapshot(
+          snapshot([
+            student('Amara', { state: 'protection_off' }),
+            student('Ethan', {
+              state: 'unlocked',
+              unlock: { eventId: 'v1', reason: null, recordedAs: null, occurredAt: iso(NOW - MIN) },
+            }),
+          ]),
+        ),
+      }),
+    );
+    expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('Check on 1');
+    expect(screen.getByRole('link', { name: 'Ethan' })).toBeDefined();
+    expect(screen.queryByText('Amara')).toBeNull();
+  });
+
+  it('keeps a Silent row the same row as its minutes turn, so a name focused in it keeps focus', () => {
+    const silent = fromSnapshot(
+      snapshot([student('Tomás', { lastSeenAt: iso(NOW - 5 * MIN - 20_000) })]),
+    );
+    const { rerender } = well(grid({ students: silent }));
+    const name = screen.getByRole('link', { name: 'Tomás' });
+    name.focus();
+    rerender(
+      <LiveWellView
+        classId="c3"
+        name="Biology, period 3"
+        grid={grid({ students: silent, now: new Date(NOW + MIN) })}
+        startedAt={iso(NOW - 26 * MIN)}
+        endsAt={BELL}
+      />,
+    );
+    expect(name.closest('li')?.textContent).toMatch(/^Silent.·.6 minTomás$/);
+    expect(document.activeElement).toBe(name);
   });
 });
 

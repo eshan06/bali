@@ -116,14 +116,18 @@ function ClassRow({
   c,
   now,
   startedAt,
+  ended,
 }: {
   c: TaughtClass;
   now: number;
   /** The running session's start, once Home's well has read it: the chip's ring. */
   startedAt: string | null;
+  /** The sessions the server has ended since the account was read: none of them runs. */
+  ended: ReadonlySet<string>;
 }) {
   const name = useId();
-  const live = liveNow(c, now);
+  const running = liveNow(c, now);
+  const live = running !== null && !ended.has(running.id) ? running : null;
   const last = c.summary?.lastSession ?? null;
   const page = `/classes/${c.id}`;
   return (
@@ -168,12 +172,15 @@ export function YourClasses({
   classes,
   now,
   starts,
+  ended,
 }: {
   id: string;
   classes: readonly TaughtClass[];
   now: number;
   /** Each running session's start, by its id, as Home's wells read them. */
   starts: ReadonlyMap<string, string>;
+  /** The sessions the server has ended since the account was read, as Home's wells heard it. */
+  ended: ReadonlySet<string>;
 }) {
   return (
     <section aria-labelledby={id} className="flex min-w-0 flex-col gap-4">
@@ -205,6 +212,7 @@ export function YourClasses({
                 c={c}
                 now={now}
                 startedAt={starts.get(c.summary?.runningSession?.id ?? '') ?? null}
+                ended={ended}
               />
             ))}
           </tbody>

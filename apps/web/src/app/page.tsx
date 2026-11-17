@@ -25,7 +25,7 @@ export default function HomePage() {
   const router = useRouter();
   const { home, error, load, refresh } = useMe();
   const [now, setNow] = useState(() => Date.now());
-  // Set by a redeem (T2): the greeting takes focus once the account is read as a teacher.
+  // Set by a redeem (T2): Home's heading takes focus once the account is read as a teacher.
   const redeemed = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const classes = home?.kind === 'teacher' ? home.me.classes : null;
@@ -43,7 +43,7 @@ export default function HomePage() {
     load();
   }, [load, router]);
 
-  // The account teaches now (T2): who it is, read again, so Home shows, the side menu with it; no
+  // The account teaches now (T2): who it is, read again, so Home shows, the top bar with it; no
   // reload.
   const onTeacher = useCallback(() => {
     redeemed.current = true;
@@ -59,7 +59,7 @@ export default function HomePage() {
   // Each read's answer is dated as it lands: "today" stays today's after a Try again past midnight.
   useEffect(() => setNow(Date.now()), [home]);
 
-  // The next change by the clock alone: a bell, or the greeting's or the date's turn.
+  // The next change by the clock alone: a bell, or the date's turn at midnight.
   useEffect(() => {
     if (!teacher) return;
     const next = Math.min(bell ?? Infinity, nextTurn(now));

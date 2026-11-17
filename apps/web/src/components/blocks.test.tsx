@@ -141,6 +141,13 @@ describe('Your block, none yet (ClassFlows)', () => {
     expect(count).toHaveBeenCalledWith('portal_block_registered');
   });
 
+  it('sends a code once however often it is pressed while Bali hasn’t answered', async () => {
+    const { user } = await opened([]);
+    await user.type(field(), 'QW4N8HJR2D{Enter}{Enter}');
+    await user.click(button('Registering…'));
+    expect(bali.calls.map((c) => c.key)).toEqual(['POST /v1/blocks']);
+  });
+
   it('says a code another teacher holds under the help, with the way on', async () => {
     const { user } = await opened([]);
     await user.type(field(), 'QW4N8HJR2D{Enter}');

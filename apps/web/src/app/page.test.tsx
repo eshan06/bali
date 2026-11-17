@@ -203,6 +203,21 @@ describe('a teacher’s Home, as the page runs it (LO3)', () => {
     expect(date()).toMatch(/^Tuesday, October 13$/);
   });
 
+  it('dates each answer as it lands: a read after a timer slept moves the clock on with it', () => {
+    vi.useFakeTimers({ now: T });
+    const { rerender } = open({ kind: 'teacher', me: account('teacher', [live(T + 60_000)]) });
+    expect(action()).toBe('Open');
+    // Asleep two minutes, its tab in view all along: no timer ran, no visibilitychange came.
+    vi.setSystemTime(T + 120_000);
+    readAs({ kind: 'teacher', me: account('teacher', [live(T + 60_000)]) });
+    rerender(
+      <main>
+        <HomePage />
+      </main>,
+    );
+    expect(action()).toBe('Start…');
+  });
+
   it('reads the clock afresh as its tab comes back into view, a timer having slept with the computer', () => {
     vi.useFakeTimers({ now: T });
     open({ kind: 'teacher', me: account('teacher', [live(T + 60_000)]) });
@@ -224,8 +239,14 @@ describe('the invite page at /invite, where a student’s home sends a teacher w
   });
 
   it('an account the 13+ check never passed: the page Home shows it, its line for students under it', () => {
-    open({ kind: 'invite' }, <InviteRoute />);
+    // The same markup, but for the ids React mints per tree.
+    const ids = (html: string) => html.replace(/_r_\w+_/g, 'id');
+    const route = open({ kind: 'invite' }, <InviteRoute />);
     expect(screen.getByText(STUDENTS_LINE)).toBeDefined();
+    const there = ids(route.container.innerHTML);
+    cleanup();
+    const home = open({ kind: 'invite' });
+    expect(ids(home.container.innerHTML)).toBe(there);
   });
 
   it('draws nothing before the account is read, nor for a teacher, whom it sends home', () => {
