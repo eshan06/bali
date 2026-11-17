@@ -1,63 +1,178 @@
 'use client';
 
-import {
-  type ActivityEvent,
-  type ActivityEventType,
-  isUnlockReason,
-  type MeResponse,
-  type SessionSnapshot,
-} from '@bali/shared';
-import {
-  CircleCheck,
-  Clock,
-  LockOpen,
-  type LucideIcon,
-  Presentation,
-  ScrollText,
-  ShieldOff,
-} from 'lucide-react';
+import type { MeResponse, SessionSnapshot } from '@bali/shared';
+import { CircleAlert, CircleCheck, Plus, Presentation } from 'lucide-react';
 import Link from 'next/link';
-import { type Ref, useCallback, useEffect, useId, useState, useSyncExternalStore } from 'react';
+import { type Ref, useCallback, useEffect, useId, useRef, useState } from 'react';
 
-import { type ActivityRead, pollActivity } from '@/lib/activity';
 import { type LastSession, lastOf, liveNow, type TaughtClass } from '@/lib/classes';
-import { gridDisplay, latestUnlock } from '@/lib/grid-state';
-import { bareTime, classFigures, nameOf, type RecapFormat, sessionTimes } from '@/lib/recap';
-import { readReport, type ReportRead } from '@/lib/reports';
+import { CANT_REACH } from '@/lib/errors';
+import {
+  gridDisplay,
+  type GridDisplay,
+  silentNote,
+  type Student,
+  type Students,
+} from '@/lib/grid-state';
+import { type RecapFormat, recapGroups } from '@/lib/recap';
+import { readSessionPage, type SessionPage } from '@/lib/reports';
 import { bellTime, laterBell } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
 
 import { Blocks } from './blocks';
-import { buttonClass } from './button';
-import { CARD_ALONE } from './card';
-import { classLine, FirstClass, LiveChip } from './classes';
-import { DOT, type GridNow, LiveGrid, StaleWords, stateCounts } from './live-grid';
-import { joinedLine, LIVE_CARD, LiveCardHead, LiveCounts, useClock } from './live-header';
-import { Figures } from './recap-card';
-import { QUIET_LINK } from './text-link';
-import { Timeline, type TimelineMoment } from './timeline';
+import { LockButton, lockButton, NAME_BUTTON } from './button';
+import { LIVE_WELL, WELL } from './card';
+import { FirstClass, OOPS, sessionRan, YourClasses } from './classes';
+import { CHIP, type GridNow, LiveGrid, LockChip, StaleWords, stateCounts } from './live-grid';
+import { Ring, shareLeft, timeLeft, useClock } from './live-header';
+import { NewClass, type NewClassHandle } from './new-class';
 import { TryAgain } from './try-again';
-import { reasonWords } from './unlock-popups';
-import { NOTICE } from './your-phone';
 
-/** Where Home's Create a class goes: Classes, its New class open (HomeNew to ClassesNew). */
-export const NEW_CLASS = '/classes?new';
-
-/** Where a live card's Present goes (Main to ClassPresent): the class's page, Present on. */
+/** Where a live class's Present goes (Main to Present): the class's page, Present on. */
 export const presentHref = (classId: string) => `/classes/${classId}?present`;
 
 /**
- * Main's live card, drawn from the grid as it stands (`GridNow`): its head (the ring, the name over
- * "Live · 25 of 28 joined", the countdown and the bell), the six counts, then Open the class, Present
- * (never on a phone, which drives no projector; PhoneHome) and the latest unlock on the grid, its
- * student and when (`latestUnlock`), none while no chip carries one; the live feed lost, the class
- * page's own line under the counts (HomeLiveStates, drawn first). Until the session is read, its
- * name and "Loading this session…"; its read failed, "Couldn't load this session." with Try again
- * (HomeMoreStates), held until the grid's read again answers, focus then on its name
- * (HomeRetryStates, drawn first). Its links are described by the class's name, so a list of links
- * tells two cards apart.
+ * Where a name in Check on goes (Main to ClassStudent): the class's page, the student named, for the
+ * class page to open their record (LO6's); until it does, the class's page.
  */
-export function LiveCardView({
+export const studentHref = (classId: string, studentId: string) =>
+  `/classes/${classId}?student=${encodeURIComponent(studentId)}`;
+
+/** The head's date (Main, HomeIdle): "Monday, October 12", by this computer's clock. */
+export function dayOf(now: number, { locale, timeZone }: RecapFormat = {}): string {
+  return new Intl.DateTimeFormat(locale, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    timeZone,
+  }).format(now);
+}
+
+/** The next time the date turns by this computer's clock: midnight. */
+export function nextTurn(now: number): number {
+  const at = new Date(now);
+  return new Date(at.getFullYear(), at.getMonth(), at.getDate() + 1).getTime();
+}
+
+/** Check on's rows in order: the unlocks first, then protection off, Silent, Not here, Left, Unknown. */
+const CHECK_ORDER: readonly GridDisplay[] = [
+  'unlocked',
+  'left_unprotected',
+  'protection_off',
+  'left_protection_off',
+  'silent',
+  'absent',
+  'ended',
+  'unknown',
+];
+
+/** A row of Check on: a state in its tile's words ("Silent · 5 min"), and who is in it. */
+export interface CheckRow {
+  display: GridDisplay;
+  words: string;
+  students: Student[];
+}
+
+/**
+ * Who to check on (Main; LiveStates, HomeMoments): everyone the grid shows who isn't focused, the
+ * count the board draws (28 − 24 = 4), a row per state in its tile's words, Silent's with its minutes
+ * so two silent for different times get a row each; in `CHECK_ORDER`, each row's students in the
+ * grid's order.
+ */
+export function checkOn(students: Students, now: Date): CheckRow[] {
+  const rows = new Map<string, CheckRow>();
+  for (const s of Object.values(students)) {
+    const display = gridDisplay(s, now);
+    if (display === 'focused') continue;
+    const { label } = CHIP[display];
+    const words = display === 'silent' ? `${label} · ${silentNote(s, now)}` : label;
+    const row = rows.get(words) ?? { display, words, students: [] };
+    row.students.push(s);
+    rows.set(words, row);
+  }
+  return [...rows.values()].sort(
+    (a, b) => CHECK_ORDER.indexOf(a.display) - CHECK_ORDER.indexOf(b.display),
+  );
+}
+
+/**
+ * Check on (Main; LiveStates, HomeMoments): "Check on 4" over its rows, each the state's chip and
+ * who is in it, each name a link to them on the class's page; while the live feed is down, the rows
+ * faded and the names plain, as they were at the last update. Everyone focused says so in one line;
+ * a class with no students yet says that.
+ */
+function CheckOn({
+  classId,
+  rows,
+  total,
+  stale,
+}: {
+  classId: string;
+  rows: CheckRow[];
+  total: number;
+  stale: boolean;
+}) {
+  if (total === 0) return <p className="text-text-secondary">No students yet.</p>;
+  const count = rows.reduce((n, row) => n + row.students.length, 0);
+  if (count === 0) {
+    return (
+      <p className="flex items-center gap-3 self-start border-y border-border-default py-4 font-medium text-state-focused-fg">
+        <CircleCheck size={18} aria-hidden="true" className="shrink-0" />
+        Everyone&apos;s focused.
+      </p>
+    );
+  }
+  return (
+    <div className={stale ? 'opacity-60' : undefined}>
+      <h3 className="mb-2 text-data font-semibold">Check on {count}</h3>
+      <ul className="border-t border-live-edge">
+        {rows.map((row) => (
+          <li
+            key={row.words}
+            className="grid grid-cols-[150px_minmax(0,1fr)] items-center gap-4 border-b border-live-edge py-3 max-[760px]:grid-cols-[140px_minmax(0,1fr)] max-[760px]:gap-x-3 max-[760px]:gap-y-2"
+          >
+            <span>
+              <LockChip display={row.display} words={row.words} />
+            </span>
+            <p className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+              {row.students.map((s) => {
+                const name = s.displayName ?? s.studentId.slice(0, 8);
+                return stale ? (
+                  <span key={s.studentId} className="font-semibold wrap-anywhere">
+                    {name}
+                  </span>
+                ) : (
+                  <Link
+                    key={s.studentId}
+                    href={studentHref(classId, s.studentId)}
+                    className={`${NAME_BUTTON} wrap-anywhere`}
+                  >
+                    {name}
+                  </Link>
+                );
+              })}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** The live feed's health over the count (lock.css's `.status`; HomeMoments): a white pill, its dot still. */
+const STATUS =
+  'inline-flex items-center gap-2 self-start rounded-full border border-border-strong bg-surface-card py-2 pr-4 pl-3 text-meta text-text-primary shadow-2';
+
+/**
+ * A class live on Home (Main; HomeMoments), drawn from the class page's own grid as it stands
+ * (`GridNow`): the ring, the class's name over "Live until 9:55 AM", the time left on this
+ * computer's clock to the server's bell; the class counted, "24 of 28 focused"; Open the class and
+ * Present; and who to check on (`CheckOn`). Until the session is read, its line in the count's place;
+ * its read failed, the reason with Try again, held until the grid's read again answers, focus then on
+ * its name; the live feed lost or quiet, the class page's own words over the count, the count and
+ * Check on faded. Its links are described by the class's name, so two wells' links differ.
+ */
+export function LiveWellView({
   classId,
   name,
   grid,
@@ -73,96 +188,126 @@ export function LiveCardView({
 }) {
   const id = useId();
   const now = useClock(endsAt);
-  if (grid.error !== null || grid.students === null) {
-    return (
-      <section aria-labelledby={id} className={LIVE_CARD}>
-        <LiveCardHead id={id} name={name} now={now} />
-        {grid.error === null ? (
-          <p role="status" className="text-body text-text-secondary">
+  const students = grid.error === null ? grid.students : null;
+  const counts =
+    students === null
+      ? null
+      : stateCounts(Object.values(students).map((s) => gridDisplay(s, grid.now)));
+  const faded = grid.stale === null ? '' : 'opacity-60';
+  return (
+    <section
+      aria-labelledby={id}
+      className={`${LIVE_WELL} grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-x-12 gap-y-6 p-6 max-[760px]:grid-cols-1 max-[760px]:gap-8 max-[760px]:p-5`}
+    >
+      <div className="col-span-full flex flex-wrap items-center gap-x-4 gap-y-3">
+        <Ring
+          share={startedAt === null ? 0 : shareLeft(startedAt, endsAt, now)}
+          box={44}
+          stroke={5}
+        />
+        <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-0.5">
+          <h2 id={id} className="text-section-title wrap-anywhere">
+            {name}
+          </h2>
+          <p className="text-meta text-text-secondary">
+            Live until <time dateTime={endsAt}>{bellTime(endsAt)}</time>
+          </p>
+        </div>
+        <p className="flex flex-col items-end max-[760px]:items-start">
+          <span className="text-home-countdown tabular-nums">
+            {timeLeft(Date.parse(endsAt) - now)}
+          </span>
+          <span className="text-countdown-sub text-text-tertiary">left</span>
+        </p>
+      </div>
+      <div className="flex flex-col justify-between gap-6">
+        {grid.error !== null ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <TryAgain onRetry={grid.retry} held={grid.retrying} then={[id]}>
+              <p role="alert">Couldn&apos;t load this session. {grid.error}</p>
+            </TryAgain>
+          </div>
+        ) : counts === null ? (
+          <p role="status" className="text-text-secondary">
             Loading this session…
           </p>
         ) : (
-          <div>
-            <TryAgain onRetry={grid.retry} held={grid.retrying} then={[id]} className="mt-3.5">
-              <div role="alert" className="text-body">
-                <p className="font-semibold">Couldn&apos;t load this session.</p>
-                <p className="text-text-secondary">{grid.error}</p>
-              </div>
-            </TryAgain>
+          <div className="flex flex-col gap-4">
+            {grid.stale ? (
+              <p role="status" className={`${STATUS} tabular-nums`}>
+                <span aria-hidden="true" className="size-1.75 shrink-0 rounded-full bg-pip" />
+                <StaleWords stale={grid.stale} />
+              </p>
+            ) : null}
+            <p className={`flex flex-wrap items-baseline gap-x-3 ${faded}`}>
+              <span className="text-count tabular-nums max-[760px]:text-count-phone">
+                {counts.counts.focused}
+              </span>
+              <span className="text-count-of text-text-secondary max-[760px]:text-count-of-phone">
+                of {counts.total} focused
+              </span>
+            </p>
           </div>
         )}
-      </section>
-    );
-  }
-  const shown = grid.students;
-  const counts = stateCounts(Object.values(shown).map((s) => gridDisplay(s, grid.now)));
-  const latest = latestUnlock(shown);
-  const at = latest?.unlock?.at.toISOString() ?? null;
-  return (
-    <section aria-labelledby={id} className={LIVE_CARD}>
-      <LiveCardHead
-        id={id}
-        name={name}
-        line={joinedLine(counts)}
-        startedAt={startedAt}
-        endsAt={endsAt}
-        now={now}
-      />
-      <LiveCounts counts={counts} />
-      {grid.stale ? (
-        <p role="status" className={`${NOTICE} tabular-nums`}>
-          <StaleWords stale={grid.stale} />
-        </p>
-      ) : null}
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Link href={`/classes/${classId}`} aria-describedby={id} className={buttonClass('primary')}>
-          Open the class
-        </Link>
-        <Link
-          href={presentHref(classId)}
-          aria-describedby={id}
-          className={buttonClass('secondary', 'max-sm:hidden')}
-        >
-          <Presentation size={16} aria-hidden="true" />
-          Present
-        </Link>
-        {latest !== null && at !== null ? (
-          <p className="ml-auto text-countdown-sub text-text-tertiary wrap-anywhere max-sm:ml-0">
-            {latest.displayName ?? latest.studentId.slice(0, 8)} used Emergency Unlock at{' '}
-            <time dateTime={at}>{bellTime(at)}</time>
-          </p>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/classes/${classId}`}
+            aria-describedby={id}
+            className={lockButton('primary')}
+          >
+            Open the class
+          </Link>
+          <Link
+            href={presentHref(classId)}
+            aria-describedby={id}
+            className={lockButton('secondary')}
+          >
+            <Presentation size={16} aria-hidden="true" />
+            Present
+          </Link>
+        </div>
       </div>
+      {students !== null && counts !== null ? (
+        <CheckOn
+          classId={classId}
+          rows={checkOn(students, grid.now)}
+          total={counts.total}
+          stale={grid.stale !== null}
+        />
+      ) : null}
     </section>
   );
 }
 
 /**
- * A class live on Home (PV17b; Main): the class page's own grid (`LiveGrid`: its snapshot, its live
- * feed and its 15 s read), drawn as Main's card (`LiveCardView`). Its start comes with the
- * snapshot, for the ring, and so does a later bell (time added on the class page), which has your
- * classes read again (`onRead`), so the row, the date's line and the card keep to it. The server
+ * A class live on Home (Main): the class page's own grid (`LiveGrid`: its snapshot, its live feed
+ * and its 15 s read), drawn as Main's well (`LiveWellView`). Its start comes with the snapshot, for
+ * the ring, and is told to Home (`onStart`) for the class's row; a later bell (time added on the
+ * class page) has the classes read again (`onRead`), so the row and the well keep to it. The server
  * ending the session (End, or the bell's sweep) is told to Home (`onEnded`).
  */
-function LiveCard({
+function LiveWell({
   c,
   session,
   onEnded,
   onRead,
+  onStart,
 }: {
   c: TaughtClass;
   session: { id: string; endsAt: string };
   onEnded: (sessionId: string) => void;
   onRead: () => void;
+  onStart: (sessionId: string, startedAt: string) => void;
 }) {
   const [read, setRead] = useState<{ startedAt: string; endsAt: string } | null>(null);
   const bell = session.endsAt;
   const onSession = useCallback(
     ({ startedAt, endsAt }: SessionSnapshot['session']) => {
       setRead({ startedAt, endsAt });
+      onStart(session.id, startedAt);
       if (Date.parse(endsAt) > Date.parse(bell)) onRead();
     },
-    [bell, onRead],
+    [bell, onRead, onStart, session.id],
   );
   const endsAt = laterBell(read?.endsAt ?? null, bell);
   return (
@@ -171,7 +316,7 @@ function LiveCard({
       onEnded={onEnded}
       onSession={onSession}
       card={(grid) => (
-        <LiveCardView
+        <LiveWellView
           classId={c.id}
           name={c.name}
           grid={grid}
@@ -184,310 +329,125 @@ function LiveCard({
 }
 
 /**
- * The greeting (Main, HomeIdle, HomeNew): Good morning until noon, Good afternoon until 5 PM, then
- * Good evening (HomeInterimStates, drawn first), by this computer's clock, with the account's name,
- * or none for an account with no name (HomeNoName).
+ * Last session's figures (HomeIdle), as the recap counts them (`recapGroups`), so the two never
+ * disagree: of those who joined, how many stayed focused the whole time; the emergency unlocks; and
+ * who didn't join. Nobody joined, the recap's line in their place, the unlocks kept if it had any
+ * (HomeMoments).
  */
-export function greeting(now: number, name: string | null, { timeZone }: RecapFormat = {}): string {
-  const hour = Number(
-    new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone }).format(now),
-  );
-  const part = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  return name ? `${part}, ${name}` : part;
-}
-
-/** The next time the greeting or the date turns by this computer's clock: noon, 5 PM or midnight. */
-export function nextTurn(now: number): number {
-  const at = new Date(now);
-  const day = (hour: number) =>
-    new Date(at.getFullYear(), at.getMonth(), at.getDate(), hour).getTime();
-  return [day(12), day(17)].find((turn) => turn > now) ?? day(24);
-}
-
-/**
- * The line under the greeting: today's date, then, for a teacher with a class, what is in session
- * by this computer's clock to the server's bell: none, the one live and its bell (Main), or how many
- * (HomeInterimStates, drawn first).
- */
-export function dayLine(classes: TaughtClass[], now: number, format: RecapFormat = {}): string {
-  const { locale, timeZone } = format;
-  const day = new Intl.DateTimeFormat(locale, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    timeZone,
-  }).format(now);
-  if (classes.length === 0) return day;
-  const live = classes.flatMap((c) => {
-    const session = liveNow(c, now);
-    return session ? [{ name: c.name, endsAt: session.endsAt }] : [];
-  });
-  const [only] = live;
-  const said =
-    only === undefined
-      ? 'no class in session'
-      : live.length === 1
-        ? `${only.name} ends at ${bellTime(only.endsAt, format)}`
-        : `${live.length} classes in session`;
-  return `${day}${DOT}${said}`;
-}
-
-/**
- * A class once (Main's and HomeIdle's `.schedrow`): its name over its line, as Classes' card says it
- * (`classLine`), in the row's own 15/22 line as the board renders its inline line; while its session
- * runs, the Live chip and the live card's edge, and Open, else Start…, both to its page, each
- * described by the class's name.
- */
-function ClassRow({ c, now }: { c: TaughtClass; now: number }) {
-  const name = useId();
-  const live = liveNow(c, now);
+function LastFigures({ page }: { page: Extract<SessionPage, { kind: 'ready' }> }) {
+  const { report } = page;
+  const { wholeTime, notJoined } = recapGroups(page.session, report, page.events, page.roster);
+  const n = new Intl.NumberFormat();
+  const joined = report.joined.length;
+  const unlocks = report.unlocks.length;
+  const unlocked: [string, string] = [
+    n.format(unlocks),
+    unlocks === 1 ? 'emergency unlock' : 'emergency unlocks',
+  ];
+  const figures: [string, string][] =
+    joined > 0
+      ? [
+          [`${n.format(wholeTime.length)} of ${n.format(joined)}`, 'stayed focused the whole time'],
+          unlocked,
+          [n.format(notJoined.length), "didn't join"],
+        ]
+      : unlocks > 0
+        ? [unlocked]
+        : [];
   return (
-    <li
-      className={`flex items-center gap-3.5 rounded-md border bg-surface-card px-4.5 py-3.75 text-body ${live ? 'border-live-edge' : 'border-border-default'}`}
-    >
-      <div className="min-w-0 flex-1">
-        <span id={name} className="block text-tile-name wrap-anywhere">
-          {c.name}
-        </span>
-        <span className="text-countdown-sub text-text-tertiary">{classLine(c, now)}</span>
-      </div>
-      {live ? (
-        <>
-          <LiveChip endsAt={live.endsAt} />
-          <Link href={`/classes/${c.id}`} aria-describedby={name} className={QUIET_LINK}>
-            Open
-          </Link>
-        </>
-      ) : (
-        <Link
-          href={`/classes/${c.id}`}
-          aria-describedby={name}
-          className={buttonClass('secondary', '', 'sm')}
-        >
-          Start…
-        </Link>
-      )}
-    </li>
-  );
-}
-
-/** A rail card's label (v2.css's `.wlabel`) with its icon, as the block's card has it. */
-const RAIL_LABEL = 'flex items-center gap-2 text-section-label text-text-tertiary uppercase';
-
-/** Each moment's dot (Main): an unlock's open lock, protection off's shield, a start's check. */
-const ACTIVITY_ICON: Record<ActivityEventType, LucideIcon> = {
-  unlock: LockOpen,
-  protection_off: ShieldOff,
-  session_started: CircleCheck,
-};
-
-/**
- * A moment of Recent activity as Main says it: who did what, the student named as their tile names
- * them, then an unlock's reason as the pop-up says it and the class, or the class alone; its time
- * without AM or PM, all of them today's.
- */
-export function activityMoment(e: ActivityEvent, clock?: Intl.DateTimeFormat): TimelineMoment {
-  const who = e.student === null ? '' : nameOf(e.student);
-  const reason = reasonWords(isUnlockReason(e.reason) ? e.reason : null);
-  const [words, under] =
-    e.type === 'unlock'
-      ? [`${who} used Emergency Unlock`, `${reason}${DOT}${e.class.name}`]
-      : e.type === 'protection_off'
-        ? [`${who} turned protection off`, e.class.name]
-        : ['Session started', e.class.name];
-  const at = new Date(e.occurredAt);
-  return {
-    key: e.eventId,
-    Icon: ACTIVITY_ICON[e.type],
-    words,
-    under,
-    at,
-    time: bareTime(+at, clock),
-  };
-}
-
-/**
- * Recent activity (PV17c; Main): today's unlocks with their reasons, protection offs and starts
- * across the teacher's classes, newest first, four at most, then Open the class while one class is
- * live (with more, each live card has its own: HomeRailStates, drawn first). Loading and a failure
- * as HomeMoreStates draws them, the failure in the list's place until a read works, its Try again
- * held until its read answers, focus then on the card's label (HomeRetryStates, drawn first). None
- * at all for a list that came back empty: a live class's own start is always in it (PV1), but for
- * one that started before midnight.
- */
-export function RecentActivityView({
-  read,
-  only,
-  retrying = false,
-  onRetry,
-}: {
-  read: ActivityRead;
-  /** The class live, when there is one alone. */
-  only: string | null;
-  /** Try again's read on its way. */
-  retrying?: boolean;
-  onRetry: () => void;
-}) {
-  const id = useId();
-  if (read.kind === 'ready' && read.events.length === 0) return null;
-  return (
-    <section aria-labelledby={id} className={CARD_ALONE}>
-      <h2 id={id} className={RAIL_LABEL}>
-        <ScrollText size={14} aria-hidden="true" className="shrink-0" />
-        Recent activity
-      </h2>
-      {read.kind === 'loading' ? (
-        <p role="status" className="mt-3.5 text-body text-text-secondary">
-          Loading…
-        </p>
-      ) : read.kind === 'error' ? (
-        <div className="mt-3.5">
-          <TryAgain onRetry={onRetry} held={retrying} then={[id]} className="mt-3.5">
-            <div role="alert" className="text-body">
-              <p className="font-semibold">Couldn&apos;t load recent activity.</p>
-              <p className="text-text-secondary">{read.message}</p>
+    <>
+      {joined === 0 ? <p className="text-text-secondary">Nobody joined this session.</p> : null}
+      {figures.length > 0 ? (
+        <dl className="flex flex-wrap gap-y-4">
+          {figures.map(([value, words]) => (
+            <div
+              key={words}
+              className="flex flex-col gap-0.5 border-l border-border-strong px-6 first:border-l-0 first:pl-0 max-[760px]:px-4 max-[760px]:first:pl-0"
+            >
+              <dt className="order-2 text-caption text-text-secondary">{words}</dt>
+              <dd className="order-1 text-h2 tabular-nums">{value}</dd>
             </div>
-          </TryAgain>
-        </div>
-      ) : (
-        <>
-          <Timeline moments={read.events.map((e) => activityMoment(e))} className="mt-3.5" />
-          {/* In a line of the body's height, as the board sets it: 14 px under the list. */}
-          {only !== null ? (
-            <div className="mt-3.5 text-body">
-              <Link href={`/classes/${only}`} className={QUIET_LINK}>
-                Open the class
-              </Link>
-            </div>
-          ) : null}
-        </>
-      )}
-    </section>
-  );
-}
-
-/** Recent activity, read as Home shows it and again while it is in view (`pollActivity`). */
-function RecentActivity({ only }: { only: string | null }) {
-  const api = useApi();
-  const [read, setRead] = useState<ActivityRead>({ kind: 'loading' });
-  const [attempt, setAttempt] = useState(0);
-  const [retrying, setRetrying] = useState(false);
-  useEffect(() => {
-    const poll = pollActivity(api, (answer) => {
-      setRead(answer);
-      setRetrying(false);
-    });
-    return () => poll.stop();
-  }, [api, attempt]);
-  return (
-    <RecentActivityView
-      read={read}
-      only={only}
-      retrying={retrying}
-      onRetry={() => {
-        setRetrying(true);
-        setAttempt((n) => n + 1);
-      }}
-    />
+          ))}
+        </dl>
+      ) : null}
+    </>
   );
 }
 
 /**
- * Last session (PV17c; HomeIdle): the last session over, its class and when it ran from the account
- * (PV2's `lastSession`), its figures from its report (R2): who joined, the average per student and
- * the unlocks; nobody joined, the recap's line in place of the first two (HomeRailStates, drawn
- * first). Within a minute of its bell its report says `ended: false`, the sweep not there yet, its
- * figures already counted to the bell: never read here, so the card never calls it running. Loading
- * and a failure as HomeMoreStates draws them, its Try again held until its read answers, focus then
- * on the card's label (HomeRetryStates, drawn first).
+ * Last session (HomeIdle; HomeMoments), while no class runs: the last session over, its class and
+ * when it ran from the account (PV2's `lastSession`), then its figures (`LastFigures`) from its
+ * report, its events and the class's roster, the recap's own reads (`readSessionPage`). Open the
+ * recap goes to the class's page once they are in. Being read, a line in their place; failed, the
+ * reason with Try again, held until its read answers, focus then on its title.
  */
 export function LastSessionView({
   last,
   read,
+  now,
   onRetry,
 }: {
   last: LastSession;
-  read: ReportRead;
+  read: SessionPage;
+  now: number;
   /** Read it again, the failure said until it answers. */
   onRetry: () => Promise<void>;
 }) {
   const id = useId();
   const name = useId();
-  const { startedAt, endedAt } = last.session;
   return (
-    <section aria-labelledby={id} className={CARD_ALONE}>
-      <h2 id={id} className={RAIL_LABEL}>
-        <Clock size={14} aria-hidden="true" className="shrink-0" />
-        Last session
-      </h2>
-      <p id={name} className="mt-3.5 text-body font-semibold wrap-anywhere">
-        {last.name}
-      </p>
-      <p className="text-caption text-text-tertiary">
-        {sessionTimes({ startedAt, endsAt: endedAt, endedAt })}
-      </p>
-      {read.kind === 'loading' ? (
-        <p role="status" className="mt-3.5 text-body text-text-secondary">
-          Loading the last session…
-        </p>
-      ) : read.kind === 'error' ? (
-        <div className="mt-3.5">
-          <TryAgain onRetry={onRetry} then={[id]} className="mt-3.5">
-            <div role="alert" className="text-body">
-              <p className="font-semibold">Couldn&apos;t load the last session.</p>
-              <p className="text-text-secondary">{read.message}</p>
-            </div>
-          </TryAgain>
+    <section
+      aria-labelledby={id}
+      className={`${WELL} flex flex-wrap items-end justify-between gap-x-12 gap-y-6 p-6`}
+    >
+      <div className="flex min-w-0 flex-col gap-5">
+        <div>
+          <h2 id={id} className="text-section-title">
+            Last session
+          </h2>
+          <p className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-meta text-text-secondary">
+            <span id={name} className="font-semibold text-text-primary wrap-anywhere">
+              {last.name}
+            </span>
+            <span>{sessionRan(last.session, new Date(now))}</span>
+          </p>
         </div>
-      ) : (
-        <LastFigures report={read.report} />
-      )}
-      {/* In a line of the body's height, as the board sets it: 14 px under the figures. */}
+        {read.kind === 'loading' ? (
+          <p role="status" className="text-text-secondary">
+            Loading the last session…
+          </p>
+        ) : read.kind === 'error' ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <TryAgain onRetry={onRetry} then={[id]}>
+              <p role="alert">Couldn&apos;t load the last session. {read.message}</p>
+            </TryAgain>
+          </div>
+        ) : (
+          <LastFigures page={read} />
+        )}
+      </div>
       {read.kind === 'ready' ? (
-        <div className="mt-3.5 text-body">
-          <Link href={`/classes/${last.classId}`} aria-describedby={name} className={QUIET_LINK}>
-            Open the recap
-          </Link>
-        </div>
+        <Link
+          href={`/classes/${last.classId}`}
+          aria-describedby={name}
+          className={lockButton('secondary')}
+        >
+          Open the recap
+        </Link>
       ) : null}
     </section>
   );
 }
 
-/** HomeIdle's three figures; nobody joined, the recap's line, and the unlocks only if any. */
-function LastFigures({ report }: { report: Extract<ReportRead, { kind: 'ready' }>['report'] }) {
-  const joined = report.joined.length;
-  const unlocks = new Intl.NumberFormat().format(report.unlocks.length);
-  const { joined: who, average } = classFigures(joined, report);
-  const figures =
-    joined > 0
-      ? ([
-          ['Joined', who],
-          ['Average per student', `${average} min`],
-          ['Unlocks', unlocks],
-        ] as const)
-      : report.unlocks.length > 0
-        ? ([['Unlocks', unlocks]] as const)
-        : [];
-  return (
-    <>
-      {joined === 0 ? (
-        <p className="mt-3.5 text-body text-text-secondary">Nobody joined this session.</p>
-      ) : null}
-      {figures.length > 0 ? <Figures figures={figures} className="mt-3.5 gap-x-7 gap-y-3" /> : null}
-    </>
-  );
-}
-
-/** Last session, its report read as Home shows it and by Try again (`readReport`). */
-function LastSessionCard({ last }: { last: LastSession }) {
+/** Last session, its reads made as Home shows it and again by Try again (`readSessionPage`). */
+function LastSessionWell({ last, now }: { last: LastSession; now: number }) {
   const api = useApi();
-  const [read, setRead] = useState<ReportRead>({ kind: 'loading' });
+  const [read, setRead] = useState<SessionPage>({ kind: 'loading' });
   const { classId } = last;
   const sessionId = last.session.id;
   useEffect(() => {
     let live = true;
-    void readReport(api, classId, sessionId).then((answer) => {
+    void readSessionPage(api, classId, sessionId).then((answer) => {
       if (live) setRead(answer);
     });
     return () => {
@@ -498,39 +458,24 @@ function LastSessionCard({ last }: { last: LastSession }) {
     <LastSessionView
       last={last}
       read={read}
-      onRetry={async () => setRead(await readReport(api, classId, sessionId))}
+      now={now}
+      onRetry={async () => setRead(await readSessionPage(api, classId, sessionId))}
     />
   );
 }
 
-/** v2.css's phone width, Tailwind's `sm`: under it Recent activity is hidden (PV1; PhoneHome). */
-const WIDE = '(min-width: 40rem)';
-
-/** Whether the page is at least `WIDE`, so a phone never reads what it hides. */
-function useWide(): boolean {
-  return useSyncExternalStore(
-    (changed) => {
-      const query = window.matchMedia(WIDE);
-      query.addEventListener('change', changed);
-      return () => query.removeEventListener('change', changed);
-    },
-    () => window.matchMedia(WIDE).matches,
-    () => true,
-  );
-}
-
 /**
- * A teacher's Home (PV17a; Main, HomeIdle, HomeNew): the greeting and the date, the list's failure
- * with Try again over the classes read before (HomeInterimStates), each class live by this
- * computer's clock to the server's bell on its live card (PV17b), then each class once, or for a new
- * teacher the first class's card, its Create a class to Classes' New class; beside them, under them
- * on anything narrower, the rail (PV17c): while a class is live Recent activity, never on a phone;
- * once the last read has none running, the last session over, if any has ended; then the block's
- * card. A session the server ends while Home is open loses its card at once, and the classes are
- * read again (HomeLiveStates, drawn first), Last session showing once the read says none runs, so
- * it never shows an older session meanwhile (HomeRailStates, drawn first). `ref` is the greeting's,
- * for focus after a redeem. The list's Try again reads with `onRetry` (the shell's `refresh`), held
- * until it answers, focus then on Your classes or, with none, the greeting (HomeRetryStates).
+ * A teacher's Home, one page for their classes (Main, HomeIdle, HomeStates, PhonePages; its other
+ * moments on HomeMoments, drawn first): its head, Classes and the date, with New class; a later read
+ * of the account that failed, said under it with Try again over what was read before; each class live
+ * by this computer's clock to the server's bell in a well of its own, in the account's order; while
+ * none runs, the last session over, once one has ended; then Your classes, or a new teacher's first
+ * class, beside Your block, under it on a phone. New class and Create a class open New class's
+ * dialog, and its every answer has the account read again (`onRead`). A session the server ends while
+ * Home is open loses its well at once and the account is read again; Last session shows once that
+ * read says none runs, so it never shows an older session meanwhile. `ref` is the heading's, for
+ * focus after a redeem. The failure's Try again reads with `onRetry` (the shell's `refresh`), held
+ * until it answers, focus then on Your classes or, with none, the heading.
  */
 export function TeacherHome({
   ref,
@@ -546,13 +491,15 @@ export function TeacherHome({
   failed: string | null;
   now: number;
   onRead: () => void;
-  /** The list's Try again: the account read again, its failure kept until the answer. */
+  /** The failure's Try again: the account read again, its failure kept until the answer. */
   onRetry: () => Promise<void>;
 }) {
   const yours = useId();
-  const name = me.user.displayName?.trim() || null;
-  // The sessions the server ended while Home was open: their cards go before the read answers.
+  const newClass = useRef<NewClassHandle>(null);
+  // The sessions the server ended while Home was open: their wells go before the read answers.
   const [ended, setEnded] = useState<ReadonlySet<string>>(() => new Set());
+  // Each running session's start, as its well reads it, for its class's row.
+  const [starts, setStarts] = useState<ReadonlyMap<string, string>>(() => new Map());
   const onEnded = useCallback(
     (session: string) => {
       setEnded((cur) => new Set(cur).add(session));
@@ -560,63 +507,68 @@ export function TeacherHome({
     },
     [onRead],
   );
+  const onStart = useCallback(
+    (session: string, startedAt: string) =>
+      setStarts((had) =>
+        had.get(session) === startedAt ? had : new Map(had).set(session, startedAt),
+      ),
+    [],
+  );
   const live = me.classes.flatMap((c) => {
     const session = liveNow(c, now);
     return session && !ended.has(session.id) ? [{ c, session }] : [];
   });
-  const wide = useWide();
   // Past a bell, or past an End elsewhere, the read still counts the session running until it is
-  // read again; until then there is no Last session to show, never an older one (HomeRailStates).
+  // read again; until then there is no Last session to show, never an older one.
   const running = me.classes.some((c) => (c.summary?.runningSession ?? null) !== null);
   const last = running ? null : lastOf(me.classes);
+  const onNew = () => newClass.current?.open();
   return (
-    <div className="flex flex-col gap-5.5">
-      <div>
-        <h1 ref={ref} tabIndex={-1} className="text-greeting text-balance wrap-anywhere">
-          {greeting(now, name)}
-        </h1>
-        <p className="mt-0.75 text-meta text-text-secondary">{dayLine(me.classes, now)}</p>
+    <div className="flex flex-col gap-10 text-body max-[760px]:gap-8">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+        <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-1">
+          <h1 ref={ref} tabIndex={-1} className="text-page-title">
+            Classes
+          </h1>
+          <p className="text-meta text-text-secondary">{dayOf(now)}</p>
+        </div>
+        <LockButton variant="secondary" aria-haspopup="dialog" onClick={onNew}>
+          <Plus size={16} aria-hidden="true" />
+          New class
+        </LockButton>
       </div>
       {failed !== null ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className={OOPS}>
           <TryAgain onRetry={onRetry} then={[yours]}>
-            <p role="alert" className="text-body">
-              Couldn&apos;t load your classes. {failed}
+            <p role="alert" className="flex items-center gap-3">
+              <CircleAlert size={18} aria-hidden="true" className="shrink-0" />
+              {/* HomeStates' line where Bali couldn't be reached; any other failure named as
+                  what didn't load, today's words, so a reason written for a log never stands alone. */}
+              {failed === CANT_REACH ? failed : `Couldn't load your classes. ${failed}`}
             </p>
           </TryAgain>
         </div>
       ) : null}
-      <div className="flex flex-wrap items-start gap-5">
-        <div className="flex min-w-0 grow-999 basis-130 flex-col gap-5">
-          {live.map(({ c, session }) => (
-            <LiveCard key={session.id} c={c} session={session} onEnded={onEnded} onRead={onRead} />
-          ))}
-          {me.classes.length === 0 ? (
-            <FirstClass href={NEW_CLASS} />
-          ) : (
-            <section aria-labelledby={yours}>
-              <h2 id={yours} className="mb-3 text-section-label text-text-tertiary uppercase">
-                Your classes
-              </h2>
-              <ul className="flex flex-col gap-2.5">
-                {me.classes.map((c) => (
-                  <ClassRow key={c.id} c={c} now={now} />
-                ))}
-              </ul>
-            </section>
-          )}
-        </div>
-        <div className="flex min-w-0 grow basis-80 flex-col gap-5">
-          {live.length > 0 ? (
-            wide ? (
-              <RecentActivity only={live.length === 1 ? (live[0]?.c.id ?? null) : null} />
-            ) : null
-          ) : last !== null ? (
-            <LastSessionCard key={last.session.id} last={last} />
-          ) : null}
-          <Blocks />
-        </div>
+      {live.map(({ c, session }) => (
+        <LiveWell
+          key={session.id}
+          c={c}
+          session={session}
+          onEnded={onEnded}
+          onRead={onRead}
+          onStart={onStart}
+        />
+      ))}
+      {last !== null ? <LastSessionWell key={last.session.id} last={last} now={now} /> : null}
+      <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-12 max-[760px]:grid-cols-1 max-[760px]:gap-8">
+        {me.classes.length === 0 ? (
+          <FirstClass onNew={onNew} />
+        ) : (
+          <YourClasses id={yours} classes={me.classes} now={now} starts={starts} />
+        )}
+        <Blocks />
       </div>
+      <NewClass ref={newClass} onAnswer={onRead} />
     </div>
   );
 }

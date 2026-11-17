@@ -20,17 +20,20 @@ const A_MOMENT = 5;
 export const NOT_AN_INVITE_CODE =
   'An invite code is 25 letters and digits, with no 0, O, 1, I or L. Check it against the one you were sent.';
 
-/** A block's ID (P3): said before it is sent, and if the register refuses it. */
+/**
+ * A block's code (P3), the field's word since LO3 (ClassFlows' "Block code"): said before it is
+ * sent, and if the register refuses it.
+ */
 export const NOT_A_BLOCK_ID =
-  'A block ID is 10 letters and digits. Check it against the one written on your block.';
+  'A block code is 10 letters and digits. Check it against the one written on your block.';
 
 /**
  * `POST /v1/blocks`'s 409 with no reason (P3): a live block of another teacher's holds the tag.
- * Nothing moves a block between teachers today, so the way on is the ID itself (the Classes home
+ * Nothing moves a block between teachers today, so the way on is the code itself (the Classes home
  * design).
  */
 export const BLOCK_TAKEN =
-  'That block is registered to another teacher. Check the ID against the one written on your block.';
+  'That block is registered to another teacher. Check the code against the one written on your block.';
 
 /**
  * No answer from the API (P3), and so every `NetworkError` a page shows (D2c-2): the connection,

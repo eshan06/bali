@@ -4,8 +4,8 @@ import { type ApiClient, ApiError, NetworkError, SAVE_TIMEOUT_MS } from './api-c
 import { CANT_CREATE, CANT_REACH, errText } from './errors';
 
 /*
- * A teacher's classes (D2e; Classes since PV16), tested: the name's limit, the create's answer, and
- * what the Classes page counts from each class's summary (PV2).
+ * A teacher's classes (D2e; Home since LO3, Classes' page folded into it), tested: the name's
+ * limit, the create's answer, and what Home counts from each class's summary (PV2).
  */
 
 /** A teacher's own class as `/v1/me` lists it, its summary (PV2) with it. */
@@ -47,7 +47,7 @@ export function lastOf(classes: TaughtClass[]): LastSession | null {
 }
 
 /**
- * How long after a bell Classes reads the account again: a computer's clock a little ahead of the
+ * How long after a bell Home reads the account again: a computer's clock a little ahead of the
  * server's would otherwise read it before the server's bell and still find the session running.
  */
 export const AFTER_BELL_MS = 3000;

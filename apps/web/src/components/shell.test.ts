@@ -8,7 +8,6 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ClassDetailPage from '../app/classes/[id]/page';
-import ClassesPage from '../app/classes/page';
 import InviteRoute from '../app/invite/page';
 import HomePage from '../app/page';
 import QuestionsPage from '../app/questions/page';
@@ -572,7 +571,7 @@ describe('one `<main>` on a page, in every state (the owner’s follow-up, 2026-
   const signedIn: [string, ReturnType<typeof createElement>][] = [
     ['/', createElement(HomePage)],
     ['/invite', createElement(InviteRoute)],
-    ['/classes', createElement(ClassesPage)],
+    // Classes' old address draws no page of its own since LO3: the server sends it Home.
     [`/classes/${classId}`, createElement(ClassDetailPage)],
     ['/reports', createElement(ReportsPage)],
     [`/reports/${classId}/${sessionId}`, createElement(SessionReportPage, { classId, sessionId })],
