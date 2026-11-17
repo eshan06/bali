@@ -8,6 +8,66 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-16** — **Bali's teacher portal becomes a phone lock only: questions and slides are switched off in the portal
+  but kept in the code, the portal is rebuilt from the approved canvas "Bali portal, lock only", and the conductor may run
+  two workers at once on a phase's lanes (the owner; LO0, #LO0PR, the docs of PLAN's Lock-only portal phase).**
+
+  **Why** (the owner, word for word): "Something I'm having concerns with is not really going by the value prop of the app.
+  We talk about how there's legislation banning phone use in all these different states. Yet, Bali as an app still has this
+  extra feature of asking questions and showing slideshows. I'm not sure if that's really our selling point, and I think
+  that may be taking away from our selling point as well. I'm thinking, instead of focusing on those things, why not just
+  focus completely on locking the app, right? That would make our work a lot easier, and we have one clear value prop to
+  sell to."
+
+  **The lesson code is kept** (the owner: "i want to save the code for the slides and the qeustiosn though", and "I want to
+  have the old web portal with the capabilities for slides and questions saved as well(like I can turn them on easily later
+  if I want them)"). So one portal setting, the lessons switch (LO1; ARCHITECTURE, Web portal, decision 8), hides the lesson
+  pieces, and the code, its tests, the API's lesson routes (additive-only) and the apps stay. The apps show a question or a
+  slide only when a teacher sends one, so they need no change. Turning lessons back on after the redesign needs one design
+  pass and one step, to fit them into the new pages.
+
+  **The design:** the canvas [Bali portal, lock only](https://claude.ai/artifact/6edxfannfGQKbSnrZkyXC2), version 27,
+  approved by the owner: "are all the boards drawn out for the main states of the app? then I approve it. create the phase
+  plan hten". The conductor answered that every main state is drawn; an in-between state no board draws is drawn on that
+  canvas by the step's worker first (CLAUDE.md, Working rules). Every figure on its boards is one Bali already keeps; new
+  are Reports' CSV and the count in the browser tab's title. DESIGN.md names its boards and its look.
+
+  **The owner's calls on it:**
+  - Check on loses its lines about each student: "we also dont need these little blurbs like used emergency unlock at
+    9:31 AM. Nurse. No check in since 9:26 etc. the teacher can just see that when they click open on soeone". It shows a
+    student's state and name; the times and the reason are in the student panel.
+  - The recap the same: "remove these in hte recap as well. make sure you can tap to see a simple key here as well." Its
+    rows are a name and a timeline, and Key shows what the colours mean.
+  - The words: "we will still present with student names, we will say focused instead of locked". Today's words stay:
+    Focused, Back in focus.
+  - The pop-ups: "yes lets all have emergency unlock pop ups. I still want those." Today's unlock pop-ups stay, in the new
+    look.
+  - The recap's two lists of names fold into two lines, "22 stayed focused the whole time" with Show names, and "Didn't
+    join: …" (the owner: "lets do this").
+  - The page of a class before it starts is redrawn ("I dont liek the a class before it starts page", then "Yes, redraw
+    it"), with today's session lengths: ClassPage, the old page kept beside it as ClassBefore.
+  - Ending at a class's usual time is set aside: "lets not worry about the end times for now. we can do that later on if
+    needed. remove that for this right now."
+
+  **Blocks:** "I think that we just give them a bunch of blocks that already have codes on them, and then they could input
+  them into their system when they want to, if they want to register another block." The code is written on the block, and
+  Register block (P3) takes it as it does today. Removing a lost block, LO10's endpoint and LO11's button (ClassFlows'
+  "Remove a lost block"), was the conductor's proposal and stays in the plan: the conductor's call, awaiting the owner's
+  look. It overlaps the owner command that retires a block (PLAN's Before the pilot, item 3), which stays planned.
+
+  **Two workers at once** (the owner: "ok yeah lets do your two worksers at once plan."), where the 2026-09-23 entry had one
+  at a time (CLAUDE.md, How to work, step 2; `.claude/commands/plan.md`). The conductor may run two workers at once, only on
+  steps whose files don't overlap (a phase's lanes), each in its own worktree. Each step's PLAN.md line is written up front,
+  and a worker changes only its own line. When the other lane's PR merges, a worker brings its branch up to date with main
+  and pushes, since main requires it; a DECISIONS conflict on that catch-up keeps both entries. Such a phase has a tracker
+  issue and an issue per step: a worker comments when it starts and if it parks, and its PR closes its issue. The conductor
+  still never writes code, and every check and both reviewers stay.
+
+  **The phase** (PLAN's Lock-only portal; tracker #601, an issue a step): LO0, LO1 and LO2 first, LO10 beside LO1; then lane
+  A (LO3, LO8, LO11) beside lane B (LO4–LO7, LO9). Left for the owner (PLAN's Open owner items): turning lessons off on
+  Vercel, the App Store screenshot about questions, the website's lesson pictures, and whether the policies drop questions
+  and slides.
+
 - **2026-11-13** — **AN11a2, a cap on how many push tokens one student holds: at most five, APNs's and FCM's together; a
   register that would make a sixth lets go of the student's oldest, by `updated_at` and then by token, in its own transaction
   under a lock per student, so no commit leaves more; `PUT /v1/me/push-token` answers as it always did (the conductor's three

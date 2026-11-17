@@ -1464,6 +1464,21 @@ Reports, Questions, Slides and Help on a teacher's signed-in pages, and a studen
 layout with Your classes and Help. Its pages and their order are PLAN's "Portal redesign (v2's
 look)" steps (PV0–PV17); the look is DESIGN.md's. A look only: the API stays the one brain, and
 the reads its pages need are additive steps of their own (PV2, PV3).
+*Amended 2026-11-16 (the owner's approval; `docs/DECISIONS.md`):* a teacher's pages move to the
+canvas "Bali portal, lock only", page by page in PLAN's Lock-only portal steps (LO): a top bar with
+Classes, Reports and Help in place of the side menu, Home and Classes one page; sign-in, the invite
+page and Help keep their looks. Still a look: every figure the canvas draws is one Bali already
+keeps, and its one new call is LO10's, a teacher removing a lost block.
+
+**8. The lessons switch** (the owner, 2026-11-16; `docs/DECISIONS.md`): Bali is sold as a phone
+lock, so the portal can hide the live lesson. One portal setting, `NEXT_PUBLIC_LESSONS`, on unless
+it is set to `off`, set on Vercel and baked into the build, as every `NEXT_PUBLIC_` value is (a
+change takes a redeploy). Off, the portal hides decision 6's pieces: Questions and Slides in the
+menu, the class page's lesson panels, Present's question and slide views, a session report's
+Questions card, and a student's lesson page and its link. On, nothing changes. The pieces' code and
+tests stay, the tests covering both. The API's lesson routes stay, additive-only, and the apps are
+unchanged: they show a question or a slide only when a teacher sends one. Turning lessons back on
+after the lock-only redesign takes one design pass and one step, to fit them into its pages.
 
 ## Live lesson (Phase 7)
 
@@ -1481,7 +1496,8 @@ pilot's first class, holding back no screen (the owner, 2026-10-12).
 The owner's picks of 2026-10-09 (the
 screens' design, the defaults confirmed, and saved questions) follow the ten decisions
 (decisions 11 and 12), and those of 2026-10-10 (students on the web, decision 13, and the open
-questions settled) after them.
+questions settled) after them. Since 2026-11-16 its portal pieces sit behind the lessons switch
+(Web portal, decision 8), for the owner to turn off while Bali is sold as a phone lock.
 
 ### The decisions (2026-10-05)
 
