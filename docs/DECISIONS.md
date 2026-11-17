@@ -9,8 +9,8 @@ touching before changing how something works. A pointer of the form
 a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-16** — **The lessons switch, built: `NEXT_PUBLIC_LESSONS`, on unless it says off; off, the portal shows
-  nothing of a live lesson, its class page and reports read none, and a lesson page's address goes to `/` (LO1, the
-  conductor's calls and this step's).**
+  nothing of a live lesson, its class page and reports read none, and a lesson page's address goes to `/` (LO1, #615,
+  the conductor's calls and this step's).**
 
   **What off does** (ARCHITECTURE, Web portal, decision 8): `lessonsOn()` (`apps/web/src/lib/lessons.ts`) is false only
   for `off`, its case and the spaces around it aside, so an unset variable, every build before it, keeps lessons on. A

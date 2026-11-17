@@ -171,7 +171,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO0** The docs: the decision, the design, these lines and the two-worker rule (#602) — ✅ (#614; DECISIONS 2026-11-16)
 
-- **LO1** The lessons switch, `NEXT_PUBLIC_LESSONS` (#603; after LO0, beside LO10) — ✅ (DECISIONS 2026-11-16); for Now at the phase's end: 27 source-text tests left (`session-report.test.ts` converted)
+- **LO1** The lessons switch, `NEXT_PUBLIC_LESSONS` (#603; after LO0, beside LO10) — ✅ (#615; DECISIONS 2026-11-16); for Now at the phase's end: 27 source-text tests left (`session-report.test.ts` converted)
 
 - **LO2** 👀 The top bar and the new look's shared pieces (#604; after LO1)
 
