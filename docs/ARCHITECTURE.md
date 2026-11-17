@@ -1475,10 +1475,13 @@ lock, so the portal can hide the live lesson. One portal setting, `NEXT_PUBLIC_L
 it is set to `off`, set on Vercel and baked into the build, as every `NEXT_PUBLIC_` value is (a
 change takes a redeploy). Off, the portal hides decision 6's pieces: Questions and Slides in the
 menu, the class page's lesson panels, Present's question and slide views, a session report's
-Questions card, and a student's lesson page and its link. On, nothing changes. The pieces' code and
-tests stay, the tests covering both. The API's lesson routes stay, additive-only, and the apps are
-unchanged: they show a question or a slide only when a teacher sends one. Turning lessons back on
-after the lock-only redesign takes one design pass and one step, to fit them into its pages.
+Questions card, and a student's lesson page and its link. On, a page shows them as it did, but a
+teacher's page rebuilt from the lock-only canvas (decision 7), which draws none, shows none either
+way. The
+pieces' code and tests stay, the tests covering both. The API's lesson routes stay, additive-only,
+and the apps are unchanged: they show a question or a slide only when a teacher sends one. Turning
+lessons back on after the lock-only redesign takes one design pass and one step, to fit them into
+its pages.
 
 ## Live lesson (Phase 7)
 

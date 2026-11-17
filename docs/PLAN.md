@@ -162,9 +162,10 @@ One line each. Phases 3–6's step lists, the push's (N1–N6) and this table in
 Planned 2026-11-16 (`docs/DECISIONS.md`): the portal as a phone lock only, rebuilt from the approved
 canvas [Bali portal, lock only](https://claude.ai/artifact/6edxfannfGQKbSnrZkyXC2) (version 27;
 DESIGN.md), questions and slides switched off by LO1 but kept in the code (ARCHITECTURE, Web portal,
-decision 8). Tracker #601, and an issue a step naming the files it may touch. Two workers at once, on
-steps whose files don't overlap (CLAUDE.md, How to work, step 2): LO0, LO1 and LO2 first, LO10
-beside LO1; then lane A (LO3, LO8, LO11) beside lane B (LO4–LO7, LO9). Every line below was written
+decision 8). Tracker #601, and an issue a step naming the files it may touch. Two workers at once,
+never more, on steps whose files don't overlap (CLAUDE.md, How to work, step 2): LO0, LO1 and LO2
+first, LO10 beside LO1 (and beside LO2, should it run longer); then lane A (LO3, LO8, LO11) beside
+lane B (LO4–LO7, LO9), a lane's next step waiting for a free worker. Every line below was written
 up front, in LO0: a step's worker changes only its own, adding ✅, its PR and its DECISIONS date in
 that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is done.
 
@@ -188,7 +189,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO9** 👀 Present (#611; lane B; after LO7)
 
-- **LO10** API: remove a lost block, the conductor's call, awaiting the owner's look (#612; after LO0, beside LO1)
+- **LO10** API: remove a lost block, the conductor's call, awaiting the owner's look (#612; after LO0, beside LO1). The first endpoint that frees a block's code for another teacher, so it settles the other-teacher case first: a tap's honest retry after the block moves (ARCHITECTURE, tap step 9; DECISIONS 2026-09-22's recorded follow-up), an engine change with its race tests
 
 - **LO11** 👀 Home: Remove a lost block (#613; lane A; after LO3 and LO10)
 
@@ -338,11 +339,15 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 
 - **The lock-only portal (2026-11-16; DECISIONS 2026-11-16):**
   - 🔧 Turn lessons off on Vercel's `bali-portal` when ready: `NEXT_PUBLIC_LESSONS=off`, then
-    Redeploy (LO1 ships the switch on).
+    Redeploy (LO1 ships the switch on). Best before LO2 lands: each teacher page rebuilt from the
+    canvas shows no lesson pieces whatever the switch says (DESIGN.md), so with lessons on, the
+    portal mixes pages with them and pages without until the phase ends.
   - The App Store screenshot about questions, the third, "Answer without unlocking."
     (`docs/APP-STORE.md`, Screenshots): whether it stays.
   - The website's lesson pictures (`demo3`).
-  - Whether the privacy policy and terms drop questions and slides.
+  - Whether the privacy policy and terms drop questions and slides. The switch is the portal's
+    alone: the API still takes answers and decks, the apps still show what a teacher sends, and
+    what is stored stays until retention, so the policies' lines stay true until that changes.
 - 🔧 **Prod's sign-in pages to managed login (2026-11-12):** its two clients wear the style; switch
   its domain, outside class hours, by the one command in `infra/cognito/managed-login/README.md`
   ("The domain's switch, and back", its rollback beside it), then sign in once on prod to confirm.
@@ -471,8 +476,10 @@ decision log, <date>" means the entry with that date there.
   word for word to `docs/PLAN-ARCHIVE.md`. Before building a step, search the archive for its id:
   finished steps' notes say what they left for it ("for L7 to wire").
 - A phase whose step lines were written up front, two workers at once (Lock-only portal): a worker
-  changes only its own line, a step done keeping it with ✅, its PR and its DECISIONS date, and leaves
-  the header line to the phase's end; the phase's lines move to the archive together then.
+  changes only its own line, a step done keeping it with ✅, its PR and its DECISIONS date. Whatever
+  else its step changes here (the header line, a count in Now such as the source-text tests left)
+  waits for the phase's end, noted on the step's own line meanwhile; the phase's lines move to the
+  archive together then.
 - An Android step updates `docs/PLAN-ANDROID.md` by these same rules, and here Android's lines
   (Now, its phase rows, its owner items): its Now line at least when it changes source, as CLAUDE.md
   asks of every source change.

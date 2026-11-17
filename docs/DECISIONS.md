@@ -56,12 +56,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   look. It overlaps the owner command that retires a block (PLAN's Before the pilot, item 3), which stays planned.
 
   **Two workers at once** (the owner: "ok yeah lets do your two worksers at once plan."), where the 2026-09-23 entry had one
-  at a time (CLAUDE.md, How to work, step 2; `.claude/commands/plan.md`). The conductor may run two workers at once, only on
-  steps whose files don't overlap (a phase's lanes), each in its own worktree. Each step's PLAN.md line is written up front,
-  and a worker changes only its own line. When the other lane's PR merges, a worker brings its branch up to date with main
-  and pushes, since main requires it; a DECISIONS conflict on that catch-up keeps both entries. Such a phase has a tracker
-  issue and an issue per step: a worker comments when it starts and if it parks, and its PR closes its issue. The conductor
-  still never writes code, and every check and both reviewers stay.
+  at a time (CLAUDE.md, How to work, step 2; `.claude/commands/plan.md`). The conductor may run two workers at once, never
+  more, only on steps whose own files don't overlap (a phase's lanes), each in its own worktree. Each step's PLAN.md line is
+  written up front, and a worker changes only its own line. When the other lane's PR merges, a worker brings its branch up
+  to date with main and pushes, since main requires it; a DECISIONS conflict on that catch-up keeps both entries, and so
+  does one in another file both lanes edit, a shared list such as the source-text tests' (santa's round 1 found two lanes'
+  steps taking adjacent entries off it). Such a phase has a tracker issue and an issue per step: a worker comments when it
+  starts and if it parks, and its PR closes its issue. The conductor still never writes code, and every check and both
+  reviewers stay.
 
   **The phase** (PLAN's Lock-only portal; tracker #601, an issue a step): LO0, LO1 and LO2 first, LO10 beside LO1; then lane
   A (LO3, LO8, LO11) beside lane B (LO4–LO7, LO9). Left for the owner (PLAN's Open owner items): turning lessons off on

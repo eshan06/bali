@@ -91,9 +91,10 @@ comparison and never built. Its look is the canvas's `project/lock.css` (§1, Th
 lock-only look). It is built in PLAN's Lock-only portal steps, each teacher page
 keeping v2's look until its step lands. Sign-in, the invite page and Help are not
 redrawn: they keep today's approved designs and words, the sign-in redesign's for
-sign-in and v2's boards for the other two. Its pages are drawn with the lessons
-switch off (ARCHITECTURE, Web portal, decision 8); fitting the lesson pieces into
-them, to turn lessons back on, takes one design pass and one step. An
+sign-in and v2's boards for the other two. Its teacher pages draw no lesson
+pieces, so a teacher page rebuilt from it shows none whichever way the lessons
+switch is set (ARCHITECTURE, Web portal, decision 8); fitting them into its
+pages, to turn lessons back on, takes one design pass and one step. An
 intermediate state of one of its screens that no board draws is drawn on this
 canvas first, as below.
 
