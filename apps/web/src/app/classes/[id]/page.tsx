@@ -934,7 +934,7 @@ export default function ClassDetailPage() {
         </Oops>
       )}
       <section aria-labelledby={`${id}-over`} className="grid flex-1 place-items-center py-12">
-        <h2 id={`${id}-over`} className="text-present-clock">
+        <h2 id={`${id}-over`} className="text-center text-present-clock text-balance">
           Class is over
         </h2>
       </section>

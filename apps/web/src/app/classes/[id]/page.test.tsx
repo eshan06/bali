@@ -100,6 +100,8 @@ const bali = vi.hoisted(() => {
     existing: false,
     /** The session over, as the class's reports list it after the bell (LO7). */
     ended: false,
+    /** The roster's read with no answer at all, as when Bali can't be reached (LO9). */
+    rosterDown: false,
   };
   /**
    * What the session has open, as its read says it (L7, M6): a question and a slide, none unless a
@@ -214,6 +216,10 @@ const bali = vi.hoisted(() => {
         waiting.push({ answer, fail });
       });
     }
+    if (now.rosterDown && path === `/v1/classes/${CLASS}/roster`) {
+      sent.push({ method, path, body });
+      return Promise.reject(new TypeError('Failed to fetch'));
+    }
     const held =
       now.holdStart && method === 'POST' && path === `/v1/classes/${CLASS}/sessions`
         ? new Promise<void>((go) => starts.push(go))
@@ -311,6 +317,7 @@ afterEach(() => {
   bali.now.block = true;
   bali.now.existing = false;
   bali.now.ended = false;
+  bali.now.rosterDown = false;
   bali.lesson.question = null;
   bali.lesson.presentation = null;
   bali.lesson.decks = [];
@@ -471,8 +478,8 @@ describe('the live header (LO5; ClassLive, PhoneLive), and Present (LO9; Present
     );
     expect(code.getAttribute('translate')).toBe('no');
     expect(code.className).toMatch(/\bfont-mono\b.*\btext-code-join\b/);
-    // No menu's place, no roster, no New code, no Check on, no session list: the class sees this.
-    expect(screen.queryByRole('navigation')).toBeNull();
+    // No roster, no New code, no Check on, no session list: the class sees this. (No menu: the
+    // shell is told, below.)
     expect(screen.queryByRole('button', { name: /New code|Add students/ })).toBeNull();
     expect(screen.queryByText(/^Check on/)).toBeNull();
     expect(screen.queryByRole('complementary')).toBeNull();
@@ -1066,7 +1073,10 @@ describe('Present’s toggle, focus following it (PV9, LO9)', () => {
     bali.now.ended = true;
     await bell();
     const over = await screen.findByRole('heading', { level: 2, name: 'Class is over' });
-    expect(over.className).toBe('text-present-clock');
+    // At the time's size, centred and balanced where it wraps on a phone.
+    expect(over.className.split(' ')).toEqual(
+      expect.arrayContaining(['text-present-clock', 'text-center', 'text-balance']),
+    );
     const header = screen.getByRole('banner');
     expect(within(header).getByRole('heading', { level: 1 }).textContent).toBe('Biology, period 3');
     expect(
@@ -1080,6 +1090,31 @@ describe('Present’s toggle, focus following it (PV9, LO9)', () => {
     expect(screen.getByText('VMAF7E').parentElement?.textContent).toBe(
       'New to this class? Join in the Bali app with VMAF7E',
     );
+    expect(bali.unexpected).toEqual([]);
+  });
+
+  it('says a roster that didn’t load after the bell under Present’s header, its Try again reading it again (PresentStates)', async () => {
+    sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
+    const user = userEvent.setup();
+    render(<ClassDetailPage />);
+    await screen.findByText('Ana Rodríguez');
+    await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
+    bali.now.running = false;
+    bali.now.rosterDown = true;
+    await bell();
+    await screen.findByRole('heading', { level: 2, name: 'Class is over' });
+    const line = await screen.findByRole('alert');
+    expect(line.textContent).toBe(`Couldn't load this class. ${CANT_REACH}`);
+    expect(line.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    // Under the header, over Class is over.
+    expect(screen.getByRole('banner').compareDocumentPosition(line)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    // Read again, and answered: the line goes, Class is over stays.
+    bali.now.rosterDown = false;
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await vi.waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(screen.getByRole('heading', { level: 2, name: 'Class is over' })).toBeTruthy();
     expect(bali.unexpected).toEqual([]);
   });
 
