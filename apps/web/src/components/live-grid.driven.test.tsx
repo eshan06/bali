@@ -8,7 +8,7 @@ import {
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LiveGrid } from './live-grid';
+import { LiveGrid, LockChip } from './live-grid';
 import { CLOCK_OFF } from './student-panel';
 
 /*
@@ -356,5 +356,38 @@ describe('the live grid’s stream', () => {
     const asked = bali.streams[0] as { url: string; after: number; settled?: number };
     expect(asked.url).toMatch(/\/v1\/sessions\/S\/stream$/);
     expect(asked).toMatchObject({ after: 12, settled: 7 });
+  });
+});
+
+describe('a state’s chip in the lock-only look (LockChip; LO2)', () => {
+  it('says its state in words beside its icon, never by colour alone, its label or the words given', () => {
+    render(
+      <ul>
+        <li>
+          <LockChip display="unlocked" />
+        </li>
+        <li>
+          <LockChip display="silent" words="Silent · 5 min" />
+        </li>
+        <li>
+          <LockChip display="left_unprotected" />
+        </li>
+      </ul>,
+    );
+    const chips = screen.getAllByRole('listitem').map((item) => item.firstElementChild);
+    // Its words, a line never starting with a dot (a no-break space before each).
+    expect(chips.map((chip) => chip?.textContent)).toEqual([
+      'Unlocked',
+      'Silent\u00a0· 5 min',
+      'Left\u00a0· unlocked',
+    ]);
+    // Its icon hidden from a screen reader, which hears the words; its tint and its edge its
+    // state's, Silent's dashed (DESIGN.md §2).
+    for (const chip of chips) {
+      expect(chip?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    }
+    expect(chips[0]?.className).toMatch(/\bbg-state-emergency-bg\b.*\btext-state-emergency-fg\b/);
+    expect(chips[1]?.className).toMatch(/\bborder-dashed\b/);
+    expect(chips[2]?.className).toMatch(/\bbg-state-emergency-bg\b/);
   });
 });

@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { buttonClass } from '../components/button';
+import { buttonClass, ICON_BUTTON, lockButton } from '../components/button';
 import { CARD_ALONE, CARD_ENTRY } from '../components/card';
 
 /*
@@ -145,6 +145,23 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   // wordmark over the art and the art's line.
   wordmark: ['72px', '76px', 600, '-0.04em'],
   tagline: ['40px', '46px', 600, '-0.02em'],
+};
+/**
+ * The lock-only look's sizes off the scale (DESIGN.md §1, The lock-only look; LO2), as its canvas's
+ * lock.css draws each: the top bar's links and the phone menu's, a part's title, the page's one
+ * number and its words on a computer and on a phone, a code in its well, a dialog's or the student
+ * panel's title.
+ */
+const LOCK_SIZES: Record<string, [string, string, number, string?]> = {
+  nav: ['14.5px', '20px', 500],
+  'menu-link': ['17px', '24px', 500],
+  'section-title': ['17px', '24px', 600],
+  count: ['64px', '64px', 600, '-0.035em'],
+  'count-phone': ['52px', '52px', 600, '-0.035em'],
+  'count-of': ['22px', '28px', 500],
+  'count-of-phone': ['19px', '26px', 500],
+  'code-well': ['34px', '44px', 500, '0.08em'],
+  'panel-title': ['19px', '26px', 600],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -372,13 +389,19 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       .filter((k) => k.startsWith('--text-') && k !== '--text-*' && !k.slice(2).includes('--'))
       .map((k) => k.slice('--text-'.length));
     const styles = tokens.type.groups.flatMap((g) => g.styles.map((s) => s.name));
-    expect(sizes.sort()).toEqual([...styles, 'input', ...Object.keys(V2_SIZES)].sort());
+    expect(sizes.sort()).toEqual(
+      [...styles, 'input', ...Object.keys(V2_SIZES), ...Object.keys(LOCK_SIZES)].sort(),
+    );
     expect(theme.get('--text-input')).toBe('16px');
     expect(theme.get('--text-input--line-height')).toBe('24px');
     expect(theme.get('--text-input--font-weight')).toBe('400');
     expect(read('../components/field.tsx')).toMatch(/<input[^]*className=\{`[^`]*\btext-input\b/);
-    // v2's sizes off the scale, each as drawn; the ones the scale has, the scale's own.
-    for (const [name, [size, line, weight, tracking]] of Object.entries(V2_SIZES)) {
+    // v2's sizes off the scale, and the lock-only look's, each as drawn; the ones the scale has,
+    // the scale's own.
+    for (const [name, [size, line, weight, tracking]] of Object.entries({
+      ...V2_SIZES,
+      ...LOCK_SIZES,
+    })) {
       expect(theme.get(`--text-${name}`), name).toBe(size);
       expect(theme.get(`--text-${name}--line-height`), name).toBe(line);
       expect(theme.get(`--text-${name}--font-weight`), name).toBe(String(weight));
@@ -459,7 +482,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), a live card’s edge (W3), a question’s bars and correct letter (L7; the letter on Your questions too, L7b), the correct answer’s fill on the projector (L7, part 2), the "is ready" dialog’s check (PV16b), and the sign-in page’s art panel (the sign-in redesign)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), a live card’s edge (W3), a question’s bars and correct letter (L7; the letter on Your questions too, L7b), the correct answer’s fill on the projector (L7, part 2), the "is ready" dialog’s check (PV16b), the sign-in page’s art panel (the sign-in redesign), and the lock-only look’s live class (LO2)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -473,6 +496,8 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       '--color-border-input',
       '--color-letter-right',
       '--color-live-edge',
+      '--color-live-fill',
+      '--color-live-hover',
       '--color-mark',
       '--color-mark-off',
       '--color-option-right',
@@ -484,6 +509,13 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     ]);
     // A live card's edge: green-200, as v2.css's `.livecard` draws it.
     expect(inline.get('--color-live-edge')).toBe('var(--bali-green-200)');
+    // The lock-only look's live class (LO2), as lock.css draws it: its fill green-50, under the
+    // strip's secondary ink and its name's primary at 4.5:1 and more; its edge on hover green-600.
+    expect(inline.get('--color-live-fill')).toBe('var(--bali-green-50)');
+    expect(inline.get('--color-live-hover')).toBe('var(--bali-green-600)');
+    expect(contrast(hexOf('text-secondary', 'light'), hexOf('green-50', 'light'))).toBeGreaterThan(
+      4.5,
+    );
     // The "is ready" dialog's check (PV16b, ClassesCreated): green-600, as the board draws it, a
     // graphic at 3:1 and more on the dialog's white (1.4.11).
     expect(inline.get('--color-ready')).toBe('var(--bali-green-600)');
@@ -728,12 +760,14 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     // drawn so too; a live question's (L7) options' letters, and its "Results can't refresh", drawn
     // as the stale banner is, on the class page and in Present (L7, part 2); on Your questions
     // (L7b) the answers' letters; Your slides' (M5b) file tiles and an upload's progress track; on a
-    // student's lesson (W4) their own answer once the question closes (StudentClosed); and "Can't
+    // student's lesson (W4) their own answer once the question closes (StudentClosed); "Can't
     // reach Bali", drawn as the stale banner is, the notice `your-phone.tsx` shares with the lesson
-    // page's lines and the home's live card (StudentChipUnreached, W4's follow-up).
+    // page's lines and the home's live card (StudentChipUnreached, W4's follow-up); and the
+    // lock-only look's two wells (LO2), a plain one and a code's, as its canvas draws them.
     expect(filled).toEqual({
       [join('app', 'classes', '[id]', 'page.tsx')]: 1,
       [join('app', 'support', 'page.tsx')]: 1,
+      [join('components', 'card.ts')]: 2,
       [join('components', 'join-code.tsx')]: 1,
       [join('components', 'live-grid.tsx')]: 1,
       [join('components', 'present-question.tsx')]: 2,
@@ -804,6 +838,61 @@ describe('the buttons in v2’s look (DESIGN.md §1 and §4, PV4)', () => {
     );
     expect(large).not.toEqual(expect.arrayContaining(['h-10']));
     expect(large).not.toEqual(expect.arrayContaining(['text-button']));
+  });
+});
+
+describe('the lock-only look’s buttons (DESIGN.md §1, The lock-only look; LO2)', () => {
+  const look = lockButton('primary').split(' ');
+
+  it('are v2’s height, corners and label on one line, 16 px in, pressed by `press`', () => {
+    expect(look).toEqual(
+      expect.arrayContaining(['h-10', 'rounded-sm', 'px-4', 'text-button', 'whitespace-nowrap']),
+    );
+    expect(look).toContain('press');
+    expect(look).not.toContain('px-4.5');
+  });
+
+  it('come small: 34 px tall, 12 px in, a 13.5/18 label, their hit area 44 px tall', () => {
+    const small = lockButton('secondary', 'sm').split(' ');
+    expect(small).toEqual(
+      expect.arrayContaining([
+        'h-8.5',
+        'px-3',
+        'text-button-sm',
+        'relative',
+        'after:absolute',
+        'after:-inset-y-1.25',
+      ]),
+    );
+    expect(small).not.toContain('text-button');
+  });
+
+  it('held, dim to 55 % with the cursor not allowed; pressed grey with a primary edge; open, as at rest', () => {
+    expect(look).toEqual(
+      expect.arrayContaining([
+        'disabled:opacity-55',
+        'aria-disabled:opacity-55',
+        'disabled:cursor-not-allowed',
+        'aria-disabled:cursor-not-allowed',
+      ]),
+    );
+    const secondary = lockButton('secondary').split(' ');
+    expect(secondary).toEqual(
+      expect.arrayContaining([
+        'aria-pressed:border-text-primary',
+        'aria-pressed:bg-surface-sunken',
+      ]),
+    );
+    expect(secondary.filter((c) => c.startsWith('aria-expanded:'))).toEqual([]);
+  });
+
+  it('press: 0.97, an icon button’s 0.94, on the ease-out over 140 ms; never one held, nothing under reduced motion', () => {
+    expect(css).toMatch(
+      /@utility press \{\s*transition:\s*transform 140ms cubic-bezier\(0\.23, 1, 0\.32, 1\),\s*background-color 150ms cubic-bezier\(0\.2, 0, 0, 1\),\s*border-color 150ms cubic-bezier\(0\.2, 0, 0, 1\),\s*color 150ms cubic-bezier\(0\.2, 0, 0, 1\);\s*@media \(prefers-reduced-motion: no-preference\) \{\s*&:active:not\(:disabled, \[aria-disabled='true'\]\) \{\s*transform: scale\(var\(--press-scale, 0\.97\)\);\s*\}\s*\}\s*\}/,
+    );
+    expect(ICON_BUTTON.split(' ')).toEqual(
+      expect.arrayContaining(['press', '[--press-scale:0.94]', 'size-8', 'rounded-item']),
+    );
   });
 });
 

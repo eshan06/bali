@@ -31,21 +31,22 @@ import {
   Shell,
   SideMenu,
   SIGNED_OUT_PATHS,
+  TOP_PAGE,
 } from './shell';
 import { StudentLessonPage } from './student-lesson';
 
 /*
- * The shell (PV5): v2's side menu on a teacher's signed-in pages, built to the canvas's teacher
- * boards, StudentZoom's bar and PV1's phone and no-name boards, under the owner's rulings of
- * 2026-10-13 (no menu in Present; nothing shown from an account that left; the menu only once the
- * account reads as a teacher). Which frame a page gets, what happens to the account as pages change
- * and the back button restores one, and, rendered, the menu's items, the page it marks, its foot
- * with and without a name, its bar under 776 px and its three rows under 640 px, and the page beside
- * it. And how the account is read (PV5b, the owner's approval of #352's review): Loading… in the
- * page's place until it answers, its failure there with Try again, read again on the next page,
- * and only the newest read's answer counts; the 13+ check read before `/v1/me`, which makes the
- * account, and a tab with no sign-in sent to /login (PV15). And a student's menu, Your classes and
- * Help, for an account that said 13+ in the app, the invite page at /invite under the bar (W3).
+ * The shell (PV5): a teacher's signed-in pages under the top bar since LO2 (its own tests drive it,
+ * `portal-bar.test.tsx`, and the shell's choice of it, `shell.driven.test.tsx`), a student's beside
+ * v2's side menu (W3), under the owner's rulings of 2026-10-13 (no menu in Present; nothing shown
+ * from an account that left; the menu only once the account reads as a student's). Which frame a
+ * page gets, what happens to the account as pages change and the back button restores one, and,
+ * rendered, the menu's items, the page it marks, its foot with and without a name, its bar under
+ * 776 px and its three rows under 640 px, and the page beside it. And how the account is read
+ * (PV5b, the owner's approval of #352's review): Loading… in the page's place until it answers, its
+ * failure there with Try again, read again on the next page, and only the newest read's answer
+ * counts; the 13+ check read before `/v1/me`, which makes the account, and a tab with no sign-in
+ * sent to /login (PV15). And the invite page at /invite under the bar (W3).
  */
 const nav = vi.hoisted(() => ({
   path: '/',
@@ -78,7 +79,6 @@ const homeOf = (kind: Home['kind']): Home =>
 const menu = (over: Partial<Parameters<typeof SideMenu>[0]> = {}) =>
   renderToStaticMarkup(
     createElement(SideMenu, {
-      role: 'teacher',
       path: '/',
       name: 'Ms. Rivera',
       leaving: false,
@@ -102,6 +102,7 @@ const classesOf = (html: string, tag: RegExp) =>
 
 const NONE = { chrome: null, framed: false, hidden: false };
 const MENU = { chrome: 'menu', framed: true, hidden: false };
+const TOP = { chrome: 'top', framed: true, hidden: false };
 
 describe('what frames a page', () => {
   it('draws nothing on a page read without signing in: each has its own bar', () => {
@@ -110,9 +111,9 @@ describe('what frames a page', () => {
     }
   });
 
-  it('draws the side menu for a teacher, the page beside it in v2’s frame', () => {
-    for (const path of ['/', '/classes/c1', '/reports']) {
-      expect(frameFor(path, homeOf('teacher'), null, false), path).toEqual(MENU);
+  it('draws the top bar for a teacher, the page under it in its frame (LO2)', () => {
+    for (const path of ['/', '/classes', '/classes/c1', '/reports', '/questions', '/invite']) {
+      expect(frameFor(path, homeOf('teacher'), null, false), path).toEqual(TOP);
     }
   });
 
@@ -159,8 +160,8 @@ describe('what frames a page', () => {
       framed: false,
       hidden: false,
     });
-    // A teacher there has the menu, and the page sends them to their classes.
-    expect(frameFor('/invite', homeOf('teacher'), null, false)).toEqual(MENU);
+    // A teacher there has the top bar, and the page sends them to their classes.
+    expect(frameFor('/invite', homeOf('teacher'), null, false)).toEqual(TOP);
   });
 
   it('says a failed read in the page’s place under the bar, with Sign out, on every page (#352’s review)', () => {
@@ -276,18 +277,6 @@ describe('the shell’s wiring of the rulings (read from its source)', () => {
     );
   });
 
-  it('reads the account as the home does, the 13+ check first, and never /v1/me itself (PV15)', () => {
-    expect(shell).toMatch(/said = \{ home: await homeFor\(api\) \};/);
-    expect(shell).not.toMatch(/['"]\/v1\/me['"?]/);
-    // The menu names the account `/v1/me` read, none for one the check never let it read.
-    expect(shell).toMatch(
-      /const me = home === null \|\| home\.kind === 'invite' \? null : home\.me;\s*const value = useMemo\(\s*\(\) => \(\{ home, me, error, load, refresh \}\),\s*\[home, me, error, load, refresh\],\s*\);/,
-    );
-    expect(shell).toMatch(/name=\{me\?\.user\.displayName\?\.trim\(\) \|\| null\}/);
-    // A student's menu once the account reads as one, a teacher's otherwise (W3).
-    expect(shell).toMatch(/role=\{home\?\.kind === 'student' \? 'student' : 'teacher'\}/);
-  });
-
   it('says the account unread in the page’s place, Try again reading it again (#352’s review)', () => {
     // Read as the student home's 30 s read is (`refresh`): its failure kept until the answer, so
     // the card and its Try again stay while it reads (PV17a). In the page's one `<main>`, the page
@@ -321,58 +310,16 @@ describe('the avatar’s initials', () => {
   });
 });
 
-describe('the side menu', () => {
-  it('links Bali, Home, Classes, Reports, Questions, Slides and Help, each page as it exists', () => {
+describe('the side menu, a student’s (W3; a teacher’s pages have the top bar since LO2)', () => {
+  it('links Bali in the brand’s ink, the mark at 20 px, as every board renders it', () => {
     const html = menu();
     expect(html).toMatch(/^<nav aria-label="Main" /);
-    expect(links(html).map(({ href, text }) => [href, text])).toEqual([
-      ['/', 'Bali'],
-      ['/', 'Home'],
-      ['/classes', 'Classes'],
-      ['/reports', 'Reports'],
-      ['/questions', 'Questions'],
-      ['/slides', 'Slides'],
-      ['/support', 'Help'],
-    ]);
-    // Classes with the boards' icon, the grid of four (PV16a); Reports with the boards' icon, the
-    // class page's Reports button's (PV13); Questions with
-    // theirs, the speech bubble with a question mark (L7b); Slides with theirs, the presentation
-    // board (M5b).
-    expect(html).toMatch(/<a [^>]*href="\/classes"><svg[^>]*\blucide-layout-grid\b/);
-    expect(html).toMatch(/<a [^>]*href="\/reports"><svg[^>]*\blucide-chart-bar\b/);
-    expect(html).toMatch(
-      /<a [^>]*href="\/questions"><svg[^>]*\blucide-message-circle-question-mark\b/,
-    );
-    expect(html).toMatch(/<a [^>]*href="\/slides"><svg[^>]*\blucide-presentation\b/);
-    // The lockup, the mark at 20 px and its word at 16/22 in the brand's ink, as the boards render
-    // it (v2.css's links take that ink, `.brand` among them).
     expect(html).toMatch(/<a [^>]*translate="no"[^>]*><svg[^>]*width="20"/);
     expect(links(html)[0]?.classes).toEqual(
       expect.arrayContaining(['text-lockup', 'text-text-brand']),
     );
-  });
-
-  it('marks the page open, grey and semibold, and nothing on a page it doesn’t list yet', () => {
-    const current = (path: string) =>
-      links(menu({ path }))
-        .filter((l) => l.current)
-        .map((l) => l.text);
-    expect(current('/')).toEqual(['Home']);
-    expect(current('/classes')).toEqual(['Classes']);
-    expect(current('/reports')).toEqual(['Reports']);
-    expect(current('/questions')).toEqual(['Questions']);
-    expect(current('/slides')).toEqual(['Slides']);
-    // A page under one it lists: a class's page and its reports' old address under Classes (PV16a),
-    // a session's report under Reports (PV14, ReportOpened); none under Home's `/`, nor a page whose
-    // name only starts as another's does.
-    expect(current('/classes/c1')).toEqual(['Classes']);
-    expect(current('/classes/c1/reports')).toEqual(['Classes']);
-    expect(current('/classesx')).toEqual([]);
-    expect(current('/reports/c1/s1')).toEqual(['Reports']);
-    expect(current('/reportsx')).toEqual([]);
-    // By its aria-current, which a screen reader says too, never by colour alone.
-    const home = links(menu()).find((l) => l.text === 'Home');
-    expect(home?.classes).toEqual(
+    // Its item marked by its aria-current, which a screen reader says too, never by colour alone.
+    expect(links(html).find((l) => l.text === 'Your classes')?.classes).toEqual(
       expect.arrayContaining([
         'aria-[current=page]:bg-surface-sunken',
         'aria-[current=page]:font-semibold',
@@ -427,7 +374,7 @@ describe('the side menu', () => {
   });
 
   it('for a student, links Bali, Your classes and Help, as StudentHome draws it, and none of a teacher’s pages (W3)', () => {
-    const html = menu({ role: 'student', name: 'Ana Rodríguez' });
+    const html = menu({ name: 'Ana Rodríguez' });
     expect(links(html).map(({ href, text, current }) => [href, text, current])).toEqual([
       ['/', 'Bali', false],
       ['/', 'Your classes', true],
@@ -441,19 +388,17 @@ describe('the side menu', () => {
       /<span aria-hidden="true" class="[^"]*\bbg-avatar-bg\b[^"]*">AR<\/span><span title="Ana Rodríguez" class="[^"]*\btext-menu-name\b[^"]*">Ana Rodríguez<\/span><button type="button" aria-label="Sign out"/,
     );
     // On a page the student has no item for, nothing is marked.
-    expect(links(menu({ role: 'student', path: '/invite' })).filter((l) => l.current)).toEqual([]);
+    expect(links(menu({ path: '/invite' })).filter((l) => l.current)).toEqual([]);
   });
 
   it('marks Your classes on a student’s lesson too, as StudentLesson draws it, and on no page merely named alike (W4)', () => {
     const current = (path: string) =>
-      links(menu({ role: 'student', path }))
+      links(menu({ path }))
         .filter((l) => l.current)
         .map((l) => l.text);
     expect(current('/lessons/c1/s1')).toEqual(['Your classes']);
     expect(current('/lessonsx')).toEqual([]);
     expect(current('/support')).toEqual(['Help']);
-    // A teacher's menu has no lessons under Home.
-    expect(links(menu({ path: '/lessons/c1/s1' })).filter((l) => l.current)).toEqual([]);
   });
 
   it('holds Sign out while it signs out, as the bar does', () => {
@@ -503,6 +448,23 @@ describe('the shell', () => {
   // A signed-in page draws its parts in the shell's `<main>`; one read without signing in, its own.
   const page = createElement('div', null, 'page');
   const own = createElement('main', null, 'page');
+
+  it('sets the page under the top bar centred under its row, 1360 px at most, in its gutters, its sides clipped (LO2)', () => {
+    expect(TOP_PAGE.split(' ')).toEqual(
+      expect.arrayContaining([
+        'mx-auto',
+        'w-full',
+        'max-w-[1360px]',
+        'overflow-x-clip',
+        'px-10',
+        'pt-8',
+        'pb-16',
+        'max-[760px]:px-4',
+        'max-[760px]:pt-6',
+        'max-[760px]:pb-12',
+      ]),
+    );
+  });
 
   it('sets the page beside the menu left-aligned, 1260 px at most, in v2’s gutters', () => {
     expect(PAGE.split(' ')).toEqual(
@@ -666,10 +628,11 @@ describe('one `<main>` on a page, in every state (the owner’s follow-up, 2026-
     for (const [state, html] of Object.entries(frames)) {
       expect(html.match(/<main\b/g), state).toHaveLength(1);
     }
-    // v2's width and gutters on the shell's `<main>` beside the menu and while the account is
-    // said, as on the page's place before; none in Present or on the invite page, which frame
-    // themselves; the page in it, as it was, its frame never remounting it.
-    expect(classesOf(frames.teacher, /^<main\b[^>]*>/)).toEqual(PAGE.split(' '));
+    // The top bar's frame on the shell's `<main>` under it (LO2); v2's width and gutters beside the
+    // menu and while the account is said, as on the page's place before; none in Present or on the
+    // invite page, which frame themselves; the page in it, as it was, its frame never remounting it.
+    expect(classesOf(frames.teacher, /^<main\b[^>]*>/)).toEqual(TOP_PAGE.split(' '));
+    expect(classesOf(frames.student, /^<main\b[^>]*>/)).toEqual(PAGE.split(' '));
     expect(classesOf(frames.reading, /^<main\b[^>]*>/)).toEqual(PAGE.split(' '));
     expect(frames.present).toBe('<main><div><div>page</div></div></main>');
     expect(frames.invite).toBe(frames.present);

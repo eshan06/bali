@@ -1,16 +1,7 @@
 'use client';
 
 import type { MeResponse, PortalEvent } from '@bali/shared';
-import {
-  ChartBar,
-  CircleQuestionMark,
-  House,
-  LayoutGrid,
-  LogOut,
-  type LucideIcon,
-  MessageCircleQuestionMark,
-  Presentation,
-} from 'lucide-react';
+import { CircleQuestionMark, LayoutGrid, LogOut, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -28,23 +19,27 @@ import { countAction } from '@/lib/actions';
 import { type ApiClient, UnauthorizedError } from '@/lib/api-client';
 import { endSession, getAccessToken, tookSignIn } from '@/lib/auth';
 import { errText } from '@/lib/errors';
-import { lessonsOn } from '@/lib/lessons';
 import { type Home, homeFor } from '@/lib/student-web';
 import { useApi } from '@/lib/use-api';
 
 import { CARD_ALONE } from './card';
 import { CountContext } from './count';
 import { Mark } from './mark';
-import { PortalBar } from './portal-bar';
+import { initials, PortalBar, TopBar } from './portal-bar';
 import { TryAgain } from './try-again';
+
+export { initials };
 
 /** The pages read without signing in (sign-in, its callback, Help, the policies), each with a bar. */
 export const SIGNED_OUT_PATHS = /^\/(login|auth|support|privacy|terms)(\/|$)/;
 
-/** How the shell frames a page: the side menu or the bar, the page's frame, or nothing yet. */
+/**
+ * How the shell frames a page: a teacher's top bar, a student's side menu or the bar, the page's
+ * frame, or nothing yet.
+ */
 export interface Frame {
-  chrome: 'menu' | 'bar' | null;
-  /** The page at v2's width and gutters (`PAGE`). */
+  chrome: 'top' | 'menu' | 'bar' | null;
+  /** The page in its frame: under the top bar, the bar's (`TOP_PAGE`); else v2's (`PAGE`). */
   framed: boolean;
   /**
    * The page waits: the account isn't read, so neither its frame nor a page drawn from it shows,
@@ -61,10 +56,10 @@ const INVITE_PATHS = new Set(['/', '/invite']);
  * a page on the projector (Present) has no menu and no frame of the shell's, as ClassPresent draws
  * it. Otherwise the page waits for the account, so no frame flashes before it is known and no page
  * is drawn from an account that left: Loading… with no menu or bar while it is read, its failure
- * under the bar with Sign out (PV5b, the owner's approval of #352's review); then the side menu for
- * a teacher, and for a student who said 13+ in the app (W3), but on the invite page, which frames
- * itself under the bar (Invite, PV15), as it does for an account the 13+ check never passed, whose
- * every page has the bar.
+ * under the bar with Sign out (PV5b, the owner's approval of #352's review); then the top bar for a
+ * teacher (LO2), and the side menu for a student who said 13+ in the app (W3), but on the invite
+ * page, which frames itself under the bar (Invite, PV15), as it does for an account the 13+ check
+ * never passed, whose every page has the bar.
  */
 export function frameFor(
   path: string,
@@ -75,7 +70,8 @@ export function frameFor(
   if (SIGNED_OUT_PATHS.test(path) || presenting)
     return { chrome: null, framed: false, hidden: false };
   if (home === null) return { chrome: error === null ? null : 'bar', framed: false, hidden: true };
-  if (home.kind === 'teacher' || (home.kind === 'student' && path !== '/invite'))
+  if (home.kind === 'teacher') return { chrome: 'top', framed: true, hidden: false };
+  if (home.kind === 'student' && path !== '/invite')
     return { chrome: 'menu', framed: true, hidden: false };
   return { chrome: 'bar', framed: !INVITE_PATHS.has(path), hidden: false };
 }
@@ -217,45 +213,23 @@ export function usePresenting(on: boolean): void {
   }, [on, setPresenting]);
 }
 
-/** A name's initials, as v2 drew them: the first letter of its first two words (Ms. Rivera, MR). */
-export function initials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => (/\p{L}/u.exec(word) ?? [...word])[0])
-    .join('')
-    .toLocaleUpperCase();
-}
-
 interface Item {
   href: string;
   label: string;
   Icon: LucideIcon;
   /** Pages under it at another path: a student's lessons under Your classes (W4). */
   under?: string;
-  /** A live lesson's page: listed only while the lessons switch is on (`lessonsOn`, LO1). */
-  lesson?: true;
 }
 
-/** Whose menu it is: a teacher's, or a student's who said 13+ in the app (W3). */
-export type MenuRole = 'teacher' | 'student';
-
 /**
- * The menu's pages, each listed only once it exists, never as a dead or disabled link: a teacher's
- * Classes (PV16) is marked on a class's page too, and Questions and Slides are gone while lessons
- * are off (LO1); a student's is Your classes alone (StudentHome), its lessons under it
- * (StudentLesson). Help sits under the gap, in both.
+ * A student's menu (StudentHome): Your classes, their lessons under it (StudentLesson), and Help
+ * under the gap. A teacher's pages have the top bar since LO2 (`TopBar`).
  */
-const PAGES: Record<MenuRole, Item[]> = {
-  teacher: [
-    { href: '/', label: 'Home', Icon: House },
-    { href: '/classes', label: 'Classes', Icon: LayoutGrid },
-    { href: '/reports', label: 'Reports', Icon: ChartBar },
-    { href: '/questions', label: 'Questions', Icon: MessageCircleQuestionMark, lesson: true },
-    { href: '/slides', label: 'Slides', Icon: Presentation, lesson: true },
-  ],
-  student: [{ href: '/', label: 'Your classes', Icon: LayoutGrid, under: '/lessons' }],
+const YOUR_CLASSES: Item = {
+  href: '/',
+  label: 'Your classes',
+  Icon: LayoutGrid,
+  under: '/lessons',
 };
 const HELP: Item = { href: '/support', label: 'Help', Icon: CircleQuestionMark };
 
@@ -286,28 +260,35 @@ export const PAGE =
   'max-w-[1260px] min-w-0 flex-1 px-9 pt-7.5 pb-14 max-sm:px-4 max-sm:pt-5.5 max-sm:pb-10';
 
 /**
- * The side menu, drawn from what it is given: a teacher's, or a student's (StudentHome). Its foot
- * names the account, its initials beside the name and Sign out an icon; with no name on the
- * account, Sign out in words alone (HomeNoName). A name too long for the foot, such as the sign-in's
- * email that an account with no name of its own shows, stays on one line cut with an ellipsis, whole
- * on hover and to a screen reader; on a phone the foot keeps its place beside Bali, the name cut to
- * fit (MenuNameStates, drawn first).
+ * The page under the top bar (lock.css's `.wrap.page`; LO2): centred under the bar's row, 1360 px
+ * at most, 40 px in at the sides, 32 over and 64 under; under 760 px 16 px in, 24 over and 48 under.
+ * A page not yet rebuilt from the lock-only canvas keeps its own look in it, its sides clipped as
+ * lock.css clips the page's, so a layer v2 drew for its own wider gutters (the unlock pop-ups', 36 px
+ * out) never scrolls the page sideways.
+ */
+export const TOP_PAGE =
+  'mx-auto w-full max-w-[1360px] overflow-x-clip px-10 pt-8 pb-16 max-[760px]:px-4 max-[760px]:pt-6 max-[760px]:pb-12';
+
+/**
+ * A student's side menu (StudentHome). Its foot names the account, its initials beside the name
+ * and Sign out an icon; with no name on the account, Sign out in words alone (HomeNoName). A name too
+ * long for the foot, such as the sign-in's email that an account with no name of its own shows, stays
+ * on one line cut with an ellipsis, whole on hover and to a screen reader; on a phone the foot keeps
+ * its place beside Bali, the name cut to fit (MenuNameStates, drawn first).
  */
 export function SideMenu({
-  role,
   path,
   name,
   leaving,
   onSignOut,
 }: {
-  role: MenuRole;
   path: string;
   name: string | null;
   leaving: boolean;
   onSignOut: () => void;
 }) {
-  // Its own page, or one under it (a session's report under Reports, PV14; ReportOpened), or under
-  // its other path (a lesson under Your classes, W4; StudentLesson).
+  // Its own page, or one under it, or under its other path (a lesson under Your classes, W4;
+  // StudentLesson).
   const here = (href: string, under?: string) =>
     path === href ||
     [href !== '/' && href, under].some((root) => root && path.startsWith(`${root}/`));
@@ -328,7 +309,7 @@ export function SideMenu({
         <Mark size={20} />
         Bali
       </Link>
-      {PAGES[role].filter((item) => !item.lesson || lessonsOn()).map(link)}
+      {link(YOUR_CLASSES)}
       <div className={GAP} />
       {link(HELP)}
       {name ? (
@@ -406,8 +387,9 @@ export function AccountUnread({
 /**
  * The page's place, and its one `<main>` in every state (the owner's follow-up of 2026-10-16): on
  * a signed-in page the shell's own, holding the account not read (`AccountUnread`) with the page
- * waiting hidden after it (PV5b), else the page, in v2's frame beside the menu or under the bar, or
- * alone in Present. A page draws its parts in it, never a `<main>` of its own, so none waits hidden
+ * waiting hidden after it (PV5b), else the page, in the top bar's frame under it (LO2), v2's beside
+ * the menu or under the bar, or alone in Present. A page draws its parts in it, never a `<main>` of
+ * its own, so none waits hidden
  * beside the shell's. One element throughout, so the page is never remounted as its frame changes.
  * A page read without signing in draws its own bar and its own `<main>`: going there from a
  * signed-in page, or back, opens another page, mounted afresh either way.
@@ -427,7 +409,11 @@ export function PagePlace({
 }) {
   if (signedOut) return <div>{children}</div>;
   return (
-    <main className={frame.framed || frame.hidden ? PAGE : undefined}>
+    <main
+      className={
+        frame.chrome === 'top' ? TOP_PAGE : frame.framed || frame.hidden ? PAGE : undefined
+      }
+    >
       {frame.hidden ? <AccountUnread error={error} onRetry={onRetry} /> : null}
       <div hidden={frame.hidden}>{children}</div>
     </main>
@@ -532,19 +518,24 @@ export function Shell({ children }: { children: ReactNode }) {
     () => ({ home, me, error, load, refresh }),
     [home, me, error, load, refresh],
   );
+  // The account's name, as the bar and the menu name it: none for an account with no name.
+  const name = me?.user.displayName?.trim() || null;
   return (
     <MeContext value={value}>
       <CountContext value={count}>
         <PresentingContext value={setPresenting}>
           <div className={frame.chrome === 'menu' ? SHELL : undefined}>
-            {frame.chrome === 'menu' ? (
-              <SideMenu
-                role={home?.kind === 'student' ? 'student' : 'teacher'}
+            {frame.chrome === 'top' && home?.kind === 'teacher' ? (
+              <TopBar
                 path={path}
-                name={me?.user.displayName?.trim() || null}
+                name={name}
+                classes={home.me.classes}
                 leaving={leaving}
                 onSignOut={onSignOut}
+                refresh={refresh}
               />
+            ) : frame.chrome === 'menu' ? (
+              <SideMenu path={path} name={name} leaving={leaving} onSignOut={onSignOut} />
             ) : frame.chrome === 'bar' ? (
               <PortalBar leaving={leaving} onSignOut={onSignOut} />
             ) : null}
