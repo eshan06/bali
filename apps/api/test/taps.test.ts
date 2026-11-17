@@ -1,5 +1,6 @@
 import {
   armedTaps,
+  blocks,
   classes,
   type Database,
   endSession,
@@ -396,6 +397,118 @@ describe('POST /v1/taps', () => {
     expect(elsewhere.body).toMatchObject({ error: { code: 'conflict' } });
   });
 
+  describe('after its block moved (tap step 9; LO10a)', () => {
+    /*
+     * Teacher X's block moves to teacher Y: X removes it, which frees its
+     * tag, and Y registers the tag (the owner's "Free the code", 2026-11-17).
+     * The rows are written as the removal (LO10b) and `POST /v1/blocks` write
+     * them. The phone resends a tap whose 200 was lost with the same id and
+     * the same tag, and that retry is answered as any retry, never the 409
+     * that kept it retrying and shown.
+     */
+    async function movingBlock(tag: string) {
+      const x = await seedClassroom(db, `${tag}-x`);
+      const y = await seedClassroom(db, `${tag}-y`, x.school);
+      await db.insert(enrollments).values({ classId: y.klass.id, studentId: x.student.id });
+      const remove = () =>
+        db.update(blocks).set({ removedAt: new Date() }).where(eq(blocks.id, x.block.id));
+      const move = async () => {
+        await remove();
+        await db.insert(blocks).values({ tagId: x.block.tagId, teacherId: y.teacher.id });
+      };
+      const token = await ctx.tokenFor(x.student.cognitoId);
+      return { x, y, token, remove, move };
+    }
+
+    it('answers the retry of a tap that landed 200 replay, on the arm path and the join path', async () => {
+      const { x, y, token, move } = await movingBlock('tap-moved');
+      const lesson = await startSession(db, {
+        classId: x.klass.id,
+        startedAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 25 * 60_000),
+      });
+      const sent = { tagId: x.block.tagId, eventId: randomUUID() };
+      expect((await tap(token, sent)).body.outcome).toBe('joined');
+      await endSession(db, { sessionId: lesson.session.id, at: new Date(), reason: 'ended' });
+      await move();
+
+      // Nothing of Y's running: the arm path, under Y.
+      const armPath = await tap(token, sent);
+      expect(armPath.status).toBe(200);
+      expect(armPath.body).toEqual({ outcome: 'replay', session: null, state: null });
+      expect(
+        await db.select().from(armedTaps).where(eq(armedTaps.studentId, x.student.id)),
+      ).toEqual([]);
+
+      // Y's class running: the join path, under Y. Nothing joins it.
+      const running = await startSession(db, {
+        classId: y.klass.id,
+        startedAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 25 * 60_000),
+      });
+      const joinPath = await tap(token, sent);
+      expect(joinPath.status).toBe(200);
+      expect(joinPath.body).toEqual({ outcome: 'replay', session: null, state: null });
+      expect(
+        await db
+          .select()
+          .from(participations)
+          .where(eq(participations.sessionId, running.session.id)),
+      ).toEqual([]);
+    });
+
+    it('answers the retry of a tap still waiting for the old teacher 200 already_armed', async () => {
+      const { x, token, move } = await movingBlock('tap-moved-armed');
+      const sent = { tagId: x.block.tagId, eventId: randomUUID() };
+      expect((await tap(token, sent)).body.outcome).toBe('armed');
+      await move();
+
+      const retry = await tap(token, sent);
+      expect(retry.status).toBe(200);
+      expect(retry.body).toEqual({ outcome: 'already_armed', session: null, state: null });
+      // Still X's, for X's Start.
+      const row = one(
+        await db.select().from(armedTaps).where(eq(armedTaps.studentId, x.student.id)),
+      );
+      expect(row).toMatchObject({ teacherId: x.teacher.id, consumedAt: null });
+    });
+
+    it('answers a retry at a block removed and not registered again as its retry, and anything else there 404', async () => {
+      const { x, y, token, remove } = await movingBlock('tap-removed');
+      const landed = { tagId: x.block.tagId, eventId: randomUUID() };
+      const waiting = { tagId: x.block.tagId, eventId: randomUUID() };
+      const lesson = await startSession(db, {
+        classId: x.klass.id,
+        startedAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 25 * 60_000),
+      });
+      expect((await tap(token, landed)).body.outcome).toBe('joined');
+      await endSession(db, { sessionId: lesson.session.id, at: new Date(), reason: 'ended' });
+      expect((await tap(token, waiting)).body.outcome).toBe('armed');
+      await remove();
+
+      expect(await tap(token, landed)).toEqual({
+        status: 200,
+        body: { outcome: 'replay', session: null, state: null },
+      });
+      expect(await tap(token, waiting)).toEqual({
+        status: 200,
+        body: { outcome: 'already_armed', session: null, state: null },
+      });
+      // A fresh tap there, and another student's under the same id, are the
+      // unknown block they always were: nothing about whose an id is shows.
+      const stranger = await ctx.tokenFor(y.student.cognitoId);
+      for (const [who, eventId] of [
+        [token, randomUUID()],
+        [stranger, landed.eventId],
+        [stranger, waiting.eventId],
+      ] as const) {
+        const res = await tap(who, { tagId: x.block.tagId, eventId });
+        expect(res.status).toBe(404);
+      }
+    });
+  });
+
   it('is a 404 for an unknown tag', async () => {
     const { student } = await seedClassroom(db, 'tap-unknown');
     const res = await authedInject(ctx.app, await ctx.tokenFor(student.cognitoId), {
@@ -725,3 +838,90 @@ describe.runIf(REAL_PG)(
     }, 20_000);
   },
 );
+
+describe.runIf(REAL_PG)('POST /v1/taps racing its block’s move (real Postgres, LO10a)', () => {
+  /*
+   * The move as the portal makes it, two requests: the old teacher removes
+   * the block (LO10b's removal, its row written as that will write it), and
+   * the new teacher registers its tag (`POST /v1/blocks`). A retry racing them
+   * reads the tag before, between or after them: under the old teacher, under
+   * none, or under the new one. Whichever it reads, it is answered as the
+   * retry it is, and records nothing anywhere new.
+   */
+  it.each([
+    ['that landed, nothing running', 'landed'],
+    ['that landed, the new teacher’s class running', 'running'],
+    ['still waiting for the old teacher’s Start', 'waiting'],
+  ] as const)(
+    'the retry of a tap %s is answered as its retry, whichever side of the move it reads',
+    async (_, shape) => {
+      const lesson = () => ({
+        startedAt: new Date(Date.now() - 60_000),
+        endsAt: new Date(Date.now() + 25 * 60_000),
+      });
+      for (let round = 0; round < 12; round += 1) {
+        const tag = `tap-race-move-${shape}-${round}`;
+        const x = await seedClassroom(db, `${tag}-x`);
+        const y = await seedClassroom(db, `${tag}-y`, x.school);
+        await db.insert(enrollments).values({ classId: y.klass.id, studentId: x.student.id });
+        const token = await ctx.tokenFor(x.student.cognitoId);
+        const sent = { tagId: x.block.tagId, eventId: randomUUID() };
+        if (shape === 'waiting') {
+          expect((await tap(token, sent)).body.outcome).toBe('armed');
+        } else {
+          const { session } = await startSession(db, { classId: x.klass.id, ...lesson() });
+          expect((await tap(token, sent)).body.outcome).toBe('joined');
+          await endSession(db, { sessionId: session.id, at: new Date(), reason: 'ended' });
+        }
+        const running =
+          shape === 'running' ? await startSession(db, { classId: y.klass.id, ...lesson() }) : null;
+
+        const registering = await ctx.tokenFor(y.teacher.cognitoId);
+        const move = async () => {
+          await db.update(blocks).set({ removedAt: new Date() }).where(eq(blocks.id, x.block.id));
+          const registered = await authedInject(ctx.app, registering, {
+            method: 'POST',
+            url: '/v1/blocks',
+            payload: { tagId: x.block.tagId },
+          });
+          expect(registered.statusCode).toBe(200);
+        };
+        // A head start for the move in two rounds of three, so the retry
+        // reads the tag on each side of it.
+        const [retried] = await Promise.all([
+          new Promise((resolve) => setTimeout(resolve, (round % 3) * 4)).then(() =>
+            tap(token, sent),
+          ),
+          move(),
+        ]);
+
+        expect(retried, `round ${round}`).toEqual({
+          status: 200,
+          body: {
+            outcome: shape === 'waiting' ? 'already_armed' : 'replay',
+            session: null,
+            state: null,
+          },
+        });
+        const armed = await db
+          .select()
+          .from(armedTaps)
+          .where(eq(armedTaps.studentId, x.student.id));
+        expect(armed).toEqual(
+          shape === 'waiting'
+            ? [expect.objectContaining({ teacherId: x.teacher.id, consumedAt: null })]
+            : [],
+        );
+        if (running) {
+          expect(
+            await db
+              .select()
+              .from(participations)
+              .where(eq(participations.sessionId, running.session.id)),
+          ).toEqual([]);
+        }
+      }
+    },
+    60_000,
+  );
+});

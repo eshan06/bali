@@ -4071,6 +4071,100 @@ describe.runIf(REAL_PG)('armed taps under contention (real Postgres)', () => {
     expect(rows).toHaveLength(1);
   }, 20_000);
 
+  it.each([
+    ['its own tag, the moved block’s', 'replay'],
+    ['another tag, one teacher X never held', 'conflict'],
+  ] as const)(
+    'a retry after its block moved that loses the event_id index, carrying %s, is answered by the rule the lookup uses (LO10a)',
+    async (_, answer) => {
+      /*
+       * The staging above, one teacher over: the row the holder sits on is the
+       * student's tap for teacher X, made at X's block, and the delivery comes
+       * under teacher Y, who registered the block's tag once X removed it. Its
+       * recovery reads the row's owner by the rule the `exact` select uses
+       * (`sameTap`): this student's, under a teacher who held a block with the
+       * tag it carries. Read by the teacher alone, as before, the moved
+       * block's retry was a stranger's row and a 409; another tag still is.
+       */
+      const x = await seed(`race-arm-eventid-moved-${answer}-x`);
+      const y = await seed(`race-arm-eventid-moved-${answer}-y`);
+      const tagId = `TAG-race-arm-eventid-moved-${answer}`;
+      const xBlock = one(
+        await db.insert(blocks).values({ tagId, teacherId: x.teacherId }).returning(),
+      );
+      await db.update(blocks).set({ removedAt: new Date() }).where(eq(blocks.id, xBlock.id));
+      const yBlock = one(
+        await db.insert(blocks).values({ tagId, teacherId: y.teacherId }).returning(),
+      );
+      const eventId = newUuidV7();
+
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let inserted!: () => void;
+      const hasRow = new Promise<void>((resolve) => {
+        inserted = resolve;
+      });
+      let rivalId = '';
+      const rival = db.transaction(async (tx) => {
+        const row = one(
+          await tx
+            .insert(armedTaps)
+            .values({
+              studentId: x.studentId,
+              teacherId: x.teacherId,
+              blockId: xBlock.id,
+              eventId,
+              deviceTime: new Date(),
+              expiresAt: new Date(Date.now() + 3_600_000),
+              consumedAt: new Date(),
+            })
+            .returning(),
+        );
+        rivalId = row.id;
+        inserted();
+        await held;
+      });
+
+      await hasRow;
+      const arming = armTap(db, {
+        studentId: x.studentId,
+        teacherId: y.teacherId,
+        blockId: yBlock.id,
+        tagId: answer === 'replay' ? tagId : `${tagId}-elsewhere`,
+        eventId,
+        deviceTime: new Date(),
+        expiresAt: new Date(Date.now() + 3_600_000),
+        now: new Date(),
+      });
+      let unstaged: Error | null = null;
+      try {
+        await waitForBlockedBackend();
+      } catch (err) {
+        unstaged = err instanceof Error ? err : new Error(String(err));
+      } finally {
+        release();
+      }
+      await rival;
+      const [settled] = await Promise.allSettled([arming]);
+      if (unstaged !== null) throw unstaged;
+      if (answer === 'replay') {
+        if (settled.status === 'rejected') throw settled.reason as Error;
+        expect(settled.value).toEqual({ outcome: 'replay', armedTapId: rivalId });
+      } else {
+        expect(settled).toMatchObject({
+          status: 'rejected',
+          reason: { code: 'EVENT_ID_CONFLICT' },
+        });
+      }
+      // One row owns the id, still X's: nothing was written for Y.
+      const rows = await db.select().from(armedTaps).where(eq(armedTaps.eventId, eventId));
+      expect(rows.map((row) => row.teacherId)).toEqual([x.teacherId]);
+    },
+    20_000,
+  );
+
   it('a spent row that wins the slot late is still taken over, not reported back', async () => {
     /*
      * The fallback door into the same failure the standing-row check closes.

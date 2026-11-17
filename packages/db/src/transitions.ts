@@ -605,7 +605,9 @@ async function convertArmedTaps(
     // `tap_in` of this student's under ANOTHER teacher is still a tap that
     // landed, so it is skipped here. Reaching that needs an id reused across
     // teachers, which `armTap` refuses once the id is on record, or a block
-    // that moved, which nothing ships yet.
+    // that moved (LO10): this waiting tap's retry, heard once its tag is
+    // another teacher's while a class of theirs the student is in runs, joins
+    // that class, as any tap `tapIn` has not seen land does.
     //
     // "Spent" means THIS student's `tap_in`, and nothing looser. `insertEvent`
     // raises the same code for an id held by another type or another user —
@@ -862,6 +864,12 @@ export interface ArmTapInput {
   studentId: string;
   teacherId: string;
   blockId?: string;
+  /**
+   * The tag the phone tapped, which its retries carry too: a tap of this student's on record
+   * under another teacher is this tap's retry only if that teacher held a block with this tag,
+   * which has moved since (tap step 9, `sameTap`). None, and it never is.
+   */
+  tagId?: string;
   eventId: string;
   deviceTime: Date;
   /** The phone's own order for the tap (A12): kept for the `tap_in` its conversion records. */
@@ -892,9 +900,49 @@ export interface ArmTapResult {
 type ArmedTapRow = typeof armedTaps.$inferSelect;
 
 /**
+ * The tap arriving: its student, the tag it carried, and the teacher whose live
+ * block holds that tag now (null when none does: its block was removed since).
+ */
+interface ArrivingTap {
+  studentId: string;
+  tagId?: string;
+  teacherId: string | null;
+}
+
+/**
+ * Whether a tap already on record under the arriving tap's id — landed (a
+ * `tap_in`) or armed (`armed_taps`) — is this same tap resent (tap step 9): the
+ * same student's, recorded under the teacher whose block the tag is now, or
+ * under a teacher who held a block with this tag. The second is a block that
+ * moved: its teacher removed it, which frees its tag, and another registered
+ * that tag (LO10; the owner's "Free the code", 2026-11-17). A retry carries the
+ * tag its tap did, so the honest retry of a tap made before the move reaches the
+ * server under the new teacher, or under none, while its tap is on record under
+ * the old one, whose block row a removal keeps. A spent id reused at a block
+ * whose tag that teacher never held is not a retry but a client bug, the
+ * conflict it always was. The blocks are read only when the teachers differ:
+ * a moved block's retry, or such a reuse.
+ */
+async function sameTap(
+  tx: Database,
+  held: { studentId: string | null; teacherId: string | null },
+  tap: ArrivingTap,
+): Promise<boolean> {
+  if (held.studentId !== tap.studentId || held.teacherId === null) return false;
+  if (held.teacherId === tap.teacherId) return true;
+  if (tap.tagId === undefined) return false;
+  const theirs = await tx
+    .select({ id: blocks.id })
+    .from(blocks)
+    .where(and(eq(blocks.teacherId, held.teacherId), eq(blocks.tagId, tap.tagId)))
+    .limit(1);
+  return theirs.length > 0;
+}
+
+/**
  * Who holds `eventId` in `armed_taps` right now — the answer both 23505
  * recoveries in `armTap` need, and scoped the same way the `exact` select at
- * the top of `armTap` is.
+ * the top of `armTap` is (`sameTap`).
  *
  * `'conflict'` rather than `'own'` for a stranger's id: answering it as this
  * phone's would hand its outbox someone else's row and tell it the tap is
@@ -904,15 +952,13 @@ type ArmedTapRow = typeof armedTaps.$inferSelect;
  */
 async function ownerOfEventId(
   tx: Database,
-  eventId: string,
-  studentId: string,
-  teacherId: string,
+  input: ArmTapInput,
 ): Promise<{ kind: 'own'; row: ArmedTapRow } | { kind: 'conflict' } | { kind: 'gone' }> {
   const owner = firstOrUndefined(
-    await tx.select().from(armedTaps).where(eq(armedTaps.eventId, eventId)).limit(1),
+    await tx.select().from(armedTaps).where(eq(armedTaps.eventId, input.eventId)).limit(1),
   );
   if (!owner) return { kind: 'gone' };
-  if (owner.studentId !== studentId || owner.teacherId !== teacherId) return { kind: 'conflict' };
+  if (!(await sameTap(tx, owner, input))) return { kind: 'conflict' };
   return { kind: 'own', row: owner };
 }
 
@@ -1051,7 +1097,7 @@ async function takeOverStaleRow(
       // Kept for the give-up below: a bare Error there would discard the
       // constraint name, and it ships as a 500 on a pre-bell tap.
       lastViolation = err;
-      const owner = await ownerOfEventId(tx, input.eventId, input.studentId, input.teacherId);
+      const owner = await ownerOfEventId(tx, input);
       if (owner.kind === 'conflict') {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
@@ -1106,7 +1152,7 @@ async function recordLateArm(tx: Database, input: ArmTapInput, now: Date): Promi
       .returning({ id: armedTaps.id }),
   );
   if (recorded) return { outcome: 'replay', armedTapId: recorded.id };
-  const owner = await ownerOfEventId(tx, input.eventId, input.studentId, input.teacherId);
+  const owner = await ownerOfEventId(tx, input);
   if (owner.kind === 'own') return answerOwnArmedTap(tx, owner.row, now);
   throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
 }
@@ -1141,8 +1187,8 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // Start. The standing-row branch below already refuses to let a SPENT id
     // sit in a waiting row; this refuses to put one there.
     //
-    // Scoped to the CALLER — student, type and teacher, the axes the
-    // `armed_taps` lookups below cover too (every row there is a tap). An id
+    // Scoped to the CALLER — student, type and teacher (`sameTap`), the axes
+    // the `armed_taps` lookups below cover too (every row there is a tap). An id
     // on record for anything else is not this phone's replay: answering
     // `replay` would tell this outbox the tap is durably recorded, so it drops
     // a tap that was never armed and never converts. `insertEvent` refuses the same class of reuse for the same
@@ -1167,13 +1213,13 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // a class they are not in — which is why it reached `armTap`. Written up
     // in docs/PLAN.md's armed-tap review entry.
     //
-    // And it costs what the `armed_taps` lookup's teacher scope below costs:
-    // a block that MOVES between a tap and its retry resolves the retry to a
-    // teacher other than the one it landed under, so the honest retry of a
-    // tap that did land gets this 409 instead of `replay`. Unreachable today —
-    // nothing outside tests writes `blocks.removed_at` or changes a class's
-    // teacher — and recorded in PLAN.md with the other lookup's cost: the
-    // endpoint that makes blocks movable must settle both.
+    // A block that MOVED between a tap and its retry (LO10) resolves the retry
+    // to a teacher other than the one it landed under, and the scope reads the
+    // tag to tell that honest retry from a spent id reused at another block:
+    // the teacher it landed under held a block with this tag (`sameTap`), so
+    // it is answered `replay` as any retry here is, never the 409. Named in no
+    // session, as here it never is: the phone re-reads the truth, which names
+    // the session while the tap is still current in it.
     const recorded = firstOrUndefined(
       await tx
         .select({ type: events.type, userId: events.userId, teacherId: classes.teacherId })
@@ -1191,8 +1237,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
       // tap this whole check exists to stop, arrived by the other door.
       if (
         recorded.type !== 'tap_in' ||
-        recorded.userId !== input.studentId ||
-        recorded.teacherId !== input.teacherId
+        !(await sameTap(tx, { studentId: recorded.userId, teacherId: recorded.teacherId }, input))
       ) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
@@ -1210,28 +1255,18 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     // not the answer to a tap on teacher Y's block, and handing it back would
     // arm nothing for Y while telling the outbox it was recorded.
     //
-    // That scope also refuses a case which is NOT reuse, and it is a real cost
-    // of it. Blocks are reassignable by design (`blocks_tag_active_unique`: a
-    // tag re-registers once its block row is soft-removed) and
-    // `resolveTapTarget` resolves the teacher from the tag as it stands NOW,
-    // so a tap armed under X whose 200 was lost, retried after the block moved
-    // to Y, is this student's own id for their own physical tap — and it gets
-    // a permanent 409, which the phone keeps and surfaces (`tapDisposition`)
-    // but never lands. Unreachable today: nothing outside tests writes
-    // `blocks.removed_at`, so no shipped path moves a block.
-    //
-    // NOT patched here, because the obvious patch is wrong. Taking the row
-    // over for Y collides with the (student, teacher) partial index the moment
-    // the student has tapped the moved block for real, and `ownerOfEventId`
-    // reads that collision as a conflict and raises the same 409 — in a case
-    // that IS reachable. The honest fix consumes the stale X row and answers
-    // about the Y one, which is engine work with its own races, so it lands
-    // with the endpoint that makes blocks movable. Recorded in PLAN.
+    // Unless the block moved to Y since (LO10): a tap armed under X whose 200
+    // was lost, retried after the move, is this student's own id for their own
+    // physical tap, made at X's block, and `sameTap` reads the tag to know it.
+    // It is answered about its own row, which stays X's and waits for X's
+    // Start, as the tap was made for: never taken over for Y, which would
+    // collide with the (student, teacher) index once the student has tapped
+    // the moved block for real, and never the permanent 409 it got before.
     const exact = firstOrUndefined(
       await tx.select().from(armedTaps).where(eq(armedTaps.eventId, input.eventId)).limit(1),
     );
     if (exact) {
-      if (exact.studentId !== input.studentId || exact.teacherId !== input.teacherId) {
+      if (!(await sameTap(tx, exact, input))) {
         throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
       }
       return answerOwnArmedTap(tx, exact, now);
@@ -1367,7 +1402,7 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
         // Another delivery of THIS tap got there first — a replay, the same
         // answer the `exact` select above would have given had it seen the
         // row, and scoped the same way for the same reason.
-        const owner = await ownerOfEventId(tx, input.eventId, input.studentId, input.teacherId);
+        const owner = await ownerOfEventId(tx, input);
         if (owner.kind === 'conflict') {
           throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another event');
         }
@@ -1412,6 +1447,55 @@ export async function armTap(db: Database, input: ArmTapInput): Promise<ArmTapRe
     throw new Error('armTap: could not arm or read a standing tap', {
       cause: lastUniqueViolation,
     });
+  });
+}
+
+export interface RemovedBlockRetryInput {
+  studentId: string;
+  eventId: string;
+  /** The tag the phone tapped, which no live block holds now. */
+  tagId: string;
+  /** Server clock for a waiting tap's expiry; defaults to now. */
+  now?: Date;
+}
+
+/**
+ * A tap whose tag no live block holds (`resolveTapTarget` finds none), when it is
+ * the retry of a tap made at that block before its teacher removed it (tap step
+ * 9; LO10): the same student's, on record under a teacher who held a block with
+ * this tag (`sameTap`). Answered as the arm path answers a retry, since the tag
+ * points at no one's class now: landed, `replay`, naming no session, so the
+ * phone re-reads the truth; armed, as its row says (`answerOwnArmedTap`),
+ * `already_armed` while it still waits for its teacher's Start. Anything else is
+ * not this tap's retry, and is `undefined`: the route answers it as it answers
+ * any tag no block holds, `404`, so nothing about whose an id is shows.
+ */
+export async function retryAtRemovedBlock(
+  db: Database,
+  input: RemovedBlockRetryInput,
+): Promise<ArmTapResult | undefined> {
+  const now = input.now ?? new Date();
+  const tap: ArrivingTap = { studentId: input.studentId, tagId: input.tagId, teacherId: null };
+  return db.transaction(async (tx) => {
+    // The tap's own lock, as `armTap` takes it: a delivery of this tap still
+    // landing is waited out, and this is answered as its replay.
+    await lockTap(tx, input.eventId);
+    const recorded = firstOrUndefined(
+      await tx
+        .select({ type: events.type, studentId: events.userId, teacherId: classes.teacherId })
+        .from(events)
+        .leftJoin(classes, eq(classes.id, events.classId))
+        .where(eq(events.eventId, input.eventId))
+        .limit(1),
+    );
+    if (recorded) {
+      const landed = recorded.type === 'tap_in' && (await sameTap(tx, recorded, tap));
+      return landed ? { outcome: 'replay' } : undefined;
+    }
+    const armed = firstOrUndefined(
+      await tx.select().from(armedTaps).where(eq(armedTaps.eventId, input.eventId)).limit(1),
+    );
+    return armed && (await sameTap(tx, armed, tap)) ? answerOwnArmedTap(tx, armed, now) : undefined;
   });
 }
 
@@ -1809,6 +1893,12 @@ export interface TapInput {
   studentId: string;
   /** The client's idempotency key for this tap (rule 4). */
   eventId: string;
+  /**
+   * The tag the phone tapped, which its retries carry too: a tap of this student's on record
+   * under another teacher is this tap's retry only if that teacher held a block with this tag,
+   * which has moved since (tap step 9, `sameTap`). None, and it never is.
+   */
+  tagId?: string;
   /** The device's clock; clamped into the session window (rule 1). */
   deviceTime: Date;
   /** The phone's own order for the tap (A12), if it sent one: it orders the tap against an unlock. */
@@ -2043,19 +2133,27 @@ export async function tapIn(db: Database, input: TapInput): Promise<TapResult> {
             session: recorded,
           };
         }
-        // No longer current, it is this tap's retry only under the teacher it
-        // was recorded with — the tapped block's, which one physical tap's
-        // retries always resolve to. Under another teacher it is a spent id
-        // reused at another block (or a block that moved, which nothing ships
-        // yet): not a retry (tap step 9), so it falls through to insertEvent's
-        // EVENT_ID_CONFLICT, as armTap refuses the same id — a 200 would drop
-        // a physical tap at that block. (A `tap_in` always carries its class,
-        // so `prior.teacherId` is never the left join's null here.) The first
-        // test is only a fast path: the same session is the same class, so the
-        // same teacher — it saves the teacherOfClass read.
+        // No longer current, it is this tap's retry under the teacher it was
+        // recorded with — the tapped block's, which one physical tap's retries
+        // resolve to — or, the block moved since (LO10), under one who held a
+        // block with this tag (`sameTap`). Under any other teacher it is a spent
+        // id reused at another block: not a retry (tap step 9), so it falls
+        // through to insertEvent's EVENT_ID_CONFLICT, as armTap refuses the
+        // same id — a 200 would drop a physical tap at that block. (A `tap_in`
+        // always carries its class, so `prior.teacherId` is never the left
+        // join's null here.) The first test is only a fast path: the same
+        // session is the same class, so the same teacher — it saves the reads.
         if (
           prior.sessionId === session.id ||
-          prior.teacherId === (await teacherOfClass(tx, session.classId))
+          (await sameTap(
+            tx,
+            { studentId: prior.userId, teacherId: prior.teacherId },
+            {
+              studentId: input.studentId,
+              tagId: input.tagId,
+              teacherId: (await teacherOfClass(tx, session.classId)) ?? null,
+            },
+          ))
         ) {
           return { outcome: 'replay', state: null, participationId: null, session: null };
         }

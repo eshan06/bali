@@ -44,9 +44,13 @@ middle was considered and rejected — see below.)
    On the arm path (decision 5, nothing joinable running) the same goes for this
    student's tap recorded under another teacher — and on the join path too, once that
    tap is no longer current (step 10) — and for an id already held by a waiting tap that
-   is not this student's for this teacher. Blocks cannot move yet; the endpoint that lets
-   them must revisit the other-teacher case, because after a move an honest retry looks
-   exactly like it.
+   is not this student's for this teacher. Except across a block's move (LO10, the
+   owner's "Free the code", 2026-11-17): removing a block frees its tag for anyone to
+   register again, and a retry carries its tap's tag. So a tap of this student's recorded
+   under a teacher who held a block with that tag, a row the removal keeps, is this tap's
+   retry wherever the tag points now, no live block included: answered as step 10 says,
+   never `409`. The same id at a tag that teacher never held is still a client bug. A
+   tag no live block holds is otherwise an unknown block, `404`.
 10. Respond `200 OK`. Only now does the phone delete the record from local storage. The
     retry of a tap that already landed gets that `200` with what was recorded — even when
     the server now resolves the tag to a different running session — but it names that
@@ -55,9 +59,14 @@ middle was considered and rejected — see below.)
     removed from the class), the retry is answered `replay` with no session (ruled
     2026-09-24, replacing 2026-09-22's `409`): recorded, with no window to shield to, so
     the phone deletes it and re-reads the truth — a `200` naming the old session would
-    keep a backgrounded phone shielded to a window that is over. The retry of a tap still
-    waiting for Start (decision 5) is answered `already_armed`, so the phone keeps showing
-    "waiting for your teacher". The phone keeps a `409`'s record and keeps retrying it,
+    keep a backgrounded phone shielded to a window that is over. On the arm path, and at a
+    tag no live block holds (step 9), it names none: the phone re-reads the truth. The
+    retry of a tap still waiting for Start (decision 5) is answered `already_armed`, so
+    the phone keeps showing "waiting for your teacher", its row left with the teacher it
+    waits for; one that finds a class running where its tag points now, the student in it,
+    joins it as a tap the server has not seen land does — after a block's move too, as a
+    tap first heard after the move would — and the row is declined at its teacher's Start
+    (`armed_tap_skipped`). The phone keeps a `409`'s record and keeps retrying it,
     and shows it (rule 5) while re-reading the truth; the typed table is `tapDisposition`
     in `@bali/shared`.
 11. Insert an event row so the teacher's live grid updates (see rule 6).

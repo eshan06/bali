@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { newUuidV7 } from '../src/ids.js';
 import {
   armedTaps,
+  blocks,
   classes,
   enrollments,
   events,
@@ -25,6 +26,7 @@ import {
   protectionOn as protectionOnNow,
   refocus as refocusNow,
   renameStudent,
+  retryAtRemovedBlock,
   startSession,
   tapIn as tapInNow,
   tapsMadeSince,
@@ -4645,12 +4647,11 @@ describe('armed taps', () => {
 
   it("will not answer a tap on one teacher's block with a row held for another", async () => {
     /*
-     * Two readings, one behaviour, and this pins it for both. The benign one
-     * is a block that moved: blocks are reassignable by design, so a retry
-     * after the move is the student's OWN id for their own tap and this 409
-     * is wrong for it — unreachable today, disclosed at the call site, and
-     * fixed with the endpoint that makes blocks movable. The one it was added
-     * for follows.
+     * Two readings of the same shape. The benign one is a block that moved:
+     * a retry after the move is the student's OWN id for their own tap, and it
+     * carries the tag teacher X's block had, which this tap, with no tag, does
+     * not: answered as its retry since LO10a ("a retry after its block moved").
+     * The one this was added for, which still gets the 409, follows.
      *
      * The `armed_taps` event-id lookup was scoped to the student but not the
      * teacher. A student holding a waiting row for teacher X under id E who
@@ -4712,9 +4713,10 @@ describe('armed taps', () => {
      * on student and type — tap step 10) and this path still refuses: the one
      * split left, recorded in PLAN.md. A4 keeps the 409 here on both paths: a
      * tap recorded but no longer current replays with no session only under
-     * the teacher it was recorded with. Under another it is not this tap's
-     * retry (tap step 9), and a 200 would drop a physical tap at B's block —
-     * so `tapIn`'s half goes red if its teacher check is removed.
+     * the teacher it was recorded with, or one whose block its tag was, moved
+     * since (LO10a). Under another it is not this tap's retry (tap step 9),
+     * and a 200 would drop a physical tap at B's block — so `tapIn`'s half
+     * goes red if its teacher check is removed.
      *
      * Only the cross-teacher half. The SAME teacher, an id spent in an earlier
      * session of theirs, still answers `replay` here — "does not arm an id
@@ -5996,6 +5998,366 @@ describe('a retried tap the server re-resolves elsewhere', () => {
         deviceTime: new Date('2026-01-01T09:02:00Z'),
       }),
     ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+  });
+});
+
+describe('a retry after its block moved (tap step 9; LO10a)', () => {
+  /*
+   * A block moves when its teacher removes it, which frees its tag, and another
+   * teacher registers that tag (LO10; the owner's "Free the code", 2026-11-17).
+   * The rows are written as the removal (LO10b) and `POST /v1/blocks` write
+   * them: the old row marked removed, never deleted, and a new live row with
+   * the same tag under the new teacher. A retry carries its tap's tag, so after
+   * a move the honest retry of a tap on record under the old teacher reaches
+   * the server under the new one, or under none, where it looked exactly like
+   * a spent id reused at another teacher's block: a 409, which the phone keeps
+   * retrying and shows, for a tap the server kept.
+   */
+  const DAY_END = new Date('2026-01-01T23:59:59Z');
+
+  /** A student in a class of teacher X's and one of Y's, X's block, and the block's removal and move. */
+  async function aBlock(tag: string) {
+    const x = await seedClass(`${tag}-x`);
+    const y = await seedClass(`${tag}-y`);
+    await db.insert(enrollments).values({ classId: y.klass.id, studentId: x.student.id });
+    const tagId = `TAG-${tag}`;
+    const xBlock = one(
+      await db.insert(blocks).values({ tagId, teacherId: x.teacher.id }).returning(),
+    );
+    /** X removes the block, so no live block holds its tag. */
+    const remove = () =>
+      db.update(blocks).set({ removedAt: new Date() }).where(eq(blocks.id, xBlock.id));
+    /** X removes it and Y registers its tag: Y's live block. */
+    const move = async () => {
+      await remove();
+      return one(await db.insert(blocks).values({ tagId, teacherId: y.teacher.id }).returning());
+    };
+    /** The tap, as the phone keeps it and resends it: the same id, the same tag. */
+    const tap = (at: string) => ({
+      studentId: x.student.id,
+      eventId: newUuidV7(),
+      tagId,
+      deviceTime: new Date(at),
+    });
+    return { x, y, student: x.student, xBlock, remove, move, tap };
+  }
+
+  /** A tap of the student's that landed in X's class at 09:01, which X ended at 09:20. */
+  async function landedAndEnded(block: Awaited<ReturnType<typeof aBlock>>) {
+    const { session } = await startSession(db, {
+      classId: block.x.klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const tap = block.tap('2026-01-01T09:01:00Z');
+    expect((await tapIn(db, { sessionId: session.id, ...tap })).outcome).toBe('joined');
+    await endSession(db, {
+      sessionId: session.id,
+      at: new Date('2026-01-01T09:20:00Z'),
+      reason: 'ended',
+    });
+    return tap;
+  }
+
+  it('answers the retry of a tap that landed under the old teacher on the join path: replay, naming no session once it is not current', async () => {
+    const block = await aBlock('moved-join');
+    const tap = await landedAndEnded(block);
+    // The 200 was lost. X removes the block and Y registers its tag; at 10:01,
+    // while Y's class runs, the phone's outbox sends the tap again.
+    await block.move();
+    const { session } = await startSession(db, {
+      classId: block.y.klass.id,
+      ...window('2026-01-01T10:00:00Z'),
+    });
+    const retried = await tapIn(db, {
+      sessionId: session.id,
+      ...tap,
+      now: new Date('2026-01-01T10:01:00Z'),
+    });
+    expect(retried).toEqual({
+      outcome: 'replay',
+      state: null,
+      participationId: null,
+      session: null,
+    });
+    // Kept once, where it landed: nothing of it in Y's class.
+    expect((await eventsFor(session.id)).map((e) => e.type)).toEqual(['session_started']);
+    expect(
+      await db.select().from(participations).where(eq(participations.sessionId, session.id)),
+    ).toEqual([]);
+  });
+
+  it('names the session it is still live in, as any retry does, when it lands in the new teacher’s class', async () => {
+    const block = await aBlock('moved-join-live');
+    const first = await startSession(db, {
+      classId: block.x.klass.id,
+      ...window('2026-01-01T09:00:00Z', 90),
+    });
+    const tap = block.tap('2026-01-01T09:01:00Z');
+    const joined = await tapIn(db, { sessionId: first.session.id, ...tap });
+    await block.move();
+    const second = await startSession(db, {
+      classId: block.y.klass.id,
+      ...window('2026-01-01T10:00:00Z'),
+    });
+    const retried = await tapIn(db, {
+      sessionId: second.session.id,
+      ...tap,
+      now: new Date('2026-01-01T10:01:00Z'),
+    });
+    expect(retried).toMatchObject({
+      outcome: 'replay',
+      state: 'focused',
+      participationId: joined.participationId,
+    });
+    expect(retried.session?.id).toBe(first.session.id);
+  });
+
+  it('answers it replay on the arm path, arming nothing for the new teacher', async () => {
+    const block = await aBlock('moved-arm');
+    const tap = await landedAndEnded(block);
+    const yBlock = await block.move();
+    // 09:55, nothing of Y's running: the retry reaches the arm path, under Y.
+    const retried = await armTap(db, {
+      ...tap,
+      teacherId: block.y.teacher.id,
+      blockId: yBlock.id,
+      expiresAt: DAY_END,
+      now: new Date('2026-01-01T09:55:00Z'),
+    });
+    expect(retried).toEqual({ outcome: 'replay' });
+    expect(
+      await db.select().from(armedTaps).where(eq(armedTaps.studentId, block.student.id)),
+    ).toEqual([]);
+  });
+
+  it('answers the retry of a tap still waiting for the old teacher already_armed, its row left theirs for their Start', async () => {
+    const block = await aBlock('moved-waiting');
+    const tap = { ...block.tap('2026-01-01T08:50:00Z'), expiresAt: DAY_END };
+    const armed = await armTap(db, {
+      ...tap,
+      teacherId: block.x.teacher.id,
+      blockId: block.xBlock.id,
+      now: new Date('2026-01-01T08:50:00Z'),
+    });
+    expect(armed.outcome).toBe('armed');
+    const yBlock = await block.move();
+    const retry = (at: string) =>
+      armTap(db, { ...tap, teacherId: block.y.teacher.id, blockId: yBlock.id, now: new Date(at) });
+
+    expect(await retry('2026-01-01T08:55:00Z')).toEqual({
+      outcome: 'already_armed',
+      armedTapId: armed.armedTapId,
+    });
+    const row = one(
+      await db.select().from(armedTaps).where(eq(armedTaps.studentId, block.student.id)),
+    );
+    expect(row).toMatchObject({
+      id: armed.armedTapId,
+      teacherId: block.x.teacher.id,
+      blockId: block.xBlock.id,
+      consumedAt: null,
+    });
+
+    // Made for X's class, and X's Start takes it.
+    const start = await startSession(db, {
+      classId: block.x.klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    expect(start.armedConverted).toBe(1);
+    // Taken, its next retry is the replay of a tap that landed.
+    expect(await retry('2026-01-01T09:30:00Z')).toEqual({ outcome: 'replay' });
+  });
+
+  it('keeps both waiting taps once the student tapped the moved block for real: the retry answered about its own', async () => {
+    const block = await aBlock('moved-both');
+    const before = { ...block.tap('2026-01-01T08:50:00Z'), expiresAt: DAY_END };
+    const first = await armTap(db, {
+      ...before,
+      teacherId: block.x.teacher.id,
+      blockId: block.xBlock.id,
+      now: new Date('2026-01-01T08:50:00Z'),
+    });
+    const yBlock = await block.move();
+    const onY = { teacherId: block.y.teacher.id, blockId: yBlock.id };
+    const now = new Date('2026-01-01T08:56:00Z');
+    const fresh = await armTap(db, {
+      ...block.tap('2026-01-01T08:55:00Z'),
+      ...onY,
+      expiresAt: DAY_END,
+      now,
+    });
+    expect(fresh.outcome).toBe('armed');
+
+    expect(await armTap(db, { ...before, ...onY, now })).toEqual({
+      outcome: 'already_armed',
+      armedTapId: first.armedTapId,
+    });
+    const waiting = await db
+      .select({ id: armedTaps.id, teacherId: armedTaps.teacherId })
+      .from(armedTaps)
+      .where(and(eq(armedTaps.studentId, block.student.id), isNull(armedTaps.consumedAt)));
+    expect(waiting).toEqual(
+      expect.arrayContaining([
+        { id: first.armedTapId, teacherId: block.x.teacher.id },
+        { id: fresh.armedTapId, teacherId: block.y.teacher.id },
+      ]),
+    );
+    expect(waiting).toHaveLength(2);
+  });
+
+  it('still refuses a spent id reused at a block whose tag the old teacher never held, on both paths', async () => {
+    // X's block never moved; Y has a block of its own, another tag. The same
+    // id at Y's block is a client bug, not a retry: a 200 would drop the
+    // physical tap made there.
+    const block = await aBlock('moved-not');
+    const yTag = 'TAG-moved-not-y-own';
+    const yBlock = one(
+      await db.insert(blocks).values({ tagId: yTag, teacherId: block.y.teacher.id }).returning(),
+    );
+    const landed = await landedAndEnded(block);
+    const waiting = { ...block.tap('2026-01-01T09:30:00Z'), expiresAt: DAY_END };
+    await armTap(db, {
+      ...waiting,
+      teacherId: block.x.teacher.id,
+      blockId: block.xBlock.id,
+      now: new Date('2026-01-01T09:30:00Z'),
+    });
+
+    for (const tap of [landed, waiting]) {
+      await expect(
+        armTap(db, {
+          ...tap,
+          tagId: yTag,
+          teacherId: block.y.teacher.id,
+          blockId: yBlock.id,
+          expiresAt: DAY_END,
+          now: new Date('2026-01-01T09:40:00Z'),
+        }),
+      ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    }
+    const { session } = await startSession(db, {
+      classId: block.y.klass.id,
+      ...window('2026-01-01T10:00:00Z'),
+    });
+    await expect(
+      tapIn(db, {
+        sessionId: session.id,
+        ...landed,
+        tagId: yTag,
+        now: new Date('2026-01-01T10:01:00Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+  });
+
+  it('still refuses another student’s id and another kind’s at the moved block', async () => {
+    const block = await aBlock('moved-other');
+    const classmate = one(
+      await db
+        .insert(users)
+        .values({
+          cognitoId: 'student-moved-other-2',
+          role: 'student',
+          schoolId: block.x.school.id,
+        })
+        .returning(),
+    );
+    await db.insert(enrollments).values({ classId: block.x.klass.id, studentId: classmate.id });
+    const { session } = await startSession(db, {
+      classId: block.x.klass.id,
+      ...window('2026-01-01T09:00:00Z'),
+    });
+    const theirs = { ...block.tap('2026-01-01T09:01:00Z'), studentId: classmate.id };
+    await tapIn(db, { sessionId: session.id, ...theirs });
+    await tapIn(db, { sessionId: session.id, ...block.tap('2026-01-01T09:01:00Z') });
+    const unlockId = newUuidV7();
+    await unlock(db, {
+      sessionId: session.id,
+      studentId: block.student.id,
+      eventId: unlockId,
+      deviceTime: new Date('2026-01-01T09:05:00Z'),
+    });
+    await endSession(db, {
+      sessionId: session.id,
+      at: new Date('2026-01-01T09:20:00Z'),
+      reason: 'ended',
+    });
+    const yBlock = await block.move();
+
+    for (const eventId of [theirs.eventId, unlockId]) {
+      await expect(
+        armTap(db, {
+          ...block.tap('2026-01-01T09:30:00Z'),
+          eventId,
+          teacherId: block.y.teacher.id,
+          blockId: yBlock.id,
+          expiresAt: DAY_END,
+          now: new Date('2026-01-01T09:30:00Z'),
+        }),
+      ).rejects.toMatchObject({ code: 'EVENT_ID_CONFLICT' });
+    }
+  });
+
+  it('answers a retry whose tag no live block holds as the arm path does, and nothing else', async () => {
+    // X removed the block and no one has registered its tag: the route's
+    // `resolveTapTarget` finds none, and asks this before its 404.
+    const block = await aBlock('removed');
+    const landed = await landedAndEnded(block);
+    const waiting = { ...block.tap('2026-01-01T09:30:00Z'), expiresAt: DAY_END };
+    const armed = await armTap(db, {
+      ...waiting,
+      teacherId: block.x.teacher.id,
+      blockId: block.xBlock.id,
+      now: new Date('2026-01-01T09:30:00Z'),
+    });
+    await block.remove();
+    const retry = (
+      eventId: string,
+      over: { studentId?: string; tagId?: string; now?: Date } = {},
+    ) =>
+      retryAtRemovedBlock(db, {
+        studentId: block.student.id,
+        eventId,
+        tagId: landed.tagId,
+        now: new Date('2026-01-01T09:40:00Z'),
+        ...over,
+      });
+
+    expect(await retry(landed.eventId)).toEqual({ outcome: 'replay' });
+    expect(await retry(waiting.eventId)).toEqual({
+      outcome: 'already_armed',
+      armedTapId: armed.armedTapId,
+    });
+    // Past the end of its day it waits no more.
+    expect(await retry(waiting.eventId, { now: new Date('2026-01-02T00:00:00Z') })).toEqual({
+      outcome: 'replay',
+      armedTapId: armed.armedTapId,
+    });
+
+    // Not this tap's retry: an id no write holds, another tag, another student.
+    const classmate = one(
+      await db
+        .insert(users)
+        .values({ cognitoId: 'student-removed-2', role: 'student', schoolId: block.x.school.id })
+        .returning(),
+    );
+    expect(await retry(newUuidV7())).toBeUndefined();
+    for (const eventId of [landed.eventId, waiting.eventId]) {
+      expect(await retry(eventId, { tagId: 'TAG-never-theirs' })).toBeUndefined();
+      expect(await retry(eventId, { studentId: classmate.id })).toBeUndefined();
+    }
+    // Nor is another kind's id: an unlock of the student's own.
+    const unlockId = newUuidV7();
+    await unlock(db, {
+      sessionId: newUuidV7(),
+      studentId: block.student.id,
+      eventId: unlockId,
+      deviceTime: new Date('2026-01-01T09:45:00Z'),
+    });
+    expect(await retry(unlockId)).toBeUndefined();
+    // And it wrote nothing.
+    expect(
+      await db.select().from(armedTaps).where(eq(armedTaps.studentId, block.student.id)),
+    ).toHaveLength(1);
   });
 });
 
