@@ -61,7 +61,10 @@ function declarations(block: string | undefined): Map<string, string> {
   return new Map(entries as [string, string][]);
 }
 const light = declarations(/^:root\s*\{([^}]*)\}/m.exec(css)?.[1]);
-const theme = declarations(/@theme\s*\{([^}]*)\}/.exec(css)?.[1]);
+// Every @theme block, the lanes' own at the file's end too (LO4).
+const theme = declarations(
+  [...css.matchAll(/@theme\s*\{([^}]*)\}/g)].map((m) => m[1] ?? '').join('\n'),
+);
 const inline = declarations(/@theme inline\s*\{([^}]*)\}/.exec(css)?.[1]);
 
 const byName = (list: Token[]) => new Map(list.map((t) => [t.name, t]));
@@ -162,6 +165,8 @@ const LOCK_SIZES: Record<string, [string, string, number, string?]> = {
   'count-of-phone': ['19px', '26px', 500],
   'code-well': ['34px', '44px', 500, '0.08em'],
   'panel-title': ['19px', '26px', 600],
+  // A page's title on a phone (LO4).
+  'page-title-phone': ['23px', '29px', 600, '-0.01em'],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -763,9 +768,9 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     // student's lesson (W4) their own answer once the question closes (StudentClosed); "Can't
     // reach Bali", drawn as the stale banner is, the notice `your-phone.tsx` shares with the lesson
     // page's lines and the home's live card (StudentChipUnreached, W4's follow-up); and the
-    // lock-only look's two wells (LO2), a plain one and a code's, as its canvas draws them.
+    // lock-only look's two wells (LO2), a plain one and a code's, as its canvas draws them, which
+    // the class page before a session takes since LO4, its length picker's track the rule's stone.
     expect(filled).toEqual({
-      [join('app', 'classes', '[id]', 'page.tsx')]: 1,
       [join('app', 'support', 'page.tsx')]: 1,
       [join('components', 'card.ts')]: 2,
       [join('components', 'join-code.tsx')]: 1,

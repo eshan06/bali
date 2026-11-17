@@ -54,7 +54,6 @@ const STILL_READING = [
   'components/decks-panel.test.ts',
   'components/entry-page.test.ts',
   'components/invite-code.test.ts',
-  'components/join-code.test.ts',
   'components/live-grid.test.ts',
   'components/present-question.test.ts',
   'components/present-slide.test.ts',

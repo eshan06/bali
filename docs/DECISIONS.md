@@ -53,17 +53,49 @@ a real decision? Add a dated entry at the top: what was decided and why.
   load first, today's words ("Couldn't load your classes."), since the API answers a 500 with "internal error", which
   would otherwise stand alone (drawn on HomeMoments).
 
-  **Left for the conductor's tidy-up step at the phase's end** (the conductor's call), outside lane A's files: a page
-  title's phone size (23/29 on PhonePages) needs a token, one for both lanes' titles, Home's keeping 26/32 on a phone
+  **Left for the conductor's tidy-up step at the phase's end** (the conductor's call): Home's title on a phone takes
+  LO4's `page-title-phone` (23/29 on PhonePages), one token for both lanes' titles, keeping 26/32 on a phone
   meanwhile; `--color-ready`, v2's "is ready" check, has no user now; and `portal-bar.tsx` still says Classes is
   marked on its old page "until LO3". TryAgain's button keeps v2's look (2 px more padding than lock.css's), as LO2
   left it.
 
   **Tests:** driven (Testing Library on jsdom). `app/home.test.ts`, `components/home.test.ts` and
-  `components/classes.test.ts` read source text and are converted, so 24 source-text tests are left:
+  `components/classes.test.ts` read source text and are converted, so 23 source-text tests are left with LO4's:
   `app/page.test.tsx` (each account's page, the redeem's focus, the reads at a bell, the date at midnight, a tab
   back in view, `/classes`), `components/home.test.tsx` (it absorbs `home.driven.test.tsx`), `blocks.test.tsx`, and
   the days' words in `classes.test.ts`.
+
+- **2026-11-17** — **LO4, a class before it starts: the class page with no session running rebuilt from ClassPage; the
+  start waits for a block; the last session's line, and v2's recap card the day a session ended until LO7; one PR (the
+  worker's calls and the conductor's, awaiting the owner's look; LO4, #606).**
+
+  **What the page shows** (ClassPage, ClassStates, ClassFlows' New code, PhonePages' "A class, before it starts"; its
+  in-between states on the canvas's ClassBeforeStates, drawn first, version 35): the name over its students and This
+  class's reports; one well with today's 25, 50, 75 and Other... and Start; the last session's line; the students, the
+  join code behind Add students, open at once for a class with none, New code's confirm the new look's dialog.
+
+  **No block yet** (ClassStates): the teacher's blocks are read as the page opens, and with none the well asks for one
+  first, through `lib/blocks.ts`'s own register (blocks.tsx is lane A's, and holds no piece to import). A read that fails
+  counts as a block (the conductor's call): Start is never kept from a teacher whose blocks Bali couldn't list, since a
+  session starts without one and only the students' tap needs it.
+
+  **The last session** (the worker's call, the conductor's approval): the line counts who stayed focused the whole time
+  of who joined as the recap does (`recapGroups`), its day "On Friday" for the last six days, else "On Oct 2". The day a
+  session ended, by this computer's calendar, the page shows v2's recap card in its place instead, as today, and
+  ClassEnded's "Ended at 9:55 AM" under the name, until LO7 redraws after the bell: the line's own read stops at the
+  session's summary then, so the card's read is the only full one.
+
+  **Kept for later** (the conductor's call): Try again, and Start while it sends (Starting..., no spinner), keep v2's
+  button, since `TryAgain` draws it and `try-again.tsx` is neither lane's; a step at the phase's end moves Try again to
+  the new look on every rebuilt page. A page's title on a phone takes a size of its own, `page-title-phone` (23/29), in
+  lane B's `@theme` block; on a phone each length is 10 px in, not 12, so the four fit one row (ClassBeforeStates).
+
+  **One PR** (the conductor's call): 787 changed lines without tests, over santa's 400, kept whole: the first of the
+  three parts proposed was still over 400, about 200 lines delete the old part, and the three share one render branch.
+
+  **Tests:** driven (`classes/[id]/before.test.tsx`, `components/join-code.test.tsx`, Present's toggle in
+  `classes/[id]/page.test.tsx`); `join-code.test.ts` leaves the source-text list (26 left), and the pins of this part in
+  `class-page.test.ts` and `present.test.ts` are converted.
 
 - **2026-11-17** — **LO2, the top bar: a teacher's pages under the lock-only canvas's bar, with its phone menu and the
   live class riding in it; a student keeps v2's side menu; the new look's shared pieces beside v2's (the worker's calls,

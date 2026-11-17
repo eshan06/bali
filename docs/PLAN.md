@@ -175,9 +175,9 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO2** 👀 The top bar and the new look's shared pieces (#604; after LO1) — ✅ (#617; DECISIONS 2026-11-17); its in-between states on the canvas's BarStates (version 32); until LO3, a teacher with classes reaches New class at /classes by its address only
 
-- **LO3** 👀 Home, one page for your classes (#605; lane A; after LO2) — ✅ (one PR, the conductor's call; DECISIONS 2026-11-17); its in-between states on the canvas's HomeMoments (version 37); for the phase's end: 24 source-text tests left (Now), and the conductor's tidy-up: one phone page-title token for both lanes, the unused `--color-ready`, `portal-bar.tsx`'s "until LO3"
+- **LO3** 👀 Home, one page for your classes (#605; lane A; after LO2) — ✅ (one PR, the conductor's call; DECISIONS 2026-11-17); its in-between states on the canvas's HomeMoments (version 37); Check on's rarer rows wait for the owner (Open owner items); for the phase's end: 23 source-text tests left (Now), and the conductor's tidy-up: Home's phone title to LO4's `page-title-phone`, the unused `--color-ready`, `portal-bar.tsx`'s "until LO3"
 
-- **LO4** 👀 A class before it starts (#606; lane B; after LO2)
+- **LO4** 👀 A class before it starts (#606; lane B; after LO2) — ✅ (#618; DECISIONS 2026-11-17); its in-between states on the canvas's ClassBeforeStates (version 35); left for a step at the phase's end: Try again, and Start while it sends, still v2's button (`TryAgain`, every rebuilt page); for Now at the phase's end: 26 source-text tests left (`join-code.test.ts` converted)
 
 - **LO5** 👀 Live: the count, Check on, the room (#607; lane B; after LO4)
 
@@ -345,6 +345,9 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
   - The App Store screenshot about questions, the third, "Answer without unlocking."
     (`docs/APP-STORE.md`, Screenshots): whether it stays.
   - The website's lesson pictures (`demo3`).
+  - 👀 Check on's rarer rows (LO3; DECISIONS 2026-11-17): whether Home's Check on also lists
+    protection off, left and unknown, drawn as a proposal on the canvas's HomeMoments (version 39).
+    Until then such a student only counts against the focused count and shows in the room.
   - Whether the privacy policy and terms drop questions and slides. The switch is the portal's
     alone: the API still takes answers and decks, the apps still show what a teacher sends, and
     what is stored stays until retention, so the policies' lines stay true until that changes.

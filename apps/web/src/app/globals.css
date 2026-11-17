@@ -545,4 +545,13 @@
 
 /* Lane B: the class page, Present */
 
+/* A page's title on a phone (LO4; lock.css's `.t-title` under 760 px): a size the scale lacks,
+   pinned in tokens.test.ts with the lock-only look's others. */
+@theme {
+  --text-page-title-phone: 23px;
+  --text-page-title-phone--line-height: 29px;
+  --text-page-title-phone--font-weight: 600;
+  --text-page-title-phone--letter-spacing: -0.01em;
+}
+
 /* End of lane B */
