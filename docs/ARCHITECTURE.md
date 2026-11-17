@@ -2019,8 +2019,8 @@ and keeps everything that enforces focus.
   `eventId` that any `responses` or `saved_questions` row holds, as the answers route already
   checks `events` (L1, L3b). The writers beside the engine, `PUT /v1/me/age-check`, `PUT` and
   `DELETE /v1/me/push-token`, `POST /v1/teacher-invites/redeem` and, since 2026-10-23, `POST
-  /v1/classes`, check only their own table: a UUIDv7 minted fresh never collides (narrowed
-  2026-10-12, the owner's ruling on #317).
+  /v1/classes`, and since 2026-11-17 `DELETE /v1/blocks/{id}` (LO10b), check only their own
+  table: a UUIDv7 minted fresh never collides (narrowed 2026-10-12, the owner's ruling on #317).
 - The guard wherever counts are read: one guarded count that the results route, the recap and
   any report read (L3, L3c, L7c).
 - The portal checks a deck's `sha256` as the phone does, refusing a mismatch, for the presenter
