@@ -631,6 +631,19 @@ describe('Present and the recap (portal_present_opened, portal_recap_opened)', (
     await vi.waitFor(() => expect(counted()).toEqual(['portal_recap_opened']));
   });
 
+  it('counts the recap only once the page shows it, never while the teacher’s blocks are read and the well’s place says Loading…', async () => {
+    bali.now.hold = 'GET /v1/blocks';
+    afterTheBell();
+    await screen.findByRole('button', { name: 'Start another session' });
+    await settle();
+    expect(screen.getByRole('status').textContent).toBe('Loading…');
+    expect(counted()).toEqual([]);
+    // Every read of them held, Strict Mode's first too.
+    while (bali.holding.length > 0) await release();
+    await recapShown();
+    await vi.waitFor(() => expect(counted()).toEqual(['portal_recap_opened']));
+  });
+
   it('counts nothing more as Start another session leaves the recap', async () => {
     const user = afterTheBell();
     await recapShown();
