@@ -43,8 +43,12 @@ a real decision? Add a dated entry at the top: what was decided and why.
   hooks and their own tests stay, used by no page until lessons are fitted back in.
 
   **Gone, with no user left:** v2's `LiveHeader`, `LiveCounts`, `joinedLine`, the countdown's Present size, the
-  Present tile and `PRESENT_COLUMNS`, the floating pill. **For the phase's tidy-up** (outside lane B's block): v2's
-  `present-title`, `present-tile-name`, `present-tile-state` and `code-present`, which no page uses now.
+  Present tile and `PRESENT_COLUMNS`, the floating pill. **For the phase's tidy-up** (#625; outside lane B's block):
+  v2's `present-title`, `present-tile-name`, `present-tile-state` and `code-present`, which no page uses now.
+
+  **One PR** (the conductor's call): 770 changed lines without tests, over santa's 400, rather than (a) Present stops
+  drawing and reading lessons, about 90, and (b) the new look, about 680: (b) alone is still over 400, it is one
+  render branch and one grid, and 503 of the 770 lines delete v2's Present and its lesson wiring.
 
   **Tokens:** nine sizes the scale lacks, in lane B's block (DESIGN.md §1, The lock-only look).
 
