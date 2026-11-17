@@ -8,6 +8,39 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-17** — **LO2, the top bar: a teacher's pages under the lock-only canvas's bar, with its phone menu and the
+  live class riding in it; a student keeps v2's side menu; the new look's shared pieces beside v2's (the worker's calls,
+  awaiting the owner's look; LO2, #604).**
+
+  **The bar** (Main, Reports, PhonePages; its in-between states on the canvas's BarStates, drawn first, version 31):
+  Bali, Classes and Reports, Help and the account, never Questions or Slides whichever way the lessons switch is set.
+  Classes links `/`, as the boards do; until LO3 makes Home and Classes one page it is marked on `/classes` and a class's
+  page too, and a teacher with classes reaches New class at `/classes` by its address only (Home's Create a class still
+  opens it for a new teacher). A student's pages keep v2's side menu until LO12 redraws them.
+
+  **The page under it** (`TOP_PAGE`): centred under the bar's row, 1360 px at most, 40 px in, so a page not yet rebuilt
+  keeps its own look, aligned with the bar. The bar stays in view as the page scrolls (z 3), under the student panel, a
+  dialog, the unlock pop-ups and the reconnect pill, which stick to the window's top as before, over it.
+
+  **The live class in the bar** (the conductor: from what the portal already reads, no API change): the account's
+  running sessions, the first in Your classes' order that isn't the page's own class, none on Classes; its session read
+  as Home's live card reads it (`LiveGrid`), and shown only once that read says it runs, so a class ended a moment ago
+  never shows as live; its count only while Bali can vouch for it. A session starts, ends or runs longer only on a
+  class's page, so as one is left the bar has the shell read the account again (its `refresh`, never beside a read on
+  its way, and after the next page's own reads begin): the account's reads are unchanged, and every other page change
+  keeps the one read. A class started in another tab rides in the bar from the next read (Home, Classes, or leaving a
+  class's page).
+
+  **Narrow windows:** under 1024 px the account's name and the class's count go, as on a phone; under 760 px the menu
+  button, and the live class on a row of its own under the bar, since the board's inline strip pushes the menu button
+  out of a 390 px phone.
+
+  **The shared pieces**, for both lanes (the conductor: buttons, wells, chips, ledger rows), beside v2's, so no page
+  changes before its step: `lockButton` and `LockButton`, `ICON_BUTTON`, `QUIET`, `NAME_BUTTON`; `WELL`, `LIVE_WELL`,
+  `CODE_WELL`, the `LEDGER` set and `DIALOG_LOCK` (v2's dialog lives in lane B's `join-code.tsx`, out of lane A's reach);
+  `CHIP_LOCK` and `LockChip`; the tokens DESIGN.md §1 lists. A field keeps `border-input`, the owner's 3:1 ruling, where
+  lock.css draws `rule-strong`.
+
 - **2026-11-16** — **The lessons switch, built: `NEXT_PUBLIC_LESSONS`, on unless it says off; off, the portal shows
   nothing of a live lesson, its class page and reports read none, and a lesson page's address goes to `/` (LO1, #615,
   the conductor's calls and this step's).**

@@ -630,7 +630,19 @@ one page. It is built with the portal's own tokens and components, never by
 copying `lock.css`: a value it draws that the tokens lack joins as a named
 portal token that `tokens.test.ts` pins, as v2's did (Its call). Each teacher
 page keeps v2's look, above, until its LO step lands; sign-in, the invite page
-and Help keep theirs.
+and Help keep theirs. LO2 added the bar's and the shared pieces' (`globals.css`,
+2026-11-17): the sizes `nav` (14.5/20, medium: the bar's places and Help, and
+Reports' class tabs), `menu-link` (17/24, medium: the phone menu's rows),
+`section-title` (17/24, semibold: a part's title), `count` and `count-phone`
+(64/64 and 52/52, semibold, −0.035em: the page's one number), `count-of` and
+`count-of-phone` (22/28 and 19/26, medium: its words), `code-well` (34/44, mono
+at medium, +0.08em: a code in its well) and `panel-title` (19/26, semibold: a
+dialog's or the student panel's title); the colours `live-fill` (green-50: the
+live class's fill) and `live-hover` (green-600: its edge in the bar on hover);
+and the press, the `press` utility (0.97, an icon button's 0.94, on the
+ease-out curve over 140 ms; nothing under reduced motion). A text field keeps
+the Field's `border-input` edge, the owner's 3:1 ruling, where `lock.css` draws
+`rule-strong`.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the

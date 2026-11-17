@@ -153,6 +153,25 @@ const SELECTED = 'rounded-md ring-2 ring-focus-ring ring-offset-2 ring-offset-su
 export const CHIP_PILL =
   'inline-flex shrink-0 items-center gap-1.5 rounded-full border-[1.5px] px-2.5 py-0.75 text-caption font-medium whitespace-nowrap tabular-nums';
 
+/** A state's chip in the lock-only look (lock.css's `.chip`; LO2): 4 × 12 px in, its icon 14 px. */
+export const CHIP_LOCK =
+  'inline-flex shrink-0 items-center gap-1.5 rounded-full border-[1.5px] px-3 py-1 text-caption font-medium whitespace-nowrap tabular-nums';
+
+/**
+ * A state as the lock-only look's chip (Check on, on Home and the class page): its tint, its icon
+ * and its words, never colour alone; `words` its label unless given ("Silent · 5 min").
+ */
+export function LockChip({ display, words }: { display: GridDisplay; words?: string }) {
+  const { label, icons, tone } = CHIP[display];
+  const Icon = icons[icons.length - 1] ?? Circle;
+  return (
+    <span className={`${CHIP_LOCK} ${tone}`}>
+      <Icon size={14} aria-hidden="true" className="shrink-0" />
+      {(words ?? label).replaceAll(' · ', DOT)}
+    </span>
+  );
+}
+
 /** A dot between two parts of a line, after a no-break space, so a line never starts with one. */
 export const DOT = '\u00a0· ';
 
