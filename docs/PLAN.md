@@ -173,7 +173,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO1** The lessons switch, `NEXT_PUBLIC_LESSONS` (#603; after LO0, beside LO10) — ✅ (#615; DECISIONS 2026-11-16); for Now at the phase's end: 27 source-text tests left (`session-report.test.ts` converted)
 
-- **LO2** 👀 The top bar and the new look's shared pieces (#604; after LO1)
+- **LO2** 👀 The top bar and the new look's shared pieces (#604; after LO1) — ✅ (#617; DECISIONS 2026-11-17); its in-between states on the canvas's BarStates (version 32); until LO3, a teacher with classes reaches New class at /classes by its address only
 
 - **LO3** 👀 Home, one page for your classes (#605; lane A; after LO2)
 
