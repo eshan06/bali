@@ -42,17 +42,24 @@ a real decision? Add a dated entry at the top: what was decided and why.
   in its student's record and counted in the figures), and so is the Questions card and its read, whichever way the
   lessons switch is set (ARCHITECTURE, Web portal, decision 8).
 
-  **Left out, no board drawing them** (CLAUDE.md, Working rules): a student who never joined but has an Emergency
-  Unlock or protection off on record is named under Didn't join and counted in the figures, with no row and no record,
-  where v2's recap gave them a row; nobody joined shows only those figures. The owner's to approve if wanted.
+  **Awaiting the owner, left out with no board drawing it** (CLAUDE.md, Working rules: anything new shown about a
+  student waits for the owner's approval): a student who never joined but has an Emergency Unlock or protection off
+  on record is counted in the figures and named under Didn't join, with no row and no record, where v2's recap gave
+  them a row with the moment; nobody joined shows only those figures. A row or a record for them is the owner's to
+  approve. **The tracks' contrast**, also the owner's to look at: the focused green (green-200) on the bare track
+  (stone-100) is under WCAG 1.4.11's 3:1, as the board draws it; each track's words (its label) and the Key carry what
+  the colours say, and restyling the approved board is the owner's call.
 
-  **Costs, said plainly:** the tracks' green on the bare track is under 3:1 (WCAG 1.4.11), as drawn; each track's
-  words and the Key carry it. Home's Open the recap leads to the class's page, so for a session from an earlier day it
-  lands on ClassPage's line, whose Open the report opens the recap (lane A's link).
+  **Left for the phase-end tidy-up** (the conductor's call): Home's Open the recap (lane A's link) leads to the class's
+  page, so for a session from an earlier day it lands on ClassPage's line, whose Open the report opens the recap.
 
   **Tokens:** `track-focused` (green-200) and `track-silent` (stone-500) and the `track-dashes` utility, in lane B's
   block; `tokens.test.ts` now reads every `@theme inline` block. For the phase's tidy-up: `--color-mark` (v2's marks)
   has no user now, and the record's words are written twice, `recap-card.tsx` and `student-panel.tsx`.
+
+  **One PR** (the conductor's call): 1,394 changed lines without tests, over santa's 400, kept whole rather than the
+  proposed three (~250, ~330 plus deletions, ~220 plus ~450 deletions): 704 of them delete v2's card, its marks and
+  the report's Unlocks table, and a split would review `recap-card.tsx` and `timeline.tsx` twice.
 
   **Tests:** driven. `recap-card.test.ts` is converted to `recap-card.test.tsx` (21 source-text tests left), the
   report page's two files are one driven `session-report.test.tsx`, `timeline.test.ts` tests the tracks, and the class
