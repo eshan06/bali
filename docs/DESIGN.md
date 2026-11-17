@@ -255,10 +255,10 @@ the line over the grid are a status a screen reader hears, never their age's tic
 whose pop-up or panel it closes and each Mark correct its answer's letter; and focus goes to the
 class's name after Start, to the student's tile as the last pop-up closes (else the class's name),
 and to End session if the browser closes its dialog while the end is on its way.
-Reports is v2's since PV13 (2026-10-15): a menu page, one class at a time picked
-with pills, its sessions as a table in a box that scrolls sideways beside each
+Reports was v2's from PV13 (2026-10-15) until LO8 (2026-11-17; §1, The lock-only look): a menu page, one class at
+a time picked with pills, its sessions as a table in a box that scrolls sideways beside each
 one's average focus as a bar, and `/classes/[id]/reports` a redirect to it with
-that class picked; each row's session a link to its own page since PV14, where a row opened
+that class picked, as it still is; each row's session a link to its own page since PV14, where a row opened
 its report under it, as the reports list did, until then.
 A session's report is v2's since PV14 (2026-10-15): a page and a URL of its own
 (`/reports/<class>/<session>`, Reports marked in the menu), ReportOpened's page: the way back to
@@ -688,6 +688,15 @@ states as ClassEndedStates draws them (drawn on the canvas first). LO7 added the
 colours `track-focused` (green-200) and `track-silent` (stone-500) and the
 `track-dashes` utility (a silence's dashed line), in lane B's block; an unlock's
 and a protection off's stretch take v2's marks' `unlock-edge` and `mark-off`.
+Since LO8 (2026-11-17) Reports is Reports': a tab per class; the
+share of the listed sessions' class time spent focused, with Download CSV of
+their totals (never a student's name or row); and the sessions, ten a page with
+Show earlier, each with how many stayed focused the whole time as its recap
+counts them and its average as words beside a bar, in a ledger that scrolls
+sideways under 760 px, every cell on one line; its states as HomeStates and
+ReportsMoments draw them (drawn on the canvas first, the CSV's columns too). LO8
+added `share` (56/56, semibold, −0.035em: the share, at every width), in lane
+A's block.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the

@@ -541,6 +541,16 @@
 
 /* Lane A: Home, Reports, blocks */
 
+/* Reports' share of class time spent focused (LO8; lock.css's `.proof .count .n`): its one number,
+   56/56 at every width, a size the scale lacks, pinned in tokens.test.ts with the lock-only look's
+   others. */
+@theme {
+  --text-share: 56px;
+  --text-share--line-height: 56px;
+  --text-share--font-weight: 600;
+  --text-share--letter-spacing: -0.035em;
+}
+
 /* End of lane A */
 
 /* Lane B: the class page, Present */

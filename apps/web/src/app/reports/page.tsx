@@ -17,8 +17,10 @@ import {
 import { useApi } from '@/lib/use-api';
 
 /**
- * Reports, in the menu (PV13; the Reports board): one class at a time, the one `?class=` names,
- * else the first of the account's classes, its sessions R3's, 20 a page.
+ * Reports, in the top bar (the lock-only canvas's Reports; LO8): one class at a time, the one
+ * `?class=` names, else the first of the account's classes, its sessions R3's, `REPORTS_PAGE` at a
+ * time, each with its whole-time count, kept while the page is open so a class picked again reads
+ * none of them again.
  */
 export default function ReportsPage() {
   const api = useApi();
@@ -33,6 +35,8 @@ export default function ReportsPage() {
   const [list, setList] = useState(FIRST_READ);
   // Each read's number: one answered after a newer read started, or the class changed, is dropped.
   const latest = useRef(0);
+  // Each session's whole-time count, under the figures that would change it (`readSessions`).
+  const counted = useRef(new Map<string, number>());
 
   // Another class picked, or none left: its list starts afresh in this same render, so no row of
   // the last class is ever drawn under this one's id.
@@ -46,7 +50,7 @@ export default function ReportsPage() {
     if (classId === null) return;
     const mine = ++latest.current;
     setList(startRead(from, at));
-    const next = await readSessions(api, classId, from, at);
+    const next = await readSessions(api, classId, from, at, counted.current);
     if (mine === latest.current) setList(next);
   }
 

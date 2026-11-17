@@ -175,6 +175,8 @@ const LOCK_SIZES: Record<string, [string, string, number, string?]> = {
   'room-name-phone': ['14px', '19px', 600],
   // A time in a log, the session list's and the student panel's (LO6).
   'log-time': ['13px', '20px', 400],
+  // Reports' share of class time spent focused, at every width (LO8).
+  share: ['56px', '56px', 600, '-0.035em'],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -774,10 +776,11 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     );
     // The stale banner, and v2's on the class page: the length
     // picker's track and the join code's chip; the recap's track and its Key's Not here (LO7, as
-    // lock.css's `.track` and `.sw.k-notin` draw them, where v2's dots and name pills were); on Reports (PV13) its table's head, its bars' tracks and the place-lost notice, drawn
-    // as the stale banner is; and on Help (PV15, SupportPage) the two lists of what a teacher sees,
-    // drawn so too; a live question's (L7) options' letters, and its "Results can't refresh", drawn
-    // as the stale banner is, on the class page and in Present (L7, part 2); on Your questions
+    // lock.css's `.track` and `.sw.k-notin` draw them, where v2's dots and name pills were); v2's
+    // table head (PV13), which a session's report kept until LO7, and Reports' bars' tracks (LO8,
+    // `.minibar`); on Help (PV15, SupportPage) the two lists of what a teacher sees, drawn as the
+    // stale banner is; a live question's (L7) options' letters, and its "Results can't refresh",
+    // drawn as the stale banner is, on the class page and in Present (L7, part 2); on Your questions
     // (L7b) the answers' letters; Your slides' (M5b) file tiles and an upload's progress track; on a
     // student's lesson (W4) their own answer once the question closes (StudentClosed); "Can't
     // reach Bali", drawn as the stale banner is, the notice `your-phone.tsx` shares with the lesson
@@ -791,7 +794,7 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       [join('components', 'live-grid.tsx')]: 1,
       [join('components', 'present-question.tsx')]: 2,
       [join('components', 'question-card.tsx')]: 2,
-      [join('components', 'reports-list.tsx')]: 3,
+      [join('components', 'reports-list.tsx')]: 2,
       [join('components', 'saved-questions.tsx')]: 1,
       [join('components', 'slides.tsx')]: 2,
       [join('components', 'student-lesson.tsx')]: 1,
@@ -917,14 +920,12 @@ describe('the lock-only look’s buttons (DESIGN.md §1, The lock-only look; LO2
 
 describe('Reports’ tables are each in a box that scrolls sideways (PV13, PV14; DESIGN.md §8)', () => {
   // v2's look superseded the card per session (D2g) and "never a table that scrolls sideways": the
-  // box scrolls, never the page, and no figure wraps or shrinks below its size to fit.
+  // box scrolls, never the page, and no figure wraps or shrinks below its size to fit. Reports' own
+  // since LO8 is driven in app/reports/page.test.tsx.
   const list = read('../components/reports-list.tsx');
 
   it('scrolls in its own box, and only there', () => {
-    expect(list.match(/<table\b/g)).toHaveLength(1);
-    expect(list.match(/overflow-x-auto/g)).toHaveLength(1);
     expect(list).toMatch(/export const TABLE_BOX =\s*'overflow-x-auto [^']*';/);
-    expect(list).toMatch(/<div className=\{TABLE_BOX\}>\s*<table\b/);
     // A session's report is the recap since LO7, its Unlocks table gone with v2's page.
     expect(read('../components/session-report.tsx')).not.toMatch(/overflow-x|<table\b/);
     expect(read('./reports/page.tsx')).not.toMatch(/overflow-x|<table\b/);

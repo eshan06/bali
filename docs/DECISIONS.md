@@ -69,6 +69,63 @@ a real decision? Add a dated entry at the top: what was decided and why.
   page's after-the-bell pins in `class-page.test.ts` and `present.test.ts` are converted into `before.test.tsx` and
   `page.test.tsx`.
 
+- **2026-11-17** — **LO8, Reports in the lock-only look: a tab per class, the share of the listed sessions' class time
+  spent focused, Download CSV of their totals, and the sessions ten a page, each with how many stayed focused the whole
+  time; its in-between states and the CSV's columns drawn first on the canvas's ReportsMoments (version 55); one PR (the
+  worker's calls, the conductor's approval, awaiting the owner's look; LO8, #610).**
+
+  **What the page shows** (Reports, HomeStates' "Reports, nothing yet", PhonePages): Reports over a tab per class, the one
+  picked marked by its ink and its rule; the share, "95%" over "of class time spent focused", with Download CSV; then the
+  sessions, newest first, in a ledger that scrolls sideways under 760 px (720 px wide at least, every cell on one line):
+  the session (its day, a link to its own page, over its times, "9:05 to 9:55 AM", the start's AM or PM left off when the
+  end's is the same, as the board says them), Joined, Focused the whole time, Average time focused as its words beside a
+  bar out of the session's length, Emergency unlocks and Protection off; "Nobody joined" across three cells for a session
+  nobody joined; Show earlier. v2's framing line, its pills and the bars beside the table went with its look.
+
+  **Focused the whole time, counted in the portal** (the worker's call): R3's rows carry no such count, so each listed
+  session someone joined is counted as its recap counts it (`recapGroups`), from its report and its events, the class
+  page's own reads of its last session (LO4): three reads a session (the report, the events and the empty page that ends
+  them; more for a session past 200 events). So a page is 10 sessions, not R3's 20 (`REPORTS_PAGE`): about 32 reads of
+  a teacher's 120 a minute (`apps/api/src/limits.ts`, a burst of 120 refilled at 2 a second). That holds for a page at
+  a time; four classes picked, or Show earlier pressed three or four times, within a few seconds can meet a `429`, said
+  with Try again and over in moments, and so can anything else the teacher sends meanwhile, in another tab too (both
+  reviewers' WARN, santa's round 1). Each count is kept while the page is open, under the session and the R3 figures a late
+  unlock or protection off changes, so a class picked again reads no count again, and a session one of those has
+  reached since is counted again. A page lands whole: a count that fails is the page's failure, said with Try again,
+  which reads only the counts not in. **A possible later step:** the server counting it on R3's rows (additive, one rule
+  for both, `sessionReport`), one read a page, should classes outgrow ten a page.
+
+  **The share and the CSV cover the sessions listed** (the worker's call; ReportsMoments' head says so): the share is
+  their focus minutes over their students' time in them, each student's time the session's length as its bar counts it,
+  rounded down so it never claims more than was kept (29 of 100 is 29 %, never floating point's 28); none when nobody
+  joined any, Download CSV then alone over the table. Show earlier adds to both. The board's 95 % is exactly the share
+  of the rows it draws.
+
+  **The CSV** (the worker's call, drawn on ReportsMoments): "Biology, period 3 sessions.csv", a row per session listed,
+  newest first: Class, Date (2026-10-12) and Start and End (09:05, 24 hours, by the viewer's clock), so a spreadsheet
+  reads them anywhere; Joined; Focused the whole time; Average time focused (min) and Length (min), the board's "47 of 50
+  min"; Emergency unlocks; Protection off. A session nobody joined has no average. The session totals alone, never a
+  student's name or id (the conductor's rule, tested). UTF-8 with a byte-order mark, CRLF lines and RFC 4180's quoting;
+  the class's name always quoted, so a spreadsheet splitting on semicolons keeps it one cell (santa's round 1), and one
+  a spreadsheet would run as a formula (=, +, -, @, a tab or a return first) kept as text, a quote before it.
+
+  **Its in-between states** (ReportsMoments, drawn first): the sessions being read and counted, the sessions that didn't
+  load, a teacher with no class, nobody joined any session listed, Show earlier reading, earlier sessions that didn't
+  load, and the place lost; today's words throughout. Try again and Show earlier keep v2's button until the phase-end
+  step moves it.
+
+  **One PR** (the conductor's call): "One PR rather than LO8a (the lib, ~255 lines) and LO8b (the page, ~454): LO8b alone
+  is still over 400, LO8a alone is either unused code or makes v2's live Reports page do reads it never shows, and 214 of
+  the 709 lines delete v2's view (the conductor's call, 2026-11-17)."
+
+  **Tests:** driven (`app/reports/page.test.tsx`); `components/reports-list.test.ts` converted and gone, 21 source-text
+  tests left, its pins of the page's stale-answer guard, the same-render reset (the render itself seen by a
+  layout-effect probe, santa's round 2) and the cleanup's bump driven now, each shown failing on its mutant (santa's
+  round 1, Reviewer B's blocker); the counts, the share and the bar in
+  `lib/reports.test.ts`, the CSV in `lib/report-csv.test.ts`. The share's
+  size, `share` (56/56), joins lane A's block. Left for the phase's tidy-up: v2's `text-pill` and `text-bar-row`, unused
+  now.
+
 - **2026-11-17** — **LO6, live: the session list, the unlock pop-ups, the student panel and the tab's title in the
   lock-only look, from one log of the session read for the list and every panel; its in-between states on the canvas's
   LiveListStates, drawn first (version 53) (the worker's calls, awaiting the owner's look; LO6, #608).**
