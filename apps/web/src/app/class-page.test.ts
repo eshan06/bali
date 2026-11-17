@@ -123,8 +123,9 @@ describe('the class page while no session runs', () => {
 });
 
 describe('the class page while a session runs (ClassLive)', () => {
-  // Its header, its controls, Present's and the lines said under them are driven in
-  // classes/[id]/page.test.tsx since LO5.
+  // Its header, its controls, Present's and an extend's lines under them are driven in
+  // classes/[id]/page.test.tsx since LO5; a read again of the class that failed there is the
+  // same `Oops` line the session's own failure is driven through (live-grid.driven.test.tsx).
 
   it('counts Present’s grid by the live grid’s own session', () => {
     // The live grid's own counts, never another session's (a Start after an end).

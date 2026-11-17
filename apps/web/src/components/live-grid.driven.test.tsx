@@ -301,6 +301,29 @@ describe('the count and Check on (LO5; ClassLive, LiveStates, LiveTopStates)', (
     expect(within(count).getByRole('button', { name: 'Wei Zhang' })).toBeTruthy();
   });
 
+  it('keeps a Silent row, and the name focused in it, as its minutes turn over', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await open(false, [
+        student('Tomás Herrera', { lastSeenAt: ago(330) }),
+        student('Ana Rodríguez'),
+      ]);
+      await act(async () => {
+        (bali.streams[0] as { onStatus: (s: string) => void }).onStatus('open');
+        await Promise.resolve();
+      });
+      const region = screen.getByRole('region', { name: '1 of 2 focused' });
+      const name = within(region).getByRole('button', { name: 'Tomás Herrera' });
+      name.focus();
+      expect(checks()).toEqual([['Silent · 5 min', 'Tomás Herrera']]);
+      await act(() => vi.advanceTimersByTimeAsync(50_000));
+      expect(checks()).toEqual([['Silent · 6 min', 'Tomás Herrera']]);
+      expect(document.activeElement).toBe(name);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('says everyone is focused in one line, and nothing to check', async () => {
     await open(false, [student('Ana Rodríguez'), student('Marcus Bell')]);
     const count = screen.getByRole('region', { name: '2 of 2 focused' });

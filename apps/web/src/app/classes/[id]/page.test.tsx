@@ -460,20 +460,23 @@ describe('the live page’s other lines, and Present left on a phone (LO5)', () 
   it('puts focus on the class’s name as Present is left on a phone, where the page draws no Present', async () => {
     sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(width < 760px)' }));
-    const user = userEvent.setup();
-    render(
-      <main>
-        <ClassDetailPage />
-      </main>,
-    );
-    await screen.findByText('Ana Rodríguez');
-    await user.click(screen.getByRole('button', { name: 'Present' }));
-    expect(screen.queryByText('Live · 1 of 1 joined')).toBeNull();
-    expect(document.activeElement).toBe(
-      screen.getByRole('heading', { level: 1, name: 'Biology, period 3' }),
-    );
-    vi.unstubAllGlobals();
-    vi.stubGlobal('ResizeObserver', NoLayout);
+    try {
+      const user = userEvent.setup();
+      render(
+        <main>
+          <ClassDetailPage />
+        </main>,
+      );
+      await screen.findByText('Ana Rodríguez');
+      await user.click(screen.getByRole('button', { name: 'Present' }));
+      expect(screen.queryByText('Live · 1 of 1 joined')).toBeNull();
+      expect(document.activeElement).toBe(
+        screen.getByRole('heading', { level: 1, name: 'Biology, period 3' }),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+      vi.stubGlobal('ResizeObserver', NoLayout);
+    }
   });
 });
 
@@ -675,14 +678,16 @@ describe('a class live, an unlock lands (GA2)', () => {
     const glow = () => anasTile().querySelector('.animate-softpulse');
     const first = glow();
     expect(first).not.toBeNull();
+    // A second unlock while the first still pulses: a glow of its own, from the start.
+    await bring(unlocked(6));
+    const second = glow();
+    expect(second).not.toBeNull();
+    expect(second).not.toBe(first);
     // Its end: jsdom has no AnimationEvent, so React listens for the prefixed name there.
     act(() => {
-      first?.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
+      second?.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
     });
     expect(glow()).toBeNull();
-    await bring(unlocked(6));
-    expect(glow()).not.toBeNull();
-    expect(glow()).not.toBe(first);
   });
 
   it('closes on Open student, the student’s panel opening from their tile', async () => {

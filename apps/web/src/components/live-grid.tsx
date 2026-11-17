@@ -529,10 +529,15 @@ function CheckOn({
         {rows.map((row) => {
           const [one] = row.students.length === 1 ? row.students : [];
           return (
-            // Keyed by its state and its first student, never its words: a Silent row's minutes
-            // turn over each minute, and the row, a name in it focused, stays put.
+            // Keyed by its state, never its words: a Silent row's minutes turn over each minute,
+            // and the row, a name in it focused, stays put. Silent alone has a row per minute,
+            // each told apart by its first student.
             <li
-              key={`${row.display}-${row.students[0]?.studentId ?? ''}`}
+              key={
+                row.display === 'silent'
+                  ? `silent-${row.students[0]?.studentId ?? ''}`
+                  : row.display
+              }
               className={`grid grid-cols-[150px_minmax(0,1fr)_auto] items-center gap-4 border-b border-border-default py-3 max-[760px]:grid-cols-[140px_minmax(0,1fr)] max-[760px]:gap-x-3 max-[760px]:gap-y-2 ${faded}`}
             >
               <span>
