@@ -3,6 +3,7 @@ import {
   changeUnlockReason,
   closeQuestion,
   completeDeck,
+  createBlock,
   createDeck,
   createSavedQuestion,
   type Database,
@@ -358,6 +359,16 @@ const REPEATS: Record<string, Repeat> = {
         replay: (first) => ({ ...first, ...now }),
       };
     },
+  },
+  // Its code registered again since, by its teacher (LO10b): a replay answers the block it removed,
+  // as it is, never the new one, and frees nothing more.
+  'DELETE /v1/blocks/:id': {
+    as: 'owner',
+    sent: (w) => ({
+      url: `/v1/blocks/${w.block.id}`,
+      body: { eventId: newUuidV7() },
+      between: () => createBlock(db, { teacherId: w.owner.id, tagId: w.block.tagId }),
+    }),
   },
   // Time added again since: a replay adds none and answers the bell now, `extended` as always.
   'POST /v1/sessions/:id/extend': {

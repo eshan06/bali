@@ -708,6 +708,25 @@ export interface BlockListResponse {
   blocks: BlockDetail[];
 }
 
+// DELETE /v1/blocks/{id} — a teacher removes one of their own blocks, a lost one (LO10b). Its tag
+// is free from then on, for anyone to register again (the owner's "Free the code", 2026-11-17).
+export interface RemoveBlockRequest {
+  /** The removal's idempotency key (rule 4), a UUIDv7: resent, it is answered `replay`. */
+  eventId: string;
+}
+/**
+ * Every outcome a block's removal answers with (`RemoveBlockResponse.outcome`): `removed` this call
+ * removed it; `replay` it was removed already, by this call's first send or another removal, and
+ * nothing changed.
+ */
+export const REMOVE_BLOCK_OUTCOMES = ['removed', 'replay'] as const;
+export type RemoveBlockOutcome = (typeof REMOVE_BLOCK_OUTCOMES)[number];
+export interface RemoveBlockResponse {
+  outcome: RemoveBlockOutcome;
+  /** The block, removed: `GET /v1/blocks` lists it no more. */
+  block: BlockDetail;
+}
+
 // DELETE /v1/enrollments/{id} — a student leaves their own, or the teacher removes any.
 // A student never leaves while the class has a session running by the server's
 // clock: `409 class_in_session`, nothing recorded (owner, 2026-09-30; A19).

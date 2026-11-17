@@ -201,7 +201,7 @@ export function buildApp(env: Env, deps: AppDeps): FastifyInstance {
   registerTeacherInvitesRoute(app, deps.db, limits);
   registerClassesRoutes(app, deps.db);
   registerReportsRoutes(app, deps.db, clock);
-  registerBlocksRoutes(app, deps.db);
+  registerBlocksRoutes(app, deps.db, clock);
   registerQuestionsRoutes(app, deps.db, clock);
   registerDecksRoutes(app, deps.db, clock, deps.parsePdf ?? ((bytes) => parsePdf(bytes)));
   registerFeedRoutes(app, deps.db, clock, deps.stream);

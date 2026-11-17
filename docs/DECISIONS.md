@@ -8,6 +8,66 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-17** — **LO10b, a teacher removes a lost block: `DELETE /v1/blocks/{id}`, a soft remove
+  that frees its code for anyone to register again (the owner's "Free the code"), idempotent on its
+  `eventId`; a session running is no refusal (the worker's calls, the owner away; LO10b, closes
+  #612).**
+
+  **The route.** `{ eventId }`, a UUIDv7, as every write's. Another teacher's block, live or removed,
+  and a student are `403`; no block with the id, `404` with no `reason`: one status, one meaning on
+  this route, and a new reason would change BaliCore's and `core`'s vocabularies for a refusal no
+  phone meets. The answer is `RemoveBlockResponse`, `{ outcome, block }`: `removed` or `replay`.
+
+  **Its `eventId` is kept on the block's row** (`blocks.removed_event_id`, a nullable uuid under a
+  unique constraint; migration 0032 only adds, so the migration guard passes), as Create class keeps
+  its own (2026-10-23): a writer beside the engine, writing no event and no participation, checks
+  only its own table for the id (the owner's ruling on #317). Not an event: `events` is the lessons'
+  history, and a new event type is a new vocabulary on the phones.
+
+  **Removing twice** (the worker's call): a block removed already is a `replay`, answered with the
+  block as it is, whatever removed it: the request resent, in either letter case, or a second Remove
+  under a new id (two tabs). The truth now, nothing written, the first removal's id kept. Not the
+  `404` a removed deck's second removal gets (M2a): the block is gone, as the teacher asked, and the
+  portal drops it from its list either way. The id another block's removal holds is `409
+  event_id_conflict`, the unique constraint settling two removals racing under one id; sent to a
+  block removed already, it is that block's `replay` first, as a complete of a checked deck is
+  (M2b), since nothing would be written.
+
+  **A session running** (the worker's call, the owner away: the plainest answer that strands no
+  one): the block is removed all the same. A session is its class's, never its block's: its students
+  check in, unlock and return by its id, and it ends at its bell by the phones' clocks and the sweep,
+  so a removal takes no one out of a lesson and keeps no one in one. Only a new tap at the tag finds
+  no block, `404` as at any tag none holds, while the retry of a tap made there before is still that
+  tap's retry (LO10a). *Weighed:* refusing with an honest line until the session ends, which keeps a
+  found block working to the bell, but holds a teacher's Remove through a day of back-to-back
+  lessons and needs a new refusal, a new reason and a new line in LO11's Remove.
+
+  **Its code registered again at once** (the owner's "Free the code"): a new block, by its teacher
+  or anyone, never the removed one back, whose row stays (decision 3). The window `createBlock`
+  disclosed on 2026-09-22 is reachable now, so it is settled: a registration whose insert met the
+  tag's live block, removed before its read of the holder, answered `tag_taken` for a tag no block
+  held. The read now takes the holder FOR SHARE, so a removal under way (`removeBlock` holds the
+  row FOR UPDATE, then writes) is waited out, and none starts before an answer naming the holder
+  commits; finding no live holder, it inserts again, three tries at most, then a 500.
+
+  **Left as they are.** A tap waiting for the teacher's Start (decision 5) was made at their block
+  for their class, and waits for that Start still: nothing of the engine's changes. The retention
+  run (C6b) counts a teacher's live block, or one made since the year's end, as a record, and a
+  removal since is none, as a deck's removal is none (M4): it matters only to a teacher with no
+  class at all, since only a disposal removes a class; a step of its own if the owner wants it.
+  `tapDisposition`'s comment in `@bali/shared`, and BaliCore's and `core`'s copies (comment only),
+  now say what LO10a changed: the retry of a tap whose block moved is never `409` or `404`.
+
+  **Tests:** the route's (`blocks.test.ts`: the happy path, a replay in either case, removing
+  twice, another teacher's block live and removed, a student, no token, an unknown id, four
+  malformed requests, a spent id, the code registered again by its teacher and by another, and a
+  lesson running: the student's check-in, the tap's retry, an Emergency Unlock, a new tap and the
+  session's snapshot after the removal); `removeBlock`'s on PGlite (`management.test.ts`); the
+  authorization matrix's row; #442's check, its scenario registering the code again between the
+  sends; on real Postgres (`races.test.ts`), a removal behind its own resend and behind a second
+  removal, two blocks under one id, and a registration staged behind a removal under way, its read
+  parked on the held row: `registered`.
+
 - **2026-11-17** — **LO7, after the bell: the recap rebuilt from ClassEnded and ClassEndedOpen, on a class's page the
   day its session ended and on a session's report page, the same recap under a head of its own; its in-between states
   on the canvas's ClassEndedStates, drawn first (version 56) (the worker's calls, awaiting the owner's look; LO7,

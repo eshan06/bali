@@ -191,7 +191,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO10a** API: a tap's honest retry after its block moved, answered as any retry, never `409`, settled before any block can move (#612's first PR; after LO0) — ✅ (#621; DECISIONS 2026-11-17); a tag no live block holds answers such a retry too, where it was `404`
 
-- **LO10b** API: remove a lost block, its code freed for anyone to register again (the owner's "Free the code", 2026-11-17; #612's second PR, which closes it; after LO10a)
+- **LO10b** API: remove a lost block, its code freed for anyone to register again (the owner's "Free the code", 2026-11-17; #612's second PR, which closes it; after LO10a) — ✅ (DECISIONS 2026-11-17); `DELETE /v1/blocks/{id}`, a session running no refusal; for LO11, removing a removed block is a `replay`, never a 404
 
 - **LO11** 👀 Home: Remove a lost block (#613; lane A; after LO3 and LO10)
 
