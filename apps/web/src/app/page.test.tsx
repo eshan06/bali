@@ -243,6 +243,8 @@ describe('the invite page at /invite, where a student’s home sends a teacher w
     const ids = (html: string) => html.replace(/_r_\w+_/g, 'id');
     const route = open({ kind: 'invite' }, <InviteRoute />);
     expect(screen.getByText(STUDENTS_LINE)).toBeDefined();
+    // It reads nothing of its own: the account is the shell's one read.
+    expect(bali.sent).toEqual([]);
     const there = ids(route.container.innerHTML);
     cleanup();
     const home = open({ kind: 'invite' });
