@@ -260,6 +260,7 @@ function RegisterFirst({ onRegistered }: { onRegistered: () => void }) {
           id={`${id}-code`}
           label="Block code"
           mono
+          name="block-code"
           value={typed}
           onChange={(e) => {
             setTyped(e.target.value);

@@ -675,14 +675,22 @@ describe('Present’s toggle, focus following it (PV9)', () => {
       await Promise.resolve();
     });
     await screen.findByRole('heading', { name: 'Class is over' });
+    // Present's page after the bell shows no last session, so none is read while it shows.
+    const lastRead = () => bali.sent.filter(({ path }) => path.endsWith('/sessions?limit=1'));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(lastRead()).toEqual([]);
     await user.click(toggle());
     const start = await screen.findByRole('button', { name: 'Start 50-minute session' });
     expect(document.activeElement).toBe(start);
+    await vi.waitFor(() => expect(lastRead()).toHaveLength(1));
     expect(bali.unexpected).toEqual([]);
   });
 
   it('takes no focus as the page comes back in Present: only a press moves it', async () => {
     sessionStorage.setItem(`bali.present.${bali.CLASS}`, 'on');
+    // Focus never moves at all, not even to the name held while the class is read.
+    const moved = vi.fn();
+    document.addEventListener('focusin', moved);
     render(
       <main>
         <ClassDetailPage />
@@ -694,6 +702,8 @@ describe('Present’s toggle, focus following it (PV9)', () => {
     );
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(document.activeElement).toBe(document.body);
+    document.removeEventListener('focusin', moved);
+    expect(moved).not.toHaveBeenCalled();
   });
 
   it('goes to the class’s name as Present is left after the bell with no block, so no Start', async () => {
