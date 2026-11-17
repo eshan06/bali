@@ -34,7 +34,6 @@ import {
   gridDisplay,
   type GridDisplay,
   landsLive,
-  lastSeenNote,
   mergeSnapshot,
   silentNote,
   snapshotIsFresh,
@@ -44,7 +43,6 @@ import {
   staleWords,
   type Student,
   type Students,
-  unlockNote,
 } from '@/lib/grid-state';
 import { type LogRead, useSessionLog, withStreamed } from '@/lib/session-log';
 import { createSseClient, type SseClient, type SseStatus } from '@/lib/sse-client';
@@ -141,13 +139,15 @@ export function stateCounts(displays: readonly GridDisplay[]): StateCounts {
 
 /**
  * The room's columns (LO5; ClassLive's `.room`): as many tiles as fit, each at least 178 px, 8 px
- * apart, never wider than the room (`min`); on a phone, under 760 px, two (PhoneLive). Present keeps
- * v2's four columns from a 56 rem grid (DESIGN.md §5), 12 px apart, three and then two narrower, so a
- * 1024 px projector still shows four, until LO9.
+ * apart, never wider than the room (`min`); on a phone, under 760 px, two (PhoneLive). In Present
+ * (LO9; Present, PresentStates), fewer a row as it narrows, never smaller type: each at least 200 px
+ * and 16 % of the room, so six at most, as the board draws 1,440 px (four on a 1,024 px projector,
+ * five on a 1,280 px laptop); two on a phone.
  */
 export const ROOM =
   'grid-cols-[repeat(auto-fill,minmax(min(178px,100%),1fr))] gap-2 max-[760px]:grid-cols-2';
-export const PRESENT_COLUMNS = 'grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4';
+export const PRESENT_ROOM =
+  'grid-cols-[repeat(auto-fill,minmax(max(200px,16%),1fr))] gap-2 max-[760px]:grid-cols-2';
 
 /** A state's chip (v2.css's `.chip-mini`): a pill 3 × 10 px in, its words 13/18, its edge 1.5 px. */
 export const CHIP_PILL =
@@ -178,10 +178,12 @@ export const DOT = '\u00a0· ';
 /**
  * A tile in the room, the lock-only look (LO5; ClassLive's `.tile`): its state's tint, its edge
  * 1.5 px, 10 px corners, at least 60 px tall, 8 × 12 px in, its parts 12 px apart; pressed, it
- * scales to 0.98.
+ * scales to 0.98. In Present one size up (LO9; Present's `.room.is-proj .tile`): at least 84 px
+ * tall, 12 px in.
  */
 const ROOM_TILE =
-  'relative flex min-h-15 w-full items-center gap-3 rounded-sm border-[1.5px] px-3 py-2 text-left tabular-nums';
+  'relative flex w-full items-center gap-3 rounded-sm border-[1.5px] text-left tabular-nums';
+const TILE_SIZE = { room: 'min-h-15 px-3 py-2', present: 'min-h-21 p-3' };
 
 /**
  * One student's tile. In the room on the class page (LO5; ClassLive, LiveStates' rare tiles,
@@ -191,11 +193,9 @@ const ROOM_TILE =
  * unlock's reason, "last seen" and Clock off are in the student's panel (the owner, 2026-11-16). On
  * the live page a button that opens the panel and closes it; hovered, its edge shows, and while its
  * panel is open its edge is the primary ink, solid (LO6; ClassStudent's `aria-current`). In Present
- * (ClassPresent), v2's tile until LO9: 100 px tall, 12 × 18 px in, its icon 24 px, the name, the
- * state's words after a Left state's flag and one line, "last seen" (`lastSeenNote`) and a protection
- * off's unlock (`unlockNote`), never the reason or Clock off, both the teacher's alone (the owner,
- * 2026-10-28). `pulse` is `bali-softpulse` (DESIGN.md §7) on the whole tile, and `onPulseEnd` hears it
- * finish.
+ * (LO9; Present, PresentStates' rare tiles) the same tile one size up, its icon 22 px, its name
+ * 18/23 and its state 15/20, never a button: nothing in it is the class's to open. `pulse` is
+ * `bali-softpulse` (DESIGN.md §7) on the whole tile, and `onPulseEnd` hears it finish.
  */
 export function Tile({
   student: s,
@@ -230,47 +230,6 @@ export function Tile({
       />
     ) : null;
 
-  if (present) {
-    // The state's own icon at the side; a Left state's flag before its words.
-    const flags = icons.slice(0, -1);
-    const StateIcon = icons[icons.length - 1] ?? Circle;
-    const note = unlockNote(s, display, true);
-    const seen = lastSeenNote(s, display, now);
-    const line = [
-      ...(note === null ? [] : [note.charAt(0).toUpperCase() + note.slice(1)]),
-      ...(seen === null ? [] : [seen]),
-    ];
-    return (
-      <li className="flex min-w-0">
-        <div
-          className={`relative grid h-25 w-full grid-cols-[24px_minmax(0,1fr)] items-start gap-x-3 rounded-md border-[1.5px] px-4.5 py-3 text-left tabular-nums ${tone}`}
-        >
-          {glow('rounded-md')}
-          <StateIcon size={24} aria-hidden="true" className="mt-px" />
-          <span className="flex min-w-0 flex-col">
-            <span className="block truncate text-present-tile-name">{name}</span>
-            <span className="block truncate text-present-tile-state">
-              {flags.map((Icon, i) => (
-                <Icon
-                  key={i}
-                  size={16}
-                  aria-hidden="true"
-                  className="mr-0.75 inline align-[-2px]"
-                />
-              ))}
-              {words}
-            </span>
-            {line.length === 0 ? null : (
-              <span className="block truncate text-body font-medium">
-                {line.join(' · ').replaceAll(' · ', DOT)}
-              </span>
-            )}
-          </span>
-        </div>
-      </li>
-    );
-  }
-
   const Icon = icons[0] ?? Circle;
   // On the live page a button, which opens the panel; else the tile alone.
   const Box = select ? 'button' : 'div';
@@ -285,18 +244,20 @@ export function Tile({
           'aria-controls': select.selected ? select.panel : undefined,
           onClick: select.onSelect,
         })}
-        className={`${ROOM_TILE} ${tone}${select ? ` press cursor-pointer [--press-scale:0.98] ${dashed ? 'hover:border-border-input' : 'hover:border-border-strong'} aria-expanded:border-solid aria-expanded:border-text-primary` : ''}`}
+        className={`${ROOM_TILE} ${TILE_SIZE[present ? 'present' : 'room']} ${tone}${select ? ` press cursor-pointer [--press-scale:0.98] ${dashed ? 'hover:border-border-input' : 'hover:border-border-strong'} aria-expanded:border-solid aria-expanded:border-text-primary` : ''}`}
       >
         {glow('rounded-sm')}
-        <Icon size={18} aria-hidden="true" className="shrink-0" />
+        <Icon size={present ? 22 : 18} aria-hidden="true" className="shrink-0" />
         <span className="flex min-w-0 flex-col">
           <span
             title={name}
-            className="truncate text-room-name text-text-primary max-[760px]:text-room-name-phone"
+            className={`truncate text-text-primary ${present ? 'text-present-room-name' : 'text-room-name max-[760px]:text-room-name-phone'}`}
           >
             {name}
           </span>
-          <span className="truncate text-tile-line">{words}</span>
+          <span className={`truncate ${present ? 'text-present-room-state' : 'text-tile-line'}`}>
+            {words}
+          </span>
         </span>
       </Box>
     </li>
@@ -335,18 +296,6 @@ export function healthOf(status: SseStatus, connectingMs: number): 'open' | 'rec
 }
 
 /**
- * The stream lost, said as v2's floating pill (ClassStale; DESIGN.md §4): white, a strong edge,
- * `shadow-2` and a stone dot. It sits on a layer over the whole page, 14 px from its top as drawn,
- * taking no room and nobody's clicks, and stays in view as the page scrolls, so a grid scrolled to
- * its last row still says it may be out of date. The layer is placed against the nearest
- * positioned ancestor, the class page's own root (its frame is 30 px in, 22 on a phone; in Present
- * it has no frame, and the pill, sticky, still rests 14 px from the screen's top).
- */
-const PILL_LAYER = 'pointer-events-none absolute inset-x-0 -top-4 bottom-0 z-10 max-sm:-top-2';
-const PILL =
-  'sticky top-3.5 mx-auto flex w-fit max-w-full items-center gap-2 rounded-full border border-border-strong bg-surface-card px-3.5 py-1.5 text-caption font-medium text-text-secondary shadow-2';
-
-/**
  * The grid's health in words (`staleWords`), inside a status (DR-05): a screen reader hears it as
  * it comes and as its reason changes, as a student hears "Can't reach Bali", but not its age at
  * each second's tick (`aria-live="off"`, as YourPhone's minutes). One span, so the pill's flex row
@@ -366,9 +315,9 @@ export function StaleWords({ stale }: { stale: Staleness }) {
 
 /**
  * The live feed lost or quiet, over the count (LO5; LiveStates' "The live feed drops", and
- * LiveTopStates' quiet feed): a white pill, a strong edge and `shadow-2`, its words today's
- * (`staleWords`), after a stone dot that holds still, where the board draws a spinner: nothing loops
- * (DESIGN.md §7), as Home's (HomeMoments).
+ * LiveTopStates' quiet feed), and over Present's band (LO9; PresentStates): a white pill, a strong
+ * edge and `shadow-2`, its words today's (`staleWords`), after a stone dot that holds still, where
+ * the board draws a spinner: nothing loops (DESIGN.md §7), as Home's (HomeMoments).
  */
 export function FeedLine({ stale }: { stale: Staleness }) {
   return (
@@ -610,10 +559,9 @@ export function LiveGrid({
   onEnded,
   onSession,
   onCounts,
-  onEvent,
   present = false,
+  clock = null,
   livePage = false,
-  tiles = true,
   card,
   opening = null,
 }: {
@@ -624,33 +572,28 @@ export function LiveGrid({
   onSession?: (session: SessionSnapshot['session']) => void;
   /** Called with `sessionId` and the grid counted (`stateCounts`) whenever a count changes (PV7). */
   onCounts?: (sessionId: string, counts: StateCounts) => void;
-  /** Called with each event the stream brings: a live question's open and close (L7). */
-  onEvent?: (e: FeedEvent) => void;
   /**
-   * The projector view (DESIGN.md §5; ClassPresent): four columns of tiles one size up, readable
-   * from the back of a classroom; the same states and words, but never an unlock's reason or Clock
-   * off: the class can see it (`Tile`).
+   * The projector view (LO9; Present, PresentStates): the band, the time left (`clock`) beside the
+   * count of who is focused, over a hairline, then everyone's tile one size up (`Tile`); the same
+   * states and words, but never an unlock's reason, a last check-in or Clock off, no pop-up and no
+   * panel: the class can see it. No lesson piece, whichever way the lessons switch is set.
    */
   present?: boolean;
+  /** Present's time left (`PresentClock`), at the start of its band. */
+  clock?: ReactNode;
   /**
    * The class page's own grid while a session runs. On the page (LO5, LO6; ClassLive, LiveStates,
    * LiveTopStates, LiveListStates, PhoneLive): the count of who is focused, Check on, then the room,
    * Everyone's tiles, and on the right the session list (`SessionList`), under the room on a phone;
    * the live feed lost or quiet said over the count (`FeedLine`), the count and Check on faded; a
-   * grid that didn't load said in the count's place with Try again. In Present (PV9), v2's: a lost
-   * stream as the floating pill (`PILL`), a quiet one as the stone line, a grid that didn't load
-   * with a small Try again. Each unlock the stream brings opens a pop-up (PV10; ClassUnlock), and
-   * each tile and each name in Check on opens the student's panel (ClassStudent), as does a pop-up's
-   * Open student; neither in Present, where the panel closes. The session's log is read for the
-   * list and the panel once the grid is (`useSessionLog`), here alone, never for Home's card.
+   * grid that didn't load said in the count's place with Try again. In Present (LO9) the same lines
+   * over its band and in its room's place, the count faded. Each unlock the stream brings opens a
+   * pop-up (PV10; ClassUnlock), and each tile and each name in Check on opens the student's panel
+   * (ClassStudent), as does a pop-up's Open student; neither in Present, where the panel closes.
+   * The session's log is read for the list and the panel once the grid is (`useSessionLog`), here
+   * alone, never for Home's card.
    */
   livePage?: boolean;
-  /**
-   * Off while Present's question shows in the grid's place (L7, part 2; PresentQuestion): the
-   * tiles and their loading line give way, and the stream, the counts and the grid's own lines
-   * (its health, a boot that failed) stay, so nothing reboots as the question comes and goes.
-   */
-  tiles?: boolean;
   /**
    * Home's live card (PV17b; Main): the grid handed to it as it stands (`GridNow`), drawn there in
    * place of all the grid draws, so Home counts the class from the class page's own snapshot,
@@ -669,13 +612,11 @@ export function LiveGrid({
   const onEndedRef = useRef(onEnded);
   const onSessionRef = useRef(onSession);
   const onCountsRef = useRef(onCounts);
-  const onEventRef = useRef(onEvent);
   useEffect(() => {
     onEndedRef.current = onEnded;
     onSessionRef.current = onSession;
     onCountsRef.current = onCounts;
-    onEventRef.current = onEvent;
-  }, [onEnded, onSession, onCounts, onEvent]);
+  }, [onEnded, onSession, onCounts]);
   const [students, setStudents] = useState<Students | null>(null);
   // Over when it boots (R5's grid under the recap card): drawn once, holding none of the streams.
   const [over, setOver] = useState(false);
@@ -773,7 +714,6 @@ export function LiveGrid({
             lastStreamActivity.current = Date.now();
             lastGridActivity.current = Date.now();
             if (endsSession(e)) onEndedRef.current?.(sessionId);
-            onEventRef.current?.(e);
           },
           onActivity: () => {
             lastStreamActivity.current = Date.now();
@@ -886,74 +826,45 @@ export function LiveGrid({
   // Home's live card draws the grid as it stands, every line in its own words (PV17b).
   if (card) return card({ students, now, error, retry, retrying, stale: over ? null : stale });
 
-  // The class page's own room, in the lock-only look (LO5); Present keeps v2's until LO9.
+  // The class page's own room, in the lock-only look (LO5); Present's band and room after it (LO9).
   const room = !present;
-  // Read, focus on the class's name, the page's heading (ClassRetryStates, LiveTopStates).
-  if (error) {
-    return room ? (
-      <Oops onRetry={retry} held={retrying} ruled={false}>
-        Couldn&apos;t load this session. {error}
-      </Oops>
-    ) : (
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <TryAgain onRetry={retry} held={retrying} then={[]}>
-          <p role="alert" className="text-body">
-            {error}
-          </p>
-        </TryAgain>
-      </div>
-    );
-  }
-  if (!students) {
-    return tiles ? (
-      <p role="status" className="text-body text-text-secondary">
-        {room ? 'Loading this session…' : 'Loading grid…'}
-      </p>
-    ) : null;
-  }
-  const lost = stale && !over ? stale : null;
-  // Present's health (§4), v2's: stone, never amber; honest, not alarmed.
-  const health = lost ? (
-    livePage && lost.reason === 'reconnecting' ? (
-      <div className={PILL_LAYER}>
-        <p role="status" className={PILL}>
-          <span aria-hidden="true" className="size-1.75 shrink-0 rounded-full bg-pip" />
-          <StaleWords stale={lost} />
-        </p>
-      </div>
-    ) : (
-      <p
-        role="status"
-        className="rounded-sm border border-border-default bg-surface-sunken px-4 py-3 text-body text-text-primary tabular-nums"
-      >
-        <StaleWords stale={lost} />
-      </p>
-    )
-  ) : null;
-  // Present's question in the tiles' place (PresentQuestionStates): the grid's own line alone.
-  if (!tiles) return health;
-  const rows = Object.values(students);
+  // A session that didn't load, or isn't read yet: said in the count's place (ClassRetryStates,
+  // LiveTopStates), or in Present in the room's, under its band's time (PresentStates); read, focus
+  // on the class's name, the page's heading.
+  const waiting = error ? (
+    <Oops onRetry={retry} held={retrying} ruled={false}>
+      Couldn&apos;t load this session. {error}
+    </Oops>
+  ) : students ? null : (
+    <p role="status" className="text-body text-text-secondary">
+      Loading this session…
+    </p>
+  );
+  if (room && waiting) return waiting;
+  const lost = waiting === null && stale && !over ? stale : null;
+  const rows = students ? Object.values(students) : [];
   const open = (studentId: string, from?: string) => {
     setPanel((cur) => ({ studentId, opens: (cur?.opens ?? 0) + 1, from }));
   };
   // Its tiles are buttons, and its panel shows, on the live page alone, and never in Present.
   const selects = livePage && !present;
-  const shown = selects && panel !== null ? students[panel.studentId] : undefined;
+  const shown = selects && panel !== null ? students?.[panel.studentId] : undefined;
   // The unlock pop-ups (ClassUnlock, ClassUnlocks, placed as GA2's boards draw them), never on the
   // projector: laid over the tiles' own box, so never over the header, the count or Check on
   // above it. Open student closes its pop-up, as ClassStudent draws none.
-  const unlocks = selects ? (
-    <UnlockPopups
-      unlocks={popups.open}
-      students={students}
-      tileOf={tileId}
-      onClose={(eventId) => tell({ kind: 'close', eventId })}
-      onOpen={(u) => {
-        tell({ kind: 'close', eventId: u.eventId });
-        open(u.studentId);
-      }}
-    />
-  ) : null;
+  const unlocks =
+    selects && students ? (
+      <UnlockPopups
+        unlocks={popups.open}
+        students={students}
+        tileOf={tileId}
+        onClose={(eventId) => tell({ kind: 'close', eventId })}
+        onOpen={(u) => {
+          tell({ kind: 'close', eventId: u.eventId });
+          open(u.studentId);
+        }}
+      />
+    ) : null;
   const tilesOf = rows.map((s) => {
     const unlock = s.unlock?.eventId;
     return (
@@ -1004,14 +915,14 @@ export function LiveGrid({
     />
   ) : null;
 
-  if (room) {
+  const counted = stateCounts(rows.map((s) => gridDisplay(s, now)));
+  if (room && students) {
     // ClassLive: the count of who is focused, then who to check on, then the whole room, 40 px
     // apart; the live feed lost or quiet said over the count, the count and Check on as they were
     // at the last update, faded (LiveStates, LiveTopStates). Nobody in the class yet: no room. On
     // the right, 340 px and 48 px off, the session list; under 1024 px, where beside it the room
     // would narrow to a tile or two a row, after the room, 40 px under it, and on a phone, under
     // 760 px, 32 (LiveListStates' tablet, PhoneLive).
-    const counted = stateCounts(rows.map((s) => gridDisplay(s, now)));
     return (
       <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-12 max-lg:grid-cols-1 max-[760px]:gap-8 min-[760px]:max-lg:gap-10">
         <div className="flex min-w-0 flex-col gap-10">
@@ -1064,17 +975,32 @@ export function LiveGrid({
     );
   }
 
+  // Present (LO9; Present, PresentStates): the live feed lost or quiet said over the band, the count
+  // faded with it; the band, the time left beside the count of who is focused, over a hairline;
+  // then everyone's tile one size up. Until the session is read, or if it didn't load, the band's
+  // time alone and that line in the room's place; nobody in the class yet, said there.
   return (
-    <div className="flex flex-col gap-3">
-      {health}
-      {rows.length === 0 ? (
-        <p className="text-body text-text-secondary">No students enrolled yet.</p>
-      ) : (
-        // Fewer columns as the grid narrows, never smaller type (§5); the tiles straight on the page.
-        <div className="@container">
-          <ul className={`grid ${PRESENT_COLUMNS}`}>{tilesOf}</ul>
-        </div>
-      )}
-    </div>
+    <>
+      {lost ? <FeedLine stale={lost} /> : null}
+      <div className="flex flex-wrap items-center justify-between gap-x-10 gap-y-6 border-b border-border-strong pb-6">
+        {clock}
+        {waiting ? null : (
+          <h2 className={`flex flex-wrap items-baseline gap-x-4 ${lost ? 'opacity-60' : ''}`}>
+            <span className="text-present-count tabular-nums">{counted.counts.focused}</span>{' '}
+            <span className="text-present-count-of text-text-secondary">
+              of {counted.total} focused
+            </span>
+          </h2>
+        )}
+      </div>
+      {waiting ??
+        (rows.length === 0 ? (
+          <p className="text-body text-text-secondary">No students yet.</p>
+        ) : (
+          <ul aria-label="Everyone in the class" className={`grid ${PRESENT_ROOM}`}>
+            {tilesOf}
+          </ul>
+        ))}
+    </>
   );
 }

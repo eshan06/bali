@@ -50,6 +50,56 @@ a real decision? Add a dated entry at the top: what was decided and why.
   refusal resent anew; the read after a lost answer, both ways; Chrome's second Escape, both ways; the register race;
   the register line taken back); `removeBlock`, `removeAttemptFor` and `blocksNow` in `lib/blocks.test.ts`.
 
+- **2026-11-17** — **LO9, Present in the lock-only look: the time, the count of who is focused, everyone's tile with
+  their name, and how to join; no lesson piece in Present and none read; its in-between states on the canvas's
+  PresentStates, drawn first (version 59) (the worker's calls, awaiting the owner's look; LO9, #611).**
+
+  **What it shows** (Present): the mark and the class's name, +5 and +10 as one pair, End session and Exit Present,
+  all small, as drawn; over a hairline, the ring, 84 px, beside the time left over "left, until 9:55 AM", and "24 of
+  28 focused" at the band's end; everyone's tile, the class page's one size up, the state and the name only, never a
+  button; "New to this class? Join in the Bali app with VMAF7E" at the foot. The pressed toggle is the board's "Exit
+  Present", `aria-pressed` kept as drawn. **Gone from Present, no board drawing them:** v2's "Live · 25 of 28
+  joined", the six counts, the join code's well, a tile's "last seen" and a protection off's "Unlocked" line, the
+  floating reconnect pill and the quiet feed's stone line.
+
+  **Nothing new about a student:** a tile says what the class page's room says, the state and the name, as v2's
+  Present did; never an unlock's reason, a last check-in or Clock off; no pop-up and no panel. An unlock the stream
+  brings still glows its tile twice, as v2's Present did.
+
+  **The in-between states** (PresentStates, drawn first): the session not read yet (the ring's track, "…" over
+  "left", Loading this session… in the room's place), the session that didn't load (there, with Try again), the
+  live feed lost or quiet (the class page's line over the band, the count faded), adding time's lines under the
+  header, no students yet, the rare tiles one size up, after the bell, a narrower projector and a phone.
+
+  **Widths** (the worker's call): as many tiles a row as fit, each at least 200 px and 16 % of the room, so six at
+  most, as drawn at 1,440 px and at 1,920; five at 1,280, four on a 1,024 px projector, two under 760 px; never
+  smaller type. On a phone, 16 px in, the controls on a line of their own, the time over the count.
+
+  **After the bell** (the worker's call, drawn first): "Class is over" at the time's size, alone in the room's
+  place, Exit Present the header's one control, the join line kept; v2's "28 students · no session running" went
+  with v2's header.
+
+  **No lesson piece in Present** (ARCHITECTURE, Web portal, decision 8): the class page runs neither
+  `useLiveQuestion` nor `useSlide` now, so nothing of a lesson is read on the page or in Present, a question or a
+  slide left open included; `LiveGrid` loses its `onEvent` and `tiles` props. PresentQuestion, PresentSlide, their
+  hooks and their own tests stay, used by no page until lessons are fitted back in.
+
+  **Gone, with no user left:** v2's `LiveHeader`, `LiveCounts`, `joinedLine`, the countdown's Present size, the
+  Present tile and `PRESENT_COLUMNS`, the floating pill. **For the phase's tidy-up** (#625; outside lane B's block):
+  v2's `present-title`, `present-tile-name`, `present-tile-state` and `code-present`, which no page uses now.
+
+  **One PR** (the conductor's call): 770 changed lines without tests, over santa's 400, rather than (a) Present stops
+  drawing and reading lessons, about 90, and (b) the new look, about 680: (b) alone is still over 400, it is one
+  render branch and one grid, and 503 of the 770 lines delete v2's Present and its lesson wiring.
+
+  **Tokens:** nine sizes the scale lacks, in lane B's block (DESIGN.md §1, The lock-only look).
+
+  **Tests:** driven (`classes/[id]/page.test.tsx`: the header, the band, the join line, the frame, after the bell,
+  `?present`, and no lesson piece either way of the switch, on the page and in Present;
+  `live-grid.driven.test.tsx`: the band, the tiles, the feed's lines, loading, a read that failed, nobody yet);
+  `app/present.test.ts` is converted and gone (19 source-text tests left); `live-header.test.ts` renders Present's
+  time.
+
 - **2026-11-17** — **LO10b, a teacher removes a lost block: `DELETE /v1/blocks/{id}`, a soft remove
   that frees its code for anyone to register again (the owner's "Free the code"), idempotent on its
   `eventId`; a session running is no refusal (the worker's calls, the owner away; LO10b, closes

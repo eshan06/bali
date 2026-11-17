@@ -11,8 +11,8 @@ import { describe, expect, it, vi } from 'vitest';
  * ends, and a Start within a save's limit. The page before a session is driven in
  * classes/[id]/before.test.tsx since LO4 (ClassPage, ClassStates), which took this file's pins of
  * its look. And the page while a session runs (PV7; ClassLive, ClassStale, ClassStates' lines
- * during a session), read from the source too; its header and counts are rendered in
- * live-header.test.ts, and Present's page (PV9) is pinned in present.test.ts.
+ * during a session), read from the source too; its header is rendered in
+ * live-header.test.ts, and Present is driven in classes/[id]/page.test.tsx since LO9.
  */
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'c1' }),
@@ -46,7 +46,6 @@ describe('the class page before its class is read', () => {
     expect(page.match(/setRosterError\(null\)/g)).toHaveLength(2);
     // Read, focus on the page's own heading, the class's name, whichever page it then draws.
     expect(html.match(/<h1 /g)).toHaveLength(1);
-    expect(live).toMatch(/<LiveHeader\s+name=\{klass\.name\}/);
   });
 
   it('draws only the newest read’s answer, so two Try agains for one failure never leave a stale one (santa’s review)', () => {
@@ -68,9 +67,10 @@ describe('the class page before its class is read', () => {
     // roster's read answered (#429's review): each line holds while a read of what it says runs,
     // the class's or else its roster's. The recap after the bell has no Try again of its own since
     // LO7: the roster's failure is said under the header alone (driven in before.test.tsx).
-    expect(page).toMatch(
-      /<TryAgain onRetry=\{load\} held=\{error !== null \? classReading : rosterReading\} then=\{\[\]\}>/,
-    );
+    // Under the header before a session, and under Present's after the bell (LO9).
+    expect(
+      page.match(/<Oops onRetry=\{load\} held=\{error !== null \? classReading : rosterReading\}/g),
+    ).toHaveLength(2);
     // Each on its way from its start to its newest read's answer, never an older one's.
     expect(page).toMatch(
       /const readRoster = useCallback\(async \(\) => \{\s*const mine = \+\+reads\.current\.roster;\s*setRosterReading\(true\);\s*try \{[^]*?\} finally \{\s*if \(reads\.current\.roster === mine\) setRosterReading\(false\);\s*\}\s*\}, \[api, classId\]\);/,

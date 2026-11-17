@@ -3,7 +3,6 @@
 import {
   type BlockListResponse,
   type ClassDetail,
-  type FeedEvent,
   MAX_SESSION_MINUTES,
   type RosterResponse,
   type SessionView,
@@ -12,7 +11,15 @@ import {
 import { Check, CircleAlert, Presentation } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { type ComponentProps, useCallback, useEffect, useId, useRef, useState } from 'react';
+import {
+  type ComponentProps,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 
 import { Button, LockButton, lockButton, QUIET } from '@/components/button';
 import { WELL } from '@/components/card';
@@ -20,10 +27,8 @@ import { useCount, useCountOpened } from '@/components/count';
 import { Input } from '@/components/field';
 import { DIALOG, JoinCode } from '@/components/join-code';
 import { LiveGrid, Oops, type StateCounts } from '@/components/live-grid';
-import { LiveCounts, LiveHead, LiveHeader, Ring } from '@/components/live-header';
-import { PresentQuestion } from '@/components/present-question';
-import { PresentSlide } from '@/components/present-slide';
-import { useLiveQuestion } from '@/components/question-card';
+import { LiveHead, PresentClock, Ring } from '@/components/live-header';
+import { Mark } from '@/components/mark';
 import { endedToday, Recap } from '@/components/recap-card';
 import { usePresenting } from '@/components/shell';
 import { land, TryAgain } from '@/components/try-again';
@@ -37,7 +42,6 @@ import {
   NOT_A_SESSION_LENGTH,
   SESSION_ALREADY_RUNNING,
 } from '@/lib/errors';
-import { lessonsOn } from '@/lib/lessons';
 import { failureOf } from '@/lib/live-question';
 import { loadRecap, recapGroups, type RecapState } from '@/lib/recap';
 import { reportPath } from '@/lib/reports';
@@ -60,14 +64,14 @@ import {
   sessionRunning,
 } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
-import { useSlide } from '@/lib/use-slide';
 
 /**
- * The page in Present, the projector's view (ClassPresent, PresentEnded): no menu, the shell
- * drawing none (PV5), the page 36/48/40 in and at least the screen's height, its parts 22 px apart,
- * as v2.css's `.proj` draws it. A 1024 px projector still shows four columns (`PRESENT_COLUMNS`).
+ * The page in Present, the projector's view (LO9; Present, PresentStates): no menu, the shell
+ * drawing none (PV5), at least the screen's height, 32/48/48 in as lock.css's `.proj`, 24/16/32 on a
+ * phone, its parts 24 px apart, the join line at its foot.
  */
-const PRESENT_PAGE = 'relative flex min-h-dvh flex-col gap-5.5 px-4 pt-9 pb-10 sm:px-12';
+const PRESENT_PAGE =
+  'flex min-h-dvh flex-col gap-6 px-12 pt-8 pb-12 max-[760px]:px-4 max-[760px]:pt-6 max-[760px]:pb-8';
 
 /**
  * The length picker in its well (ClassPage's `.seg`): a stone track holding each length as a
@@ -248,15 +252,13 @@ function RegisterFirst({ onRegistered }: { onRegistered: () => void }) {
  * joined" and the join code, the countdown and the bell, +5, +10 and End session, which asks first in
  * a dialog (GA6; GA1AClassLive, GA1APresent, GA1AStates); the class counted by state
  * beside Present, then the live grid, and no roster: the grid names every student. In Present
- * (PV9; ClassPresent), the same parts one size up for the projector, the code in a well of its own
- * and +5, +10 and End kept beside Present (the owner, 2026-10-12), so a class of 28 fits one 1080p
- * screen; a question there in the grid's place, totals only (L7, part 2; PresentQuestion,
- * PresentAnswer), closed and put away there too (L7, part 3; PresentQuestionControls,
- * PresentAnswerControls); after the bell there "Class is over" alone (PresentEnded, as PV1
- * approved), the figures left to the recap. With lessons off (LO1), no question or slide, on the
- * page or in Present. Each failure is said where it happened. It sits in the
- * shell's frame beside the side menu (PV5), which sets its width and gutters; in Present the shell
- * draws neither, and the page sets its own (`PRESENT_PAGE`).
+ * (LO9; Present, PresentStates), the projector's view: the mark and the name with +5, +10, End
+ * session and Exit Present, then the time left beside the count of who is focused, everyone's tile
+ * with their name one size up, and the join line at the foot; after the bell there "Class is over"
+ * alone, the figures left to the recap. No lesson piece on the page or in Present, whichever way
+ * the lessons switch is set (ARCHITECTURE, Web portal, decision 8), and none is read. Each failure
+ * is said where it happened. It sits in the shell's frame under the top bar, which sets its width
+ * and gutters; in Present the shell draws neither, and the page sets its own (`PRESENT_PAGE`).
  */
 export default function ClassDetailPage() {
   const api = useApi();
@@ -374,35 +376,12 @@ export default function ClassDetailPage() {
   const endCancel = useRef<HTMLButtonElement>(null);
   const endAsked = useRef(false);
   const [endSaid, setEndSaid] = useState<string | null>(null);
-  // The live question (L7) and the slide (M6), in Present alone with lessons on: the class page is
-  // rebuilt from the lock-only canvas, which draws no lesson piece, so it shows none whichever way
-  // the switch is set (ARCHITECTURE, Web portal, decision 8; LO5), and Present keeps v2's until
-  // LO9. Out of Present, or with lessons off (LO1), neither hook follows the session, so nothing of a
-  // lesson is read that nothing shows.
-  const lessons = lessonsOn();
   const live = klass !== null && grid !== null && !grid.over;
-  const following = live && lessons && present ? grid.id : null;
-  const { lesson, onEvent, snapshot, reread } = useLiveQuestion(following);
-  // What the session shows (M6, part 2b): from the question's read of the session, the stream and
-  // this tab's own changes, the question first (the conductor's call, 2026-10-16).
-  const { slides, onEvent: onSlideEvent } = useSlide(following, snapshot, reread);
-  const onLessonEvent = useCallback(
-    (e: FeedEvent) => {
-      onEvent(e);
-      onSlideEvent(e);
-    },
-    [onEvent, onSlideEvent],
-  );
   // A session shown, by an answer or a read: a Start lost before it is settled, the session its
   // own or another's.
   useEffect(() => {
     lostStart.current = null;
   }, [grid?.id]);
-  // In Present the question shows in the live grid's place (L7, part 2; PresentQuestion,
-  // PresentAnswer), its totals the room's alone, else the slide the session shows (M6, part 2d;
-  // PresentSlide): the question first (the conductor's call, 2026-10-16). The grid stays
-  // underneath, its stream with it.
-  const projected = present && (lesson.question !== null || slides.slide !== null);
 
   // Each read's turn, the class's and the roster's: only the newest one's answer is drawn, so a
   // slow read never says its failure over one read since, two Try agains for one failure (under the
@@ -707,55 +686,35 @@ export default function ClassDetailPage() {
   }
 
   // Present, the projector the class can see (DESIGN.md §5): at the end of the live header's
-  // controls (ClassLive), hidden on a phone, which never drives a projector (PhoneLive), and in
-  // Present's header in v2's look, after the bell too; none on the page after the bell. Pressed, its
-  // grey fill and `text-primary` edge, never colour alone; its icon the same both ways, as
-  // ClassPresent draws it. Present's Done sends focus to it (`${id}-present`).
+  // controls (ClassLive), hidden on a phone, which never drives a projector (PhoneLive), and as Exit
+  // Present at the end of Present's header, after the bell too (Present, PresentStates); none on the
+  // page after the bell. Pressed, its grey fill and `text-primary` edge, never colour alone; its
+  // icon the same both ways.
   const togglePresent = () => {
     rememberPresent(classId, !present);
     toggled.current = true;
     setPresent(!present);
   };
-  const presentToggle = (className = '') => (
-    <Button
+  // Each small in Present (Present's `.btn-sm`), and on a phone (PhoneLive).
+  const size = present ? 'sm' : 'md';
+  const small = present ? '' : SMALL_ON_PHONE;
+  const presentToggle = (
+    <LockButton
       ref={toggle}
       id={`${id}-present`}
       variant="secondary"
+      size={size}
       aria-pressed={present}
       onClick={togglePresent}
-      className={className}
+      className={present ? '' : 'max-[760px]:hidden'}
     >
       <Presentation size={16} aria-hidden="true" />
-      Present
-    </Button>
+      {present ? 'Exit Present' : 'Present'}
+    </LockButton>
   );
 
-  // +5 and +10, and End session: v2's in Present's header; on the class page the lock-only look's
-  // (ClassLive), +5 and +10 joined as one pair, End set apart, each small on a phone (PhoneLive).
+  // +5 and +10 joined as one pair, End set apart (ClassLive, Present).
   const addTimeOf = (add: number) => () => addTime(extendAttemptFor(unanswered.current, add));
-  const extend = EXTEND_PRESETS.map((add) => (
-    <Button
-      key={add}
-      variant="secondary"
-      onClick={addTimeOf(add)}
-      aria-disabled={busy !== null}
-      className="tabular-nums"
-    >
-      +{add} min
-    </Button>
-  ));
-  const end = (
-    <Button
-      ref={endButton}
-      variant="secondary"
-      aria-haspopup="dialog"
-      onClick={askEnd}
-      aria-disabled={busy !== null}
-      className="ml-2"
-    >
-      End session
-    </Button>
-  );
   const controls = (
     <>
       <div className="inline-flex">
@@ -763,9 +722,10 @@ export default function ClassDetailPage() {
           <LockButton
             key={add}
             variant="secondary"
+            size={size}
             onClick={addTimeOf(add)}
             aria-disabled={busy !== null}
-            className={`tabular-nums focus-visible:z-1 ${i === 0 ? 'rounded-r-none' : '-ml-px rounded-l-none'} ${SMALL_ON_PHONE}`}
+            className={`tabular-nums focus-visible:z-1 ${i === 0 ? 'rounded-r-none' : '-ml-px rounded-l-none'} ${small}`}
           >
             +{add} min
           </LockButton>
@@ -774,25 +734,36 @@ export default function ClassDetailPage() {
       <LockButton
         ref={endButton}
         variant="secondary"
+        size={size}
         aria-haspopup="dialog"
         onClick={askEnd}
         aria-disabled={busy !== null}
-        className={SMALL_ON_PHONE}
+        className={small}
       >
         End session
       </LockButton>
-      <LockButton
-        ref={toggle}
-        id={`${id}-present`}
-        variant="secondary"
-        aria-pressed={present}
-        onClick={togglePresent}
-        className="max-[760px]:hidden"
-      >
-        <Presentation size={16} aria-hidden="true" />
-        Present
-      </LockButton>
+      {presentToggle}
     </>
+  );
+  // Present's header (Present, PresentStates): the mark and the class's name, the controls at the
+  // end, on a line of their own on a phone.
+  const presentHead = (name: string, children: ReactNode) => (
+    <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
+      <div className="flex min-w-0 flex-[1_1_300px] items-center gap-4">
+        <Mark size={30} />
+        <h1 className="min-w-0 text-present-name text-balance wrap-anywhere">{name}</h1>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">{children}</div>
+    </header>
+  );
+  // How to join, at Present's foot (Present): the class's join code, read from the back of the room.
+  const joinLine = (code: string) => (
+    <p className="mt-auto text-present-join text-text-secondary">
+      New to this class? Join in the Bali app with{' '}
+      <span translate="no" className="font-mono text-code-join text-text-primary">
+        {code}
+      </span>
+    </p>
   );
   // End session's confirm (GA1AClassLive, GA1APresent, GA1AStates; on a phone GA6EndPhone): v2's
   // dialog, New code's, the same on the class page and in Present, where the room sees it, saying
@@ -869,10 +840,6 @@ export default function ClassDetailPage() {
     };
   }, [liveName, toCheck]);
 
-  // Present's line after the bell, with no session running: "28 students · no session running".
-  const noSession = roster
-    ? `${students(roster.students.length)} · no session running`
-    : 'No session running';
   // The class's last session over, once found; the day it ended, by this computer's calendar, the
   // page is ClassEnded (LO7), "Ended at 9:55 AM" under the name, unless Start another session moved
   // past it.
@@ -884,55 +851,25 @@ export default function ClassDetailPage() {
     'portal_recap_opened',
     endedAt !== null && hasBlock !== null && last.kind === 'ready' && roster !== null,
   );
-  // A read again of the class failed, or its roster didn't load: said under the header; or the
-  // class didn't load, in the session's place. Held while a read of what it says is on its way,
-  // the class's or else its roster's, whichever Try again sent it. Read, focus on the class's name
-  // (ClassRetryStates).
-  const cantLoad = (message: string | null) =>
-    message === null ? null : (
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <TryAgain onRetry={load} held={error !== null ? classReading : rosterReading} then={[]}>
-          <p role="alert" className="text-body">
-            Couldn&apos;t load this class. {message}
-          </p>
-        </TryAgain>
-      </div>
-    );
   // What is said under the controls: an extend refused, or one that failed with Try again, sending
   // the same one again, held as every control is until Bali answers, then focus on the class's
-  // name; or a note on the session shown (ClassRetryStates; on the class page LiveTopStates).
+  // name; or a note on the session shown (ClassRetryStates; LiveTopStates, PresentStates).
   const resend = () => {
     const again = unanswered.current;
     if (again) addTime(again, true);
   };
-  const saidLine = said && (
-    <p role={said.kind === 'note' ? 'status' : 'alert'} className="text-body">
-      {said.message}
-    </p>
-  );
 
   // While a session runs: one tree in both views, each part in its place whether Present is on or
   // off, so the grid never restarts or reconnects as it turns on. On the class page (LO5; ClassLive,
   // LiveTopStates, PhoneLive): the header, what is said under it, then over a hairline the count,
   // Check on and the room, the grid's own (`LiveGrid`), its parts 40 px apart, 32 on a phone. In
-  // Present (PV9; ClassPresent), v2's until LO9: its header, its counts over the grid, and the
-  // question or the slide in the tiles' place with lessons on.
+  // Present (LO9; Present, PresentStates): its header, what is said under it, the grid's band and
+  // room, then the join line at the foot, 24 px apart.
   return klass !== null && grid !== null && !grid.over ? (
     <div className={present ? PRESENT_PAGE : 'flex flex-col gap-10 max-[760px]:gap-8'}>
-      {/* No New code, which neither header draws; in Present +5, +10 and End kept beside Present. */}
+      {/* No New code, which neither header draws. */}
       {present ? (
-        <LiveHeader
-          name={klass.name}
-          joinCode={klass.joinCode}
-          counts={counts}
-          startedAt={grid.startedAt}
-          endsAt={grid.endsAt}
-          present
-        >
-          {extend}
-          {end}
-          {presentToggle('ml-2')}
-        </LiveHeader>
+        presentHead(klass.name, controls)
       ) : (
         <LiveHead
           name={klass.name}
@@ -946,49 +883,28 @@ export default function ClassDetailPage() {
 
       {/* A read again of the class that failed; a roster's waits for the page that shows one,
           after the bell. */}
-      {error === null ? null : present ? (
-        cantLoad(error)
-      ) : (
+      {error === null ? null : (
         <Oops onRetry={load} held={classReading} ruled={false}>
           Couldn&apos;t load this class. {error}
         </Oops>
       )}
 
       {/* Said right under the controls, where they are. */}
-      {said === null ? null : !present ? (
-        said.kind === 'note' ? (
-          <p role="status" className="text-body text-text-secondary">
-            {said.message}
-          </p>
-        ) : (
-          <Oops
-            onRetry={said.kind === 'failed' ? resend : undefined}
-            held={busy !== null}
-            ruled={false}
-          >
-            {said.message}
-          </Oops>
-        )
+      {said === null ? null : said.kind === 'note' ? (
+        <p role="status" className="text-body text-text-secondary">
+          {said.message}
+        </p>
       ) : (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          {said.kind === 'failed' ? (
-            <TryAgain onRetry={resend} held={busy !== null} then={[]}>
-              {saidLine}
-            </TryAgain>
-          ) : (
-            saidLine
-          )}
-        </div>
+        <Oops
+          onRetry={said.kind === 'failed' ? resend : undefined}
+          held={busy !== null}
+          ruled={false}
+        >
+          {said.message}
+        </Oops>
       )}
-      {/* The rest of the page: on the class page over a hairline; in Present it fills what the
-          screen leaves under the header, for the slide. */}
-      <section
-        aria-label={present && !projected ? 'Live grid' : undefined}
-        className={present ? 'flex flex-1 flex-col gap-5.5' : 'border-t border-border-default pt-8'}
-      >
-        {/* Present's counts over the grid (ClassPresent), none while the question or the slide
-            shows in the grid's place (PresentQuestion, PresentSlide). */}
-        {present && !projected && counts ? <LiveCounts counts={counts} present /> : null}
+      {/* The rest of the page: on the class page over a hairline; in Present the band and the room. */}
+      <section className={present ? 'flex flex-col gap-6' : 'border-t border-border-default pt-8'}>
         {/* One grid a session: its log and its stream are that session's alone. */}
         <LiveGrid
           key={grid.id}
@@ -997,45 +913,32 @@ export default function ClassDetailPage() {
           onEnded={onEnded}
           onSession={onSession}
           onCounts={onCounts}
-          onEvent={onLessonEvent}
           present={present}
+          clock={present ? <PresentClock startedAt={grid.startedAt} endsAt={grid.endsAt} /> : null}
           livePage
-          tiles={!projected}
         />
-        {/* In Present, the question in the tiles' place, after the grid's own lines; else the
-            slide. */}
-        {projected && lesson.question !== null ? <PresentQuestion id={id} lesson={lesson} /> : null}
-        {projected && lesson.question === null && slides.slide !== null ? (
-          <PresentSlide id={id} lesson={slides} slide={slides.slide} />
-        ) : null}
       </section>
+      {present ? joinLine(klass.joinCode) : null}
       {/* End session's confirm, shown only while open, as a modal over the page. */}
       {endConfirm}
     </div>
   ) : klass !== null && present ? (
-    // After the bell in Present (PresentEnded, as PV1 approved): the header, its ring whole, and
-    // "Class is over" alone, the figures left to the recap, where the class can't misread them.
+    // After the bell in Present (PresentStates' after the bell): the header with Exit Present alone,
+    // "Class is over" alone in the room's place, the figures left to the recap, where the class
+    // can't read them, and the join line at the foot.
     <div className={PRESENT_PAGE}>
-      <LiveHeader
-        name={klass.name}
-        joinCode={klass.joinCode}
-        counts={null}
-        startedAt={null}
-        endsAt={null}
-        present
-        over={noSession}
-      >
-        {presentToggle()}
-      </LiveHeader>
-      {cantLoad(error ?? rosterError)}
-      <section
-        aria-labelledby={`${id}-over`}
-        className="flex flex-1 flex-col items-center justify-center rounded-lg border border-border-default bg-surface-card px-11 py-9 shadow-1"
-      >
-        <h2 id={`${id}-over`} className="text-present-question">
+      {presentHead(klass.name, presentToggle)}
+      {(error ?? rosterError) === null ? null : (
+        <Oops onRetry={load} held={error !== null ? classReading : rosterReading} ruled={false}>
+          Couldn&apos;t load this class. {error ?? rosterError}
+        </Oops>
+      )}
+      <section aria-labelledby={`${id}-over`} className="grid flex-1 place-items-center py-12">
+        <h2 id={`${id}-over`} className="text-center text-present-clock text-balance">
           Class is over
         </h2>
       </section>
+      {joinLine(klass.joinCode)}
     </div>
   ) : (
     // No session running (PV6), or the class not read yet: the lock-only canvas's ClassPage since

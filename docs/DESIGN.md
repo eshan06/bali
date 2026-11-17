@@ -216,7 +216,8 @@ over who wasn't focused the whole time (a row each: the name, a thin line with i
 the moments in words), who was and who didn't join, by name; How it ended is gone; and
 since PV14 its head's Open its report opens the session's own page. The grid's cells are v2's tinted
 tiles since PV8 (2026-10-14), on the class page and in Present alike, a
-phone's with one detail at most since PV9. Present is v2's since PV9 (2026-10-14):
+phone's with one detail at most since PV9. Present was v2's from PV9 (2026-10-14) until LO9
+(2026-11-17; §1, The lock-only look):
 ClassPresent's page, the class page's own parts one size up, its code in a well of
 its own and +5, +10 and End kept; after the bell PresentEnded's "Class is over"
 alone; and the reconnect pill there too, and for a first connect past 3 s. Its tiles never say Clock
@@ -657,7 +658,7 @@ count of who is focused, Check on (the state and the name only) and Everyone's
 tiles (the state and the name only, a Left state's icon its flag), its states as
 LiveStates and LiveTopStates draw them (drawn on the canvas first), the live
 feed's line with its dot held still; no lesson piece, whichever way the switch
-is set; and Present v2's until LO9. LO5 added `room-name` and
+is set; and Present v2's until LO9 (below). LO5 added `room-name` and
 `room-name-phone` (14.5/19 and 14/19, semibold: a tile's name in the room), in
 lane B's block. Since LO6 (2026-11-17) the live page's right side is ClassLive's
 session list, "This session": a line per moment, newest first, from the
@@ -696,11 +697,26 @@ counts them and its average as words beside a bar, in a ledger that scrolls
 sideways under 760 px, every cell on one line; its states as HomeStates and
 ReportsMoments draw them (drawn on the canvas first, the CSV's columns too). LO8
 added `share` (56/56, semibold, −0.035em: the share, at every width), in lane
-A's block. Since LO11 (2026-11-17) each row of Your blocks ends on Remove,
-ClassFlows' Remove a lost block, under the code where the row is full, as in
-Home's column: a confirm naming the block, Cancel focused, Remove block in the
-primary green, never red; a block removed is said under the list; its in-between
-states as RemoveBlockStates draws them (drawn on the canvas first).
+A's block. Since LO9 (2026-11-17) Present is Present's: the mark and the class's
+name with +5 and +10 as one pair, End session and Exit Present, all small; over a
+hairline, the ring beside the time left over "left, until 9:55 AM", and the count
+of who is focused at the band's end; then everyone's tile, the room's one size up
+(the state and the name only, never a button), as many a row as fit, each at least
+200 px and 16 % of the room, so six at most, two on a phone; and "New to this
+class? Join in the Bali app with VMAF7E" at the foot. No lesson piece and none
+read, whichever way the switch is set; after the bell "Class is over" alone, Exit
+Present its one control; its in-between states as PresentStates draws them (drawn
+on the canvas first). LO9 added `present-name` (30/36, semibold), `present-clock`
+(64/64, semibold), `present-until` (20/26), `present-count` (88/88, semibold),
+`present-count-of` (30/38, medium), `present-room-name` (18/23, semibold),
+`present-room-state` (15/20, medium), `present-join` (22/30) and `code-join`
+(26/30, mono at medium, +0.06em), in lane B's block; v2's `present-title`,
+`present-tile-name`, `present-tile-state` and `code-present` have no user now.
+Since LO11 (2026-11-17) each row of Your blocks ends on Remove, ClassFlows'
+Remove a lost block, under the code where the row is full, as in Home's column:
+a confirm naming the block, Cancel focused, Remove block in the primary green,
+never red; a block removed is said under the list; its in-between states as
+RemoveBlockStates draws them (drawn on the canvas first).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
