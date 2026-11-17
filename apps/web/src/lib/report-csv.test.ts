@@ -74,26 +74,30 @@ describe('the sessions listed, as a CSV file', () => {
       endedAt: '2026-10-13T04:20:00.000Z',
     });
     const text = sessionsCsv('Night class', { sessions: [late], wholeTime: { c: 1 } }, NY);
-    expect(body(text).split('\r\n')[1]).toBe('Night class,2026-10-12,23:30,00:20,26,1,47,50,2,1');
+    expect(body(text).split('\r\n')[1]).toBe('"Night class",2026-10-12,23:30,00:20,26,1,47,50,2,1');
   });
 
   it('counts a session to its bell until it is marked over', () => {
     const open = { ...MON, endedAt: null, endsAt: '2026-10-12T14:05:00.000Z' };
     const text = sessionsCsv('Biology', { sessions: [open], wholeTime: { a: 3 } }, NY);
-    expect(body(text).split('\r\n')[1]).toBe('Biology,2026-10-12,09:05,10:05,26,3,47,60,2,1');
+    expect(body(text).split('\r\n')[1]).toBe('"Biology",2026-10-12,09:05,10:05,26,3,47,60,2,1');
   });
 
   it('never makes up a count it wasn’t given: blank, never a zero, for a session someone joined', () => {
     const text = sessionsCsv('Biology', { sessions: [MON], wholeTime: {} }, NY);
-    expect(body(text).split('\r\n')[1]).toBe('Biology,2026-10-12,09:05,09:55,26,,47,50,2,1');
+    expect(body(text).split('\r\n')[1]).toBe('"Biology",2026-10-12,09:05,09:55,26,,47,50,2,1');
   });
 
-  it('quotes a name holding a comma, a quote or a line break, its quotes doubled (RFC 4180)', () => {
+  it('always quotes the class’s name, its quotes doubled (RFC 4180), and nothing else needing none', () => {
     const row = (name: string) =>
       body(sessionsCsv(name, { sessions: [THU], wholeTime: {} }, NY)).split('\r\n')[1];
     expect(row('Bio "A", room 2')).toBe('"Bio ""A"", room 2",2026-10-01,09:05,09:06,0,0,,1,0,0');
     expect(row('Line\nbreak')?.startsWith('"Line\nbreak",')).toBe(true);
-    expect(row('Plain')?.startsWith('Plain,')).toBe(true);
+    expect(row('Plain')).toBe('"Plain",2026-10-01,09:05,09:06,0,0,,1,0,0');
+    // The header is words this file writes: quoted only where a field needs it, none here.
+    expect(body(sessionsCsv('Plain', { sessions: [], wholeTime: {} }, NY))).toBe(
+      `${CSV_COLUMNS.join(',')}\r\n`,
+    );
   });
 
   it('keeps a name a spreadsheet would run as a formula as text (CSV injection)', () => {
@@ -102,12 +106,15 @@ describe('the sessions listed, as a CSV file', () => {
         .split('\r\n')[1]
         ?.split(',2026-10-01')[0];
     expect(first('=HYPERLINK("http://x","y")')).toBe(`"'=HYPERLINK(""http://x"",""y"")"`);
-    expect(first('+1')).toBe("'+1");
-    expect(first('-1')).toBe("'-1");
-    expect(first('@SUM(A1)')).toBe("'@SUM(A1)");
-    expect(first('\tTab')).toBe("'\tTab");
+    expect(first('+1')).toBe(`"'+1"`);
+    expect(first('-1')).toBe(`"'-1"`);
+    expect(first('@SUM(A1)')).toBe(`"'@SUM(A1)"`);
+    expect(first('\tTab')).toBe(`"'\tTab"`);
     // Anywhere but first, the same characters are only text.
-    expect(first('Bio 1+1')).toBe('Bio 1+1');
+    expect(first('Bio 1+1')).toBe('"Bio 1+1"');
+    // A spreadsheet splitting on semicolons keeps it one cell, so no part of it starts a formula
+    // (santa's review).
+    expect(first('x;=1+1;')).toBe('"x;=1+1;"');
   });
 
   it('is named for its class', () => {

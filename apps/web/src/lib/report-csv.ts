@@ -26,13 +26,15 @@ const BOM = String.fromCharCode(0xfeff);
 
 /**
  * A field as a spreadsheet reads it back: quoted when it holds a comma, a quote or a line break, its
- * quotes doubled (RFC 4180); and text a spreadsheet would run as a formula, its first character one
- * of = + - @, a tab or a return, kept as text by a quote before it (OWASP's CSV injection). Only a
- * class's name is text a person typed; every figure is a count, never negative.
+ * quotes doubled (RFC 4180), and always when it is `text` a person typed, a class's name, so a
+ * spreadsheet that splits on another separator (a semicolon, where a comma is a decimal point) keeps
+ * it one cell; and text a spreadsheet would run as a formula, its first character one of = + - @, a
+ * tab or a return, kept as text by a quote before it (OWASP's CSV injection). Every figure is a
+ * count, never negative.
  */
-function field(value: string | number): string {
-  const text = /^[=+\-@\t\r]/.test(String(value)) ? `'${value}` : String(value);
-  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+function field(value: string | number, text = false): string {
+  const said = /^[=+\-@\t\r]/.test(String(value)) ? `'${value}` : String(value);
+  return text || /[",\r\n]/.test(said) ? `"${said.replaceAll('"', '""')}"` : said;
 }
 
 /**
@@ -75,8 +77,10 @@ export function sessionsCsv(
       s.protectionOffCount,
     ];
   });
-  const lines = [CSV_COLUMNS, ...rows].map((row) => row.map(field).join(','));
-  return `${BOM}${lines.join('\r\n')}\r\n`;
+  const header = CSV_COLUMNS.map((name) => field(name)).join(',');
+  // A row's first field is its class's name: text a person typed.
+  const lines = rows.map((row) => row.map((value, i) => field(value, i === 0)).join(','));
+  return `${BOM}${[header, ...lines].join('\r\n')}\r\n`;
 }
 
 /** The file's name, for its class: "Biology, period 3 sessions.csv". */

@@ -24,8 +24,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **Focused the whole time, counted in the portal** (the worker's call): R3's rows carry no such count, so each listed
   session someone joined is counted as its recap counts it (`recapGroups`), from its report and its events, the class
   page's own reads of its last session (LO4): three reads a session (the report, the events and the empty page that ends
-  them). So a page is 10 sessions, not R3's 20 (`REPORTS_PAGE`), to keep well inside a teacher's 120 reads a minute
-  (`apps/api/src/limits.ts`). Each count is kept while the page is open, under the session and the R3 figures a late
+  them; more for a session past 200 events). So a page is 10 sessions, not R3's 20 (`REPORTS_PAGE`): about 32 reads of
+  a teacher's 120 a minute (`apps/api/src/limits.ts`, a burst of 120 refilled at 2 a second). That holds for a page at
+  a time; four classes picked, or Show earlier pressed three or four times, within a few seconds can meet a `429`, said
+  with Try again and over in moments, and so can anything else the teacher sends meanwhile, in another tab too (both
+  reviewers' WARN, santa's round 1). Each count is kept while the page is open, under the session and the R3 figures a late
   unlock or protection off changes, so a class picked again reads no count again, and a session one of those has
   reached since is counted again. A page lands whole: a count that fails is the page's failure, said with Try again,
   which reads only the counts not in. **A possible later step:** the server counting it on R3's rows (additive, one rule
@@ -42,8 +45,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   reads them anywhere; Joined; Focused the whole time; Average time focused (min) and Length (min), the board's "47 of 50
   min"; Emergency unlocks; Protection off. A session nobody joined has no average. The session totals alone, never a
   student's name or id (the conductor's rule, tested). UTF-8 with a byte-order mark, CRLF lines and RFC 4180's quoting;
-  a class name a spreadsheet would run as a formula (=, +, -, @, a tab or a return first) is kept as text, a quote
-  before it.
+  the class's name always quoted, so a spreadsheet splitting on semicolons keeps it one cell (santa's round 1), and one
+  a spreadsheet would run as a formula (=, +, -, @, a tab or a return first) kept as text, a quote before it.
 
   **Its in-between states** (ReportsMoments, drawn first): the sessions being read and counted, the sessions that didn't
   load, a teacher with no class, nobody joined any session listed, Show earlier reading, earlier sessions that didn't
@@ -55,7 +58,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   the 709 lines delete v2's view (the conductor's call, 2026-11-17)."
 
   **Tests:** driven (`app/reports/page.test.tsx`); `components/reports-list.test.ts` converted and gone, 21 source-text
-  tests left; the counts, the share and the bar in `lib/reports.test.ts`, the CSV in `lib/report-csv.test.ts`. The share's
+  tests left, its pins of the page's stale-answer guard, the same-render reset and the cleanup's bump driven now, each
+  shown failing on its mutant (santa's round 1, Reviewer B's blocker); the counts, the share and the bar in
+  `lib/reports.test.ts`, the CSV in `lib/report-csv.test.ts`. The share's
   size, `share` (56/56), joins lane A's block. Left for the phase's tidy-up: v2's `text-pill` and `text-bar-row`, unused
   now.
 

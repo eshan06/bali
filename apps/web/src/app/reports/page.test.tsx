@@ -575,6 +575,75 @@ describe('Reports in between (ReportsMoments, drawn first)', () => {
     expect(bali.sent.sort()).toEqual([`GET ${klass(C1)}`, NEWEST()].sort());
   });
 
+  it('drops a read answered after another class was picked: never its sessions under the new tab (santa’s review)', async () => {
+    lists([MON]);
+    holds(MON);
+    // Biology's page on its way while Period 1 is picked, and answers first.
+    const late = held({ sessions: [MON], nextBefore: null });
+    bali.routes.set(NEWEST(), late.route);
+    lists([SEP], null, C2);
+    holds(SEP, [BEN], C2);
+    const view = open();
+    await act(() => Promise.resolve());
+    expect(bali.sent).toContain(NEWEST());
+    nav.params = new URLSearchParams(`class=${C2}`);
+    view.rerender(
+      <main>
+        <ReportsPage />
+      </main>,
+    );
+    await screen.findByRole('link', { name: new RegExp(sessionRow(SEP).day) });
+    // Biology's answer lands now and is counted, then dropped: its class isn't the one picked.
+    await act(async () => {
+      late.release();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(bali.sent).toContain(REPORT(MON));
+    expect(screen.queryByRole('link', { name: new RegExp(sessionRow(MON).day) })).toBeNull();
+    expect(rows().map((row) => row[0])).toEqual(['Session', when(SEP)]);
+  });
+
+  it('lists nothing once the account has no class left: the last class’s rows go in that render', async () => {
+    lists([MON]);
+    holds(MON);
+    const view = open();
+    await screen.findByRole('table');
+    // The account read again with no class left: no tab, and none of the last class's rows.
+    const none = { kind: 'teacher' as const, me: account([]) };
+    shell.me = { ...(shell.me as Me), home: none, me: none.me };
+    view.rerender(
+      <main>
+        <ReportsPage />
+      </main>,
+    );
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'Class' })).toBeNull();
+    expect(screen.getByText('When a session ends, its report shows here.')).toBeDefined();
+  });
+
+  it('drops a read still on its way when the account’s classes go meanwhile', async () => {
+    lists([MON]);
+    holds(MON);
+    const late = held({ sessions: [MON], nextBefore: null });
+    bali.routes.set(NEWEST(), late.route);
+    const view = open();
+    await act(() => Promise.resolve());
+    const none = { kind: 'teacher' as const, me: account([]) };
+    shell.me = { ...(shell.me as Me), home: none, me: none.me };
+    view.rerender(
+      <main>
+        <ReportsPage />
+      </main>,
+    );
+    await act(async () => {
+      late.release();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(bali.sent).toContain(REPORT(MON));
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByText('When a session ends, its report shows here.')).toBeDefined();
+  });
+
   it('scrolls sideways in a box of its own, at least 720 px wide on a phone, each cell on one line', async () => {
     lists([MON]);
     holds(MON);
