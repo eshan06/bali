@@ -146,6 +146,24 @@ describe('the home sends each account where it belongs (PV15; decision 13)', () 
     expect(screen.queryByText(STUDENTS_LINE)).toBeNull();
   });
 
+  it('a student’s home reads the account through the shell: a later read’s failure said with its Try again, the shell’s refresh, and its tab back in view the shell’s load (LO12)', async () => {
+    const user = userEvent.setup();
+    const me = readAs({ kind: 'student', me: account('student') }, CANT_REACH);
+    render(
+      <main>
+        <HomePage />
+      </main>,
+    );
+    expect(me.load).toHaveBeenCalledOnce();
+    expect(screen.getByRole('alert').textContent).toBe("Bali couldn't load your classes.");
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(me.refresh).toHaveBeenCalledOnce();
+    act(() => {
+      fireEvent(document, new Event('visibilitychange'));
+    });
+    expect(me.load).toHaveBeenCalledTimes(2);
+  });
+
   it('after a redeem, reads the account afresh and, once it teaches, gives Home’s heading focus', async () => {
     const user = userEvent.setup();
     const { me, rerender } = open({ kind: 'invite' });
