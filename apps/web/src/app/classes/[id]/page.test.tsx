@@ -397,8 +397,10 @@ describe('the live header (LO5; ClassLive, PhoneLive), and Present’s (ClassPre
     expect(screen.getByRole('button', { name: 'Present' }).getAttribute('aria-pressed')).toBe(
       'true',
     );
-    // Its line, the class counted, v2's: "Live · 1 of 1 joined".
-    expect(within(screen.getByRole('banner')).getByText('Live · 1 of 1 joined')).toBeTruthy();
+    // Its line, the class counted once the grid tells the page its counts: v2's "Live · 1 of 1 joined".
+    expect(
+      await within(screen.getByRole('banner')).findByText('Live · 1 of 1 joined'),
+    ).toBeTruthy();
   });
 
   it('says time it can’t add under the header, after the alert’s icon, over the page’s rule', async () => {

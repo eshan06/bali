@@ -538,7 +538,7 @@ function CheckOn({
                   ? `silent-${row.students[0]?.studentId ?? ''}`
                   : row.display
               }
-              className={`grid grid-cols-[150px_minmax(0,1fr)_auto] items-center gap-4 border-b border-border-default py-3 max-[760px]:grid-cols-[140px_minmax(0,1fr)] max-[760px]:gap-x-3 max-[760px]:gap-y-2 ${faded}`}
+              className={`grid grid-cols-[minmax(150px,max-content)_minmax(0,1fr)_auto] items-center gap-4 border-b border-border-default py-3 max-[760px]:grid-cols-[minmax(140px,max-content)_minmax(0,1fr)] max-[760px]:gap-x-3 max-[760px]:gap-y-2 ${faded}`}
             >
               <span>
                 <LockChip display={row.display} words={row.words} />
