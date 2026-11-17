@@ -17,9 +17,10 @@ import {
   ShieldOff,
   WifiOff,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useId, useReducer, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useId, useMemo, useReducer, useRef, useState } from 'react';
 
 import { NAME_BUTTON, QUIET } from '@/components/button';
+import { SessionList } from '@/components/session-list';
 import { StudentPanel } from '@/components/student-panel';
 import { TryAgain } from '@/components/try-again';
 import { NO_POPUPS, popupsAfter, unlockNews, UnlockPopups } from '@/components/unlock-popups';
@@ -45,6 +46,7 @@ import {
   type Students,
   unlockNote,
 } from '@/lib/grid-state';
+import { type LogRead, useSessionLog, withStreamed } from '@/lib/session-log';
 import { createSseClient, type SseClient, type SseStatus } from '@/lib/sse-client';
 import { useApi, useSignOut } from '@/lib/use-api';
 
@@ -147,9 +149,6 @@ export const ROOM =
   'grid-cols-[repeat(auto-fill,minmax(min(178px,100%),1fr))] gap-2 max-[760px]:grid-cols-2';
 export const PRESENT_COLUMNS = 'grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-4';
 
-/** The tile whose panel is open (v2.css's `.tile.is-selected`, until LO6): the focus ring's look. */
-const SELECTED = 'rounded-sm ring-2 ring-focus-ring ring-offset-2 ring-offset-surface-page';
-
 /** A state's chip (v2.css's `.chip-mini`): a pill 3 × 10 px in, its words 13/18, its edge 1.5 px. */
 export const CHIP_PILL =
   'inline-flex shrink-0 items-center gap-1.5 rounded-full border-[1.5px] px-2.5 py-0.75 text-caption font-medium whitespace-nowrap tabular-nums';
@@ -190,7 +189,8 @@ const ROOM_TILE =
  * the state's words (Silent's with its minutes), each cut short with an ellipsis rather than
  * wrapped, so every tile is one size, the whole name on hover. The state and the name only: an
  * unlock's reason, "last seen" and Clock off are in the student's panel (the owner, 2026-11-16). On
- * the live page a button that opens the panel and closes it; hovered, its edge shows. In Present
+ * the live page a button that opens the panel and closes it; hovered, its edge shows, and while its
+ * panel is open its edge is the primary ink, solid (LO6; ClassStudent's `aria-current`). In Present
  * (ClassPresent), v2's tile until LO9: 100 px tall, 12 × 18 px in, its icon 24 px, the name, the
  * state's words after a Left state's flag and one line, "last seen" (`lastSeenNote`) and a protection
  * off's unlock (`unlockNote`), never the reason or Clock off, both the teacher's alone (the owner,
@@ -276,7 +276,7 @@ export function Tile({
   const Box = select ? 'button' : 'div';
   const dashed = display === 'silent' || display === 'unknown';
   return (
-    <li className={select?.selected ? `flex min-w-0 ${SELECTED}` : 'flex min-w-0'}>
+    <li className="flex min-w-0">
       <Box
         {...(select && {
           type: 'button',
@@ -285,7 +285,7 @@ export function Tile({
           'aria-controls': select.selected ? select.panel : undefined,
           onClick: select.onSelect,
         })}
-        className={`${ROOM_TILE} ${tone}${select ? ` press cursor-pointer [--press-scale:0.98] ${dashed ? 'hover:border-border-input' : 'hover:border-border-strong'}` : ''}`}
+        className={`${ROOM_TILE} ${tone}${select ? ` press cursor-pointer [--press-scale:0.98] ${dashed ? 'hover:border-border-input' : 'hover:border-border-strong'} aria-expanded:border-solid aria-expanded:border-text-primary` : ''}`}
       >
         {glow('rounded-sm')}
         <Icon size={18} aria-hidden="true" className="shrink-0" />
@@ -310,19 +310,12 @@ function stateWords(s: Student, display: GridDisplay, now: Date): string {
 }
 
 /**
- * A student's state as a chip, their tile's state, icon and words in its tint, as the class page's
- * counts draw a chip (`LiveCounts`): the student panel's (PV11b; ClassStudent, PanelStates).
+ * A student's state as a chip, their tile's state, icon and words in its tint, Silent's with its
+ * minutes: the student panel's, in the lock-only look (LO6; ClassStudent's `.chip`).
  */
 export function StateChip({ student: s, now }: { student: Student; now: Date }) {
   const display = gridDisplay(s, now);
-  const { icons, tone } = CHIP[display];
-  const Icon = icons[icons.length - 1] ?? Circle;
-  return (
-    <span className={`${CHIP_PILL} ${tone}`}>
-      <Icon size={13} aria-hidden="true" className="shrink-0" />
-      {stateWords(s, display, now).replaceAll(' · ', DOT)}
-    </span>
-  );
+  return <LockChip display={display} words={stateWords(s, display, now)} />;
 }
 
 /** How long the stream's first connect may take before the grid says so (the owner, 2026-10-14). */
@@ -474,15 +467,17 @@ export function checkOn(students: readonly Student[], now: Date): CheckRow[] {
  * Check on (LO5; ClassLive, LiveStates, LiveTopStates): "Check on 4" over its rows, each the state's
  * chip and who is in it, the state and the name only (the owner, 2026-11-16: the times and the
  * reason are in the student's panel). Each name opens that student's panel, as their tile does, and
- * so does Open at the end of a row of one, none on a phone (PhoneLive). While the live feed is down,
- * the rows faded and the names plain, as they were at the last update. Everyone focused says so in
- * one line; a class with no students yet says that.
+ * so does Open at the end of a row of one, none on a phone (PhoneLive). An unlock the stream brings
+ * glows its row's edge twice with its tile (`bali-softpulse`; LiveStates' An unlock lands), then it
+ * holds still. While the live feed is down, the rows faded and the names plain, as they were at the
+ * last update. Everyone focused says so in one line; a class with no students yet says that.
  */
 function CheckOn({
   id,
   rows,
   total,
   stale,
+  live,
   opened,
   panel,
   onOpen,
@@ -491,6 +486,8 @@ function CheckOn({
   rows: readonly CheckRow[];
   total: number;
   stale: boolean;
+  /** The unlocks that landed live and still pulse (`softpulses`), by event id. */
+  live: ReadonlySet<string>;
   /** The student whose panel is open, if any, and the panel's id. */
   opened: string | null;
   panel: string;
@@ -528,6 +525,11 @@ function CheckOn({
       <ul className="border-t border-border-default">
         {rows.map((row) => {
           const [one] = row.students.length === 1 ? row.students : [];
+          // Its pulsing unlocks, so each new one glows the row from the start, as its tile does.
+          const glowing = row.students
+            .filter((s) => softpulses(s, row.display, live))
+            .map((s) => s.unlock?.eventId)
+            .join(' ');
           return (
             // Keyed by its state, never its words: a Silent row's minutes turn over each minute,
             // and the row, a name in it focused, stays put. Silent alone has a row per minute,
@@ -538,7 +540,7 @@ function CheckOn({
                   ? `silent-${row.students[0]?.studentId ?? ''}`
                   : row.display
               }
-              className={`grid grid-cols-[minmax(150px,max-content)_minmax(0,1fr)_auto] items-center gap-4 border-b border-border-default py-3 max-[760px]:grid-cols-[minmax(140px,max-content)_minmax(0,1fr)] max-[760px]:gap-x-3 max-[760px]:gap-y-2 ${faded}`}
+              className={`relative grid grid-cols-[minmax(150px,max-content)_minmax(0,1fr)_auto] items-center gap-4 border-b border-border-default py-3 max-[760px]:grid-cols-[minmax(140px,max-content)_minmax(0,1fr)] max-[760px]:gap-x-3 max-[760px]:gap-y-2 ${faded}`}
             >
               <span>
                 <LockChip display={row.display} words={row.words} />
@@ -569,6 +571,14 @@ function CheckOn({
                 >
                   Open
                 </button>
+              ) : null}
+              {/* The row's edge glowing, 10 px round, its hairline left straight under it. */}
+              {glowing ? (
+                <span
+                  key={glowing}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 animate-softpulse rounded-sm"
+                />
               ) : null}
             </li>
           );
@@ -605,6 +615,7 @@ export function LiveGrid({
   livePage = false,
   tiles = true,
   card,
+  opening = null,
 }: {
   sessionId: string;
   /** Called with `sessionId` once the server marks the session over: an end event, or a snapshot. */
@@ -622,14 +633,16 @@ export function LiveGrid({
    */
   present?: boolean;
   /**
-   * The class page's own grid while a session runs. On the page (LO5; ClassLive, LiveStates,
-   * LiveTopStates, PhoneLive): the count of who is focused, Check on, then the room, Everyone's
-   * tiles; the live feed lost or quiet said over the count (`FeedLine`), the count and Check on
-   * faded; a grid that didn't load said in the count's place with Try again. In Present (PV9),
-   * v2's: a lost stream as the floating pill (`PILL`), a quiet one as the stone line, a grid that
-   * didn't load with a small Try again. Each unlock the stream brings opens a pop-up (PV10;
-   * ClassUnlock), and each tile and each name in Check on opens the student's panel (PV11b;
-   * ClassStudent), as does a pop-up's Open student; neither in Present, where the panel closes.
+   * The class page's own grid while a session runs. On the page (LO5, LO6; ClassLive, LiveStates,
+   * LiveTopStates, LiveListStates, PhoneLive): the count of who is focused, Check on, then the room,
+   * Everyone's tiles, and on the right the session list (`SessionList`), under the room on a phone;
+   * the live feed lost or quiet said over the count (`FeedLine`), the count and Check on faded; a
+   * grid that didn't load said in the count's place with Try again. In Present (PV9), v2's: a lost
+   * stream as the floating pill (`PILL`), a quiet one as the stone line, a grid that didn't load
+   * with a small Try again. Each unlock the stream brings opens a pop-up (PV10; ClassUnlock), and
+   * each tile and each name in Check on opens the student's panel (ClassStudent), as does a pop-up's
+   * Open student; neither in Present, where the panel closes. The session's log is read for the
+   * list and the panel once the grid is (`useSessionLog`), here alone, never for Home's card.
    */
   livePage?: boolean;
   /**
@@ -644,6 +657,11 @@ export function LiveGrid({
    * stream and 15 s read.
    */
   card?: (grid: GridNow) => ReactNode;
+  /**
+   * A student to open first, named by Home's Check on (`?student=`, LO3): their panel opens once the
+   * grid is read, if they are on it, on the live page and not in Present; asked once.
+   */
+  opening?: string | null;
 }) {
   const api = useApi();
   const onUnauthorized = useSignOut();
@@ -685,8 +703,20 @@ export function LiveGrid({
   const [panel, setPanel] = useState<{ studentId: string; opens: number; from?: string } | null>(
     null,
   );
-  // Every event the stream has brought, which the open panel folds into its read (PV11a).
+  // Every event the stream has brought, folded into the session's log (LO6).
   const [streamed, setStreamed] = useState<readonly FeedEvent[]>([]);
+  // The session's log, for the session list and the panel (LO6): read once the grid is, on the
+  // class page alone, the stream's events folded in as they come.
+  const { log: read, retry: readAgain } = useSessionLog(
+    api,
+    sessionId,
+    livePage && students !== null,
+  );
+  const log = useMemo<LogRead>(
+    () =>
+      read.kind === 'ready' ? { kind: 'ready', events: withStreamed(read.events, streamed) } : read,
+    [read, streamed],
+  );
   const id = useId();
   const tileId = (studentId: string) => `${id}-tile-${studentId}`;
   const panelId = `${id}-panel`;
@@ -772,6 +802,17 @@ export function LiveGrid({
   useEffect(() => {
     if (present) setPanel(null);
   }, [present]);
+  // The student Home's Check on named (`opening`), their panel opened once the grid is read, if
+  // they are on it (an own key: the address is anyone's to type), on the live page and not in
+  // Present; asked once, whatever the answer.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current || opening === null || students === null) return;
+    opened.current = true;
+    if (livePage && !present && Object.hasOwn(students, opening)) {
+      setPanel({ studentId: opening, opens: 1 });
+    }
+  }, [opening, students, livePage, present]);
 
   // Local clock so the silent badge appears with zero event traffic.
   useEffect(() => {
@@ -944,73 +985,80 @@ export function LiveGrid({
       />
     );
   });
-  // The student's panel (ClassStudent), read again for each student; Close or Escape gives focus
-  // back to the button in Check on that opened it, else to their tile.
+  // The student's panel (ClassStudent), from the session's log, sliding in afresh for each student;
+  // Close or Escape gives focus back to the button in Check on that opened it, else to their tile.
   const studentPanel = shown ? (
     <StudentPanel
       key={shown.studentId}
       id={panelId}
-      sessionId={sessionId}
       student={shown}
       chip={<StateChip student={shown} now={now} />}
-      streamed={streamed}
+      log={log}
       now={now}
       onClose={() => {
         const from = panel?.from ? document.getElementById(panel.from) : null;
         (from ?? document.getElementById(tileId(shown.studentId)))?.focus();
         setPanel(null);
       }}
+      onRetry={readAgain}
     />
   ) : null;
 
   if (room) {
     // ClassLive: the count of who is focused, then who to check on, then the whole room, 40 px
     // apart; the live feed lost or quiet said over the count, the count and Check on as they were
-    // at the last update, faded (LiveStates, LiveTopStates). Nobody in the class yet: no room.
+    // at the last update, faded (LiveStates, LiveTopStates). Nobody in the class yet: no room. On
+    // the right, 340 px and 48 px off, the session list; under 1024 px, where beside it the room
+    // would narrow to a tile or two a row, after the room, 40 px under it, and on a phone, under
+    // 760 px, 32 (LiveListStates' tablet, PhoneLive).
     const counted = stateCounts(rows.map((s) => gridDisplay(s, now)));
     return (
-      <div className="flex flex-col gap-10">
-        <section aria-labelledby={`${id}-count`} className="flex flex-col gap-6">
-          {lost ? <FeedLine stale={lost} /> : null}
-          <h2
-            id={`${id}-count`}
-            className={`flex flex-wrap items-baseline gap-x-3 ${lost ? 'opacity-60' : ''}`}
-          >
-            <span className="text-count tabular-nums max-[760px]:text-count-phone">
-              {counted.counts.focused}
-            </span>{' '}
-            <span className="text-count-of text-text-secondary max-[760px]:text-count-of-phone">
-              of {counted.total} focused
-            </span>
-          </h2>
-          <CheckOn
-            id={id}
-            rows={checkOn(rows, now)}
-            total={counted.total}
-            stale={lost !== null}
-            opened={panel?.studentId ?? null}
-            panel={panelId}
-            onOpen={(studentId, from) =>
-              panel?.studentId === studentId ? setPanel(null) : open(studentId, from)
-            }
-          />
-        </section>
-        {rows.length === 0 ? null : (
-          <section aria-labelledby={`${id}-room`} className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
-              <h2 id={`${id}-room`} className="text-section-title">
-                Everyone
-              </h2>
-              <span className="text-data font-normal text-text-tertiary">{rows.length}</span>
-            </div>
-            <div className="relative">
-              <ul aria-label="Everyone in the class" className={`grid ${ROOM}`}>
-                {tilesOf}
-              </ul>
-              {unlocks}
-            </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-12 max-lg:grid-cols-1 max-[760px]:gap-8 min-[760px]:max-lg:gap-10">
+        <div className="flex min-w-0 flex-col gap-10">
+          <section aria-labelledby={`${id}-count`} className="flex flex-col gap-6">
+            {lost ? <FeedLine stale={lost} /> : null}
+            <h2
+              id={`${id}-count`}
+              className={`flex flex-wrap items-baseline gap-x-3 ${lost ? 'opacity-60' : ''}`}
+            >
+              <span className="text-count tabular-nums max-[760px]:text-count-phone">
+                {counted.counts.focused}
+              </span>{' '}
+              <span className="text-count-of text-text-secondary max-[760px]:text-count-of-phone">
+                of {counted.total} focused
+              </span>
+            </h2>
+            <CheckOn
+              id={id}
+              rows={checkOn(rows, now)}
+              total={counted.total}
+              stale={lost !== null}
+              live={liveUnlocks}
+              opened={panel?.studentId ?? null}
+              panel={panelId}
+              onOpen={(studentId, from) =>
+                panel?.studentId === studentId ? setPanel(null) : open(studentId, from)
+              }
+            />
           </section>
-        )}
+          {rows.length === 0 ? null : (
+            <section aria-labelledby={`${id}-room`} className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+                <h2 id={`${id}-room`} className="text-section-title">
+                  Everyone
+                </h2>
+                <span className="text-data font-normal text-text-tertiary">{rows.length}</span>
+              </div>
+              <div className="relative">
+                <ul aria-label="Everyone in the class" className={`grid ${ROOM}`}>
+                  {tilesOf}
+                </ul>
+                {unlocks}
+              </div>
+            </section>
+          )}
+        </div>
+        <SessionList id={id} log={log} students={students} onRetry={readAgain} />
         {studentPanel}
       </div>
     );

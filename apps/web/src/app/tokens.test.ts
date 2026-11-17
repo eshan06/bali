@@ -170,6 +170,8 @@ const LOCK_SIZES: Record<string, [string, string, number, string?]> = {
   // A tile's name in the room, and on a phone (LO5).
   'room-name': ['14.5px', '19px', 600],
   'room-name-phone': ['14px', '19px', 600],
+  // A time in a log, the session list's and the student panel's (LO6).
+  'log-time': ['13px', '20px', 400],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [

@@ -8,6 +8,73 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-17** — **LO6, live: the session list, the unlock pop-ups, the student panel and the tab's title in the
+  lock-only look, from one log of the session read for the list and every panel; its in-between states on the canvas's
+  LiveListStates, drawn first (version 53) (the worker's calls, awaiting the owner's look; LO6, #608).**
+
+  **The session list** (ClassLive, PhoneLive): "This session" on the right, 340 px, a line per moment, newest first, its
+  time without AM or PM: the session's start, each Emergency Unlock, a phone gone silent, a student back in focus and
+  protection off, the board's five. Back in focus is a return to focused from an unlock or protection off, read by the
+  grid's own state function over the log in the engine's order (`applyEvent`, rule 2): Back to focus in the app, Screen
+  Time back on and a tap of the block each count, and a late return the engine never applied doesn't. Every unlock and
+  protection off is a line, a late one too, as the report lists them. Lines go by the server's times, so an unlock that
+  reached the server late sits at its time. **Left out, no board drawing them there:** a tap-in, a phone checking in
+  again, Screen Time back on while still unlocked, leaving or being removed, a reason changed, time added. A student's
+  own are in their panel.
+
+  **One log** (the conductor: the list reads the log the recap and the panel read): `GET /v1/sessions/{id}/events`, read
+  once the grid's own read answers, so it holds every event up to the grid's and the stream brings the rest; on the class
+  page alone, never for Home's card; the stream's events folded in by event id. The student panel reads from it too,
+  where each panel read the whole feed again as it opened (PV11a): its moments are there at once, and a failure is said
+  in the list and the panel with one read again behind both Try agains. `readStudentEvents`, `noEvents` and `withEvents`
+  went with it. One grid a session on the class page (`key`), so a log never meets another session's stream.
+
+  **The pop-ups** (ClassLive, LiveStates' An unlock lands, PhoneLive): lock.css's `.popup`, their behaviour today's
+  (GA2): the name, the reason and the time, each until it's closed, Open student, newest on top, 18 px from the
+  window's top as the room scrolls, never in Present. Over the room's top right and 12 px past it, inside the page's
+  40 px margin, the room's width under 760 px, so none is cut at the window's edge: LO2's 2 px at 640 to 759 px is
+  gone (measured whole at 390, 640, 700, 759, 760, 820, 1023, 1024 and 1440 px). The reason and the time sit 12 px apart
+  with no dot, as drawn.
+
+  **The student panel** (ClassStudent): the name over the state's chip, and Close; "This session" with the moments
+  newest first, as the board lists them, in its words ("Used Emergency Unlock", "Tapped in and focused") and the rest in
+  the session list's ("Turned protection off", "Turned protection back on", "Went silent"; "Back in focus", "Checked in
+  again" and "Left" today's), an unlock's reason under it; it slides in on the drawer curve. **"Last seen" and Clock
+  off**, the panel's alone since LO5: the last check-in, in today's words, only where the tile said "last seen" before
+  LO5 (a minute or more since contact, the student focused, unlocked or protection off), so ClassStudent's own panel
+  shows none; Clock off's line, today's. The head's "Tapped in at" and the foot's "Only you see this panel…" are gone,
+  ClassStudent drawing neither (the tap-in is a moment of the list). An open student's tile is edged in the primary
+  ink, solid, as ClassStudent's `aria-current` draws it, where v2's focus ring was.
+
+  **Check on as an unlock lands** (LiveStates, left by LO5): its row glows twice with the tile (`bali-softpulse`), then
+  holds still.
+
+  **The tab's title** (LiveStates: "(4) Biology, period 3" at 24 of 28 focused): the board's 4 is Check on's count, not
+  the focused count, so the title counts who to check on; with nobody to check on, or the grid not read yet, the
+  class's name alone; the title before it comes back as the live page goes. In Present too: a count, never a name.
+
+  **A name from Home's Check on** (`?student=`, LO3): the class page reads it as it opens and drops it from the address
+  at once, as `?present`, so a reload opens the page alone; the grid opens that student's panel once read if they are
+  on it (an own key of the grid's: the address is anyone's to type), never in Present, and asks once. The ask is for
+  the session live as Home named it: once the page shows none running, read so or after a bell, it goes, so a later
+  session's grid opens nobody's panel (santa's round 1, both reviewers).
+
+  **A tablet** (the worker's call, drawn first): under 1024 px the list goes under the room, 40 px down, 32 on a phone,
+  since beside it the room narrows to a tile or two a row on an upright iPad; lock.css stacks it only under 760 px.
+
+  **Tokens:** `log-time` (13/20, lock.css's `.log .when`) and the `drawer-in` and `pop-in` utilities, in lane B's
+  block. `--color-unlock-link` (v2's Open student, orange-700) has no user now, left for the phase's tidy-up with
+  `--color-ready`, outside lane B's block.
+
+  **Tests:** driven. `components/student-panel.test.ts` is converted and merged with its driven twin into
+  `student-panel.test.tsx` (22 source-text tests left); `lib/session-log.test.ts` is new; the pop-ups', the grid's and
+  the class page's driven tests carry the rest.
+
+  **One PR** (the conductor's call): 868 changed lines without tests, over santa's 400, kept whole rather than the
+  proposed three (~330, ~460, ~60): the pop-ups' and the panel's new look and the panel's move onto the shared log both
+  reshape `student-panel.tsx`, so a split would review the same file twice in a row, and about 460 of the lines are
+  deletions and re-indentation from that move.
+
 - **2026-11-17** — **LO10a, a tap's honest retry after its block moved: answered as any retry, never `409`, settled
   before any block can move (the owner's "Free the code"; the worker's calls, awaiting the owner's look; LO10a, part of
   #612).**

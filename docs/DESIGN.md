@@ -657,9 +657,22 @@ count of who is focused, Check on (the state and the name only) and Everyone's
 tiles (the state and the name only, a Left state's icon its flag), its states as
 LiveStates and LiveTopStates draw them (drawn on the canvas first), the live
 feed's line with its dot held still; no lesson piece, whichever way the switch
-is set; the session list, the pop-ups, the student panel and the tab title as
-they were until LO6, and Present v2's until LO9. LO5 added `room-name` and
+is set; and Present v2's until LO9. LO5 added `room-name` and
 `room-name-phone` (14.5/19 and 14/19, semibold: a tile's name in the room), in
+lane B's block. Since LO6 (2026-11-17) the live page's right side is ClassLive's
+session list, "This session": a line per moment, newest first, from the
+session's log (its start, each Emergency Unlock, a phone gone silent, a student
+back in focus, protection off), under the room below 1024 px and on a phone
+(PhoneLive); the unlock pop-ups are ClassLive's, over the room's top right and
+12 px past it, the room's width on a phone, their behaviour today's; the student
+panel is ClassStudent's, its moments newest first in the list's words, an
+unlock's reason under it, then the last check-in once it is a minute old and
+Clock off's line; an open student's tile is edged in the primary ink; Check on's
+row glows with its tile as an unlock lands; and the tab's title counts who to
+check on, "(4) Biology, period 3", the name alone with nobody to check on; its
+in-between states as LiveListStates draws them (drawn on the canvas first). LO6
+added `log-time` (13/20: a time in a log) and the `drawer-in` and `pop-in`
+utilities (the panel's slide on the drawer curve and the pop-up's 6 px drop), in
 lane B's block.
 
 Density: the teacher's live grid is dense (many students at a glance); the

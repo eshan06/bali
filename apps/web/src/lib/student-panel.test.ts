@@ -1,15 +1,6 @@
-import type {
-  EventsPage,
-  EventType,
-  FeedEvent,
-  SessionSnapshot,
-  SnapshotStudent,
-} from '@bali/shared';
-import { EVENT_PAGE_LIMIT, EVENT_RESUME_OVERLAP } from '@bali/shared';
+import type { EventType, FeedEvent, SessionSnapshot, SnapshotStudent } from '@bali/shared';
 import { describe, expect, it } from 'vitest';
 
-import { ApiError, NetworkError } from './api-client';
-import { CANT_REACH, TOO_MANY_TRIES } from './errors';
 import {
   applyEvent,
   fromSnapshot,
@@ -18,18 +9,13 @@ import {
   type Students,
   unlockNote,
 } from './grid-state';
-import {
-  noEvents,
-  readStudentEvents,
-  type StudentEvents,
-  studentPanel,
-  withEvents,
-} from './student-panel';
+import { studentPanel } from './student-panel';
 
 /*
  * The student panel's logic (PV11a): one student in one session, their state as their tile shows it,
  * and from the session's events when they tapped in, each moment and its time. Times are the server's
- * (UTC here: a lesson from 09:05 to its bell at 09:55).
+ * (UTC here: a lesson from 09:05 to its bell at 09:55). The events are the session's log since LO6,
+ * read once for the session list and every panel (`session-log.test.ts`).
  */
 
 const at = (minute: number) => new Date(Date.UTC(2026, 9, 14, 9, minute)).toISOString();
@@ -396,158 +382,5 @@ describe('studentPanel', () => {
       'silent@09:14',
       'back@09:18',
     ]);
-  });
-});
-
-/** A fake API: each path answers its value, or throws its error; every path asked is recorded. */
-function fakeApi(answers: Record<string, unknown>) {
-  const asked: string[] = [];
-  return {
-    asked,
-    get<T>(path: string): Promise<T> {
-      asked.push(path);
-      if (!(path in answers)) return Promise.reject(new Error(`unexpected ${path}`));
-      const answer = answers[path];
-      return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer as T);
-    },
-  };
-}
-
-const FEED = (after: number) => `/v1/sessions/s1/events?after=${after}`;
-/** An event of the feed at `n`, the same event wherever it is read (its id is its seq's). */
-const feed = (n: number, userId: string, type: EventType = 'came_back'): FeedEvent => ({
-  seq: n,
-  eventId: `f${n}`,
-  type,
-  userId,
-  occurredAt: at(10),
-  payload: null,
-});
-/** A page of the catch-up feed, as the API answers it. */
-const page = (events: FeedEvent[], after = 0): EventsPage => ({
-  events,
-  nextAfter: events.at(-1)?.seq ?? after,
-});
-const ofAna = (...events: FeedEvent[]) => events.filter((e) => e.userId === 'ana');
-
-describe('readStudentEvents', () => {
-  it('reads every page of the session’s feed from its start, keeping this student’s alone', async () => {
-    const first = Array.from({ length: EVENT_PAGE_LIMIT }, (_, i) =>
-      feed(i + 1, i % 3 === 0 ? 'ana' : 'ben'),
-    );
-    const rest = [feed(201, 'ana'), feed(202, 'ben')];
-    const api = fakeApi({
-      [FEED(0)]: page(first),
-      [FEED(EVENT_PAGE_LIMIT)]: page(rest),
-      [FEED(202)]: page([], 202),
-    });
-    expect(await readStudentEvents(api, noEvents('s1', 'ana'))).toEqual({
-      kind: 'ready',
-      events: {
-        sessionId: 's1',
-        studentId: 'ana',
-        events: ofAna(...first, ...rest),
-        cursor: 202,
-      },
-    });
-    expect(api.asked).toEqual([FEED(0), FEED(EVENT_PAGE_LIMIT), FEED(202)]);
-  });
-
-  it('reads again from the overlap before its cursor: a late commit found, a replay counted once', async () => {
-    const known: StudentEvents = {
-      sessionId: 's1',
-      studentId: 'ana',
-      events: [feed(80, 'ana'), feed(120, 'ana')],
-      cursor: 120,
-    };
-    // 90 committed after the first read passed it; 80 and 120 come again in the overlap.
-    const window = [
-      feed(80, 'ana'),
-      feed(90, 'ana'),
-      feed(120, 'ana'),
-      feed(125, 'ben'),
-      feed(130, 'ana'),
-    ];
-    const api = fakeApi({
-      [FEED(120 - EVENT_RESUME_OVERLAP)]: page(window),
-      [FEED(130)]: page([], 130),
-    });
-    const read = await readStudentEvents(api, known);
-    expect(read).toEqual({
-      kind: 'ready',
-      events: { ...known, events: ofAna(...window), cursor: 130 },
-    });
-    // Read before only a little: from the start.
-    const early = fakeApi({ [FEED(0)]: page([]) });
-    await readStudentEvents(early, { ...known, cursor: EVENT_RESUME_OVERLAP - 1 });
-    expect(early.asked).toEqual([FEED(0)]);
-  });
-
-  it('says a failed read for Try again, never a part of the list as the whole', async () => {
-    const unreached = fakeApi({ [FEED(0)]: new NetworkError() });
-    expect(await readStudentEvents(unreached, noEvents('s1', 'ana'))).toEqual({
-      kind: 'error',
-      message: CANT_REACH,
-    });
-    // Its first page read, its second refused.
-    const busy = new ApiError(429, 'rate_limited', 'too many requests from this account');
-    const halfway = fakeApi({ [FEED(0)]: page([feed(1, 'ana')]), [FEED(1)]: busy });
-    expect(await readStudentEvents(halfway, noEvents('s1', 'ana'))).toEqual({
-      kind: 'error',
-      message: TOO_MANY_TRIES,
-    });
-    // Try again reads it again, whole.
-    const again = fakeApi({ [FEED(0)]: page([feed(1, 'ana')]), [FEED(1)]: page([], 1) });
-    expect(await readStudentEvents(again, noEvents('s1', 'ana'))).toMatchObject({
-      kind: 'ready',
-      events: { events: [feed(1, 'ana')], cursor: 1 },
-    });
-  });
-
-  it('keeps what the stream brought while the read was out, once folded into its answer', async () => {
-    // Out from the start: the stream meanwhile brings 3, then 1, which the read holds too.
-    const held = withEvents(noEvents('s1', 'ana'), 's1', [feed(3, 'ana'), feed(1, 'ana')]);
-    const api = fakeApi({
-      [FEED(0)]: page([feed(1, 'ana'), feed(2, 'ben')]),
-      [FEED(2)]: page([], 2),
-    });
-    const answer = await readStudentEvents(api, noEvents('s1', 'ana'));
-    if (answer.kind !== 'ready') throw new Error(answer.message);
-    const now = withEvents(answer.events, 's1', held.events);
-    expect(now.events.map((e) => e.seq)).toEqual([1, 3]);
-    // The read's own cursor: a read again resumes the overlap before it, and finds 3 once.
-    expect(now.cursor).toBe(2);
-  });
-
-  it('puts the session id in the path as one segment', async () => {
-    const api = fakeApi({ '/v1/sessions/a%2Fb/events?after=0': page([]) });
-    expect(await readStudentEvents(api, noEvents('a/b', 'ana'))).toMatchObject({ kind: 'ready' });
-  });
-});
-
-describe('withEvents', () => {
-  const known: StudentEvents = {
-    sessionId: 's1',
-    studentId: 'ana',
-    events: [feed(5, 'ana'), feed(9, 'ana')],
-    cursor: 9,
-  };
-
-  it('folds in the stream’s events, each once by its id, in the order the engine recorded them', () => {
-    // One the read holds (the overlap), one committed late under a lower seq, another student's.
-    const next = withEvents(known, 's1', [
-      feed(9, 'ana'),
-      feed(7, 'ana'),
-      feed(8, 'ben'),
-      feed(12, 'ana'),
-    ]);
-    expect(next.events.map((e) => e.seq)).toEqual([5, 7, 9, 12]);
-    // The cursor stays the read's: a read again resumes where the feed was read to.
-    expect(next.cursor).toBe(9);
-  });
-
-  it('takes no other session’s events, and gives back what it had when nothing is new', () => {
-    expect(withEvents(known, 's2', [feed(12, 'ana')])).toBe(known);
-    expect(withEvents(known, 's1', [feed(9, 'ana'), feed(8, 'ben')])).toBe(known);
   });
 });
