@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { MeResponse, SessionReportQuestion, SessionReportResponse } from '@bali/shared';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -306,18 +306,30 @@ describe('a session’s report and its Questions card (L7c)', () => {
     expect(card()?.textContent).toContain('1 asked in this session');
   });
 
-  it('reads its questions alone again by the card’s own Try again, the rest of the page kept', async () => {
+  it('reads its questions alone again by the card’s own Try again, held with its line kept, never Loading…; read, focus on the card’s title (ReportRetryStates)', async () => {
     const user = userEvent.setup();
     open();
     await settle();
     await answer(QUESTIONS, ...DOWN);
-    expect(card()?.textContent).toContain("Bali couldn't load this session's questions.");
-    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    const line = screen.getByText("Bali couldn't load this session's questions.");
+    const again = screen.getByRole('button', { name: 'Try again' });
+    await user.click(again);
     await settle();
     expect([REPORT, EVENTS, ROSTER, QUESTIONS].map(asked)).toEqual([1, 1, 1, 2]);
+    // On its way: the card's line said, its Try again held as Loading… where it is with focus on
+    // it, never the card's own Loading… in their place.
+    expect(screen.getByText("Bali couldn't load this session's questions.")).toBe(line);
+    expect(card()?.getAttribute('aria-busy')).toBe('false');
+    expect(within(card() as HTMLElement).queryByRole('status')).toBeNull();
+    expect(again.textContent).toBe('Loading…');
+    expect(again.getAttribute('aria-busy')).toBe('true');
+    expect(document.activeElement).toBe(again);
     await answer(QUESTIONS, 200, { questions: [ASKED] });
     expect(card()?.textContent).toContain('1 asked in this session');
     expect(screen.getByRole('heading', { name: 'This session' })).toBeTruthy();
+    // Read: focus on the card's title, a frame after the card is drawn.
+    await act(() => new Promise((done) => setTimeout(done, 32)));
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Questions' }));
   });
 
   it('draws only the newest read’s answer: a slow one never says its failure over one read since', async () => {

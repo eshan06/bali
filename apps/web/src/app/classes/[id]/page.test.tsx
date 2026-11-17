@@ -938,12 +938,24 @@ describe('the live lesson on the class page, lessons on and off (L7, M6; LO1)', 
     rejection: null,
     createdAt: '2026-10-06T15:00:00.000Z',
   };
+  /** A deck uploaded after the page read the teacher's decks. */
+  const LATER: Deck = {
+    ...DECK,
+    id: '019a0000-0000-7000-8000-00000000d002',
+    title: 'Graphing parabolas',
+    sha256: 'b'.repeat(64),
+    pageCount: 9,
+  };
   /** Its first page, shown by the slide change `SHOWN`. */
   const SHOWN = '019a0000-0000-7000-8000-00000000e001';
   const SLIDE = { deckId: DECK.id, sha256: DECK.sha256, page: 1, pageCount: 12 };
 
   /** The stream's word of a lesson's change, its `seq` past the read's newest (4). */
-  const said = (seq: number, type: 'question_opened' | 'slide_shown', payload: object) => ({
+  const said = (
+    seq: number,
+    type: 'question_opened' | 'question_closed' | 'slide_shown',
+    payload: object,
+  ) => ({
     seq,
     eventId: `019a0000-0000-7000-8000-00000000e${String(seq).padStart(3, '0')}`,
     type,
@@ -1025,6 +1037,22 @@ describe('the live lesson on the class page, lessons on and off (L7, M6; LO1)', 
       expect(bali.unexpected).toEqual([]);
     });
 
+    it('puts a closed question away by Done in Present, the room back and focus on Present in its header (L7, part 3)', async () => {
+      bali.lesson.question = QUESTION;
+      const user = await live(true);
+      await screen.findByRole('region', { name: QUESTION.prompt });
+      // Closed from another tab: the stream says so, and Done takes the close's place.
+      bali.lesson.question = { ...QUESTION, open: false };
+      await bring(said(5, 'question_closed', { question_id: QUESTION.id, revealed: false }));
+      await user.click(await screen.findByRole('button', { name: 'Done' }));
+      // A frame after the room is drawn again.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 32)));
+      expect(screen.queryByRole('region', { name: QUESTION.prompt })).toBeNull();
+      expect(screen.getByText('Ana Rodríguez')).toBeTruthy();
+      expect(document.activeElement).toBe(present());
+      expect(bali.unexpected).toEqual([]);
+    });
+
     it('turns Present on and off with the grid kept, one stream throughout, a side panel open only out of Present (PV9; L7-1b)', async () => {
       const user = await live();
       await user.click(screen.getByRole('button', { name: 'Show slides' }));
@@ -1069,8 +1097,31 @@ describe('the live lesson on the class page, lessons on and off (L7, M6; LO1)', 
       expect(screen.getByRole('region', { name: `${DECK.title} · 2 of 12` })).toBeTruthy();
       expect(screen.queryByText('Slides · showing')).toBeNull();
       expect(screen.queryByText('Ana Rodríguez')).toBeNull();
+      expect(counts()).toBeNull();
       expect(screen.queryByRole('complementary')).toBeNull();
       expect(bali.streams).toHaveLength(1);
+      expect(bali.unexpected).toEqual([]);
+    });
+
+    it('reads the session again for a deck shown from another tab that it hasn’t listed, and follows it (M6, part 2b)', async () => {
+      bali.lesson.decks = [DECK];
+      bali.lesson.presentation = { slide: SLIDE, eventId: SHOWN };
+      await live();
+      await screen.findByRole('region', { name: DECK.title });
+      const before = sessionReads();
+      // Uploaded since this page read the decks, then shown: the stream can't say its pages, so the
+      // page reads the session for what it shows, then the decks for its title.
+      const shown = said(5, 'slide_shown', { deck_id: LATER.id, page: 1 });
+      bali.lesson.decks = [LATER, DECK];
+      bali.lesson.presentation = {
+        slide: { deckId: LATER.id, sha256: LATER.sha256, page: 1, pageCount: 9 },
+        eventId: shown.eventId,
+      };
+      await bring(shown);
+      await settle();
+      expect(sessionReads()).toBe(before + 1);
+      const card = await screen.findByRole('region', { name: LATER.title });
+      expect(within(card).getByText('of 9').previousElementSibling?.textContent).toBe('1');
       expect(bali.unexpected).toEqual([]);
     });
 

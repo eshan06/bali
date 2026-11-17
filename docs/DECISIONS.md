@@ -8,8 +8,9 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-11-16** — **The lessons switch, built: `NEXT_PUBLIC_LESSONS`, on unless it says off; off, the portal shows and
-  reads nothing of a live lesson, and a lesson page's address goes to `/` (LO1, the conductor's call and this step's).**
+- **2026-11-16** — **The lessons switch, built: `NEXT_PUBLIC_LESSONS`, on unless it says off; off, the portal shows
+  nothing of a live lesson, its class page and reports read none, and a lesson page's address goes to `/` (LO1, the
+  conductor's calls and this step's).**
 
   **What off does** (ARCHITECTURE, Web portal, decision 8): `lessonsOn()` (`apps/web/src/lib/lessons.ts`) is false only
   for `off`, its case and the spaces around it aside, so an unset variable, every build before it, keeps lessons on. A
@@ -18,7 +19,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   its line on slides and questions, which would promise what never comes. The class page's two lesson hooks follow no
   session then, so it reads no question, no totals and no deck, rather than reading them to hide them; a report reads no
   questions. The student home's live card keeps the phone's chip, the student's own phone, which the lesson's read
-  carries: alone at the card's right it looked right at 1280 px, so no in-between state was drawn.
+  carries, so that read goes on, for the phone alone; the chip alone at the card's right looked right at 1280 px, so no
+  in-between state was drawn. That page is today's (v2's StudentHome) less its lesson pieces, not the canvas's StudentWeb,
+  the new look's student home with lessons off, which no LO step builds yet.
 
   **A lesson page reached by its address** (the conductor's call: somewhere honest, the plainest): Your questions, Your
   slides and a student's lesson answer `307` to `/`, a teacher's Home or a student's Your classes, from the server
