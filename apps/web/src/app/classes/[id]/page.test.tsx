@@ -128,6 +128,10 @@ const bali = vi.hoisted(() => {
       return [200, results];
     }
     if (method === 'GET' && path === '/v1/decks') return [200, { decks: lesson.decks }];
+    // The teacher's blocks: one, so the page before a session offers Start (LO4).
+    if (method === 'GET' && path === '/v1/blocks') {
+      return [200, { blocks: [{ id: 'b1', tagId: 'T7XK2M9QPF', createdAt: klass.createdAt }] }];
+    }
     if (method === 'GET' && path === '/v1/saved-questions') return [200, { savedQuestions: [] }];
     if (method === 'POST' && path === `/v1/sessions/${SESSION}/extend`) return [409, tooLong];
     // The student panel's read of the session's moments (PV11a): none yet.
@@ -624,6 +628,54 @@ describe('a class’s Start, focus then on the class’s name (GA4)', () => {
     await screen.findByText('Ana Rodríguez');
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(document.activeElement).toBe(document.body);
+  });
+});
+
+/*
+ * Present's toggle moves as it is pressed, from beside the counts into Present's header and back,
+ * and focus follows it (PV9); Present left after the bell leaves no toggle to follow, so focus goes
+ * to Start, the next thing to do. Converted from `app/present.test.ts`'s source text (LO4).
+ */
+describe('Present’s toggle, focus following it (PV9)', () => {
+  it('follows it into Present’s header and back, then to Start as Present is left after the bell', async () => {
+    const user = userEvent.setup();
+    render(
+      <main>
+        <ClassDetailPage />
+      </main>,
+    );
+    await screen.findByText('Ana Rodríguez');
+    await vi.waitFor(() => expect(bali.streams).toHaveLength(1));
+    const toggle = () => screen.getByRole('button', { name: 'Present' });
+
+    const beside = toggle();
+    await user.click(beside);
+    expect(toggle()).not.toBe(beside);
+    expect(toggle().getAttribute('aria-pressed')).toBe('true');
+    expect(document.activeElement).toBe(toggle());
+    await user.click(toggle());
+    expect(toggle().getAttribute('aria-pressed')).toBe('false');
+    expect(document.activeElement).toBe(toggle());
+
+    // In Present again, the bell: Class is over, the toggle at its header's end.
+    await user.click(toggle());
+    bali.now.running = false;
+    await act(async () => {
+      bali.streams[0]?.onEvent({
+        seq: 5,
+        eventId: '019a0000-0000-7000-8000-000000000e05',
+        type: 'session_ended',
+        userId: null,
+        occurredAt: new Date().toISOString(),
+        payload: {},
+      });
+      await Promise.resolve();
+    });
+    await screen.findByRole('heading', { name: 'Class is over' });
+    await user.click(toggle());
+    const start = await screen.findByRole('button', { name: 'Start 50-minute session' });
+    expect(document.activeElement).toBe(start);
+    expect(bali.unexpected).toEqual([]);
   });
 });
 

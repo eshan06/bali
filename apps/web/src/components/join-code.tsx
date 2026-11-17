@@ -4,7 +4,8 @@ import type { ClassDetail } from '@bali/shared';
 import { Check, Copy } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
-import { Button } from '@/components/button';
+import { LockButton } from '@/components/button';
+import { CODE_WELL, DIALOG_LOCK } from '@/components/card';
 import { TryAgain } from '@/components/try-again';
 import { CANT_COPY, NEW_CODE_MADE } from '@/lib/errors';
 import { codeMoved, copyText, regenerateCode } from '@/lib/session-controls';
@@ -59,14 +60,15 @@ export function useCopy() {
 }
 
 /**
- * The class's join code on its own card, before a session (ClassBefore, CopyStates): the code on
- * its chip, what students do with it, then Copy and New code; Copy says Copied for a few seconds,
- * or, where the browser refuses it, says so under the buttons, the code still there to select.
- * While a session runs the header shows the code, with no New code (PV7, PV9), as ClassLive and
- * ClassPresent draw it. New code opens a dialog (ClassNewCode), since the old code stops working
- * the moment the new one is made; then the new code takes its place and is said under it. Each
- * failure is said in the dialog, and Try again sends it again. `onClass` gets the class as the
- * answer gives it, its new code included. Focus goes back to New code whenever the dialog closes.
+ * The class's join code before a session, behind Add students (LO4; ClassPage, ClassStates): the
+ * code in its well, what new students do with it, then Copy code and New code, between hairlines;
+ * Copy code says Copied for a few seconds, or, where the browser refuses it, says so under them, the
+ * code still there to select. While a session runs the header shows the code, with no New code
+ * (PV7, PV9), as ClassLive and ClassPresent draw it. New code opens a dialog (ClassFlows' New code),
+ * since the old code stops working the moment the new one is made; then the new code takes its
+ * place and is said under it. Each failure is said in the dialog, and Try again sends it again.
+ * `onClass` gets the class as the answer gives it, its new code included. Focus goes back to New
+ * code whenever the dialog closes.
  */
 export function JoinCode({
   classId,
@@ -136,9 +138,9 @@ export function JoinCode({
   }
 
   const newCode = (
-    <Button ref={toggle} variant="secondary" size="sm" aria-haspopup="dialog" onClick={open}>
+    <LockButton ref={toggle} variant="secondary" size="sm" aria-haspopup="dialog" onClick={open}>
       New code
-    </Button>
+    </LockButton>
   );
   // Mounted while empty, so a screen reader hears the new code said when it lands.
   const made = said?.kind === 'made' ? said.message : null;
@@ -152,24 +154,24 @@ export function JoinCode({
         if (sending.current) e.preventDefault();
       }}
       onClose={closed}
-      className={DIALOG}
+      className={DIALOG_LOCK}
     >
-      <h2 id={`${id}-ask`} className="text-dialog-title">
+      <h2 id={`${id}-ask`} className="text-panel-title">
         Make a new code?
       </h2>
-      <p id={`${id}-line`} className="-mt-2 text-body text-text-secondary">
+      <p id={`${id}-line`} className="text-body text-text-secondary">
         <span translate="no" className="font-mono font-medium">
           {code}
         </span>{' '}
         stops working right away.
       </p>
       {said?.kind === 'failed' ? (
-        <p role="alert" className="-mt-2 text-body">
+        <p role="alert" className="text-body">
           {said.message}
         </p>
       ) : null}
-      <div className="flex flex-wrap justify-end gap-2.5">
-        <Button
+      <div className="flex flex-wrap justify-end gap-2">
+        <LockButton
           ref={cancel}
           variant="secondary"
           onClick={() => {
@@ -178,7 +180,7 @@ export function JoinCode({
           aria-disabled={busy}
         >
           Cancel
-        </Button>
+        </LockButton>
         <TryAgain
           variant="primary"
           size="md"
@@ -192,37 +194,40 @@ export function JoinCode({
   );
 
   return (
-    <>
-      <span translate="no" className={CODE}>
-        {code}
-      </span>
+    <div className="border-y border-border-default py-4">
+      {/* The code, its line, then the buttons, on one row as they fit (`.joinbox`). */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+        <span translate="no" className={`${CODE_WELL} select-all`}>
+          {code}
+        </span>
+        <p className="min-w-0 flex-[1_1_260px] text-body text-text-secondary">
+          New students type it in the Bali app to join this class.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <LockButton variant="secondary" size="sm" onClick={() => void copyCode(code)}>
+            {copy === 'copied' ? (
+              <Check size={16} aria-hidden="true" />
+            ) : (
+              <Copy size={16} aria-hidden="true" />
+            )}
+            {copy === 'copied' ? 'Copied' : 'Copy code'}
+          </LockButton>
+          {newCode}
+          {/* The button's own word changes too quietly for a screen reader: said here as well. */}
+          <span role="status" className="sr-only">
+            {copy === 'copied' ? 'Copied' : null}
+          </span>
+        </div>
+      </div>
       <p role="status" className="mt-3 text-body empty:mt-0">
         {made}
       </p>
-      <p className="text-caption text-text-tertiary">
-        Students type it in the Bali app to join this class.
-      </p>
-      <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-        <Button variant="secondary" size="sm" onClick={() => void copyCode(code)}>
-          {copy === 'copied' ? (
-            <Check size={16} aria-hidden="true" />
-          ) : (
-            <Copy size={16} aria-hidden="true" />
-          )}
-          {copy === 'copied' ? 'Copied' : 'Copy'}
-        </Button>
-        {newCode}
-        {/* The button's own word changes too quietly for a screen reader: said here as well. */}
-        <span role="status" className="sr-only">
-          {copy === 'copied' ? 'Copied' : null}
-        </span>
-      </div>
       {copy === 'failed' ? (
         <p role="alert" className="mt-3 text-body">
           {CANT_COPY}
         </p>
       ) : null}
       {ask}
-    </>
+    </div>
   );
 }

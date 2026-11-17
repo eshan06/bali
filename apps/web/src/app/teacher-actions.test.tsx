@@ -51,6 +51,8 @@ const bali = vi.hoisted(() => {
     running: false,
     /** The class's last session, over: the recap's. */
     ranBefore: false,
+    /** The teacher's block, registered: the class page's Start waits for one (LO4). */
+    block: false,
     /** The counts' answer: `{}`, no answer at all, or a 500. */
     actions: 'ok' as 'ok' | 'down' | 'error',
     /** Requests Bali fails with a 500, by "METHOD path". */
@@ -103,11 +105,14 @@ const bali = vi.hoisted(() => {
     question: null,
     presentation: null,
   };
+  /** A time this morning, by this computer's clock, whatever the time now. */
+  const thisMorning = (h: number, m: number) => new Date(new Date(at).setHours(h, m, 0, 0));
+  // Over today, 9:05 to 9:55 AM: after the bell, the class page shows its recap card (LO4).
   const last: SessionReportSummary = {
     id: LAST,
-    startedAt: iso(-1440),
-    endsAt: iso(-1390),
-    endedAt: iso(-1390),
+    startedAt: thisMorning(9, 5).toISOString(),
+    endsAt: thisMorning(9, 55).toISOString(),
+    endedAt: thisMorning(9, 55).toISOString(),
     ended: true,
     joinedCount: 1,
     focusMinutes: 50,
@@ -189,7 +194,20 @@ const bali = vi.hoisted(() => {
       { answered: 0, eligible: 1, open: true, correctOption: 1, revealed: false, counts: null },
     ],
     'GET /v1/decks': () => [200, { decks: [deck] }],
-    'GET /v1/blocks': () => [200, { blocks: [] }],
+    'GET /v1/blocks': () => [
+      200,
+      {
+        blocks: now.block
+          ? [
+              {
+                id: '019a0000-0000-7000-8000-0000000000e0',
+                tagId: 'T7XK2M9QPF',
+                createdAt: iso(-1440),
+              },
+            ]
+          : [],
+      },
+    ],
     'POST /v1/blocks': () => [
       201,
       { id: '019a0000-0000-7000-8000-0000000000e1', tagId: 'BALI7Q2M4X', createdAt: iso(0) },
@@ -360,6 +378,7 @@ afterEach(() => {
     role: 'teacher',
     running: false,
     ranBefore: false,
+    block: false,
     actions: 'ok',
     hold: null,
     path: '/',
@@ -427,12 +446,13 @@ describe('a sign-in (portal_signed_in)', () => {
 });
 
 /**
- * The class page, signed in as a teacher: live, its grid read, or its Start's card. Its controls
- * are found once the shell shows the page, the account read; in Present, which the shell never
- * hides, at once.
+ * The class page, signed in as a teacher with a block: live, its grid read, or its Start's well. Its
+ * controls are found once the shell shows the page, the account read; in Present, which the shell
+ * never hides, at once.
  */
 async function classPage(running: boolean) {
   bali.now.running = running;
+  bali.now.block = true;
   const user = userEvent.setup();
   open(`/classes/${bali.CLASS}`, <ClassDetailPage />);
   if (running) {
@@ -452,10 +472,11 @@ describe('a class’s Start, extend and End (portal_session_started, _extended, 
     await screen.findByRole('alert');
     expect(counted()).toEqual([]);
 
-    // Start sends it again: on its way, nothing counted; answered, once.
+    // Start, become Try again (ClassStates), sends it again: on its way, nothing counted; answered,
+    // once.
     bali.now.refused.clear();
     bali.now.hold = START;
-    const button = start();
+    const button = screen.getByRole('button', { name: 'Try again' });
     await user.click(button);
     expect(button.textContent).toBe('Starting…');
     await settle();
