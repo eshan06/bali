@@ -279,8 +279,7 @@ export async function findBlock(db: Database, blockId: string): Promise<BlockRow
  * already and nothing written; or none with that id.
  */
 export type RemoveBlockResult =
-  | { outcome: 'removed' | 'replay'; block: BlockRow }
-  | { outcome: 'block_not_found' };
+  { outcome: 'removed' | 'replay'; block: BlockRow } | { outcome: 'block_not_found' };
 
 /**
  * A teacher removes one of their own blocks, a lost one (LO10b): marked removed,
