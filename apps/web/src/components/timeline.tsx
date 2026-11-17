@@ -39,8 +39,9 @@ export const KEY: readonly (readonly [TrackState, string])[] = [
 /**
  * A student's track, from the session's start to its end, as stretches: Not here until their tap-in
  * and after they leave, then focused, unlocked or protection off as their moments turn them, the
- * grid's own rules (`applyEvent`): Screen Time back on returns to unlocked while an unlock is open,
- * else to focused; a tap-in or Back in focus closes an unlock. A silence lasts from going silent to
+ * grid's own rules (`applyEvent`): an unlock never softens protection off; Screen Time back on
+ * returns to unlocked while an unlock is open, else to focused; a tap-in or Back in focus closes an
+ * unlock. A silence lasts from going silent to
  * checking in again, or to any moment of theirs, which their phone sent. Moments before their
  * tap-in, or after the bell, change no stretch (the record lists them all the same). Stretches of
  * one state side by side are one.
@@ -76,7 +77,9 @@ export function stretchesOf(
       unlockOpen = false;
     } else if (base !== null) {
       if (m.moment === 'unlock') {
-        base = 'unlocked';
+        // An unlock never softens protection off (`applyUnlock`): it stays open for Screen Time
+        // back on to return to.
+        if (base !== 'off') base = 'unlocked';
         unlockOpen = true;
       } else if (m.moment === 'focus') {
         base = 'focused';

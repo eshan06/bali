@@ -22,8 +22,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   recap, Home's Last session and the class page's line never disagree.
 
   **The tracks** (the worker's call): stretches read from the recap's own moments by the grid's own rules
-  (`applyEvent`): Not here until the tap-in and after a leave, Screen Time back on returning to unlocked while an
-  unlock is open, a tap of the block closing one. A silence runs from going silent to checking in again, or to any
+  (`applyEvent`): Not here until the tap-in and after a leave, an unlock never softening protection off (santa's
+  round 1), Screen Time back on returning to unlocked while an unlock is open, a tap of the block closing one. A silence runs from going silent to checking in again, or to any
   moment the phone sent. A moment before the tap-in or after the bell changes no stretch; the record lists it all the
   same. Each track's words are its label, as the board words them ("Focused from 9:06, unlocked 9:18 to 9:24, then
   focused to the bell"). Built in the component from what `lib/recap.ts` gives, no lib change.
@@ -45,8 +45,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **Awaiting the owner, left out with no board drawing it** (CLAUDE.md, Working rules: anything new shown about a
   student waits for the owner's approval): a student who never joined but has an Emergency Unlock or protection off
   on record is counted in the figures and named under Didn't join, with no row and no record, where v2's recap gave
-  them a row with the moment; nobody joined shows only those figures. A row or a record for them is the owner's to
-  approve. **The tracks' contrast**, also the owner's to look at: the focused green (green-200) on the bare track
+  them a row with the moment; nobody joined shows only those figures. With the report page's Unlocks table gone, that
+  unlock's time and reason show nowhere in the portal after the bell (santa's round 1). A row or a record for them is
+  the owner's to approve. **The tracks' contrast**, also the owner's to look at: the focused green (green-200) on the bare track
   (stone-100) is under WCAG 1.4.11's 3:1, as the board draws it; each track's words (its label) and the Key carry what
   the colours say, and restyling the approved board is the owner's call.
 

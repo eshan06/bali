@@ -300,7 +300,10 @@ export function Recap({
                   </button>
                 </div>
                 {namesOpen ? (
-                  <p id={`${id}-names`} className="mt-3 max-w-[96ch] text-text-secondary">
+                  <p
+                    id={`${id}-names`}
+                    className="mt-3 max-w-[96ch] text-text-secondary wrap-anywhere"
+                  >
                     {wholeTime.map((s) => s.name).join(', ')}
                   </p>
                 ) : null}

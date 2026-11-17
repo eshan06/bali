@@ -47,6 +47,20 @@ describe('a student’s stretches (stretchesOf)', () => {
     expect(said(tapped).at(-1)).toBe('focused 14-55');
   });
 
+  it('keeps protection off through an unlock that arrives then, never softening it (the grid’s applyUnlock), unlocked once Screen Time is back on', () => {
+    const track = stretchesOf(
+      moments(['in', 6], ['off', 15], ['unlock', 20], ['on', 30]),
+      START,
+      END,
+    );
+    expect(said(track)).toEqual(['notin 5-6', 'focused 6-15', 'off 15-30', 'unlocked 30-55']);
+    expect(said(stretchesOf(moments(['in', 6], ['off', 15], ['unlock', 20]), START, END))).toEqual([
+      'notin 5-6',
+      'focused 6-15',
+      'off 15-55',
+    ]);
+  });
+
   it('keeps a silence until they check in again, or any moment their phone sent', () => {
     expect(said(stretchesOf(moments(['in', 5], ['silent', 20], ['back', 30]), START, END))).toEqual(
       ['focused 5-20', 'silent 20-30', 'focused 30-55'],

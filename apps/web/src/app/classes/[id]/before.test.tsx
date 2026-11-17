@@ -654,6 +654,9 @@ describe('a class after the bell, the day its session ended (LO7; ClassEnded, Cl
     expect(screen.queryByRole('link', { name: "This class's reports" })).toBeNull();
     expect(screen.queryByRole('form', { name: 'Session length' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Students' })).toBeNull();
+    // ClassEnded draws no Present, and no How it ended.
+    expect(screen.queryByRole('button', { name: 'Present' })).toBeNull();
+    expect(screen.queryByText(/How it ended/)).toBeNull();
     expect(screen.queryByText(/stayed focused the whole time\./)).toBeNull();
     // Who wasn't focused the whole time, who was, and who didn't join, from the roster.
     expect(screen.getByRole('button', { name: 'Marcus Bell' })).toBeTruthy();

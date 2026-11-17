@@ -882,7 +882,7 @@ export default function ClassDetailPage() {
   // Opened once the recap shows whole, its roster's who didn't join too (A3b).
   useCountOpened(
     'portal_recap_opened',
-    endedAt !== null && last.kind === 'ready' && roster !== null,
+    endedAt !== null && hasBlock !== null && last.kind === 'ready' && roster !== null,
   );
   // A read again of the class failed, or its roster didn't load: said under the header; or the
   // class didn't load, in the session's place. Held while a read of what it says is on its way,
