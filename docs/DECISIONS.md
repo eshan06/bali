@@ -47,7 +47,65 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
   **Tests:** driven (`live-grid.driven.test.tsx`, `classes/[id]/page.test.tsx`); the pins of the live part in
   `class-page.test.ts`, `present.test.ts`, `live-grid.test.ts`, `student-panel.test.ts`, `ask-panel.test.ts` and
-  `decks-panel.test.ts` are converted or gone with what they pinned; none leaves the source-text list whole (26 left).
+  `decks-panel.test.ts` are converted or gone with what they pinned; none leaves the source-text list whole (23 left,
+  LO3 having taken three off).
+
+- **2026-11-17** — **LO3, Home: one page for a teacher's classes, built from the lock-only canvas's Main, HomeIdle,
+  HomeStates, ClassFlows and PhonePages, its other moments drawn first on the canvas's new HomeMoments board (version
+  37); Classes' old address goes Home (the worker's calls and the conductor's, awaiting the owner's look, and
+  Check on's rarer rows the owner's; LO3, #605).**
+
+  **The page:** Classes and the date, with New class; a later read of the account that failed, said under the head
+  with Try again over what was read before; a well for each class live by this computer's clock to the server's
+  bell, in the account's order; while none runs, the last session over; then Your classes, or a new teacher's first
+  class well, beside Your block, under it on a phone. `/classes` answers `307` to `/` from the server, as LO1's
+  retired pages do, so New class lives on Home and nothing is reached by its address alone any more.
+
+  **A class live:** the class page's own grid (its snapshot, its live feed and its 15 s read, as v2's Home card was),
+  counted "24 of 28 focused", and Check on: everyone the grid shows who isn't focused, the count the board draws (28
+  − 24 = 4), a row per state in its tile's chip and words, Silent's by its minutes, the unlocks first, then
+  protection off, Silent, Not here, Left and Unknown. The boards draw Unlocked, Silent and Not here. **The rarer rows
+  (Protection off, Left, Left · unlocked or protection off, Unknown) are the owner's approval:** the conductor asked
+  on 2026-11-17, "Keep Home's extra Check on rows (protection off, left, unknown)?", Keep them the recommended answer,
+  and the owner replied "take your reccomended". So no student who needs checking drops off Home; the rows show only
+  what the room's tiles already show, by name, and HomeMoments draws them (version 47). Santa's first round had held
+  them back until the owner ruled, as CLAUDE.md holds anything new shown about a student. A name links to
+  `/classes/<id>?student=<id>`: the class page can open that student's record from it once LO6 (the student panel)
+  reads it; until then it opens the class's page. Everyone focused says LiveStates' "Everyone's focused."; a class
+  with nobody enrolled ClassStates' "No students yet.".
+  Loading, a read that failed, and the feed dropped (LiveStates' faded count, its line over it, a still dot where
+  LiveStates draws a spinner: nothing loops, DESIGN.md §7) are HomeMoments'. Two classes live: a well each. A
+  session that ends while Home is open loses its well and its row's Live at once.
+
+  **Last session:** its figures counted as the recap counts them (`recapGroups`), from the recap's own three reads
+  (`readSessionPage`: the report, the session's events and the roster, where v2's card read the report alone), so
+  Home and the recap never disagree: how many of those who joined stayed focused the whole time, the emergency
+  unlocks, and who didn't join. Nobody joined: the recap's line, the unlocks kept if any.
+
+  **Gone with v2's Home, no board drawing them:** the greeting, the date's "no class in session", Recent activity
+  and the latest unlock's line. The portal reads `GET /v1/me/activity` no more (ARCHITECTURE amended); the route
+  stays, additive-only; `lib/activity.ts` and `readReport` went with their callers.
+
+  **New class and Your block:** a class just made is titled by its name, as ClassFlows draws it, with Open the class
+  in Done's place; Escape closes it, focus on the class's row. Register another block opens the field under the
+  list, focus in it, and closes it again. The field is "Block code", the board's word and the owner's ("blocks that
+  already have codes"), so the two refusals that said "ID" now say "code".
+
+  **Home's failure line:** HomeStates' line where Bali couldn't be reached. Any other failure is named as what didn't
+  load first, today's words ("Couldn't load your classes."), since the API answers a 500 with "internal error", which
+  would otherwise stand alone (drawn on HomeMoments).
+
+  **Left for the conductor's tidy-up step at the phase's end** (the conductor's call): Home's title on a phone takes
+  LO4's `page-title-phone` (23/29 on PhonePages), one token for both lanes' titles, keeping 26/32 on a phone
+  meanwhile; `--color-ready`, v2's "is ready" check, has no user now; and `portal-bar.tsx` still says Classes is
+  marked on its old page "until LO3". TryAgain's button keeps v2's look (2 px more padding than lock.css's), as LO2
+  left it.
+
+  **Tests:** driven (Testing Library on jsdom). `app/home.test.ts`, `components/home.test.ts` and
+  `components/classes.test.ts` read source text and are converted, so 23 source-text tests are left with LO4's:
+  `app/page.test.tsx` (each account's page, the redeem's focus, the reads at a bell, the date at midnight, a tab
+  back in view, `/classes`), `components/home.test.tsx` (it absorbs `home.driven.test.tsx`), `blocks.test.tsx`, and
+  the days' words in `classes.test.ts`.
 
 - **2026-11-17** — **LO4, a class before it starts: the class page with no session running rebuilt from ClassPage; the
   start waits for a block; the last session's line, and v2's recap card the day a session ended until LO7; one PR (the

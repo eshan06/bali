@@ -1,7 +1,8 @@
 'use client';
 
 import type { ClassDetail } from '@bali/shared';
-import { Check, CircleCheck, Copy } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
+import Link from 'next/link';
 import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
 
 import { CLASS_NAME_MAX, type CreateAnswer, createClass } from '@/lib/classes';
@@ -9,10 +10,11 @@ import { CANT_COPY } from '@/lib/errors';
 import { newEventId } from '@/lib/event-id';
 import { useApi } from '@/lib/use-api';
 
-import { Button } from './button';
+import { LockButton, lockButton } from './button';
+import { CODE_WELL, DIALOG_LOCK } from './card';
 import { useCount } from './count';
 import { Field } from './field';
-import { CODE, DIALOG, useCopy } from './join-code';
+import { useCopy } from './join-code';
 import { TryAgain } from './try-again';
 
 /** How the page opens the dialog. */
@@ -20,22 +22,22 @@ export interface NewClassHandle {
   open: () => void;
 }
 
-/** The id a class's card on the list takes, so focus can go to a class just made. */
+/** The id a class's row in Your classes takes, so focus can go to a class just made. */
 export const cardId = (classId: string) => `class-${classId}`;
 
 /**
- * New class (ClassesNew), v2's dialog: the class's name and Create class, held until a name is
- * typed; Creating… holds the name, Cancel and Escape until Bali answers; a failure is said right
- * under the help, and Try again sends the name again, but after a final refusal, which no resend can
- * change (ClassesStates, drawn first): one button throughout (`TryAgain`'s `send`), so focus stays
- * on it whatever it comes to say. One create, one `eventId` (2026-10-23): minted at its first press
- * and sent again by every press while no answer has come, Try again's and one after the name was
- * changed alike, so a create that landed unanswered is answered with its class, never a second; a
- * class made, a refusal or the dialog closed lets it go. Every answer has the page read the list
+ * New class (ClassFlows), the lock-only look's dialog: the class's name and Create class, held until
+ * a name is typed; Creating… holds the name, Cancel and Escape until Bali answers; a failure is said
+ * right under the help, and Try again sends the name again, but after a final refusal, which no
+ * resend can change (HomeMoments, drawn first): one button throughout (`TryAgain`'s `send`), so focus
+ * stays on it whatever it comes to say. One create, one `eventId` (2026-10-23): minted at its first
+ * press and sent again by every press while no answer has come, Try again's and one after the name
+ * was changed alike, so a create that landed unanswered is answered with its class, never a second;
+ * a class made, a refusal or the dialog closed lets it go. Every answer has the page read the list
  * again (`onAnswer`), so a class made shows there whatever the dialog came to say. A class made
- * turns the dialog into ClassesCreated's, focus on its title: "<name> is ready", its join code, Copy
- * code (CopyStates) and Done. Closed after Done, focus goes to the class's card once the list holds
- * it, else back to what opened the dialog.
+ * turns the dialog into ClassFlows' "A class just made", focus on its title, the class's name: its
+ * join code in its well, Copy code (Copied, or how to copy it by hand) and Open the class. Closed by
+ * Escape, focus goes to the class's row once the list holds it, else back to what opened the dialog.
  */
 export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswer: () => void }) {
   const api = useApi();
@@ -93,7 +95,7 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
     } else setFailed(answer);
   }
 
-  /** Closed: by Cancel, Escape or Done. The next New class starts afresh, under a new eventId. */
+  /** Closed: by Cancel or Escape. The next New class starts afresh, under a new eventId. */
   function closed() {
     if (sending.current) return;
     if (made) document.getElementById(cardId(made.id))?.focus();
@@ -114,52 +116,46 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
         if (sending.current) e.preventDefault();
       }}
       onClose={closed}
-      className={made ? `${DIALOG} items-start` : DIALOG}
+      className={DIALOG_LOCK}
     >
       {made ? (
         <>
-          {/* The board's own style: its 40 px check at a 1.5 stroke (PV4b). */}
-          <CircleCheck size={40} aria-hidden="true" className="stroke-[1.5] text-ready" />
           <h2
             ref={title}
             id={`${id}-title`}
             tabIndex={-1}
-            className="text-dialog-title wrap-anywhere"
+            className="text-panel-title text-balance wrap-anywhere"
           >
-            {made.name} is ready
+            {made.name}
           </h2>
-          <p id={`${id}-line`} className="-mt-2 text-body text-text-secondary">
+          <p id={`${id}-line`} className="text-text-secondary">
             Put this join code on the board. Students join with it in the Bali app.
           </p>
-          <span translate="no" className={CODE}>
+          <span translate="no" className={`${CODE_WELL} self-start`}>
             {made.joinCode}
           </span>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <Button variant="secondary" onClick={() => void copyCode(made.joinCode)}>
+          {copy === 'failed' ? <p role="alert">{CANT_COPY}</p> : null}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <LockButton variant="secondary" onClick={() => void copyCode(made.joinCode)}>
               {copy === 'copied' ? (
                 <Check size={16} aria-hidden="true" />
               ) : (
                 <Copy size={16} aria-hidden="true" />
               )}
               {copy === 'copied' ? 'Copied' : 'Copy code'}
-            </Button>
+            </LockButton>
             {/* The button's own word changes too quietly for a screen reader: said here as well. */}
             <span role="status" className="sr-only">
               {copy === 'copied' ? 'Copied' : null}
             </span>
+            <Link href={`/classes/${made.id}`} className={lockButton('primary')}>
+              Open the class
+            </Link>
           </div>
-          {copy === 'failed' ? (
-            <p role="alert" className="text-body">
-              {CANT_COPY}
-            </p>
-          ) : null}
-          <Button onClick={() => dialog.current?.close()} className="w-full">
-            Done
-          </Button>
         </>
       ) : (
-        <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-4.5">
-          <h2 id={`${id}-title`} className="text-dialog-title">
+        <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-4">
+          <h2 id={`${id}-title`} className="text-panel-title">
             New class
           </h2>
           <div>
@@ -180,13 +176,13 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
               aria-describedby={failed ? `${id}-said` : undefined}
             />
             {failed ? (
-              <p id={`${id}-said`} role="alert" className="text-body text-pretty break-words">
+              <p id={`${id}-said`} role="alert" className="mt-2 text-pretty break-words">
                 {failed.message}
               </p>
             ) : null}
           </div>
-          <div className="flex flex-wrap justify-end gap-2.5">
-            <Button
+          <div className="flex flex-wrap justify-end gap-2">
+            <LockButton
               variant="secondary"
               aria-disabled={busy}
               onClick={() => {
@@ -194,7 +190,7 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
               }}
             >
               Cancel
-            </Button>
+            </LockButton>
             {/* One button throughout, so focus stays on it whatever it comes to say. */}
             <TryAgain
               type="submit"

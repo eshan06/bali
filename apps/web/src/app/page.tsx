@@ -11,22 +11,21 @@ import { getAccessToken } from '@/lib/auth';
 import { AFTER_BELL_MS, nextBell } from '@/lib/classes';
 
 /**
- * The home (decision 13), where the account belongs. A teacher's is v2's Home (PV17a; Main,
- * HomeIdle, HomeNew): the greeting and the date, each class once, the block's card, and a new
- * teacher's first class card, its Create a class to Classes' New class (#421). The account is the
- * shell's one read (`useMe`: the 13+ check, then `/v1/me`), which the side menu names too, read
- * again as the page opens; each answer is dated as it lands. By this computer's clock the greeting
- * and the date turn at noon, 5 PM and midnight, and a live class's chip goes at its bell, the
- * account read again just after it, as Classes reads it. A student who said 13+ in the app gets their
- * own home (W3; StudentHome); an account the 13+ check never passed, the invite page with its line
- * for students (Invite, PV15). Until the account answers, the shell says Loading… or its failure in
- * the page's place (PV5b); the page sits in the shell's frame beside the menu (PV5).
+ * The home (decision 13), where the account belongs. A teacher's is Home, one page for their classes
+ * (LO3; the lock-only canvas's Main and HomeIdle): the live classes, the last session, Your classes
+ * and Your block, and New class, which Classes' old address leads here to. The account is the shell's
+ * one read (`useMe`: the 13+ check, then `/v1/me`), which the top bar names too, read again as the
+ * page opens; each answer is dated as it lands. By this computer's clock the date turns at midnight,
+ * and a live class's row goes at its bell, the account read again just after it. A student who said
+ * 13+ in the app gets their own home (W3; StudentHome); an account the 13+ check never passed, the
+ * invite page with its line for students (Invite, PV15). Until the account answers, the shell says
+ * Loading… or its failure in the page's place (PV5b); the page sits under the shell's top bar (LO2).
  */
 export default function HomePage() {
   const router = useRouter();
   const { home, error, load, refresh } = useMe();
   const [now, setNow] = useState(() => Date.now());
-  // Set by a redeem (T2): the greeting takes focus once the account is read as a teacher.
+  // Set by a redeem (T2): Home's heading takes focus once the account is read as a teacher.
   const redeemed = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const classes = home?.kind === 'teacher' ? home.me.classes : null;
@@ -44,7 +43,7 @@ export default function HomePage() {
     load();
   }, [load, router]);
 
-  // The account teaches now (T2): who it is, read again, so Home shows, the side menu with it; no
+  // The account teaches now (T2): who it is, read again, so Home shows, the top bar with it; no
   // reload.
   const onTeacher = useCallback(() => {
     redeemed.current = true;
@@ -60,7 +59,7 @@ export default function HomePage() {
   // Each read's answer is dated as it lands: "today" stays today's after a Try again past midnight.
   useEffect(() => setNow(Date.now()), [home]);
 
-  // The next change by the clock alone: a bell, or the greeting's or the date's turn.
+  // The next change by the clock alone: a bell, or the date's turn at midnight.
   useEffect(() => {
     if (!teacher) return;
     const next = Math.min(bell ?? Infinity, nextTurn(now));

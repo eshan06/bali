@@ -28,9 +28,9 @@ Try again.", "Bali couldn't lock your apps. Try again."). In
 badges); `api-client.ts` (`UnauthorizedError`'s words; a `NetworkError` is
 said as `errors.ts`'s `CANT_REACH`, its own message a log line, D2c-2);
 `recap.ts` (the session's "9:05 AM to 9:30 AM"; PB5's timeline took its reasons
-and "No reason given" with it in PV14). `blocks.ts`, `classes.ts`, `reports.ts`, `invite.ts`, `decks.ts` and `activity.ts` hold
-none: their words are in `blocks.tsx`, Home (`home.tsx`, PV17a, its live card, PV17b, Recent activity, PV17c-1, and Last session, PV17c-2), Classes'
-cards (`classes.tsx`, PV16a) and New class's dialog (`new-class.tsx`, PV16b), the reports page, `invite-code.tsx`, `slides.tsx` and `errors.ts`. In
+and "No reason given" with it in PV14). `blocks.ts`, `classes.ts`, `reports.ts`, `invite.ts` and `decks.ts` hold
+none: their words are in `blocks.tsx`, Home (`home.tsx`, its live classes and Last session, and `classes.tsx`, Your classes'
+days, since LO3) and New class's dialog (`new-class.tsx`), the reports page, `invite-code.tsx`, `slides.tsx` and `errors.ts`. In
 `ios/Bali/` outside `UI/`: the NFC sheet's words in `BlockReader.swift`
 ("Hold the top of your iPhone to your teacher's Bali block.", "This isn't a
 Bali block.", "Bali block read.", "A scan is under way."); the `problem` a
@@ -96,7 +96,8 @@ pieces, so a teacher page rebuilt from it shows none whichever way the lessons
 switch is set (ARCHITECTURE, Web portal, decision 8); fitting them into its
 pages, to turn lessons back on, takes one design pass and one step. An
 intermediate state of one of its screens that no board draws is drawn on this
-canvas first, as below.
+canvas first, as below. Home is built from it since LO3 (2026-11-17), Classes'
+page folded into it, its other moments on HomeMoments (drawn first).
 
 **v2's canvas, the portal's approved design before the lock-only canvas** (the
 owner, 2026-10-12; `docs/DECISIONS.md`), and still the design of what that
