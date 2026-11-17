@@ -89,9 +89,9 @@ const PRESENT_PAGE = 'relative flex min-h-dvh flex-col gap-5.5 px-4 pt-9 pb-10 s
  * is drawn on the label for it. The pick is white and raised, in the primary ink, with a check, never
  * colour alone; another one greys on hover.
  */
-const TRACK = 'inline-flex flex-wrap gap-1 rounded-sm bg-border-default p-1';
+const TRACK = 'inline-flex flex-wrap gap-1 self-start rounded-sm bg-border-default p-1';
 const SEGMENT =
-  'relative inline-flex h-8.5 cursor-pointer items-center gap-1.5 rounded-item px-3 text-segment whitespace-nowrap text-text-secondary transition-colors select-none [&:not(:has(:checked))]:hover:bg-border-strong has-checked:bg-surface-card has-checked:text-text-primary has-checked:shadow-1 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring';
+  'relative inline-flex h-8.5 cursor-pointer items-center gap-1.5 rounded-item px-3 text-segment max-[760px]:px-2.5 whitespace-nowrap text-text-secondary transition-colors select-none [&:not(:has(:checked))]:hover:bg-border-strong has-checked:bg-surface-card has-checked:text-text-primary has-checked:shadow-1 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring';
 
 /** A well before class (ClassPage's `.ready`): 24 px in, 20 on a phone, its parts on one row as they fit. */
 const READY = `${WELL} flex flex-wrap items-center justify-between gap-x-8 gap-y-5 p-6 max-[760px]:p-5`;
@@ -1074,11 +1074,12 @@ export default function ClassDetailPage() {
           >
             {klass?.name ?? '…'}
           </h1>
-          {/* Its line's place held while the roster is read, so nothing under it moves. */}
+          {/* Its line's place held while the class and its roster are read, so nothing under it
+              moves. */}
           <p className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-meta text-text-secondary">
-            {roster ? <span>{students(roster.students.length)}</span> : null}
+            {klass && roster ? <span>{students(roster.students.length)}</span> : null}
             {endedAt ? <span>Ended at {endedAt}</span> : null}
-            {roster || endedAt ? null : <>&nbsp;</>}
+            {(klass && roster) || endedAt ? null : <>&nbsp;</>}
           </p>
         </div>
         <Link href={`/reports?class=${encodeURIComponent(classId)}`} className={QUIET}>
