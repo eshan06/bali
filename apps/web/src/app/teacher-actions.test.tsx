@@ -530,7 +530,7 @@ describe('a class’s Start, extend and End (portal_session_started, _extended, 
 });
 
 describe('Present and the recap (portal_present_opened, portal_recap_opened)', () => {
-  const present = () => screen.getByRole('button', { name: 'Present' });
+  const present = () => screen.getByRole('button', { name: /^(Exit )?Present$/ });
 
   it('counts Present once each time it opens, never as it redraws', async () => {
     const user = await classPage(true);

@@ -177,6 +177,17 @@ const LOCK_SIZES: Record<string, [string, string, number, string?]> = {
   'log-time': ['13px', '20px', 400],
   // Reports' share of class time spent focused, at every width (LO8).
   share: ['56px', '56px', 600, '-0.035em'],
+  // Present's (LO9): the class's name, the time left and the line under it, the count and its
+  // words, a tile's name and state one size up, and the join line with its code.
+  'present-name': ['30px', '36px', 600, '-0.01em'],
+  'present-clock': ['64px', '64px', 600, '-0.03em'],
+  'present-until': ['20px', '26px', 400],
+  'present-count': ['88px', '88px', 600, '-0.04em'],
+  'present-count-of': ['30px', '38px', 500],
+  'present-room-name': ['18px', '23px', 600],
+  'present-room-state': ['15px', '20px', 500],
+  'present-join': ['22px', '30px', 400],
+  'code-join': ['26px', '30px', 500, '0.06em'],
 };
 /** The sizes §1 lists that the scale has, each its style: [style, size, line height]. */
 const ON_SCALE = [
@@ -428,12 +439,13 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
         line,
       ]);
     }
-    // A Present tile's two sizes are the live grid's alone (PV8), the header's its own (PV9).
+    // A Present tile's two sizes are the live grid's alone (LO9; v2's, PV8, used by no page since,
+    // left for the phase's tidy-up).
     const src = fileURLToPath(new URL('../', import.meta.url));
     const present = sources(src).filter(
       (file) =>
         file.endsWith('.tsx') &&
-        /\btext-present-tile-(?:name|state)\b/.test(readFileSync(file, 'utf8')),
+        /\btext-present-room-(?:name|state)\b/.test(readFileSync(file, 'utf8')),
     );
     expect(present.map((file) => relative(src, file))).toEqual([
       join('components', 'live-grid.tsx'),
@@ -774,7 +786,7 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     const filled = Object.fromEntries(
       files.filter((file) => bare(file) > 0).map((file) => [relative(src, file), bare(file)]),
     );
-    // The stale banner, and v2's on the class page: the length
+    // v2's on the class page: the length
     // picker's track and the join code's chip; the recap's track and its Key's Not here (LO7, as
     // lock.css's `.track` and `.sw.k-notin` draw them, where v2's dots and name pills were); v2's
     // table head (PV13), which a session's report kept until LO7, and Reports' bars' tracks (LO8,
@@ -791,7 +803,6 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       [join('app', 'support', 'page.tsx')]: 1,
       [join('components', 'card.ts')]: 2,
       [join('components', 'join-code.tsx')]: 1,
-      [join('components', 'live-grid.tsx')]: 1,
       [join('components', 'present-question.tsx')]: 2,
       [join('components', 'question-card.tsx')]: 2,
       [join('components', 'reports-list.tsx')]: 2,

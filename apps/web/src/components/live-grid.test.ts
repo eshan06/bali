@@ -1,4 +1,4 @@
-import { STREAM_HEARTBEAT_MS, type UnlockReason } from '@bali/shared';
+import { STREAM_HEARTBEAT_MS } from '@bali/shared';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -6,16 +6,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { staleness, staleWords, type Student } from '../lib/grid-state';
+import { staleness, staleWords } from '../lib/grid-state';
 import {
   FIRST_CONNECT_MS,
   type GridNow,
   healthOf,
   LiveGrid,
-  PRESENT_COLUMNS,
+  PRESENT_ROOM,
   ROOM,
   stateCounts,
-  Tile,
 } from './live-grid';
 
 // The grid's sign-out routes to /login; its first render needs no router beyond this.
@@ -24,134 +23,11 @@ vi.mock('next/navigation', () => ({
 }));
 
 /*
- * A student's tile in Present (ClassPresent), v2's until LO9, rendered: tinted in its state, every
- * one the same size, the state's icon, the name, the state's words and one line, "last seen" or a
- * protection off's unlock, never the reason or Clock off. The room's tiles on the class page, the
- * lock-only look's since LO5, and that Present never says the reason or Clock off are driven in
+ * The live grid's columns, its stream's health and what it hands Home's card, rendered or read from
+ * its source. Its tiles, on the class page (LO5) and in Present (LO9), are driven in
  * `live-grid.driven.test.tsx`.
  */
-const NOW = new Date('2026-10-07T14:30:00.000Z');
-const ago = (s: number) => new Date(NOW.getTime() - s * 1000);
-
-function student(over: Partial<Student> = {}): Student {
-  return {
-    studentId: 'u1',
-    displayName: 'Jaylen Brooks',
-    state: 'focused',
-    joinedAt: ago(1200),
-    lastSeenAt: ago(10),
-    endedAt: null,
-    unlock: null,
-    clockOff: false,
-    ...over,
-  };
-}
-const unlocked = (reason: UnlockReason | null) => ({ eventId: 'v1', reason, at: ago(60) });
-
-const render = (s: Student, pulse = false) =>
-  renderToStaticMarkup(createElement(Tile, { student: s, now: NOW, present: true, pulse }));
 const source = readFileSync(fileURLToPath(new URL('./live-grid.tsx', import.meta.url)), 'utf8');
-
-/**
- * Markup as read: each tag read as a space (never removed outright, so no tag can form from what
- * is left), and each run of spaces, no-break ones included, as one.
- */
-const text = (html: string) =>
-  html
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-/** The tile's parts: its classes, its words' three spans (name, state, line) and its icons' sizes. */
-function parts(html: string) {
-  const tile = /<li class="flex min-w-0"><div class="([^"]*)"/.exec(html)?.[1]?.split(' ') ?? [];
-  const words = /<span class="flex min-w-0 flex-col">([^]*)<\/span><\/div><\/li>$/.exec(html)?.[1];
-  const spans = [
-    ...(words ?? '').matchAll(
-      /<span class="(block truncate[^"]*)">([^]*?)<\/span>(?=<span class="block truncate|$)/g,
-    ),
-  ];
-  const [name, state, line] = spans.map((m) => ({
-    classes: m[1]?.split(' ') ?? [],
-    html: m[2] ?? '',
-    words: text(m[2] ?? ''),
-  }));
-  const icons = [...html.matchAll(/<svg[^>]*\swidth="(\d+)"[^>]*class="([^"]*)"/g)].map((m) => ({
-    size: Number(m[1]),
-    classes: m[2]?.split(' ') ?? [],
-  }));
-  return { tile, name, state, line, icons };
-}
-
-describe('a tile in Present (ClassPresent), v2’s until LO9', () => {
-  it('says the state and one line, "last seen" or a protection off’s unlock, never the reason or Clock off', () => {
-    const tiles: [Partial<Student>, string, string | undefined][] = [
-      [{}, 'Focused', undefined],
-      [
-        { state: 'unlocked', unlock: unlocked('bathroom'), lastSeenAt: ago(330) },
-        'Unlocked',
-        'last seen 5 min ago',
-      ],
-      [
-        { state: 'protection_off', unlock: unlocked('nurse'), lastSeenAt: ago(330) },
-        'Protection off',
-        'Unlocked · last seen 5 min ago',
-      ],
-      [{ lastSeenAt: ago(330) }, 'Silent · 5 min', undefined],
-      [{ endedAt: ago(60) }, 'Left', undefined],
-      [
-        { state: 'unlocked', unlock: unlocked('other'), endedAt: ago(60) },
-        'Left · unlocked',
-        undefined,
-      ],
-      [{ state: null }, 'Not here', undefined],
-      [{ state: 'mystery' as Student['state'] }, 'Unknown · refresh', undefined],
-      [{ clockOff: true }, 'Focused', undefined],
-    ];
-    for (const [over, state, line] of tiles) {
-      const tile = parts(render(student(over)));
-      expect(tile.name?.words, state).toBe('Jaylen Brooks');
-      expect(tile.state?.words, state).toBe(state);
-      expect(tile.line?.words, state).toBe(line);
-    }
-  });
-
-  it('is one size up, as ClassPresent draws it: 100 px tall, 12 × 18 px in, a 24 px icon', () => {
-    const tile = parts(
-      render(student({ state: 'unlocked', unlock: unlocked('bathroom'), lastSeenAt: ago(330) })),
-    );
-    expect(tile.tile).toEqual(
-      expect.arrayContaining([
-        'grid',
-        'h-25',
-        'grid-cols-[24px_minmax(0,1fr)]',
-        'gap-x-3',
-        'px-4.5',
-        'py-3',
-        'rounded-md',
-        'border-[1.5px]',
-      ]),
-    );
-    expect(tile.icons).toEqual([
-      { size: 24, classes: expect.arrayContaining(['mt-px']) as unknown },
-    ]);
-    expect(tile.name?.classes).toContain('text-present-tile-name');
-    expect(tile.state?.classes).toContain('text-present-tile-state');
-    expect(tile.line?.classes).toEqual(expect.arrayContaining(['text-body', 'font-medium']));
-    // A Left state's flag at 16 px, before its words, the state's own icon at the side.
-    const left = parts(render(student({ state: 'protection_off', endedAt: ago(60) })));
-    expect(left.icons.map((icon) => icon.size)).toEqual([24, 16]);
-    expect(left.state?.html).toMatch(/Left\u00a0· protection off$/);
-  });
-
-  it('pulses the whole tile (bali-softpulse) when the stream brings its unlock', () => {
-    const html = (pulse: boolean) =>
-      render(student({ state: 'unlocked', unlock: unlocked('nurse') }), pulse);
-    expect(html(true)).toMatch(
-      /^<li class="flex min-w-0"><div class="[^"]*\brelative\b[^"]*"><span aria-hidden="true" class="pointer-events-none absolute -inset-\[1\.5px\] animate-softpulse rounded-md"><\/span><svg/,
-    );
-    expect(html(false)).not.toContain('animate-softpulse');
-  });
-});
 
 describe('the room’s columns', () => {
   it('fits as many tiles as the room holds, each at least 178 px, 8 px apart; two on a phone (LO5)', () => {
@@ -162,13 +38,19 @@ describe('the room’s columns', () => {
     ]);
   });
 
-  it('keeps Present’s four from a 56 rem grid, 12 px apart, so a 1024 px projector still shows four', () => {
-    expect(PRESENT_COLUMNS.split(' ')).toEqual([
-      'grid-cols-2',
-      'gap-3',
-      '@2xl:grid-cols-3',
-      '@4xl:grid-cols-4',
+  it('fits fewer in Present as it narrows, never smaller type: each at least 200 px and 16 %, so six at most; two on a phone (LO9)', () => {
+    expect(PRESENT_ROOM.split(' ')).toEqual([
+      'grid-cols-[repeat(auto-fill,minmax(max(200px,16%),1fr))]',
+      'gap-2',
+      'max-[760px]:grid-cols-2',
     ]);
+    // Six at 1,440 px, as Present draws it, and at 1,920; five at 1,280; four on a 1,024 px
+    // projector: the page is 48 px in on each side, the tiles 8 px apart.
+    const columns = (width: number) => {
+      const room = width - 2 * 48;
+      return Math.floor((room + 8) / (Math.max(200, 0.16 * room) + 8));
+    };
+    expect([1920, 1440, 1366, 1280, 1024].map(columns)).toEqual([6, 6, 6, 5, 4]);
   });
 });
 
@@ -237,7 +119,7 @@ describe('the grid handed to Home’s live card (PV17b)', () => {
   it('runs every hook first, so the snapshot, the stream and the 15 s read are the class page’s own', () => {
     const at = source.indexOf('if (card) return card(');
     expect(at).toBeGreaterThan(-1);
-    expect(at).toBeLessThan(source.indexOf('if (error) {'));
+    expect(at).toBeLessThan(source.indexOf('const waiting ='));
     expect(source.slice(at)).not.toMatch(/\buse[A-Z]\w*\(/);
     // A boot that failed is read again by the grid's own Try again, held while it reads; once
     // over, no health to say.
@@ -279,30 +161,18 @@ describe('the grid counted for the class page (PV7)', () => {
 // A lost stream's pill and a quiet one's line, said as a status (DR-05), are driven in
 // `live-grid.driven.test.tsx`.
 describe('the grid’s lines on the class page while a session runs (PV7)', () => {
-  it('gives its tiles’ place to Present’s question, its stream and its own lines kept (L7, part 2)', () => {
-    // Off, no tile and no loading line; a boot that failed still says so with Try again, and the
-    // grid's health is said alone, so a lost stream is still the pill over the question.
-    expect(source).toMatch(/tiles = true,/);
-    expect(source).toMatch(
-      /if \(!tiles\) return health;\s*const rows = Object\.values\(students\);/,
-    );
-    const error = source.indexOf('if (error) {');
-    expect(error).toBeGreaterThan(-1);
-    expect(error).toBeLessThan(source.indexOf('if (!tiles) return health;'));
-    // Every hook runs before either return, so the stream and the counts go on underneath.
-    expect(source.slice(source.indexOf('if (error) {'))).not.toMatch(/\buse[A-Z]\w*\(/);
-  });
-
-  it('draws no tile and no loading line while the question has its place, and both otherwise', () => {
-    const before = (tiles: boolean, present = false) =>
-      renderToStaticMarkup(createElement(LiveGrid, { sessionId: 's1', tiles, present }));
-    expect(before(false, true)).toBe('');
-    // The class page's room says its session is being read (LiveTopStates); Present, its grid.
-    expect(before(true)).toBe(
-      '<p role="status" class="text-body text-text-secondary">Loading this session…</p>',
-    );
-    expect(before(true, true)).toBe(
-      '<p role="status" class="text-body text-text-secondary">Loading grid…</p>',
+  it('says its session is being read until it is, on the class page and in Present', () => {
+    const before = (present: boolean) =>
+      renderToStaticMarkup(createElement(LiveGrid, { sessionId: 's1', present }));
+    const loading =
+      '<p role="status" class="text-body text-text-secondary">Loading this session…</p>';
+    // The class page's room says so in the count's place (LiveTopStates); Present in the room's,
+    // under its band, which holds its time (PresentStates).
+    expect(before(false)).toBe(loading);
+    expect(before(true)).toMatch(
+      new RegExp(
+        `^<div class="[^"]*\\bborder-b border-border-strong pb-6\\b[^"]*"></div>${loading}$`,
+      ),
     );
   });
 
