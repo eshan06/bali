@@ -11,10 +11,11 @@ import type { Database } from './types.js';
 
 /*
  * Class and block administration — the teacher-facing writes that create and
- * rename classes and register NFC tags. These deliberately sit BESIDE the
- * transition engine, not inside it: they never touch `participations` or
- * `events`, so they need none of the engine's session locking or event
- * bookkeeping. The engine stays the sole writer of those two tables.
+ * rename classes and register and remove NFC tags. These deliberately sit
+ * BESIDE the transition engine, not inside it: they never touch
+ * `participations` or `events`, so they need none of the engine's session
+ * locking or event bookkeeping. The engine stays the sole writer of those two
+ * tables.
  */
 
 type ClassRow = typeof classes.$inferSelect;
@@ -197,6 +198,13 @@ export type CreateBlockResult =
   | { outcome: 'tag_taken' };
 
 /**
+ * A registration's tries at a tag (`registerBlock`): another is needed only when the block its
+ * insert met was removed before its read, so a third means two blocks of the tag registered and
+ * removed inside one registration. Bounded so a broken database can never spin here forever.
+ */
+const REGISTER_ATTEMPTS = 3;
+
+/**
  * Register a physical NFC tag to a teacher. One active block owns a tag at a
  * time (a tag can be re-registered only after its block is soft-removed), so a
  * tag held by ANOTHER teacher's live block returns `tag_taken` for the route to
@@ -211,6 +219,11 @@ export type CreateBlockResult =
  * running session rather than refusing a duplicate start. On `/v1` that is a
  * 409 -> 200, ruled in by the owner on 2026-09-22 (ARCHITECTURE, API decision
  * 2: a wrong answer may be corrected in place).
+ *
+ * A removed block's tag is free (`removeBlock`): registered again, by its
+ * teacher or anyone, it is a new block, never the removed one back. One
+ * meeting the removal of the tag's block under way waits it out, then
+ * registers (`registerBlock`).
  */
 export async function createBlock(
   db: Database,
@@ -226,28 +239,96 @@ async function registerBlock(
   db: Database,
   input: { teacherId: string; tagId: string },
 ): Promise<CreateBlockResult> {
-  const [row] = await db
-    .insert(blocks)
-    .values({ tagId: input.tagId, teacherId: input.teacherId })
-    .onConflictDoNothing({ target: blocks.tagId, where: sql`${blocks.removedAt} is null` })
-    .returning();
-  if (row) return { outcome: 'registered', block: row };
+  for (let attempt = 0; attempt < REGISTER_ATTEMPTS; attempt += 1) {
+    const [row] = await db
+      .insert(blocks)
+      .values({ tagId: input.tagId, teacherId: input.teacherId })
+      .onConflictDoNothing({ target: blocks.tagId, where: sql`${blocks.removedAt} is null` })
+      .returning();
+    if (row) return { outcome: 'registered', block: row };
 
-  // Read the block that won the tag. Not the caller's: the tag really is
-  // taken. Nothing at all: the winner was soft-removed between the insert and
-  // this read, so the tag is free again and `tag_taken` is briefly false —
-  // unreachable today, since nothing outside tests writes `blocks.removed_at`,
-  // and settled with the endpoint that removes blocks, next to the
-  // block-reassignment follow-up PLAN.md already records.
-  const [existing] = await db
-    .select()
-    .from(blocks)
-    .where(and(eq(blocks.tagId, input.tagId), isNull(blocks.removedAt)))
-    .limit(1);
-  if (existing && existing.teacherId === input.teacherId) {
-    return { outcome: 'already_registered', block: existing };
+    // Read the block that holds the tag, FOR SHARE: a removal under way holds
+    // its row FOR UPDATE (`removeBlock`), so this waits it out, and none can
+    // start before this answer commits, so the answer stays true until then.
+    // The caller's: theirs again. Another teacher's: the tag really is taken.
+    // None: the block the insert met was removed since, its tag free again
+    // (LO10b; the owner's "Free the code", 2026-11-17), so the insert goes again.
+    const [holder] = await db
+      .select()
+      .from(blocks)
+      .where(and(eq(blocks.tagId, input.tagId), isNull(blocks.removedAt)))
+      .limit(1)
+      .for('share');
+    if (holder) {
+      return holder.teacherId === input.teacherId
+        ? { outcome: 'already_registered', block: holder }
+        : { outcome: 'tag_taken' };
+    }
   }
-  return { outcome: 'tag_taken' };
+  throw new Error('createBlock: the tag was registered and removed again at every try');
+}
+
+/** The block with this id, live or removed, whoever's: none when no block has it. A read. */
+export async function findBlock(db: Database, blockId: string): Promise<BlockRow | undefined> {
+  const [row] = await db.select().from(blocks).where(eq(blocks.id, blockId)).limit(1);
+  return row;
+}
+
+/**
+ * A removal's answer: the block as it is now, `removed` by this call, or a `replay`, removed
+ * already and nothing written; or none with that id.
+ */
+export type RemoveBlockResult =
+  { outcome: 'removed' | 'replay'; block: BlockRow } | { outcome: 'block_not_found' };
+
+/**
+ * A teacher removes one of their own blocks, a lost one (LO10b): marked removed,
+ * never deleted (data-model decision 3), which frees its tag for anyone to
+ * register again, as `blocks_tag_active_unique` (live rows only) allows (the
+ * owner's "Free the code", 2026-11-17). Its row alone, FOR UPDATE, then its
+ * write: so it waits out its own resend, and a registration reading the tag's
+ * holder (`registerBlock`, FOR SHARE) waits it out in turn.
+ *
+ * Idempotent on `eventId` (rule 4): a block removed already is a `replay`,
+ * answered as it is, whatever removed it (this removal's resend, sent in any
+ * case, or another), and nothing is written. The id another block's removal
+ * holds is EVENT_ID_CONFLICT, as a class's create refuses one another class
+ * holds: its column's unique constraint refuses it, two removals racing under
+ * one id included, since a writer beside the engine checks only its own table
+ * (the owner's ruling on #317).
+ *
+ * Nothing else is touched, and nothing needs to be. A session is its class's,
+ * never its block's, so one of the teacher's running runs on to its bell, its
+ * students' check-ins, unlocks and returns naming the session. A tap waiting
+ * for the teacher's Start (decision 5: student and teacher) still waits for
+ * it. And the retry of a tap made at the block is still that tap's retry (tap
+ * step 9, `retryAtRemovedBlock`): only a new tap at the tag finds no block.
+ */
+export async function removeBlock(
+  db: Database,
+  input: { blockId: string; eventId: string; now?: Date },
+): Promise<RemoveBlockResult> {
+  try {
+    return await db.transaction(async (tx): Promise<RemoveBlockResult> => {
+      const [block] = await tx
+        .select()
+        .from(blocks)
+        .where(eq(blocks.id, input.blockId))
+        .for('update');
+      if (!block) return { outcome: 'block_not_found' };
+      if (block.removedAt) return { outcome: 'replay', block };
+      const [removed] = await tx
+        .update(blocks)
+        .set({ removedAt: input.now ?? new Date(), removedEventId: input.eventId })
+        .where(eq(blocks.id, block.id))
+        .returning();
+      return { outcome: 'removed', block: removed! };
+    });
+  } catch (err) {
+    // The one unique key this write can meet: the id another block's removal holds.
+    if (!isUniqueViolation(err)) throw err;
+    throw new TransitionError('EVENT_ID_CONFLICT', 'event_id already used by another removal');
+  }
 }
 
 /**

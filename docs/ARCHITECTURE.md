@@ -92,7 +92,7 @@ never stored here, no screen can ever show it.
 - `schools` — one row per school, so users and classes can be grouped under one, with the
   day its data agreement was signed (none on record: no teacher invite is minted for it).
 - `blocks` — one row per physical Bali block: the ID its NFC tag broadcasts, and which
-  teacher owns it.
+  teacher owns it; once its teacher removes it, the removal's `event_id` (LO10b).
 - `classes` — one row per class. Each class belongs to a teacher and a school.
 - `enrollments` — one row saying "this student is in this class." (Connecting students to
   classes needs its own table because a student has many classes and a class has many
@@ -744,9 +744,20 @@ Teacher app and web portal:
   class_not_found`.
 - `POST /v1/blocks` — register a physical block to a teacher. A tag another teacher's live
   block holds is a `409`; re-registering one's own tag returns that block (the retry of a
-  lost response).
+  lost response). A removed block's tag is free: registered again, by its teacher or anyone, it
+  is a new block, and a registration meeting that removal under way waits it out (LO10b).
 - `GET /v1/blocks` — the caller's own live blocks, oldest first (P3): never another teacher's,
   never a soft-removed one. A student is `403`.
+- `DELETE /v1/blocks/{id}` — a teacher removes one of their own blocks, a lost one (added
+  2026-11-17, LO10b, additive): marked removed (data-model decision 3), its tag free from then on
+  for anyone to register again (the owner's "Free the code"; tap step 9 answers a retry across the
+  move). `{ eventId }`, a UUIDv7, kept on the block's row: a block removed already is answered
+  `replay` with the block as it is, whatever removed it, and nothing is written; the id another
+  block's removal holds is `409 event_id_conflict`. Another teacher's block, removed or not, and
+  a student are `403`; no block with the id, `404`. A session of the teacher's running is no
+  refusal: a session is its class's, never its block's, so it runs on to its bell, its students'
+  calls naming it, and only a new tap at the tag finds no block. A tap waiting for the teacher's
+  Start still waits for it.
 
 Live lesson (Phase 7, planned 2026-10-05): the question, answer, results, presentation, deck
 and slide routes are listed in "Live lesson (Phase 7)", decision 6.
@@ -2008,8 +2019,8 @@ and keeps everything that enforces focus.
   `eventId` that any `responses` or `saved_questions` row holds, as the answers route already
   checks `events` (L1, L3b). The writers beside the engine, `PUT /v1/me/age-check`, `PUT` and
   `DELETE /v1/me/push-token`, `POST /v1/teacher-invites/redeem` and, since 2026-10-23, `POST
-  /v1/classes`, check only their own table: a UUIDv7 minted fresh never collides (narrowed
-  2026-10-12, the owner's ruling on #317).
+  /v1/classes`, and since 2026-11-17 `DELETE /v1/blocks/{id}` (LO10b), check only their own
+  table: a UUIDv7 minted fresh never collides (narrowed 2026-10-12, the owner's ruling on #317).
 - The guard wherever counts are read: one guarded count that the results route, the recap and
   any report read (L3, L3c, L7c).
 - The portal checks a deck's `sha256` as the phone does, refusing a mismatch, for the presenter
