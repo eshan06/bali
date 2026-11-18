@@ -80,11 +80,6 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   a stuck slide upload stops (#436; DECISIONS 2026-10-22), and the owner's follow-up fixes of
   2026-10-16 (#426–#433; DECISIONS 2026-10-16, 2026-10-22).
 
-- **The "class started" push (N1–N6, decided 2026-10-06)** ✅: the backend half (N4–N6) and the
-  app half (#456; DECISIONS 2026-10-24), N6's end-to-end check passed on prod at the sitting
-  (2026-11-08); left, dev's step 4 (Open owner items), and Android's sender, AN11b. Its line in
-  full: `docs/PLAN-ARCHIVE.md`.
-
 - **Deleted accounts' Cognito sign-ins (C3-cognito, 2026-10-09):** the server queues and deletes
   them; until the owner's runbook 9 sets each environment's key, dev and prod only queue (the
   boot log says `Cognito sign-in deletion is off`), and the phone's own DeleteUser still deletes
@@ -193,7 +188,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO10b** API: remove a lost block, its code freed for anyone to register again (the owner's "Free the code", 2026-11-17; #612's second PR, which closes it; after LO10a) — ✅ (#626; DECISIONS 2026-11-17); `DELETE /v1/blocks/{id}`, a session running no refusal; for LO11, removing a removed block is a `replay`, never a 404
 
-- **LO11** 👀 Home: Remove a lost block (#613; lane A; after LO3 and LO10)
+- **LO11** 👀 Home: Remove a lost block (#613; lane A; after LO3 and LO10) — ✅ (#628; DECISIONS 2026-11-17); its in-between states on the canvas's RemoveBlockStates (version 64), the confirm in ClassFlows' words; for the phase's last steps, Phase 7's finished step lines and four other finished lines moved to the archive; for the phase's end: the pilot block's old code retired by Remove, no owner command (the header line, Before the pilot's item 3, Open owner items, `docs/PILOT.md`'s step 6)
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 
@@ -211,62 +206,21 @@ W3–W5; approved 2026-10-12). **Status:** every build step is done; the exit ch
 the owner's; the portal's pieces go behind the lessons switch in LO1 (2026-11-16). The intro as it
 stood until LO0: `docs/PLAN-ARCHIVE.md`.
 
+**Done:** L0–L8, M0–M9, and W1–W5 with W4's follow-up, and the open design questions settled
+(2026-10-10): their lines as PLAN.md held them until LO11, and each step's full notes, in
+`docs/PLAN-ARCHIVE.md`. Left on them for the owner: L8's battery half hour, and M8's tap on a deck's
+link and second iPhone (Before the pilot, item 2); W3's student pages named in the privacy policy
+(C2's words); and W4's same check with a real iPhone (📱).
+
 Slice 1 — live questions:
-- **L0** The plan (docs) — ✅ (#230; DECISIONS 2026-10-05)
 - **L0b** 🔧 **Before the Vanderbilt pilot** ("Before the pilot", item 7; the owner, 2026-11-05): the owner turns production backups on before the pilot's first class, holding back no screen: Railway's Pro plan (runbook 1, step 4), or the nightly `pg_dump` to encrypted S3 that is built ready to enable (Open owner items) — validation: runbook 4's restore drill; its full line, with the rulings before it, in `docs/PLAN-ARCHIVE.md`
-- **L1** Database and engine: questions and answers — ✅ (#310; no DECISIONS entry of its own)
-- **L2** Privacy plumbing for answers and questions — ✅ (#311; DECISIONS 2026-10-11)
-- **L3** Teacher API — ✅ as L3a and L3r
-- **L3a** Open and close — ✅ (#312; DECISIONS 2026-10-11)
-- **L3r** Results through one guarded count, `questionCounts` (for L3c, L7c) — ✅ (#314, amended by #341; DECISIONS 2026-10-12)
-- **L3b** Saved questions — ✅ as L3b1 and L3b2
-- **L3b1** Their data, engine and privacy paths — ✅ (#316; DECISIONS 2026-10-11)
-- **L3b2** Their routes (for L7b) — ✅ (#318; DECISIONS 2026-10-11)
-- **L3c** A session's questions for its report (for L7c) — ✅ (#391; DECISIONS 2026-10-15)
-- **L4** Student API — ✅ as L4a and L4b
-- **L4a** The poll and the answer — ✅ (#320; DECISIONS 2026-10-11)
-- **L4b** The demo's question and the load gate's polling classes — ✅ (#321; DECISIONS 2026-10-11)
-- **L5** BaliCore's poll and answer, `LiveLesson` (for L8) — ✅ (#330; DECISIONS 2026-10-12)
-- **L6** Portal logic, `lib/live-question.ts` (for L7) — ✅ (#332; DECISIONS 2026-10-12)
-- **L7** 👀 Portal UI to v2's canvas: the class page's question and Present's — ✅ as L7-1a (#389), L7-1b (#390), L7-2 (#402) and L7-3, Close and Done on Present, Done in every window of the browser (#405); DECISIONS 2026-10-15
-- **L7b** 👀 Portal saved questions to v2's canvas — ✅ as part 1a (#393), part 1b (#394), part 1c (#395) and part 2, the panel's drafts (#411); DECISIONS 2026-10-15, 2026-10-16
-- **L7c** 👀 A session's Questions to v2's canvas — ✅ (#412; DECISIONS 2026-10-16)
-- **L8** 👀📱 iOS answer card to the app canvas — ✅ as L8a (#443), L8b (#448, #450) and L8c (#451); DECISIONS 2026-10-23; its 📱 device check passed on prod (2026-11-08) but for the battery's half hour (`ios/README.md`'s sitting, Part 2, step 6), not run
 - **L9** 📱 Exit check: a real class on prod asks and answers, the recap and the stream show the lifecycle, no screen names an answer — passed with one student on prod (2026-11-08); a class of several, the pilot's own, is the full check
 
 Slice 2 — slides:
-- **M0** 🔧 The owner: an S3 bucket per environment — ✅ (2026-10-12; DECISIONS 2026-10-12)
-- **M1** The storage interface, `DeckStorage` — ✅ (#308; DECISIONS 2026-10-10)
-- **M2** Deck endpoints — ✅ as M2a and M2b
-- **M2a** The table and the teacher's routes — ✅ (#323; DECISIONS 2026-10-11)
-- **M2b** The check — ✅ as M2b1 and M2b2
-- **M2b1** Complete and the check — ✅ (#324; DECISIONS 2026-10-11)
-- **M2b2** The 5-minute rule and the deck sweep — ✅ (#325; DECISIONS 2026-10-11)
-- **M3** Slide state — ✅ as M3a and M3b
-- **M3a** The slide change — ✅ (#327; DECISIONS 2026-10-12)
-- **M3b** The poll's slide and a deck's download (for M6) — ✅ (#328; DECISIONS 2026-10-12)
-- **M4** Decks in the privacy paths — ✅ (#329; DECISIONS 2026-10-12)
-- **M5** 👀 The slides page and upload — ✅ as M5a (#396), M5b part 1 (#397) and M5b part 2 (#400); DECISIONS 2026-10-15
-- **M6** 👀 Portal presenter to v2's canvas — ✅ as part 1 (#413), 2a (#414), 2b-1 (#415), 2b-2 (#416), 2c (#417) and 2d (#418); DECISIONS 2026-10-16; the panel line back (#457; DECISIONS 2026-10-24)
-- **M7** BaliCore's deck download and cache (for M8) — ✅ (#331; DECISIONS 2026-10-12)
-- **M8** 👀📱 iOS slide view to the app canvas — ✅ (#452; DECISIONS 2026-10-24); its 📱 device check passed on prod (2026-11-08) but for a tap on a deck's link (no deck had one) and a second iPhone (`ios/README.md`'s sitting, Part 3), not run
-- **M8b** 👀📱 The slide on Unlocked, Screen Time off and Home, and the question card on the Screen Time ask — ✅ (#454; DECISIONS 2026-10-24); its 📱 device check passed with M8's (2026-11-08)
-- **M9** Load and demo with a deck — ✅ (#335; DECISIONS 2026-10-12)
 - **M10** 📱 Exit check: a real class on prod follows a deck — passed with one student on prod (2026-11-08); a class of several, the pilot's own, is the full check
 
 Slice 3 — students on the web (added 2026-10-10; ARCHITECTURE, "Live lesson", decision 13; built web first, each step after the steps it reads):
-- **W1** The phone's state in the presentation read — ✅ (#322; DECISIONS 2026-10-11)
-- **W2** Portal student logic, `lib/student-web.ts` (for W3, W4) — ✅ (#333; DECISIONS 2026-10-12)
-- **W3** 👀 The student's home to v2's canvas — ✅ (#392; DECISIONS 2026-10-15); left for the owner: the privacy policy names the student pages (C2's words, the lawyer's)
-- **W4** 👀 The lesson page to v2's canvas — ✅ as part 1a (#406), part 1b (#407) and part 2 (#408); DECISIONS 2026-10-15; left for the owner: the same check with a real iPhone once the app's card (L8) can answer (📱)
-- **W4 follow-up** 👀 The home's chip says Bali can't be reached before its lesson's first read answers, an answer that landed after 10 s is in once a read shows it, and the home reads the account every 30 s while in view with no class in session (the owner, 2026-10-16) — ✅ (#409; DECISIONS 2026-10-15, 2026-10-16)
-- **W5** 👀 Slides on the student web to v2's canvas — ✅ (#419; DECISIONS 2026-10-16)
 - **W6** 📱 Exit check: a real class on prod follows a lesson on laptops and phones at once; each student's chip agrees with the teacher's grid — passed with one student on prod (2026-11-08); a class of several, the pilot's own, is the full check
-
-**The open design questions are settled** (the owner, 2026-10-10, each as recommended;
-ARCHITECTURE's "Live lesson", "Settled"): `event_id` refused both ways (L1, L3b), the guard
-wherever counts are read (L3, L7c), the portal's `sha256` check (M6, W5), the PDF check in its
-own worker (M2), and a load gate of several classes on phones and laptops (L4, M9).
 
 ### The audit's fixes (GA; one PR each; 👀 = the owner looks at screenshots)
 
@@ -283,13 +237,10 @@ One line each; each step's full notes are on its line in `docs/PLAN-ARCHIVE.md`.
   - **C2-drafts** The owner's drafts, for Apple's external beta review (the owner, 2026-10-24) — ✅ (#460): `docs/legal/privacy-policy.md` and `terms-of-use.md`, from General Legal's CC0 templates, every fact filled; the lawyer's questions at each file's end (DECISIONS 2026-10-24). The lawyer's review is not needed before the Vanderbilt pilot (the owner, 2026-11-03)
   - **C2-text** The drafts' words on `/privacy` and `/terms` — ✅ (#461; DECISIONS 2026-10-24)
 - **S8** 🔧 Least-privilege database roles (Phase 6): the owner's decision (Open owner items, 1)
-- **C3d** Deleted sign-ins refused on the server — ✅ (#558; DECISIONS 2026-11-11); its case's CI flake fixed (#586; DECISIONS 2026-11-12)
 - **C4c** AN9h's iPhone twin: one account's token for Delete account and the 13+ check (the owner, 2026-11-10: "Close it now"), the Mac's; DECISIONS 2026-11-10, "For C4c"; AN9e's two iOS gaps (DECISIONS 2026-11-11)
 - **C4d** AN9j's iPhone twin, the Mac's: `409 account_deleted` read as signed out (the owner, 2026-11-12; AN9j's entry in DECISIONS, 2026-11-13, says what to mirror)
 - **C4e** AN9k's iPhone twin, the Mac's: a student's notes kept off the phone's storage once a deletion's request went out (the owner, 2026-11-12; AN9k's entry, DECISIONS 2026-11-13)
-- **S12** A CI scan that fails any PR with invisible or text-direction characters — ✅ (#596; DECISIONS 2026-11-13)
 - **D2k** ⏸ The shield's new look (Phase 3): waits for a design the owner approves in Claude Design
-- **The push's app half** — ✅ (#456; DECISIONS 2026-10-24); N6's end-to-end check passed on prod (2026-11-08); left, runbook 7's step 4, dev's `APNS_*` variables, the owner's
 
 ### Phase 3: known edges, carried forward
 

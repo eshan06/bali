@@ -2,12 +2,21 @@ import type { BlockDetail } from '@bali/shared';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ApiError, createApiClient, NetworkError, SAVE_TIMEOUT_MS } from './api-client';
-import { blockIdOf, loadProblem, registerBlock } from './blocks';
+import {
+  blockIdOf,
+  blocksNow,
+  loadProblem,
+  registerBlock,
+  removeAttemptFor,
+  removeBlock,
+} from './blocks';
 import {
   ACCOUNT_DELETED,
+  BLOCK_NOT_REMOVED,
   BLOCK_TAKEN,
   CANT_REACH,
   CANT_REGISTER,
+  CANT_REMOVE_BLOCK,
   NOT_A_BLOCK_ID,
   TOO_MANY_TRIES,
   TOO_MANY_TRIES_MINUTE,
@@ -197,6 +206,188 @@ describe('registerBlock', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('removeAttemptFor', () => {
+  it('sends the removal whose answer never came again under its id, any other under a fresh one', () => {
+    const mint = vi.fn(() => 'fresh');
+    const lost = { blockId: 'b1', eventId: 'lost' };
+    expect(removeAttemptFor(lost, 'b1', mint)).toBe(lost);
+    expect(mint).not.toHaveBeenCalled();
+    expect(removeAttemptFor(lost, 'b2', mint)).toEqual({ blockId: 'b2', eventId: 'fresh' });
+    expect(removeAttemptFor(null, 'b1', mint)).toEqual({ blockId: 'b1', eventId: 'fresh' });
+  });
+
+  it('mints a UUIDv7 by default, as every write’s eventId is', () => {
+    expect(removeAttemptFor(null, 'b1').eventId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+  });
+});
+
+describe('removeBlock (LO10b’s DELETE /v1/blocks/{id})', () => {
+  const block: BlockDetail = {
+    id: '019a0000-0000-7000-8000-0000000000b1',
+    tagId: 'T7XK2M9QPF',
+    createdAt: '2026-10-04T08:00:00.000Z',
+  };
+  const attempt = { blockId: block.id, eventId: '019a7000-0000-7000-8000-000000000001' };
+
+  function api(status: number, body: unknown, headers: Record<string, string> = {}) {
+    const sent: { url: string; init: RequestInit | undefined }[] = [];
+    const client = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: (url, init) => {
+        sent.push({ url: url as string, init });
+        return Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status,
+            headers: { 'content-type': 'application/json', ...headers },
+          }),
+        );
+      },
+    });
+    return { client, sent };
+  }
+
+  it('sends the block’s removal under its eventId; removed now or already (a replay), it is gone', async () => {
+    const now = api(200, { outcome: 'removed', block });
+    expect(await removeBlock(now.client, attempt)).toEqual({ kind: 'removed' });
+    expect(now.sent[0]?.url).toBe(`http://api/v1/blocks/${block.id}`);
+    expect(now.sent[0]?.init?.method).toBe('DELETE');
+    expect(JSON.parse(now.sent[0]?.init?.body as string)).toEqual({ eventId: attempt.eventId });
+    // Its own resend, another tab's removal, or a second Remove: the route answers the truth now.
+    const already = api(200, { outcome: 'replay', block });
+    expect(await removeBlock(already.client, attempt)).toEqual({ kind: 'removed' });
+  });
+
+  it('says a refusal in the teacher’s words, never the log line, nothing removed', async () => {
+    const refusals = [
+      api(403, { error: { code: 'forbidden', message: 'not your block' } }),
+      api(403, { error: { code: 'forbidden', message: 'teacher access required' } }),
+      api(404, { error: { code: 'not_found', message: 'block not found' } }),
+      api(400, { error: { code: 'bad_input', message: 'invalid request' } }),
+    ];
+    for (const { client } of refusals) {
+      expect(await removeBlock(client, attempt)).toEqual({
+        kind: 'refused',
+        message: BLOCK_NOT_REMOVED,
+      });
+    }
+    // The id another removal holds: said as every write's spent id is, its resend a fresh id.
+    const spent = api(409, {
+      error: { code: 'conflict', reason: 'event_id_conflict', message: 'event_id already used' },
+    });
+    expect(await removeBlock(spent.client, attempt)).toEqual({
+      kind: 'refused',
+      message: "That didn't go through, so nothing changed. Try again.",
+    });
+  });
+
+  it('sends a refused one to the blocks as Bali holds them, in RemoveBlockStates’ words', () => {
+    expect(BLOCK_NOT_REMOVED).toBe(
+      "Bali couldn't remove this block. Reload the page to see your blocks.",
+    );
+    expect(CANT_REMOVE_BLOCK).toBe("Bali couldn't remove the block just now. Try again.");
+  });
+
+  it('keeps an answer that never came, a server error, a timeout or the budget’s 429, to try again', async () => {
+    const unreachable = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: () => Promise.reject(new Error('offline')),
+    });
+    expect(await removeBlock(unreachable, attempt)).toEqual({
+      kind: 'failed',
+      message: CANT_REACH,
+    });
+    const busy = api(429, { error: { code: 'rate_limited', message: 'too many requests' } });
+    expect(await removeBlock(busy.client, attempt)).toEqual({
+      kind: 'failed',
+      message: TOO_MANY_TRIES,
+    });
+    const spent = api(
+      429,
+      { error: { code: 'rate_limited', message: 'too many requests' } },
+      { 'retry-after': '60' },
+    );
+    expect(await removeBlock(spent.client, attempt)).toEqual({
+      kind: 'failed',
+      message: TOO_MANY_TRIES_MINUTE,
+    });
+    for (const status of [500, 503, 408]) {
+      const broken = api(status, { error: { code: 'internal', message: 'internal error' } });
+      expect(await removeBlock(broken.client, attempt), String(status)).toEqual({
+        kind: 'failed',
+        message: CANT_REMOVE_BLOCK,
+      });
+    }
+    // A 200 whose body isn't JSON (a proxy's page): no answer to go by, never a removal assumed.
+    const html = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: () => Promise.resolve(new Response('<html>gateway</html>', { status: 200 })),
+    });
+    expect(await removeBlock(html, attempt)).toEqual({
+      kind: 'failed',
+      message: CANT_REMOVE_BLOCK,
+    });
+  });
+
+  it('fails a removal the network swallows at SAVE_TIMEOUT_MS; sent again under its id, it is answered as gone', async () => {
+    vi.useFakeTimers();
+    try {
+      const sent: unknown[] = [];
+      const client = createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: (_url, init) => {
+          sent.push(JSON.parse(init?.body as string));
+          if (sent.length > 1) return Promise.resolve(Response.json({ outcome: 'replay', block }));
+          return new Promise((_, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            );
+          });
+        },
+      });
+      const first = removeBlock(client, attempt);
+      const settled = vi.fn();
+      void first.then(settled);
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS - 1);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await first).toEqual({ kind: 'failed', message: CANT_REACH });
+      expect(await removeBlock(client, removeAttemptFor(attempt, block.id))).toEqual({
+        kind: 'removed',
+      });
+      expect(sent).toEqual([{ eventId: attempt.eventId }, { eventId: attempt.eventId }]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('blocksNow', () => {
+  it('reads the teacher’s blocks as Bali holds them, or null when the read fails', async () => {
+    const block: BlockDetail = { id: 'b1', tagId: 'T7XK2M9QPF', createdAt: '2026-10-04T08:00:00Z' };
+    const read = (status: number, body: unknown) =>
+      createApiClient({
+        baseUrl: 'http://api',
+        getToken: () => 'tok',
+        fetchImpl: () => Promise.resolve(Response.json(body, { status })),
+      });
+    expect(await blocksNow(read(200, { blocks: [block] }))).toEqual([block]);
+    expect(await blocksNow(read(500, { error: { code: 'internal', message: 'x' } }))).toBeNull();
+    expect(await blocksNow(read(200, {}))).toBeNull();
+    const unreachable = createApiClient({
+      baseUrl: 'http://api',
+      getToken: () => 'tok',
+      fetchImpl: () => Promise.reject(new Error('offline')),
+    });
+    expect(await blocksNow(unreachable)).toBeNull();
   });
 });
 

@@ -712,6 +712,11 @@ on the canvas first). LO9 added `present-name` (30/36, semibold), `present-clock
 `present-room-state` (15/20, medium), `present-join` (22/30) and `code-join`
 (26/30, mono at medium, +0.06em), in lane B's block; v2's `present-title`,
 `present-tile-name`, `present-tile-state` and `code-present` have no user now.
+Since LO11 (2026-11-17) each row of Your blocks ends on Remove, ClassFlows'
+Remove a lost block, under the code where the row is full, as in Home's column:
+a confirm naming the block, Cancel focused, Remove block in the primary green,
+never red; a block removed is said under the list; its in-between states as
+RemoveBlockStates draws them (drawn on the canvas first).
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
