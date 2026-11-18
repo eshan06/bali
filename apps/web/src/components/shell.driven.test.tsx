@@ -6,15 +6,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApiClient } from '@/lib/api-client';
 
-import { Shell, SideMenu } from './shell';
+import { PAGE, Shell, SideMenu } from './shell';
 
 /*
  * The shell's frame as a teacher and a student meet it (the owner's decision of 2026-10-22: the
  * portal's tests drive the page), the account read by the shell through a stand-in `fetch`: a
  * teacher's pages under the top bar (LO2), named as the account names them, its Sign out the
  * shell's own, which signs out once; a student's beside the side menu, Your classes and Help
- * whichever way the lessons switch is set (LO1). Converted from `shell.test.ts`'s read of the
- * shell's source for its name and its menu (LO2).
+ * whichever way the lessons switch is set (LO1), while the student web is on, and under the bar
+ * with Sign out, nothing of theirs in it, with it off (LO15). Converted from `shell.test.ts`'s read
+ * of the shell's source for its name and its menu (LO2).
  */
 const bali = vi.hoisted(() => ({
   path: '/reports',
@@ -98,7 +99,8 @@ describe('the shell’s frame, by the account the shell reads', () => {
     expect(screen.getByRole('main').textContent).toBe('The page');
   });
 
-  it('puts a student’s page beside the side menu, Your classes and Help, never the top bar', async () => {
+  it('puts a student’s page beside the side menu, Your classes and Help, never the top bar, the student web on', async () => {
+    vi.stubEnv('NEXT_PUBLIC_STUDENT_WEB', 'on');
     await open(account('student', 'Ana Rodríguez'), '/');
     expect(screen.queryByRole('banner')).toBeNull();
     expect(links()).toEqual([
@@ -106,6 +108,38 @@ describe('the shell’s frame, by the account the shell reads', () => {
       ['Your classes', '/'],
       ['Help', '/support'],
     ]);
+  });
+
+  it('puts a student’s every page under the bar with Sign out, the student web off, never the side menu, nothing of theirs in it (LO15)', async () => {
+    for (const path of ['/', '/reports', '/classes/c1']) {
+      await open(account('student', 'Ana Rodríguez'), path);
+      const banner = screen.getByRole('banner');
+      expect(within(banner).getByRole('link', { name: 'Bali' }).getAttribute('href'), path).toBe(
+        '/',
+      );
+      expect(within(banner).getByRole('button', { name: 'Sign out' }), path).toBeTruthy();
+      expect(screen.queryByRole('navigation'), path).toBeNull();
+      expect(screen.queryByText('Ana Rodríguez'), path).toBeNull();
+      expect(screen.queryByText('AR'), path).toBeNull();
+      // Their page at `/` frames itself, as the invite page does; any other in v2's frame.
+      const main = screen.getByRole('main');
+      expect(main.className, path).toBe(path === '/' ? '' : PAGE);
+      expect(main.textContent, path).toBe('The page');
+      cleanup();
+    }
+  });
+
+  it('signs a student out through the bar once, the student web off: the tab goes to sign-in, and a second press sends nothing (LO15)', async () => {
+    const user = userEvent.setup();
+    await open(account('student', 'Ana Rodríguez'), '/');
+    const signOut = screen.getByRole('button', { name: 'Sign out' });
+    await user.click(signOut);
+    expect(bali.endSession).toHaveBeenCalledTimes(1);
+    expect(bali.router.replace).toHaveBeenCalledWith('/login');
+    expect(signOut.getAttribute('aria-disabled')).toBe('true');
+    expect(signOut.textContent).toBe('Signing out…');
+    await user.click(signOut);
+    expect(bali.endSession).toHaveBeenCalledTimes(1);
   });
 
   it('signs a teacher out through the bar once: the tab goes to sign-in, and a second press sends nothing', async () => {

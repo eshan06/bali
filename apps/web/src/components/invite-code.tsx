@@ -15,13 +15,16 @@ import {
   type SaidAnswer,
   typedCode,
 } from '@/lib/invite';
+import { studentWebOn } from '@/lib/student-web-switch';
 import { useApi } from '@/lib/use-api';
 
 /**
  * The invite page (Invite): the invite card under the shell's bar, and under the card, for an
  * account the 13+ check never passed, the line for students (PV15). A student who passed has set up
  * the app, so the line would tell them to do what they did: their home's "Setting up a teacher
- * account?" brings them here without it (W3; `app/invite`).
+ * account?" brings them here without it (W3; `app/invite`). With the student web off (LO15) a
+ * refresh brings no student home, so the line sends them to the app and promises none
+ * (InviteStudentWebOff, drawn first).
  */
 export function InviteEntry({
   forStudents,
@@ -35,7 +38,9 @@ export function InviteEntry({
       <InviteCode onTeacher={onTeacher} />
       {forStudents ? (
         <p className={STAGE_FOOT}>
-          Here as a student? Set up Bali in the app on your iPhone first, then refresh this page.
+          {studentWebOn()
+            ? 'Here as a student? Set up Bali in the app on your iPhone first, then refresh this page.'
+            : 'Here as a student? Use Bali in the app on your phone. This site is for teachers.'}
         </p>
       ) : null}
     </EntryPage>

@@ -1504,6 +1504,23 @@ and the apps are unchanged: they show a question or a slide only when a teacher 
 lessons back on after the lock-only redesign takes one design pass and one step, to fit them into
 its pages.
 
+**9. The student web's switch** (the owner, 2026-11-18: "lets just make it so students cannot sign
+in on the web right now ... make this decision reversible"; `docs/DECISIONS.md`): students use Bali
+in the app alone for now. One portal setting, `NEXT_PUBLIC_STUDENT_WEB`, off unless it says `on`,
+baked into the build as decision 8's is, so students are off the web from the deploy that brought it
+with nothing to set, and back on by setting it and redeploying. Off, an account whose role is
+student gets no student pages: every signed-in page of theirs has the invite page's bar with Sign
+out, never the side menu, and their home is one page saying the web is for teachers and Bali is in
+the app on their phone, with nothing of theirs on it and nothing read for it beyond the account read
+that says who they are (no class, no phone, no read again), and today's way to the invite page while
+they are in no class, for a teacher who set up the app first; a lesson's address goes there, and the
+invite page's line for students promises no home after a refresh (drawn first on v2's canvas:
+StudentWebOff and its states). On, the student web is Live lesson decision 13's, as it was. No
+backend change: the portal already decides where an account goes (`homeFor`), and the API keeps
+serving students, whose phones call it. Sign-in, the 13+ check, Cognito, the apps and teachers are
+unchanged; a student can still finish Cognito's sign-in, which can't know the role before it, and
+lands on that page. The student web's code and tests stay, the tests covering both values.
+
 ## Live lesson (Phase 7)
 
 During a running session the teacher can ask the class a question (Slice 1) and present
@@ -1960,6 +1977,10 @@ approved with it on 2026-10-10, and are now on
 **13. Students on the web (Slice 3).** Students mostly have a laptop open in class, so the
 portal is where a student follows a lesson first; the phone shows the same lesson (decision 11)
 and keeps everything that enforces focus.
+*Switched off for now* (the owner's order, 2026-11-18; Web portal, decision 9): while
+`NEXT_PUBLIC_STUDENT_WEB` is off, its default, a student signed in on the portal gets one page
+saying the web is for teachers, and follows a lesson on their phone alone (decision 11). Set `on`,
+everything below stands as written.
 - **What it is.** While a session of their class runs, a student signed in on the portal sees
   the slide beside the question card and answers there: the phone's card (decision 11) in the
   portal's look, under its rules (a tap answers and changes the answer until the close, no

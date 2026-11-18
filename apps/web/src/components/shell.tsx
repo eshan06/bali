@@ -20,6 +20,7 @@ import { type ApiClient, UnauthorizedError } from '@/lib/api-client';
 import { endSession, getAccessToken, tookSignIn } from '@/lib/auth';
 import { errText } from '@/lib/errors';
 import { type Home, homeFor } from '@/lib/student-web';
+import { studentWebOn } from '@/lib/student-web-switch';
 import { useApi } from '@/lib/use-api';
 
 import { CARD_ALONE } from './card';
@@ -48,7 +49,11 @@ export interface Frame {
   hidden: boolean;
 }
 
-/** Where the invite page is (Invite): `/` for an account the 13+ check never passed, and `/invite`. */
+/**
+ * Where an entry page frames itself under the bar: the invite page (Invite) at `/` for an account
+ * the 13+ check never passed and at `/invite`, and with the student web off, a student's page at `/`
+ * (StudentWebOff, LO15).
+ */
 const INVITE_PATHS = new Set(['/', '/invite']);
 
 /**
@@ -57,9 +62,10 @@ const INVITE_PATHS = new Set(['/', '/invite']);
  * it. Otherwise the page waits for the account, so no frame flashes before it is known and no page
  * is drawn from an account that left: Loading… with no menu or bar while it is read, its failure
  * under the bar with Sign out (PV5b, the owner's approval of #352's review); then the top bar for a
- * teacher (LO2), and the side menu for a student who said 13+ in the app (W3), but on the invite
- * page, which frames itself under the bar (Invite, PV15), as it does for an account the 13+ check
- * never passed, whose every page has the bar.
+ * teacher (LO2), and the side menu for a student who said 13+ in the app (W3) while the student web
+ * is on (LO15), but on the invite page, which frames itself under the bar (Invite, PV15), as it does
+ * for an account the 13+ check never passed, whose every page has the bar. With the student web off,
+ * a student's every page has the bar too, their home at `/` framing itself as the invite page does.
  */
 export function frameFor(
   path: string,
@@ -71,7 +77,7 @@ export function frameFor(
     return { chrome: null, framed: false, hidden: false };
   if (home === null) return { chrome: error === null ? null : 'bar', framed: false, hidden: true };
   if (home.kind === 'teacher') return { chrome: 'top', framed: true, hidden: false };
-  if (home.kind === 'student' && path !== '/invite')
+  if (home.kind === 'student' && path !== '/invite' && studentWebOn())
     return { chrome: 'menu', framed: true, hidden: false };
   return { chrome: 'bar', framed: !INVITE_PATHS.has(path), hidden: false };
 }

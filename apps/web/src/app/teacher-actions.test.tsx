@@ -373,6 +373,7 @@ afterEach(() => {
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   cleanup();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   sessionStorage.clear();
   window.history.replaceState(null, '', '/');
   Object.assign(bali.now, {
@@ -432,18 +433,24 @@ describe('a sign-in (portal_signed_in)', () => {
     expect(bali.unexpected).toEqual([]);
   });
 
-  it('counts a student’s sign-in never: their home sends nothing', async () => {
-    bali.now.role = 'student';
-    backFromSignIn();
-    const { rerender } = open('/auth/callback', <CallbackPage />);
-    await vi.waitFor(() => expect(bali.router.replace).toHaveBeenCalledWith('/'));
-    bali.now.path = '/';
-    rerender(inShell(<HomePage />));
-    await screen.findByRole('heading', { level: 1, name: 'Your classes' });
-    await settle();
-    expect(counted()).toEqual([]);
-    expect(bali.unexpected).toEqual([]);
-  });
+  for (const [said, home] of [
+    ['on', 'Your classes'],
+    ['off', "You're signed in as a student"],
+  ] as const) {
+    it(`counts a student’s sign-in never: their home sends nothing, the student web ${said} (LO15)`, async () => {
+      vi.stubEnv('NEXT_PUBLIC_STUDENT_WEB', said);
+      bali.now.role = 'student';
+      backFromSignIn();
+      const { rerender } = open('/auth/callback', <CallbackPage />);
+      await vi.waitFor(() => expect(bali.router.replace).toHaveBeenCalledWith('/'));
+      bali.now.path = '/';
+      rerender(inShell(<HomePage />));
+      await screen.findByRole('heading', { level: 1, name: home });
+      await settle();
+      expect(counted()).toEqual([]);
+      expect(bali.unexpected).toEqual([]);
+    });
+  }
 });
 
 /**

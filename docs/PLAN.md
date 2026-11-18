@@ -197,6 +197,8 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO14** The phase's end: its findings by step, each repeated one a rule, a GOTCHAS entry or a test (part of #601; after LO13) — ✅ (#633; DECISIONS 2026-11-17): converting a source-text test loses nothing it pinned (CLAUDE.md, `docs/WEB.md`, santa-loop); a canvas publish merges into the `canvas.json` read just before it (GOTCHAS); left, not ruled: Android's JVM timing flake, for the Android work, and the screen steps' size, the owner's question; left for a step: the recap's tracks to share the grid's state code (ARCHITECTURE's rule 2), closing LO7's three WARNs; for the owner: a student whose only unlock was superseded shows under Not focused the whole time while their track reads focused
 
+- **LO15** Students off the web for now, behind `NEXT_PUBLIC_STUDENT_WEB` (#634; the owner's order, 2026-11-18) — ✅ (#635; DECISIONS 2026-11-18); off unless it says on, so off from this deploy with nothing to set on Vercel; its in-between states on v2's canvas's Signing in row (version 128); for the owner: the sign-in page's two lines that still promise students the web
+
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 
 **Done** (2026-10-16): PV0–PV17, the last PV17c-2 (#425), to the canvas
