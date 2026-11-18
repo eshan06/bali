@@ -30,7 +30,7 @@ import { bellTime } from '@/lib/session-controls';
  */
 
 /** Whether `at` falls on `now`'s day by this computer's calendar (`format`'s, in a test). */
-export function onDay(at: string, now = new Date(), format: RecapFormat = {}): boolean {
+export function sameDay(at: string, now = new Date(), format: RecapFormat = {}): boolean {
   const day = new Intl.DateTimeFormat(format.locale, {
     dateStyle: 'short',
     timeZone: format.timeZone,
@@ -40,7 +40,7 @@ export function onDay(at: string, now = new Date(), format: RecapFormat = {}): b
 
 /**
  * The class page's line after the bell (ClassEnded), the time in "Ended at 9:55 AM": the end the
- * server marked, when that was today on this computer's calendar (`onDay`). Null for none, and for
+ * server marked, when that was today on this computer's calendar (`sameDay`). Null for none, and for
  * an older session, which the page shows as its last line instead.
  */
 export function endedToday(
@@ -50,7 +50,7 @@ export function endedToday(
 ): string | null {
   if (session === null) return null;
   const end = session.endedAt ?? session.endsAt;
-  return onDay(end, now, format) ? bellTime(end, format) : null;
+  return sameDay(end, now, format) ? bellTime(end, format) : null;
 }
 
 /**

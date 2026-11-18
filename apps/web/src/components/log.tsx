@@ -16,7 +16,9 @@ import { bareTime, type Moment, type StudentMoment } from '@/lib/recap';
 /*
  * A log in the lock-only look (LO6; lock.css's `.log`), the session list's and the student panel's,
  * and a student's record in it, the panel's and the recap's (LO13), in a module of its own that
- * imports nothing of theirs or the grid's, so either can be loaded first (santa's round 1).
+ * imports nothing of theirs or the grid's, so either can be loaded first (santa's round 1). Its one
+ * component import is the pop-ups' reason words (`reasonWords`), whose module must keep importing
+ * none of the grid, the session list or the student panel.
  */
 
 /** A moment's icon in its state's ink (lock.css's `.c-*`): focused, unlocked, protection off, quiet. */

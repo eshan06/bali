@@ -28,7 +28,7 @@ import {
 } from './live-grid';
 import { Ring, shareLeft, timeLeft, useClock } from './live-header';
 import { NewClass, type NewClassHandle } from './new-class';
-import { onDay } from './recap-card';
+import { sameDay } from './recap-card';
 import { TryAgain } from './try-again';
 
 /** Where a live class's Present goes (Main to Present): the class's page, Present on. */
@@ -397,7 +397,7 @@ export function LastSessionView({
       {read.kind === 'ready' ? (
         <Link
           href={
-            onDay(last.session.endedAt, new Date(now))
+            sameDay(last.session.endedAt, new Date(now))
               ? `/classes/${last.classId}`
               : reportPath(last.classId, last.session.id)
           }

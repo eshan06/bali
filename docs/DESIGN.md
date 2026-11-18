@@ -472,7 +472,7 @@ codes; the body 15/22 with tabular figures. *Colours:* the tokens' light
 values, unchanged, and `border-input` (§2); `v2.css` also draws with the
 primitives green-50, green-200, green-800, orange-400, orange-700, red-300 and
 stone-300 to 500, all in `bali-tokens.json` and all in `globals.css` since
-PV4; a dialog's backdrop is
+PV4 but orange-700, which went with its one user in LO13 (below); a dialog's backdrop is
 `rgba(33, 28, 21, 0.32)`. *Type:* the greeting 28/34; a page's or a class's
 heading 26/32; card titles 18/24; a dialog's title 19/25; meta lines 13.5/19;
 section labels 11.5/15, uppercase at +0.05em; chips 13/18; menu items 14/20;
@@ -745,8 +745,9 @@ it: from 1024 px it starts over the session list's top, below 1024 px over the
 room's tiles, as before. Their behaviour is otherwise today's. Since LO13 too,
 Try again is the lock-only look's button (`TryAgain`'s `look="lock"`) on every page
 rebuilt from the canvas, a student's home with lessons off included, Start and the
-other sends' buttons with it; sign-in, the invite page, Help, a student's lesson and
-the lesson pieces keep v2's, and so does End session's confirm, v2's dialog whole,
+other sends' buttons with it; sign-in, the invite page, Help, the page a failed
+account read shows, a student's home with lessons on, a student's lesson and the
+lesson pieces keep v2's, and so does End session's confirm, v2's dialog whole,
 which no board redraws. Home's title takes `page-title-phone` on a phone, and its
 Check on widens the chips' column for a long chip, as the class page's does.
 

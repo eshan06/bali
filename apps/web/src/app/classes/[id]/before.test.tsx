@@ -411,6 +411,8 @@ describe('a class before it starts, no block yet (ClassStates)', () => {
     expect(screen.queryByRole('button', { name: START })).toBeNull();
     const code = screen.getByRole('textbox', { name: 'Block code' });
 
+    // The lock-only look's primary button, Registering… and Try again with it (LO13).
+    expect(button('Register block').className).toBe(lockButton('primary', 'md'));
     // Not a block's code: said under the form, nothing sent, focus on the code.
     await user.type(code, 'ABC');
     await user.click(button('Register block'));

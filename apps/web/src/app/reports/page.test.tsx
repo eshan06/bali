@@ -508,6 +508,8 @@ describe('Reports in between (ReportsMoments, drawn first)', () => {
     bali.routes.set(EARLIER(MON.id), answer.route);
     open();
     const show = await screen.findByRole('button', { name: 'Show earlier' });
+    // The lock-only look's button, Loading… and Try again with it (LO13).
+    expect(show.className).toBe(lockButton('secondary', 'sm'));
     const user = userEvent.setup();
     await user.click(show);
     expect(show.textContent).toBe('Loading…');

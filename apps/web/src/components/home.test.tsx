@@ -495,6 +495,8 @@ describe('a class live (Main; HomeMoments)', () => {
     expect(alert.textContent).toBe(`Couldn't load this session. ${CANT_REACH}`);
     failing = false;
     const again = within(well).getByRole('button', { name: 'Try again' });
+    // The lock-only look's button, as the page is rebuilt from its canvas (LO13).
+    expect(again.className).toBe(lockButton('secondary', 'sm'));
     await user.click(again);
     expect(again.textContent).toBe('Loading…');
     await give('GET /v1/sessions/S', snapshot(MAIN));

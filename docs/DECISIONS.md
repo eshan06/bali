@@ -25,7 +25,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
   long chip ("Left · protection off") rather than run it into the names, as LO5 did on the class page; one Check on
   count, LO5's `checkOn`, which Home now reads, its own copy gone. The count stays in `live-grid.tsx`, not
   `apps/web/src/lib`: its words are its chips' (`CHIP`), a component's. Open the recap goes to the class's page the day
-  the session ended, by this computer's calendar, where the page is its recap (LO7's rule, `onDay`, which
+  the session ended, by this computer's calendar, where the page is its recap (LO7's rule, `sameDay`, which
   `endedToday` shares now), and on a later day to the session's own report page, the same recap, where before it led
   to ClassPage's line.
 
