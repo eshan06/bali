@@ -27,8 +27,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   - **The real-socket lesson case** (found): it waited for the account's `me` alone. Its sign-in is ungated, so a read made before
     the let-through carries a token and shows `me`; the let-through then hides it until the next read, the lesson half that
     followed it meanwhile follows again, and the test's server holds every poll but the first: no card. The probe met it 12 times
-    in 500 (`me` shown before the let-through 144 times), 4 of those 200 on a JVM capped at CI's 4 processors; waiting for the
-    check's pass too, as `through()` does, never in 500.
+    in 500 runs, 4 of them in the 200 on a JVM capped at CI's 4 processors (`me` shown before the let-through 144 times); waiting
+    for the check's pass too, as `through()` does, never in 500.
   - **SlideTest** (inferred, never met here): its wait for Bob's `me` alone has the same opening: a read of Bob's landing between
     his sign-in's pass and its let-through shows his `me`, the let-through hides it, and the lesson half drops the slide the test
     then asks for, so nothing is fetched. With the sign-in gated, that read must go with Bob's token in that moment: the read loop
@@ -58,10 +58,19 @@ a real decision? Add a dated entry at the top: what was decided and why.
   twin, where a drop keeping the card's own passes, the next lesson's first read letting that go too.
 
   **The loops** (the scratchpad's `flake-loop.sh`: each run a fresh Gradle run of `:outbox:test` filtered to the three classes,
-  `--rerun`, its XML counted, the test JVM capped at 4 processors through `JAVA_TOOL_OPTIONS`, the PC under 12 busy loops, main's
-  code beside it): LOOPS_AFTER. CI: CI_RUNS.
+  `--rerun`, never UP-TO-DATE, its XML counted, the test JVM capped at 4 processors through `JAVA_TOOL_OPTIONS`, the PC under 12
+  busy loops, main's code in a loop of its own beside it): after the fix, 100 runs of the three classes' 47 cases, 0 failures (54
+  min); main's code, 100 runs of its 46, 1 failure: the real-socket case by another door, "the lesson's calls held as the unlock
+  came" 6 for 5, by its likeliest reading the lesson half following twice, the poll its drop cancelled freeing OkHttp's slot for a
+  sixth call. Then, the machine quiet, `./gradlew :core:test :outbox:test` whole: core's 162 and outbox's 596 (CI's 595 and the
+  staged case), none failing. The one change after the loops was comments, reworded for santa's WARNs, no line of code moved.
+  CI's own runs of this PR, its Android jobs run again on it, are on the PR.
 
-  **Santa's review:** SANTA.
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): no blockers; their WARNs taken: `inLesson`'s KDoc narrowed to waits for a request
+  of the loop's other than a read of the truth, the file's six waits for `GET /v1/me` free to take the leftover read itself (both
+  reviewers), and the PR's description saying what `past()` lets through, a read ahead of the check-in, that order of the engine's
+  still pinned by ReadTest (reviewer B).
 
   **The conductor's calls, in the brief:** PLAN.md's tidy-up: the lock-only phase marked done, LO12a parked for the owner; LO15's
   line no longer naming the sign-in words LO16 settled; and, this PR's own, LO14's flake marked fixed.

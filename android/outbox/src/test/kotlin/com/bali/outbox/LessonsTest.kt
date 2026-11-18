@@ -663,7 +663,7 @@ class LessonsTest : EngineFiles() {
             tapped.await()
             assertNull(lessons.state.value.card)
             rig.server.next(ageCheckRoute).reply(200, ageCheckPassed)
-            // Through the 13+ check, as `through` waits, so his `me` stays shown (SlideTest's twin case; DECISIONS 2026-11-18).
+            // Through the 13+ check with his `me`, as `through` waits, so it stays shown (as SlideTest's case of it; DECISIONS 2026-11-18).
             rig.readsAnswered(meInSession("bob")) {
                 account.state.value.let { it.age == AgeCheck.Answer.Passed && it.sync?.me?.user?.id == "bob" }
             }
@@ -1237,8 +1237,9 @@ class SlideTest : EngineFiles() {
             world.until { it.lesson == null && it.slide == null }
             renderer.holds(lessons, "another student's sign-in")
             rig.server.next(ageCheckRoute).reply(200, ageCheckPassed)
-            // Through the 13+ check, as `through` waits: Bob's `me` read before its let-through could show, then go there, the
-            // lesson half followed and dropped again under the ask below (CI's flake, its likeliest path; DECISIONS 2026-11-18).
+            // Through the 13+ check with Bob's `me`, as `through` waits: a `me` of his read before the let-through can show and
+            // then go there, the lesson half dropping the slide asked for below (CI's flake, by the one path the code leaves;
+            // DECISIONS 2026-11-18).
             rig.readsAnswered(meInSession("bob")) {
                 account.state.value.let { it.age == AgeCheck.Answer.Passed && it.sync?.me?.user?.id == "bob" }
             }

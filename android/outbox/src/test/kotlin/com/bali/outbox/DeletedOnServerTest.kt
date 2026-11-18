@@ -114,8 +114,9 @@ private suspend fun past(rig: SignedRig, route: String, me: String = Answer.me()
 /**
  * a1 signed in and through the 13+ check, standing focused in session s till its bell, the lock on and the router on Focus. The
  * check's let-through asks for the truth twice (the account's `forgetMe`, then its `retryNow`), so a read of the truth can still
- * be on its way as this returns, the read loop waiting on its answer: a test that waits for the loop's next request takes it
- * through [past], never [Server.next] alone (CI's flake; DECISIONS 2026-11-18).
+ * be on its way as this returns, the read loop waiting on its answer. A test that then waits for another request of the loop's,
+ * the screen's check-in or a 13+ yes, takes it through [past], never [Server.next] alone; one that waits for `GET /v1/me` may
+ * take that read itself, sent under a1's token as its own would be (CI's flake; DECISIONS 2026-11-18).
  */
 private suspend fun EngineFiles.inLesson(): Pair<SignedRig, Routed> {
     val rig = signedRig(gated = true)
