@@ -1498,7 +1498,9 @@ change takes a redeploy). Off, the portal hides decision 6's pieces: Questions a
 menu, the class page's lesson panels, Present's question and slide views, a session report's
 Questions card, and a student's lesson page and its link. On, a page shows them as it did, but a
 teacher's page rebuilt from the lock-only canvas (decision 7), which draws none, shows none either
-way. The
+way. So does a student's home since LO12b (2026-11-17, the conductor's call for the owner's look),
+rebuilt from the canvas's StudentWeb, which draws none either: no way into a lesson whichever way the
+switch is set, and a lesson's page reached by its address keeps its look while lessons are on. The
 pieces' code and tests stay, the tests covering both. The API's lesson routes stay, additive-only,
 and the apps are unchanged: they show a question or a slide only when a teacher sends one. Turning
 lessons back on after the lock-only redesign takes one design pass and one step, to fit them into

@@ -102,8 +102,8 @@ function LiveRow({
 }
 
 /**
- * A student's home (StudentWeb; its other moments on StudentWebStates, drawn first; LO12), under the
- * student's top bar, 880 px at most: Your classes over a ledger, each class in session first in the
+ * A student's home (StudentWeb; its other moments on StudentWebStates, drawn first; LO12b), in the
+ * shell's frame, 880 px at most: Your classes over a ledger, each class in session first in the
  * live green with In class now and the student's own phone, then the rest, each part in the
  * account's order; how to join a class under it. With none yet, StudentWeb's line and a teacher's
  * way to the invite page (decision 13). No lesson piece whichever way the lessons switch is set: the

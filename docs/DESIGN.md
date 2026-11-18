@@ -288,7 +288,8 @@ error under it as before, Sign in a 52 px pill, then the line for students and t
 and no Sign up, by design. Narrower, the panels stack, the art on top at 240 px and its line at
 26/32, so Sign in shows on a 390 × 844 phone's first screen; its states as PortalStates,
 PortalPhone and PortalZoom draw them (drawn on the canvas first).
-The student's home is v2's since W3 (2026-10-15): the side menu with Your classes and Help,
+The student's home was v2's from W3 (2026-10-15) until LO12b (2026-11-17; §1, The lock-only look),
+beside the side menu with Your classes and Help, which stays until LO12a's frame is approved:
 each class in session on StudentHome's live card (its ring, its teacher, the time left and the
 bell) and the rest under it, none yet StudentHomeEmpty's card with its way to the invite page,
 at `/invite` for them; since W4's part 2 (2026-10-15) the live card ends on Open the lesson and the
@@ -717,6 +718,17 @@ Remove a lost block, under the code where the row is full, as in Home's column:
 a confirm naming the block, Cancel focused, Remove block in the primary green,
 never red; a block removed is said under the list; its in-between states as
 RemoveBlockStates draws them (drawn on the canvas first).
+Since LO12b (2026-11-17) a student's home is StudentWeb's: Your classes over a
+ledger, each class in session first in the live green with In class now (its ring
+the share of the session left) and the student's own phone after it, today's chip
+and words from the class's own read; then the rest, each part in the account's
+order, and how to join under it; with no class yet, StudentWeb's line and the way
+to the invite page; 880 px at most. No lesson piece, whichever way the switch is
+set. Its in-between states as StudentWebStates draws them (drawn on the canvas
+first): Checking… and each chip, "Can't reach Bali" once under the classes, the
+account's later read failing on HomeStates' line, two classes live, a phone. It
+sits beside v2's side menu until the student's top bar drawn there (LO12a, #629)
+has the owner's approval.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the
