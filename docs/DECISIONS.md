@@ -10,7 +10,7 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
 - **2026-11-17** — **LO11, Home: Remove a lost block, ClassFlows' Remove and its confirm on each row of Your blocks,
   through LO10b's `DELETE /v1/blocks/{id}`; its in-between states drawn first on the canvas's RemoveBlockStates
-  (version 61) (the worker's calls, the owner away; LO11, closes #613).**
+  (version 64) (the worker's calls, the owner away; LO11, closes #613).**
 
   **The confirm's words are ClassFlows'**, checked against what the server does (the brief's honesty check): "Remove
   block T7XK2M9QPF?" and "Students can't tap in with it after this." A new tap at its tag finds no block once it is
@@ -20,7 +20,9 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
   **Its in-between states** (RemoveBlockStates, drawn first): Your blocks at Home's 340 px, where a row is full and
   Remove goes under the code, the board's own row wrapping (on a phone too); Remove on a lone block's row too (the
-  worker's call: a lost block is often the only one); Removing… holding Cancel and Escape; an answer that never came,
+  worker's call: a lost block is often the only one); Removing… holding Cancel, Escape and every row's Remove, behind
+  the dialog and on the list should the browser close it early (drawn in santa's round 1, Reviewer A's WARN, before the
+  PR went up); an answer that never came,
   said in the dialog, Remove block become Try again; a refusal; a block removed, said under the list, "T7XK2M9QPF is no
   longer registered to you.", focus on the next block's Remove, else the one before, else the title; the last one
   removed, none yet with the field; and a phone.
@@ -36,8 +38,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
   its class again: a removal that landed after all leaves the list, said; the same id goes with its next Remove.
 
   **Found on the way, fixed first** (the worker's call): a register answered after a removal put back the list it was
-  sent with, bringing the removed block back on screen. The register now adds its block to the list as it is then. Its
-  failing test came first. A register's "is registered to you" line about a block removed since is taken back.
+  sent with, bringing the removed block back on screen. The register now adds a new block to the list as it is then,
+  and one already listed when it was sent, removed since, stays gone: Bali took the register first, holding the row, so
+  the removal is the truth (santa's round 1, Reviewer B's WARN). Each failing test came first. A register's "is
+  registered to you" line about a block removed since is taken back.
 
   **Left as they are:** no PostHog count for a removal (`PORTAL_EVENTS` is the owner's allow-list and names none; a step
   of its own if the owner wants one). PLAN.md's word cap: Phase 7's finished step lines, the push's line and three
@@ -47,8 +51,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
   **Tests:** driven (`components/blocks.test.tsx`: Remove on each row; the confirm, its words, focus and closing;
   Removing… held; removed and replayed, focus after; the last one; a lost answer resent under its id; Bali's failure; a
-  refusal resent anew; the read after a lost answer, both ways; Chrome's second Escape, both ways; the register race;
-  the register line taken back); `removeBlock`, `removeAttemptFor` and `blocksNow` in `lib/blocks.test.ts`.
+  refusal resent anew; the read after a lost answer, both ways; Chrome's second Escape, both ways; the register races,
+  both ways; the register line taken back); `removeBlock`, `removeAttemptFor` and `blocksNow` in `lib/blocks.test.ts`.
+  Three of Your block's earlier checks find the register's line as a status in the field's form now, no longer as the
+  page's only status: the line under the list is a status always there.
 
 - **2026-11-17** — **LO9, Present in the lock-only look: the time, the count of who is focused, everyone's tile with
   their name, and how to join; no lesson piece in Present and none read; its in-between states on the canvas's

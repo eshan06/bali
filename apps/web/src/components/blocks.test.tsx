@@ -130,6 +130,12 @@ async function answerTo(key: string, status: number | 'none', body?: unknown) {
 const statusSaying = (words: string) =>
   screen.getAllByRole('status').find((s) => s.textContent === words);
 
+/**
+ * The field's form, when a status there says `words`: the register's own line, under the field,
+ * never the line under the list a removal says.
+ */
+const fieldSaying = (words: string) => statusSaying(words)?.closest('form');
+
 /** Your block on its page, its list read with `blocks`, the count it sends kept. */
 async function opened(blocks: BlockDetail[]) {
   const user = userEvent.setup();
@@ -186,7 +192,7 @@ describe('Your block, none yet (ClassFlows)', () => {
     expect(field()).toHaveProperty('readOnly', true);
     const sent = await answer(201, NEW_BLOCK);
     expect(sent).toMatchObject({ key: 'POST /v1/blocks', body: { tagId: 'QW4N8HJR2D' } });
-    expect(statusSaying('QW4N8HJR2D is registered to you.')).toBeDefined();
+    expect(fieldSaying('QW4N8HJR2D is registered to you.')).toBeInstanceOf(HTMLFormElement);
     expect(screen.getByText('QW4N8HJR2D').getAttribute('translate')).toBe('no');
     expect(screen.queryByText('No block registered yet.')).toBeNull();
     expect(field()).toHaveProperty('value', '');
@@ -218,7 +224,7 @@ describe('Your block, none yet (ClassFlows)', () => {
     await user.click(button('Try again'));
     const again = await answer(201, NEW_BLOCK);
     expect(again.body).toEqual({ tagId: 'QW4N8HJR2D' });
-    expect(statusSaying('QW4N8HJR2D is registered to you.')).toBeDefined();
+    expect(fieldSaying('QW4N8HJR2D is registered to you.')).toBeInstanceOf(HTMLFormElement);
   });
 });
 
@@ -260,7 +266,9 @@ describe('Your block, with one (Main, HomeIdle; HomeMoments)', () => {
     await user.click(button('Register another block'));
     await user.type(field(), 'T7XK2M9QPF{Enter}');
     await answer(201, BLOCK);
-    expect(statusSaying('T7XK2M9QPF was already registered to you.')).toBeDefined();
+    expect(fieldSaying('T7XK2M9QPF was already registered to you.')).toBeInstanceOf(
+      HTMLFormElement,
+    );
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
   });
 });
@@ -510,6 +518,19 @@ describe('Remove a lost block (LO11; ClassFlows, RemoveBlockStates)', () => {
     expect(screen.getAllByRole('listitem').map((li) => li.firstChild?.textContent)).toEqual([
       'QW4N8HJR2D',
     ]);
+  });
+
+  it('never puts back a block removed while a register of its own code was on its way', async () => {
+    // Bali takes the register first (it holds the row), so the removal is the truth once both answer.
+    const { user } = await opened([BLOCK]);
+    await user.click(button('Register another block'));
+    await user.type(field(), 'T7XK2M9QPF{Enter}');
+    await user.click(remove('T7XK2M9QPF'));
+    await user.click(inConfirm('Remove block'));
+    await removed(BLOCK);
+    await answerTo('POST /v1/blocks', 201, BLOCK);
+    expect(screen.queryAllByRole('listitem')).toEqual([]);
+    expect(screen.getByText('No block registered yet.')).toBeDefined();
   });
 
   it('takes back a line saying a block is registered once that block is removed, and keeps another’s', async () => {

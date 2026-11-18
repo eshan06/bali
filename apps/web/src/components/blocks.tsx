@@ -49,9 +49,9 @@ const registeredOn = (iso: string) =>
  * Each block's row ends on Remove (LO11; ClassFlows' "Remove a lost block", its in-between states
  * on RemoveBlockStates, drawn first), under the code where the row is full, as in Home's column.
  * It asks first, in a dialog naming the block, Cancel focused. Remove block sends the removal,
- * held as Removing… with Cancel and Escape until Bali answers; the block then leaves the list, said
- * under it, focus on the next block's Remove, else the one before, else the title. A failure is
- * said in the dialog: an answer that never came makes the button Try again, which sends the same
+ * held as Removing… with Cancel, Escape and every row's Remove until Bali answers; the block then
+ * leaves the list, said under it, focus on the next block's Remove, else the one before, else the
+ * title. A failure is said in the dialog: an answer that never came makes the button Try again, which sends the same
  * removal again under its id, and a refusal keeps Remove block, which sends it anew. Closed on a
  * removal whose answer never came, the blocks are read again, since it may have landed.
  */
@@ -165,10 +165,13 @@ export function Blocks() {
     }
     count?.('portal_block_registered');
     const { block, already } = answer;
-    // Joins the list as it is now, which a removal may have changed while this was on its way.
-    setBlocks((now) =>
-      now === null || now.some((b) => b.id === block.id) ? now : [...now, block],
-    );
+    // A new block joins the list as it is now, which a removal may have changed meanwhile; one
+    // listed when this was sent and gone since was removed after Bali took this, so stays gone.
+    if (!already) {
+      setBlocks((now) =>
+        now === null || now.some((b) => b.id === block.id) ? now : [...now, block],
+      );
+    }
     // The field stays where it was said, under the list it joined.
     setOpen(true);
     setTyped('');

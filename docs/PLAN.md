@@ -188,7 +188,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO10b** API: remove a lost block, its code freed for anyone to register again (the owner's "Free the code", 2026-11-17; #612's second PR, which closes it; after LO10a) — ✅ (#626; DECISIONS 2026-11-17); `DELETE /v1/blocks/{id}`, a session running no refusal; for LO11, removing a removed block is a `replay`, never a 404
 
-- **LO11** 👀 Home: Remove a lost block (#613; lane A; after LO3 and LO10) — ✅ (#PR-TBD; DECISIONS 2026-11-17); its in-between states on the canvas's RemoveBlockStates (version 61), the confirm in ClassFlows' words; for the phase's last steps, Phase 7's finished step lines and four other finished lines moved to the archive; for the phase's end: the pilot block's old code retired by Remove, no owner command (the header line, Before the pilot's item 3, Open owner items, `docs/PILOT.md`'s step 6)
+- **LO11** 👀 Home: Remove a lost block (#613; lane A; after LO3 and LO10) — ✅ (#628; DECISIONS 2026-11-17); its in-between states on the canvas's RemoveBlockStates (version 64), the confirm in ClassFlows' words; for the phase's last steps, Phase 7's finished step lines and four other finished lines moved to the archive; for the phase's end: the pilot block's old code retired by Remove, no owner command (the header line, Before the pilot's item 3, Open owner items, `docs/PILOT.md`'s step 6)
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 
