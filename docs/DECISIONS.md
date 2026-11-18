@@ -19,9 +19,10 @@ a real decision? Add a dated entry at the top: what was decided and why.
     LO6: the unlock pop-up clipped 2 px at 640–759 px.
   - LO3 #620: Check on's rarer rows, new facts about students, held until the owner approved them; two converted
     tests no longer pinning the page. After it: its canvas publish, from a stale `canvas.json`, dropped LO5's
-    LiveTopStates (LO5 put it back); Home's long Check on chip ran into the names, and its Open the recap went to
-    the wrong place for an earlier day (both fixed in #632).
-  - LO4 #618: pins dropped converting three files; focus left on the page's body leaving Present after the bell.
+    LiveTopStates (LO5 put it back); Home's long Check on chip ran into the names, and its Open the recap missed
+    the recap for an earlier day's session once LO7 landed (both fixed in #632).
+  - LO4 #618: pins dropped converting three files; leaving Present after the bell with no block left focus on the
+    page's body.
   - LO5 #619: no PLAN line; its worker took santa's size call itself (later briefs: report and wait).
   - LO6 #622: a name from Home's Check on reopening its panel at a later session; the panel's loading line losing its
     status role and a focus pin. After it: its `?student=` test found focus on the page's body once, on main's run
