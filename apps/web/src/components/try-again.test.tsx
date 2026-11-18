@@ -7,6 +7,7 @@ import { userEvent } from '@testing-library/user-event';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { buttonClass, lockButton } from './button';
 import { handOff, TryAgain } from './try-again';
 
 /*
@@ -119,6 +120,8 @@ describe('Try again, as drawn', () => {
     expect(button.getAttribute('type')).toBe('button');
     expect(button.classList).toContain('h-8.5');
     expect(button.classList).toContain('border-border-strong');
+    // v2's button, as sign-in, the invite page and Help keep it (LO13).
+    expect(button.className).toBe(buttonClass('secondary', '', 'sm'));
   });
 
   it('holds as Loading… while the page says its read is on its way (`held`): focusable, never disabled, a press sending nothing', async () => {
@@ -134,6 +137,34 @@ describe('Try again, as drawn', () => {
     await user.keyboard('{Enter}');
     await user.keyboard(' ');
     expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it('takes the lock-only look on a page rebuilt from its canvas (`look="lock"`, LO13): its button, held the same way', () => {
+    const { rerender } = tryAgain({ look: 'lock' });
+    const button = screen.getByRole('button', { name: 'Try again' });
+    // lock.css's small button: 12 px in where v2's is 14, a press that scales, its hit area 44 px.
+    expect(button.className).toBe(lockButton('secondary', 'sm'));
+    expect(button.classList).toContain('press');
+    expect(button.classList).not.toContain('px-3.5');
+    expect(told(button)).toEqual({ words: 'Try again', ...AT_REST });
+    // Held as v2's is, aria-disabled and focusable, its cursor not allowed.
+    rerender(<TryAgain look="lock" onRetry={() => undefined} then={[]} held children={LINE} />);
+    expect(told(button)).toEqual({ words: 'Loading…', ...BUSY });
+    expect(button.classList).toContain('aria-disabled:cursor-not-allowed');
+    // A send's own button with it: Start, Starting… while it sends, Try again once one failed.
+    const send = { words: 'Start 50-minute session', sending: 'Starting…', failed: false };
+    rerender(
+      <TryAgain
+        look="lock"
+        variant="primary"
+        size="md"
+        onRetry={() => undefined}
+        then={[]}
+        send={send}
+      />,
+    );
+    expect(told(button)).toEqual({ words: 'Start 50-minute session', ...AT_REST });
+    expect(button.className).toBe(lockButton('primary', 'md'));
   });
 
   it('comes full size where its failure is a card’s, in its place', () => {

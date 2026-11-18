@@ -1,12 +1,22 @@
-import type { LucideIcon } from 'lucide-react';
+import {
+  CircleCheck,
+  Flag,
+  LockOpen,
+  type LucideIcon,
+  ShieldCheck,
+  ShieldOff,
+  Wifi,
+  WifiOff,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { bareTime } from '@/lib/recap';
+import { reasonWords } from '@/components/unlock-popups';
+import { bareTime, type Moment, type StudentMoment } from '@/lib/recap';
 
 /*
  * A log in the lock-only look (LO6; lock.css's `.log`), the session list's and the student panel's,
- * in a module of its own that imports nothing of theirs or the grid's, so either can be loaded
- * first (santa's round 1).
+ * and a student's record in it, the panel's and the recap's (LO13), in a module of its own that
+ * imports nothing of theirs or the grid's, so either can be loaded first (santa's round 1).
  */
 
 /** A moment's icon in its state's ink (lock.css's `.c-*`): focused, unlocked, protection off, quiet. */
@@ -30,6 +40,34 @@ export interface LogItem {
   words: ReactNode;
   /** An unlock's reason, in the secondary ink under its words. */
   under?: ReactNode;
+}
+
+/**
+ * Each of a student's moments in the record's words and icon, in its state's ink, one copy for the
+ * student panel (ClassStudent: "Used Emergency Unlock", "Tapped in and focused"; the rest as
+ * LiveListStates draws them, in the session list's words) and the recap's record (ClassEndedOpen).
+ */
+const MOMENT: Record<Moment, [words: string, Icon: LucideIcon, ink: string]> = {
+  in: ['Tapped in and focused', CircleCheck, INK.focused],
+  unlock: ['Used Emergency Unlock', LockOpen, INK.unlocked],
+  focus: ['Back in focus', CircleCheck, INK.focused],
+  off: ['Turned protection off', ShieldOff, INK.off],
+  on: ['Turned protection back on', ShieldCheck, INK.quiet],
+  silent: ['Went silent', WifiOff, INK.quiet],
+  back: ['Checked in again', Wifi, INK.quiet],
+  left: ['Left', Flag, INK.quiet],
+};
+
+/** A student's moment as a line of their record: its time, icon and words, an unlock's reason under. */
+export function momentLine(m: StudentMoment): LogItem {
+  const [words, Icon, ink] = MOMENT[m.moment];
+  return {
+    key: m.key,
+    at: m.at,
+    icon: logIcon(Icon, ink),
+    words,
+    under: m.moment === 'unlock' ? reasonWords(m.reason) : null,
+  };
 }
 
 /**

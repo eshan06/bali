@@ -13,6 +13,7 @@ import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { lockButton } from '@/components/button';
 import { CountContext } from '@/components/count';
 import { type ApiClient, createApiClient } from '@/lib/api-client';
 import { ACCOUNT_DELETED, CANT_REACH, NOT_A_BLOCK_ID, NOT_A_SESSION_LENGTH } from '@/lib/errors';
@@ -354,8 +355,11 @@ describe('a class before it starts (ClassPage)', () => {
     bali.now.hold = START_KEY;
     const user = open();
     const start = await screen.findByRole('button', { name: 'Start 50-minute session' });
+    // The lock-only look's button, Starting… with it (LO13; ClassPage).
+    expect(start.className).toBe(lockButton('primary', 'md'));
     await user.click(start);
     expect(start.textContent).toBe('Starting…');
+    expect(start.className).toBe(lockButton('primary', 'md'));
     expect(start.getAttribute('aria-busy')).toBe('true');
     expect(start.getAttribute('aria-disabled')).toBe('true');
     expect(document.activeElement).toBe(start);

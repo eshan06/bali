@@ -64,9 +64,10 @@ Steps 1–3 are done for the owner's own class (2026-10-05); for another profess
    waits for the teacher rather than saying it isn't a Bali block.
    🔧 **Before the first class, the owner's block needs a fresh code:** its first code
    was committed to this repo (#228) and stays in its history. Write a new code onto the
-   tag and register it on the portal. The old code stays valid until its block row is
-   retired (`blocks.removed_at` set), and no screen or command does that yet: ask a
-   session for an owner command that retires a block, and run it on the old code.
+   tag and register it on the portal. Then retire the old one there too: on Home, under Your
+   blocks, press Remove on the old code's row and confirm (since LO11, 2026-11-17; no owner
+   command needed). A new tap with the old code then finds no block; a session already
+   running goes on to its bell.
 7. **The students' app**, from the App Store, once App Review approves a prod build (what to
    send it: `docs/APP-STORE.md`, sections 1–4; the build: `docs/DEPLOY.md`, "TestFlight").
    Each student installs Bali from the App Store. A fix is a new prod build, submitted for

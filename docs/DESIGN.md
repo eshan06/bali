@@ -621,6 +621,11 @@ redesign's board (the owner's approval, 2026-11-12), built as drawn the same way
 semibold; the radius `sign-in` (28: the card); the shadow `shadow-sign-in` (0 8px 24px, the
 shadows' warm black at 6 %: the card's); the colour `art-panel` (green-50: the art's panel); and
 `Button`'s `size="pill"` (52 px, `radius-full`, 24 px in, `button-lg`: its Sign in).
+LO13 (2026-11-17) removed those no page used any more: the sizes `present-title`,
+`present-tile-name`, `present-tile-state` and `code-present` (v2's Present, gone in LO9),
+`pill`, `bar-row` and `cell` (v2's Reports and its table, gone in LO8 and LO7), and the colours
+`mark` (the recap's marks, LO7), `ready` (ClassesCreated's check, LO3) and `unlock-link`
+(v2's Open student, LO6), with orange-700, which it alone drew with.
 
 **The lock-only look, for the teacher's pages** (the owner's approval,
 2026-11-16; Sources): the lock-only canvas's `project/lock.css`, as its boards
@@ -654,7 +659,7 @@ is ClassPage's: the well with the lengths and Start, the last session's line, th
 students with the join code behind Add students, its states as ClassStates and
 ClassBeforeStates draw them (drawn on the canvas first); the day a session ended,
 ClassEnded in its place since LO7 (below); Try again, and Start while it
-sends, still v2's button until a step at the phase's end moves them. Since LO5
+sends, the lock-only look's button since LO13 (below). Since LO5
 (2026-11-17) a class's page while its session runs is ClassLive's: its header
 with +5 and +10 as one pair, End session and Present, then over a hairline the
 count of who is focused, Check on (the state and the name only) and Everyone's
@@ -714,7 +719,7 @@ on the canvas first). LO9 added `present-name` (30/36, semibold), `present-clock
 `present-count-of` (30/38, medium), `present-room-name` (18/23, semibold),
 `present-room-state` (15/20, medium), `present-join` (22/30) and `code-join`
 (26/30, mono at medium, +0.06em), in lane B's block; v2's `present-title`,
-`present-tile-name`, `present-tile-state` and `code-present` have no user now.
+`present-tile-name`, `present-tile-state` and `code-present` went in LO13.
 Since LO11 (2026-11-17) each row of Your blocks ends on Remove, ClassFlows'
 Remove a lost block, under the code where the row is full, as in Home's column:
 a confirm naming the block, Cancel focused, Remove block in the primary green,
@@ -737,7 +742,13 @@ stays pinned in view at the window's top right while one is open, 18 px under
 the top bar however far down the page is scrolled, as LiveListStates draws it;
 never above the live part, so the header, the count and Check on are never under
 it: from 1024 px it starts over the session list's top, below 1024 px over the
-room's tiles, as before. Their behaviour is otherwise today's.
+room's tiles, as before. Their behaviour is otherwise today's. Since LO13 too,
+Try again is the lock-only look's button (`TryAgain`'s `look="lock"`) on every page
+rebuilt from the canvas, a student's home with lessons off included, Start and the
+other sends' buttons with it; sign-in, the invite page, Help, a student's lesson and
+the lesson pieces keep v2's, and so does End session's confirm, v2's dialog whole,
+which no board redraws. Home's title takes `page-title-phone` on a phone, and its
+Check on widens the chips' column for a long chip, as the class page's does.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the

@@ -30,7 +30,6 @@
   --bali-stone-700: #524e47;
   --bali-orange-100: #f7e6d2;
   --bali-orange-400: #db9347;
-  --bali-orange-700: #8c4f1e;
   --bali-orange-800: #6f3f1b;
   --bali-blue-100: #e0ebfa;
   --bali-blue-700: #28528e;
@@ -203,10 +202,6 @@
   --text-home-countdown: 30px;
   --text-home-countdown--line-height: 34px;
   --text-home-countdown--font-weight: 600;
-  --text-present-title: 36px;
-  --text-present-title--line-height: 42px;
-  --text-present-title--font-weight: 600;
-  --text-present-title--letter-spacing: -0.01em;
   --text-present-countdown: 44px;
   --text-present-countdown--line-height: 48px;
   --text-present-countdown--font-weight: 600;
@@ -214,12 +209,6 @@
   --text-present-question--line-height: 40px;
   --text-present-question--font-weight: 600;
   --text-present-question--letter-spacing: -0.01em;
-  --text-present-tile-name: 21px;
-  --text-present-tile-name--line-height: 28px;
-  --text-present-tile-name--font-weight: 600;
-  --text-present-tile-state: 17px;
-  --text-present-tile-state--line-height: 24px;
-  --text-present-tile-state--font-weight: 600;
   --text-code-chip: 17px;
   --text-code-chip--line-height: 26px;
   --text-code-chip--font-weight: 600;
@@ -228,10 +217,6 @@
   --text-code-card--line-height: 48px;
   --text-code-card--font-weight: 600;
   --text-code-card--letter-spacing: 0.16em;
-  --text-code-present: 34px;
-  --text-code-present--line-height: 44px;
-  --text-code-present--font-weight: 600;
-  --text-code-present--letter-spacing: 0.16em;
 
   /* The side menu's three (PV5), as v2.css draws them and §1's facts don't list: the lockup's
      word, the name at its foot and the initials in the avatar beside it. */
@@ -266,17 +251,8 @@
   --text-present-caption--line-height: 22px;
   --text-present-caption--font-weight: 400;
 
-  /* Reports' four (PV13), as v2.css draws them and §1's facts don't list: a class's pill, a bar's
-     row, a table's cell and the line under a cell's words. */
-  --text-pill: 13.5px;
-  --text-pill--line-height: 18px;
-  --text-pill--font-weight: 500;
-  --text-bar-row: 13.5px;
-  --text-bar-row--line-height: 18px;
-  --text-bar-row--font-weight: 400;
-  --text-cell: 14px;
-  --text-cell--line-height: 19px;
-  --text-cell--font-weight: 400;
+  /* Reports' (PV13), as v2.css draws it and §1's facts don't list: the line under a table cell's
+     words, a live card's "ends 9:55 AM" since (W3). */
   --text-cell-sub: 12px;
   --text-cell-sub--line-height: 16px;
   --text-cell-sub--font-weight: 400;
@@ -416,16 +392,11 @@
   --color-pip: var(--bali-stone-500);
   /* The unlock pop-up's top edge (PV10), the primitive v2.css draws it with. */
   --color-unlock-edge: var(--bali-orange-400);
-  /* And its Open student (PV11b), the primitive v2.css's `.t-act` draws with. */
-  --color-unlock-link: var(--bali-orange-700);
   /* A live card's edge (W3, the student's home; Home's with PV17b; a live class's card on Classes,
      PV16), the primitive v2.css's `.livecard` draws it with. */
   --color-live-edge: var(--bali-green-200);
-  /* The "is ready" dialog's check (PV16b, ClassesCreated), the primitive v2.css draws it in. */
-  --color-ready: var(--bali-green-600);
-  /* The recap's marks (PV12b), the primitives v2.css's `.mk` rings them with: stone, and a
-     protection off's red; an unlock's is the pop-up's edge (`unlock-edge`). */
-  --color-mark: var(--bali-stone-400);
+  /* A protection off's mark (PV12b), the primitive v2.css's `.mk` rings it with, a stretch of it on
+     the recap's tracks since LO7; an unlock's is the pop-up's edge (`unlock-edge`). */
   --color-mark-off: var(--bali-red-300);
   /* A live question's results (L7), the primitives v2.css draws them with: an option's bar
      (`.qbar`), the correct one's bar (`.right .qbar`) and its letter's circle (`.right .letter`),

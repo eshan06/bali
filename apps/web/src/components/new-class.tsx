@@ -193,6 +193,7 @@ export function NewClass({ ref, onAnswer }: { ref?: Ref<NewClassHandle>; onAnswe
             </LockButton>
             {/* One button throughout, so focus stays on it whatever it comes to say. */}
             <TryAgain
+              look="lock"
               type="submit"
               variant="primary"
               size="md"

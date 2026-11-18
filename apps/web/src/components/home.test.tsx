@@ -18,16 +18,10 @@ import { CANT_REACH } from '@/lib/errors';
 import { fromSnapshot } from '@/lib/grid-state';
 import { bellTime } from '@/lib/session-controls';
 
-import {
-  checkOn,
-  dayOf,
-  LiveWellView,
-  nextTurn,
-  presentHref,
-  studentHref,
-  TeacherHome,
-} from './home';
-import type { GridNow } from './live-grid';
+import { lockButton } from './button';
+
+import { dayOf, LiveWellView, nextTurn, presentHref, studentHref, TeacherHome } from './home';
+import { checkOn, type GridNow } from './live-grid';
 
 /*
  * A teacher's Home, one page for their classes (LO3; the lock-only canvas's Main, HomeIdle,
@@ -238,6 +232,8 @@ describe('Home’s head (Main, HomeIdle, PhonePages)', () => {
     home([TODAY]);
     const heading = screen.getByRole('heading', { level: 1, name: 'Classes' });
     expect(heading.getAttribute('tabindex')).toBe('-1');
+    // 26/32, and on a phone LO4's 23/29, one phone title size for every page (PhonePages; LO13).
+    expect(heading.className).toBe('text-page-title max-[760px]:text-page-title-phone');
     expect(heading.nextElementSibling?.textContent).toBe(dayOf(NOW));
     const button = screen.getByRole('button', { name: 'New class' });
     expect(button.getAttribute('aria-haspopup')).toBe('dialog');
@@ -268,6 +264,8 @@ describe('Home’s head (Main, HomeIdle, PhonePages)', () => {
     expect(screen.getByRole('alert').textContent).toBe(CANT_REACH);
     expect(screen.getByRole('link', { name: 'Period 6 AP Biology' })).toBeDefined();
     const again = screen.getByRole('button', { name: 'Try again' });
+    // The lock-only look's button, as the page is rebuilt from its canvas (LO13).
+    expect(again.className).toBe(lockButton('secondary', 'sm'));
     await user.click(again);
     // Held as Loading… until the account answers, its line kept, focus on it.
     expect(onRetry).toHaveBeenCalledOnce();
@@ -560,36 +558,39 @@ describe('a live well’s rarer moments (LiveWellView; HomeMoments)', () => {
 
   it('lists Check on’s rarer rows in the unlocks’, protection off’s, Silent’s, Not here’s, then Left’s order, a silence of another length its own row', () => {
     const at = new Date(NOW);
+    // The class page's own count (LO5's), Home's since LO13: one copy for both.
     const rows = checkOn(
-      fromSnapshot(
-        snapshot([
-          student('Caleb', { endedAt: iso(NOW - 3 * MIN) }),
-          student('Zuri', absent),
-          student('Tomás', { lastSeenAt: iso(NOW - 5 * MIN - 20_000) }),
-          student('Wei', { lastSeenAt: iso(NOW - 9 * MIN - 20_000) }),
-          student('Amara', { state: 'protection_off' }),
-          student('Mateo', {
-            state: 'unlocked',
-            endedAt: iso(NOW - 2 * MIN),
-            unlock: {
-              eventId: 'v2',
-              reason: null,
-              recordedAs: null,
-              occurredAt: iso(NOW - 9 * MIN),
-            },
-          }),
-          student('Ethan', {
-            state: 'unlocked',
-            unlock: {
-              eventId: 'v1',
-              reason: 'nurse',
-              recordedAs: null,
-              occurredAt: iso(NOW - MIN),
-            },
-          }),
-          student('Ana'),
-          student('Noor', { lastSeenAt: iso(NOW - 5 * MIN - 30_000) }),
-        ]),
+      Object.values(
+        fromSnapshot(
+          snapshot([
+            student('Caleb', { endedAt: iso(NOW - 3 * MIN) }),
+            student('Zuri', absent),
+            student('Tomás', { lastSeenAt: iso(NOW - 5 * MIN - 20_000) }),
+            student('Wei', { lastSeenAt: iso(NOW - 9 * MIN - 20_000) }),
+            student('Amara', { state: 'protection_off' }),
+            student('Mateo', {
+              state: 'unlocked',
+              endedAt: iso(NOW - 2 * MIN),
+              unlock: {
+                eventId: 'v2',
+                reason: null,
+                recordedAs: null,
+                occurredAt: iso(NOW - 9 * MIN),
+              },
+            }),
+            student('Ethan', {
+              state: 'unlocked',
+              unlock: {
+                eventId: 'v1',
+                reason: 'nurse',
+                recordedAs: null,
+                occurredAt: iso(NOW - MIN),
+              },
+            }),
+            student('Ana'),
+            student('Noor', { lastSeenAt: iso(NOW - 5 * MIN - 30_000) }),
+          ]),
+        ),
       ),
       at,
     );
@@ -602,6 +603,28 @@ describe('a live well’s rarer moments (LiveWellView; HomeMoments)', () => {
       ['Not here', 'Zuri'],
       ['Left', 'Caleb'],
     ]);
+  });
+
+  it('widens the chips’ column for a long chip rather than run it into the names, as the class page does (LO13)', () => {
+    well(
+      grid({
+        students: fromSnapshot(
+          snapshot([
+            student('Ana'),
+            student('Ryan', { state: 'protection_off', endedAt: iso(NOW - 3 * MIN) }),
+          ]),
+        ),
+      }),
+    );
+    const row = screen.getByRole('link', { name: 'Ryan' }).closest('li');
+    expect(row?.textContent).toMatch(/^Left.· protection offRyan$/);
+    // 150 px at least, 140 on a phone, and as wide as its chip: the class page's Check on (LO5).
+    expect(Array.from(row?.classList ?? [])).toEqual(
+      expect.arrayContaining([
+        'grid-cols-[minmax(150px,max-content)_minmax(0,1fr)]',
+        'max-[760px]:grid-cols-[minmax(140px,max-content)_minmax(0,1fr)]',
+      ]),
+    );
   });
 
   it('names a student in a rarer state alone, never saying everyone’s focused while one isn’t', () => {
@@ -702,7 +725,8 @@ describe('Last session (HomeIdle; HomeMoments)', () => {
 
   it('names the class and when it ran, then who stayed focused the whole time, the unlocks and who didn’t join, as the recap counts them', async () => {
     answers(25, 1);
-    home(IDLE);
+    // Its end's own moment, so it ended today by this computer's calendar at any hour.
+    home(IDLE, { now: Date.parse(LAST_END) });
     const section = screen.getByRole('region', { name: 'Last session' });
     expect(within(section).getByText('Period 1 Biology')).toBeDefined();
     expect(within(section).getByRole('status').textContent).toBe('Loading the last session…');
@@ -724,6 +748,22 @@ describe('Last session (HomeIdle; HomeMoments)', () => {
     expect([...new Set(bali.sent)].sort()).toEqual(
       ['GET /v1/blocks', REPORT, `${EVENTS}?after=0`, `${EVENTS}?after=1`, ROSTER].sort(),
     );
+  });
+
+  it('opens the recap on the class’s page the day the session ended, and on its own report page on a later day (LO13)', async () => {
+    answers(25, 1);
+    // The day it ended, the class's page is its recap (LO7).
+    home(IDLE, { now: Date.parse(LAST_END) });
+    const today = screen.getByRole('region', { name: 'Last session' });
+    const recap = await within(today).findByRole('link', { name: 'Open the recap' });
+    expect(recap.getAttribute('href')).toBe('/classes/c1');
+    cleanup();
+    // Two days on, the class's page is ClassPage, its line only: the session's own report page.
+    answers(25, 1);
+    home(IDLE, { now: Date.parse(LAST_END) + 2 * 24 * 60 * MIN });
+    const later = screen.getByRole('region', { name: 'Last session' });
+    const report = await within(later).findByRole('link', { name: 'Open the recap' });
+    expect(report.getAttribute('href')).toBe('/reports/c1/s-c1');
   });
 
   it('counts unlocks as unlocks, and says nobody joined in the figures’ place, the unlocks kept if any', async () => {
@@ -758,6 +798,8 @@ describe('Last session (HomeIdle; HomeMoments)', () => {
     expect(within(section).queryByRole('link')).toBeNull();
     bali.routes.set(ROSTER, () => 'hold');
     const again = within(section).getByRole('button', { name: 'Try again' });
+    // The lock-only look's button, as the page is rebuilt from its canvas (LO13).
+    expect(again.className).toBe(lockButton('secondary', 'sm'));
     await user.click(again);
     expect(again.textContent).toBe('Loading…');
     expect(within(section).getByRole('alert')).toBeDefined();

@@ -283,7 +283,7 @@ function LedgerHome({ me, classes, failed, onRead, onRefresh }: HomeProps) {
 
       {failed ? (
         <div className={OOPS}>
-          <TryAgain onRetry={onRefresh} then={[]}>
+          <TryAgain look="lock" onRetry={onRefresh} then={[]}>
             <p role="alert" className="flex items-center gap-3">
               <CircleAlert size={18} aria-hidden="true" className="shrink-0" />
               Bali couldn&apos;t load your classes.

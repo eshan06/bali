@@ -14,6 +14,7 @@ import { NetworkError } from '@/lib/api-client';
 import { CANT_REACH } from '@/lib/errors';
 import { bareTime } from '@/lib/recap';
 
+import { lockButton } from './button';
 import { LiveGrid, LockChip } from './live-grid';
 
 /*
@@ -396,6 +397,8 @@ describe('the count and Check on (LO5; ClassLive, LiveStates, LiveTopStates)', (
     const line = screen.getByRole('alert');
     expect(line.textContent).toBe(`Couldn't load this session. ${CANT_REACH}`);
     const again = screen.getByRole('button', { name: 'Try again' });
+    // The lock-only look's button, as the page is rebuilt from its canvas (LO13).
+    expect(again.className).toBe(lockButton('secondary', 'sm'));
     await user.click(again);
     // Held while it reads, its line kept; read, the count in its place.
     expect(again.getAttribute('aria-busy')).toBe('true');

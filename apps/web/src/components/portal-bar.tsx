@@ -59,9 +59,10 @@ interface Place {
 }
 
 /**
- * The bar's places (Main, Reports): Classes, which is Home, marked on Classes' old page and a
- * class's page too until Home and Classes are one page (LO3), and Reports, a session's report under
- * it. Never Questions or Slides, whichever way the lessons switch is set: no board draws them.
+ * The bar's places (Main, Reports): Classes, which is Home, marked on a class's page too, as
+ * ClassLive draws it, and on Classes' old address, which goes Home (LO3); and Reports, a session's
+ * report under it. Never Questions or Slides, whichever way the lessons switch is set: no board
+ * draws them.
  */
 const PLACES: Place[] = [
   { href: '/', label: 'Classes', under: '/classes' },

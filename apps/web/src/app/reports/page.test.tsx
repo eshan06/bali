@@ -13,6 +13,7 @@ import { userEvent } from '@testing-library/user-event';
 import { useLayoutEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { lockButton } from '@/components/button';
 import type { Me } from '@/components/shell';
 import { type ApiClient, createApiClient } from '@/lib/api-client';
 import { CANT_REACH } from '@/lib/errors';
@@ -452,6 +453,8 @@ describe('Reports in between (ReportsMoments, drawn first)', () => {
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toBe(`Couldn't load the sessions. ${CANT_REACH}`);
     const again = screen.getByRole('button', { name: 'Try again' });
+    // The lock-only look's button, as the page is rebuilt from its canvas (LO13).
+    expect(again.className).toBe(lockButton('secondary', 'sm'));
     expect(screen.queryByText('Loading sessions…')).toBeNull();
     const answer = held({ sessions: [MON], nextBefore: null });
     lists([MON]);

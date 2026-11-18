@@ -14,7 +14,8 @@ questions and slides switched off but kept in the code, and two workers at once 
 it, a student holds at most five push tokens (AN11a2, #599). Next: LO1 and LO10 at once, then LO2,
 then lanes A and B; while the phase runs, its step lines below are its status and this line waits
 for its end. Also open: the owner's switch of prod's domain, the release call and disabling the
-review account (Open owner items); a session builds the retire-a-block command; the owner the
+review account (Open owner items); the owner's fresh block code, the old one retired by Home's
+Remove (LO11, no command); the owner the
 sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11b, AN12;
 AN1's part 2 on the owner's phones; the audit's polish waits._
 
@@ -99,8 +100,8 @@ as it stood until LO0: `docs/PLAN-ARCHIVE.md`):
 2. 📱 The phone sitting, whole (`ios/README.md`, "Phase 7's phone sitting, on prod") — ✅ 2026-11-08
    (#545). Not run, left for the owner: Part 2's battery half hour, and Part 3's tap on a deck's link
    (no deck had one) and its second iPhone.
-3. The block's fresh code (`docs/PILOT.md`, setup step 6): a session builds the owner command that
-   retires a block; the owner writes the new code, registers it and retires the old one.
+3. The block's fresh code (`docs/PILOT.md`, setup step 6): the owner writes the new code, registers it
+   and removes the old one with Home's Remove (LO11, #628; no owner command needed).
 4. PostHog — ✅ A1–A6 (#503–#536) and the owner's key on `bali prod` (2026-11-07). The notice
    `/privacy`'s section 11 promises: owed to no one yet, and due for any change that matters from
    the first pilot user on (the owner; DECISIONS 2026-11-07).
@@ -192,7 +193,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO12** 👀 A student's home (#616; lane A) — LO12b, the home with lessons off, ✅ (#630; DECISIONS 2026-11-17), under v2's side menu until LO12a, the student's frame, parked (#629) for the owner's approval on StudentWebStates (v63); 18 source-text tests left
 
-- **LO13** The phase's tidy-up (#625; last) — part 1 ✅ (#631; DECISIONS 2026-11-17): the owner's "Pin them", the unlock pop-ups pinned at the window's top right (LiveListStates, version 65), and "Leave it out" recorded; part 2, the tidy-up, next
+- **LO13** The phase's tidy-up (#625; last) — ✅ (#631, #PR2; DECISIONS 2026-11-17): the owner's "Pin them" built (LiveListStates, version 65) and "Leave it out" recorded; Try again in the new look on every rebuilt page, Home's fixes, the record's words in one place, v2's unused tokens gone, Present's guard driven; `--text-menu-name` and PortalBar's side-menu comment wait for #629
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 
@@ -345,7 +346,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 - Phase 7: **to decide**, #313 (what a teacher's own deletion, and the retention run, do with their words), kept as today for now (the owner's ruling, 2026-10-12); **tracked fixes**, #319 ✅ (#437, saved questions' id case), #326 (a slow upload outliving its deck; M5 aborts it at 25 minutes, and a stuck one once nothing is sent for 30 s, #436), #334 ✅ (#403, a timeout on the portal's polls; #432, on every other read and save but a deck's check and a class's create, which has one since 2026-10-23), #336 measured (#438; DECISIONS 2026-10-22), its fix, a random wait of up to 10 s before the phone's first read after a push, approved by the owner (2026-10-23) and built in the push's app half (#456); and a bell past the gate's 600 phones is over the Starts' 1 s with no push (1,200: 0.9–1.2 s), a later step's before a school that size; L0b is the owner's (Railway, above). The calls confirmed on 2026-10-12: this line in full in `docs/PLAN-ARCHIVE.md`.
 - #380: Present after the bell has no Start, so starting the next class from a projected tab shows the last recap's unlock reasons (the owner, 2026-10-14: tracked, not now); PresentEnded's line, "the session ended at 9:55 AM", waits with it (PV12b kept Present's "no session running")
 - Left for the owner on finished steps' lines (in full in `docs/PLAN-ARCHIVE.md`): P6's restore drill, its result recorded once a backup exists; S4's CSP check on the deployed portal after each Next upgrade (due now, for 15.5.28, #435); ⚖️ whether C7-server's yes rides Other Data Types; device rounds still marked pending (B5b's round 2, steps 7 and 9; B5c's round 3, steps 1 and 3; round 4, B6a and B6b); smaller calls on F (a refused tap's end-of-day drop or dismiss button; the waiting card's Tap in), B6c-2 (`.keep`/`.retry`), B5b (a rule for a replaced window, a code step to schedule) and D2 (Present's key per class).
-- 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), and a session builds an owner command that retires a block, to retire the old code (`docs/PILOT.md`, setup step 6). The portal's three class-page controls are built (P10, P11).
+- 🔧 Before the pilot's first class: the owner's prod block gets a fresh code (its first reached the repo's history in #228), registered on the portal, the old one removed with Home's Remove (LO11; `docs/PILOT.md`, setup step 6). The portal's three class-page controls are built (P10, P11).
 - **Before the pilot's first class, four steps for sessions** (the owner's workflow review, 2026-10-13; one PR each; after the redesign's PV17c, the owner, 2026-10-14); the event-id check done (the owner's go, 2026-10-23), the other three wait for the owner's word:
   - a column-level privacy test: every column classified personal or not, each personal one placed by the privacy paths that handle it (the account deletion, the disposal, the retention run, the export), so a new column fails until it is placed; FERPA covers university students too;
   - a repeated-`event_id` check on every data-changing route — ✅ as part 1 (#442), part 2 (#447) and part 3 (#449); DECISIONS 2026-10-23;
