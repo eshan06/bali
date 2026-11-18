@@ -103,6 +103,9 @@ const NONE = { chrome: null, framed: false, hidden: false };
 const MENU = { chrome: 'menu', framed: true, hidden: false };
 const TOP = { chrome: 'top', framed: true, hidden: false };
 
+// The student web's switch (LO15), turned on by the tests of the student web as W3 built it.
+afterEach(() => vi.unstubAllEnvs());
+
 describe('what frames a page', () => {
   it('draws nothing on a page read without signing in: each has its own bar', () => {
     for (const path of ['/login', '/auth/callback', '/support', '/privacy', '/terms']) {
@@ -147,7 +150,8 @@ describe('what frames a page', () => {
     });
   });
 
-  it('draws the side menu for a student who said 13+ in the app, their home in v2’s frame; the invite page under the bar (W3)', () => {
+  it('draws the side menu for a student who said 13+ in the app, their home in v2’s frame; the invite page under the bar (W3), the student web on', () => {
+    vi.stubEnv('NEXT_PUBLIC_STUDENT_WEB', 'on');
     for (const path of ['/', '/reports', '/classes/c1', '/no-such-page']) {
       expect(frameFor(path, homeOf('student'), null, false), path).toEqual(MENU);
     }
@@ -161,6 +165,30 @@ describe('what frames a page', () => {
     });
     // A teacher there has the top bar, and the page sends them to their classes.
     expect(frameFor('/invite', homeOf('teacher'), null, false)).toEqual(TOP);
+  });
+
+  it('draws the bar for a student, never the menu, the student web off; their page at `/` frames itself as the invite page does (LO15)', () => {
+    for (const said of [undefined, 'off']) {
+      vi.stubEnv('NEXT_PUBLIC_STUDENT_WEB', said);
+      for (const path of ['/', '/invite']) {
+        expect(frameFor(path, homeOf('student'), null, false), `${said} ${path}`).toEqual({
+          chrome: 'bar',
+          framed: false,
+          hidden: false,
+        });
+      }
+      for (const path of ['/reports', '/classes/c1', '/no-such-page']) {
+        expect(frameFor(path, homeOf('student'), null, false), `${said} ${path}`).toEqual({
+          chrome: 'bar',
+          framed: true,
+          hidden: false,
+        });
+      }
+      // Help, Present and a teacher are framed as ever.
+      expect(frameFor('/support', homeOf('student'), null, false), said).toEqual(NONE);
+      expect(frameFor('/classes/c1', homeOf('teacher'), null, false), said).toEqual(TOP);
+      expect(frameFor('/invite', homeOf('teacher'), null, false), said).toEqual(TOP);
+    }
   });
 
   it('says a failed read in the page’s place under the bar, with Sign out, on every page (#352’s review)', () => {
@@ -596,6 +624,8 @@ describe('one `<main>` on a page, in every state (the owner’s follow-up, 2026-
   });
 
   it('has one in every frame: beside the menu, under the bar, in Present, the account’s failure said, and a page read without signing in its own', () => {
+    // The menu's frame is a student's while the student web is on (LO15).
+    vi.stubEnv('NEXT_PUBLIC_STUDENT_WEB', 'on');
     const place = (
       path: string,
       home: Home | null,

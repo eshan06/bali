@@ -8,6 +8,60 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-18** — **Students off the web for now, behind a switch that brings them back: `NEXT_PUBLIC_STUDENT_WEB`,
+  off unless it says on; off, a student who signs in on the portal gets one page saying the web is for teachers and
+  Bali is in the app on their phone (LO15, #634, the owner's order; ARCHITECTURE, Web portal, decision 9).**
+
+  **The owner (2026-11-18), in chat:** "lets just make it so students cannot sign in on the web right now. if there is
+  no backend for this then go ahead and make a plan and then go thorugh with it ... just for now maybe in the future
+  they will be able to sign in again. make this decision reversible"
+
+  **What off does** (`studentWebOn()`, `apps/web/src/lib/student-web-switch.ts`, LO1's lessons switch mirrored: read
+  where it is used, never at import): an account whose role is student gets no student pages. Their home is
+  `StudentWebOff`, one entry card under the invite page's bar with Sign out, today's sign-out: "You're signed in as a
+  student" over "Use Bali in the app on your phone. This site is for teachers." Every other signed-in page of theirs
+  has that bar, never the side menu. A lesson's address answers `307` to `/` from the server, whichever way lessons
+  are set. The invite page's line for an account the 13+ check never passed reads "Here as a student? Use Bali in the
+  app on your phone. This site is for teachers.", promising no home after a refresh. Nothing of the student's is read
+  for the page or shown on it beyond the shell's account read that says who they are: no class, no phone, no 30-second
+  read, no read as the tab comes back. Off is the default, so students are off the web from this deploy with nothing
+  to set on Vercel; `on`, its case and spaces aside, and a redeploy bring the student web back exactly as it was.
+
+  **No backend change, and why:** the portal already decides where an account goes (`homeFor`: the 13+ check, then
+  `/v1/me`'s role), so the switch is the portal's alone. The API keeps serving students: the app calls it with the
+  phone's client, so refusing students there would refuse the app. Sign-in, Cognito, the 13+ check and the apps are
+  unchanged. Cognito's sign-in can't know the role before it, so a student can still finish signing in on the web,
+  and lands on that page. Teachers are unchanged either way.
+
+  **This step's calls** (the owner may be away: the recommended option, recorded here):
+  - A student in no class yet keeps today's way to the invite page under the card ("Setting up a teacher account?
+    Enter your invite code"), as their home gave it, and only then, since a student in a class can't redeem a code
+    (Live lesson, decision 13). Without it, a teacher who set up the app first, whose account reads as a student's
+    until the redeem, would reach the invite page only by its address. `/invite` itself is a teacher's page,
+    unchanged.
+  - The words, in DESIGN.md's voice and through `no-ai-slop`: the heading mirrors the app's approved screen for a
+    teacher's account ("You're signed in as a teacher"); "phone", the app being on iPhone and Android.
+  - Drawn first on v2's canvas (version 128), its Signing in row, as intermediate states of signing in and the invite
+    page: StudentWebOff, StudentWebOffNoClass, InviteStudentWebOff and StudentWebOffPhone. Built from the entry pages'
+    own pieces (`EntryPage`, `CARD_ENTRY`, `STAGE_FOOT`), no new look.
+  - A teacher's page a student reaches by its address (Reports, a class's page) has the bar, as for an account the
+    13+ check never passed; its refusals are its own, unchanged.
+  - Nothing turned up that a student can do only on the web beyond their home and the lessons: account deletion is in
+    the app (Me → Delete account), and the privacy policy, terms and Help don't say students use the web (W3's naming
+    of the student pages in the privacy policy was left for C2's words and never written).
+
+  **Left for the owner:** the portal's sign-in page, the sign-in redesign's approved words, still tells students the
+  web is theirs: "Teachers and students sign in here to see their classes." and "Students: set up Bali in the app on
+  your iPhone first." Sign-in was to stay unchanged, so neither changed here; rewording them is a change to an approved
+  screen, the owner's call.
+
+  **Tests:** each piece both ways where it is drawn, driving the page: a student's home off and on, a teacher's home
+  both ways, an account the 13+ check never passed both ways, `/invite` both ways, the lesson's address off and on
+  (`app/page.test.tsx`, `app/lesson-pages.test.tsx`, `shell.driven.test.tsx`, `app/teacher-actions.test.tsx`); the
+  switch's own values (`student-web-switch.test.ts`); `frameFor` both ways among `shell.test.ts`'s own tests of it, no
+  source-text check added. The student web's own tests run with it on. Each switched line, broken in turn, failed a
+  test.
+
 - **2026-11-17** — **LO14, the lock-only phase's end (#614–#632): its review findings and the bugs found after a
   merge, by step, and what each repeated one became (CLAUDE.md, "End of a phase"; the conductor's list, checked
   against each PR, its reviews and its CI runs).**

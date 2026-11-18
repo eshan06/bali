@@ -107,10 +107,14 @@ class NoLayout {
 beforeAll(() => vi.stubGlobal('ResizeObserver', NoLayout));
 afterAll(() => vi.unstubAllGlobals());
 
+// The student web as W4 built it: its switch on (LO15), as only then does a student reach the page.
+beforeEach(() => vi.stubEnv('NEXT_PUBLIC_STUDENT_WEB', 'on'));
+
 afterEach(() => {
   // Focus off first, so no Try again unmounted here hands focus on in the next test's page.
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   cleanup();
+  vi.unstubAllEnvs();
   vi.useRealTimers();
   bali.calls.length = 0;
   bali.loads.length = 0;

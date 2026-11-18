@@ -16,7 +16,8 @@ import InviteRoute from './invite/page';
 import HomePage from './page';
 
 /*
- * Where the home sends each account (PV15; a student to their own home since W3; a teacher to Home,
+ * Where the home sends each account (PV15; a student to their own home since W3 while the student
+ * web is on, and to the page saying the web is for teachers with it off, LO15; a teacher to Home,
  * one page for their classes, since LO3), the invite page at `/invite` (W3), and Classes' old
  * address, which goes Home (LO3), as each opens (the owner's decision of 2026-10-22: the portal's
  * tests drive the page). The shell's read of the account is the test's, its reads counted; Bali's
@@ -72,17 +73,34 @@ afterEach(() => {
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   cleanup();
   vi.useRealTimers();
+  vi.unstubAllEnvs();
   sessionStorage.clear();
   nav.router.replace.mockClear();
   bali.sent.length = 0;
 });
 
-const account = (role: 'teacher' | 'student', classes: TaughtClass[] = []): MeResponse => ({
+const account = (role: 'teacher' | 'student', classes: MeResponse['classes'] = []): MeResponse => ({
   user: { id: 'u1', role, displayName: 'Ana Rodríguez' },
   classes,
   session: null,
   armed: false,
 });
+
+/** A class of the student's, in session now (W3's live card, were the student web on). */
+const biology: MeResponse['classes'][number] = {
+  id: 'c3',
+  name: 'Biology, period 3',
+  teacher: { displayName: 'Ms. Rivera' },
+  enrollmentId: 'e3',
+  liveSession: {
+    id: 'S',
+    startedAt: new Date(Date.now() - 600_000).toISOString(),
+    endsAt: new Date(Date.now() + 1_800_000).toISOString(),
+  },
+};
+
+/** The student web's switch (LO15), set as a deploy sets it: unset is off. */
+const studentWeb = (said: 'on' | 'off') => vi.stubEnv('NEXT_PUBLIC_STUDENT_WEB', said);
 
 /** The shell's read of the account as `home`, a later read's failure `error`, its reads counted. */
 function readAs(home: Home | null, error: string | null = null) {
@@ -106,6 +124,12 @@ function open(home: Home | null, page: ReactNode = <HomePage />) {
 
 const STUDENTS_LINE =
   'Here as a student? Set up Bali in the app on your iPhone first, then refresh this page.';
+/** The line with the student web off (LO15; InviteStudentWebOff): the app, and no home promised. */
+const STUDENTS_LINE_OFF =
+  'Here as a student? Use Bali in the app on your phone. This site is for teachers.';
+/** The page a student gets with the student web off (LO15; StudentWebOff). */
+const OFF_TITLE = "You're signed in as a student";
+const OFF_LINE = 'Use Bali in the app on your phone. This site is for teachers.';
 
 describe('the home sends each account where it belongs (PV15; decision 13)', () => {
   it('sends a tab with no sign-in to sign in, and reads nothing', () => {
@@ -121,32 +145,92 @@ describe('the home sends each account where it belongs (PV15; decision 13)', () 
     expect(container.querySelector('main')?.innerHTML).toBe('');
   });
 
-  it('a teacher: Home, one page for their classes, headed by Classes, no invite card (LO3)', () => {
-    const { container } = open({ kind: 'teacher', me: account('teacher') });
-    expect(screen.getByRole('heading', { level: 1, name: 'Classes' })).toBeDefined();
-    // One page heading, and no `<main>` of its own: the shell's is the page's one.
-    expect(container.querySelectorAll('h1')).toHaveLength(1);
-    expect(container.querySelectorAll('main')).toHaveLength(1);
-    expect(screen.queryByText('Enter your invite code')).toBeNull();
+  it('a teacher: Home, one page for their classes, headed by Classes, no invite card, whichever way the student web is set (LO3; LO15)', () => {
+    for (const said of ['on', 'off'] as const) {
+      studentWeb(said);
+      const { container } = open({ kind: 'teacher', me: account('teacher') });
+      expect(screen.getByRole('heading', { level: 1, name: 'Classes' }), said).toBeDefined();
+      // One page heading, and no `<main>` of its own: the shell's is the page's one.
+      expect(container.querySelectorAll('h1'), said).toHaveLength(1);
+      expect(container.querySelectorAll('main'), said).toHaveLength(1);
+      expect(screen.queryByText('Enter your invite code'), said).toBeNull();
+      expect(screen.queryByText(OFF_TITLE), said).toBeNull();
+      cleanup();
+    }
   });
 
-  it('an account the 13+ check never passed: the invite card, the line for students under it', () => {
+  it('an account the 13+ check never passed, the student web on: the invite card, the line for students under it', () => {
+    studentWeb('on');
     open({ kind: 'invite' });
     expect(screen.getByRole('heading', { level: 1, name: 'Enter your invite code' })).toBeDefined();
     expect(screen.getByText(STUDENTS_LINE)).toBeDefined();
+    expect(screen.queryByText(STUDENTS_LINE_OFF)).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Classes' })).toBeNull();
   });
 
-  it('a student who said 13+ in the app: their own home, never the invite card (W3)', () => {
+  it('an account the 13+ check never passed, the student web off: the invite card, its line sending students to the app with no home promised after a refresh (LO15)', () => {
+    // Unset, as a deploy that sets nothing has it.
+    open({ kind: 'invite' });
+    expect(screen.getByRole('heading', { level: 1, name: 'Enter your invite code' })).toBeDefined();
+    expect(screen.getByText(STUDENTS_LINE_OFF)).toBeDefined();
+    expect(screen.queryByText(STUDENTS_LINE)).toBeNull();
+    expect(screen.queryByText(OFF_TITLE)).toBeNull();
+  });
+
+  it('a student who said 13+ in the app, the student web on: their own home, never the invite card (W3)', () => {
+    studentWeb('on');
     open({ kind: 'student', me: account('student') });
     expect(screen.getByRole('heading', { level: 1, name: 'Your classes' })).toBeDefined();
     expect(screen.getByRole('link', { name: 'Enter your invite code' }).getAttribute('href')).toBe(
       '/invite',
     );
     expect(screen.queryByText(STUDENTS_LINE)).toBeNull();
+    expect(screen.queryByText(OFF_TITLE)).toBeNull();
+  });
+
+  it('a student who said 13+ in the app, the student web off: one page saying the web is for teachers, nothing of theirs on it, nothing read for it, never read again (LO15)', async () => {
+    vi.useFakeTimers();
+    for (const said of [undefined, 'off', 'OFF ', 'no']) {
+      vi.stubEnv('NEXT_PUBLIC_STUDENT_WEB', said);
+      const { container, me } = open({ kind: 'student', me: account('student', [biology]) });
+      const title = screen.getByRole('heading', { level: 1, name: OFF_TITLE });
+      expect(container.querySelectorAll('h1'), said).toHaveLength(1);
+      expect(title.nextElementSibling?.textContent, said).toBe(OFF_LINE);
+      // Nothing of theirs: no class, no teacher, no phone, no home of theirs, no invite card.
+      for (const theirs of ['Biology, period 3', 'Ms. Rivera', 'Your phone', 'Your classes']) {
+        expect(screen.queryByText(theirs), `${said} ${theirs}`).toBeNull();
+      }
+      expect(screen.queryByRole('textbox'), said).toBeNull();
+      // In a class, so no way to the invite page: a student in a class can't redeem a code.
+      expect(screen.queryByRole('link'), said).toBeNull();
+      // The account the shell reads as the page opens, as Home's every page does; nothing else, then
+      // or later: no class's read, no 30 s read, none as the tab comes back.
+      expect(me.load, said).toHaveBeenCalledOnce();
+      await act(() => vi.advanceTimersByTimeAsync(5 * 60_000));
+      act(() => {
+        fireEvent(document, new Event('visibilitychange'));
+      });
+      expect(me.load, said).toHaveBeenCalledOnce();
+      expect(me.refresh, said).not.toHaveBeenCalled();
+      expect(bali.sent, said).toEqual([]);
+      cleanup();
+    }
+  });
+
+  it('a student in no class yet, the student web off: the same page, and a teacher who set up the app first keeps the way to the invite page (LO15; decision 13)', () => {
+    open({ kind: 'student', me: account('student') });
+    expect(screen.getByRole('heading', { level: 1, name: OFF_TITLE })).toBeDefined();
+    const way = screen.getByRole('link', { name: 'Enter your invite code' });
+    expect(way.getAttribute('href')).toBe('/invite');
+    expect(way.parentElement?.textContent).toBe(
+      'Setting up a teacher account? Enter your invite code',
+    );
+    expect(screen.queryByRole('heading', { name: 'Your classes' })).toBeNull();
+    expect(screen.queryByText(STUDENTS_LINE_OFF)).toBeNull();
   });
 
   it('a student’s home reads the account through the shell: a later read’s failure said with its Try again, the shell’s refresh, and its tab back in view the shell’s load (LO12)', async () => {
+    studentWeb('on');
     const user = userEvent.setup();
     const me = readAs({ kind: 'student', me: account('student') }, CANT_REACH);
     render(
@@ -283,23 +367,39 @@ describe('a teacher’s Home, as the page runs it (LO3)', () => {
 });
 
 describe('the invite page at /invite, where a student’s home sends a teacher who set up the app first (W3)', () => {
-  it('a student who said 13+ in the app: the invite card, never told to set up the app again', () => {
-    open({ kind: 'student', me: account('student') }, <InviteRoute />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Enter your invite code' })).toBeDefined();
-    expect(screen.queryByText(STUDENTS_LINE)).toBeNull();
+  it('a student who said 13+ in the app: the invite card, never told to set up the app again, whichever way the student web is set (LO15)', () => {
+    for (const said of ['on', 'off'] as const) {
+      studentWeb(said);
+      open({ kind: 'student', me: account('student') }, <InviteRoute />);
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Enter your invite code' }),
+        said,
+      ).toBeDefined();
+      expect(screen.queryByText(STUDENTS_LINE), said).toBeNull();
+      expect(screen.queryByText(STUDENTS_LINE_OFF), said).toBeNull();
+      expect(screen.queryByText(OFF_TITLE), said).toBeNull();
+      cleanup();
+    }
   });
 
-  it('an account the 13+ check never passed: the page Home shows it, its line for students under it', () => {
+  it('an account the 13+ check never passed: the page Home shows it, its line for students under it, whichever way the student web is set (LO15)', () => {
     // The same markup, but for the ids React mints per tree.
     const ids = (html: string) => html.replace(/_r_\w+_/g, 'id');
-    const route = open({ kind: 'invite' }, <InviteRoute />);
-    expect(screen.getByText(STUDENTS_LINE)).toBeDefined();
-    // It reads nothing of its own: the account is the shell's one read.
-    expect(bali.sent).toEqual([]);
-    const there = ids(route.container.innerHTML);
-    cleanup();
-    const home = open({ kind: 'invite' });
-    expect(ids(home.container.innerHTML)).toBe(there);
+    for (const [said, line] of [
+      ['on', STUDENTS_LINE],
+      ['off', STUDENTS_LINE_OFF],
+    ] as const) {
+      studentWeb(said);
+      const route = open({ kind: 'invite' }, <InviteRoute />);
+      expect(screen.getByText(line), said).toBeDefined();
+      // It reads nothing of its own: the account is the shell's one read.
+      expect(bali.sent, said).toEqual([]);
+      const there = ids(route.container.innerHTML);
+      cleanup();
+      const home = open({ kind: 'invite' });
+      expect(ids(home.container.innerHTML), said).toBe(there);
+      cleanup();
+    }
   });
 
   it('draws nothing before the account is read, nor for a teacher, whom it sends home', () => {

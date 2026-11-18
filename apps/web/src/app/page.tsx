@@ -7,8 +7,10 @@ import { nextTurn, TeacherHome } from '@/components/home';
 import { InviteEntry } from '@/components/invite-code';
 import { useMe } from '@/components/shell';
 import { StudentHome } from '@/components/student-home';
+import { StudentWebOff } from '@/components/student-web-off';
 import { getAccessToken } from '@/lib/auth';
 import { AFTER_BELL_MS, nextBell } from '@/lib/classes';
+import { studentWebOn } from '@/lib/student-web-switch';
 
 /**
  * The home (decision 13), where the account belongs. A teacher's is Home, one page for their classes
@@ -17,9 +19,11 @@ import { AFTER_BELL_MS, nextBell } from '@/lib/classes';
  * one read (`useMe`: the 13+ check, then `/v1/me`), which the top bar names too, read again as the
  * page opens; each answer is dated as it lands. By this computer's clock the date turns at midnight,
  * and a live class's row goes at its bell, the account read again just after it. A student who said
- * 13+ in the app gets their own home (W3; StudentHome); an account the 13+ check never passed, the
- * invite page with its line for students (Invite, PV15). Until the account answers, the shell says
- * Loading… or its failure in the page's place (PV5b); the page sits under the shell's top bar (LO2).
+ * 13+ in the app gets their own home (W3; StudentHome) while the student web is on, and with it off
+ * the one page saying the web is for teachers (LO15; StudentWebOff); an account the 13+ check never
+ * passed, the invite page with its line for students (Invite, PV15). Until the account answers, the
+ * shell says Loading… or its failure in the page's place (PV5b); the page sits under the shell's top
+ * bar (LO2).
  */
 export default function HomePage() {
   const router = useRouter();
@@ -87,6 +91,8 @@ export default function HomePage() {
   // (`AccountUnread`), as it does on every page.
   if (home === null) return null;
   if (home.kind === 'student') {
+    // The student web off (LO15): the page saying the web is for teachers, nothing more of theirs.
+    if (!studentWebOn()) return <StudentWebOff inClass={home.me.classes.length > 0} />;
     return <StudentHome me={home.me} failed={error !== null} onRead={load} onRefresh={refresh} />;
   }
   // Never through the 13+ check: the invite code, in place of the classes or a 403.
