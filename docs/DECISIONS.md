@@ -17,7 +17,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
   sign-in was to stay unchanged, and they are the sign-in redesign's approved words.
 
   **What changed** (`apps/web/src/app/login/page.tsx`, its `LINES`, chosen by LO15's `studentWebOn()` as the page
-  renders; baked into the build, so the server's page and the browser's say the same):
+  renders, as LO15's pages read it; set for the build, as Vercel sets it, so the server's page and the browser's say
+  the same):
   - Off, nothing set or anything but `on`: the card's line reads "Teachers sign in here to see their classes.", and
     the line under the card "Students: use Bali in the app on your phone."
   - On: "Teachers and students sign in here to see their classes." and "Students: set up Bali in the app on your

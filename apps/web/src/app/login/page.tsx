@@ -53,7 +53,7 @@ const PUBLIC_PAGES = [
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [left, setLeft] = useState<SignedOut | null>(null);
-  // Baked into the build, so the server's page and the browser's say the same.
+  // Set for the build, as Vercel sets it, so the server's page and the browser's say the same.
   const lines = studentWebOn() ? LINES.on : LINES.off;
 
   // Read after hydration: sessionStorage is the browser's, and the server drew none.
