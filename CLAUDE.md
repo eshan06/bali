@@ -106,7 +106,10 @@ lint && npm test`, plus `npm run demo` when API behavior changed), then run
   2026-10-22): Testing Library on jsdom, opted into per file (`docs/WEB.md`,
   Testing the portal). A UI step converts the source-text tests it touches
   and adds none: `apps/web/src/source-text-tests.test.ts` lists those left,
-  and its list only shrinks.
+  and its list only shrinks. Converting one loses nothing it pinned: list
+  every assertion before it goes, and give each a driven test shown failing
+  without the line it pins, unless the PR names the behavior change that
+  removes it (`docs/WEB.md` says how).
 - **Ponytail (the account-wide minimalism/YAGNI plugin) governs
   implementation, never the gates.** Its minimalism shapes the code you
   write; the testing rules above, every CI check, validation at trust

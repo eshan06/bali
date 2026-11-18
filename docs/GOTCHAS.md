@@ -127,6 +127,11 @@ the clone is `C:\Users\Eshan Shah\Downloads\github\bali`. Its path has a space: 
   "blocked by a Read permission rule"; the same folder as `C:\Users\Eshan Shah\…` publishes. A
   publish refused with "you haven't viewed the latest version" wants a read of the artifact itself
   (only its `url`), not only of its files, before it goes.
+- **A canvas publish can drop another worker's board.** A publish sends `project/canvas.json` whole,
+  so one built on a copy read before the other worker's publish takes their board out of the index
+  (LO3's dropped LO5's LiveTopStates; LO5 put it back). Read the artifact and its `canvas.json`
+  again right before every publish, merge your change into the copy that read gave you, check the
+  index still lists every board, and never `force`: it discards the newer version.
 
 ## Android's SDK on Windows
 

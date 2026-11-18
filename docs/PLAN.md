@@ -195,6 +195,8 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO13** The phase's tidy-up (#625; last) — ✅ (#631, #632; DECISIONS 2026-11-17): the owner's "Pin them" built (LiveListStates, version 65) and "Leave it out" recorded; Try again in the new look on every rebuilt page, Home's fixes, the record's words in one place, v2's unused tokens gone, Present's guard driven; `--text-menu-name` and PortalBar's side-menu comment wait for #629
 
+- **LO14** The phase's end: its findings by step, each repeated one a rule, a GOTCHAS entry or a test (part of #601; after LO13) — ✅ (#633; DECISIONS 2026-11-17): converting a source-text test loses nothing it pinned (CLAUDE.md, `docs/WEB.md`, santa-loop); a canvas publish merges into the `canvas.json` read just before it (GOTCHAS); left, not ruled: Android's JVM timing flake, for the Android work, and the screen steps' size, the owner's question
+
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 
 **Done** (2026-10-16): PV0–PV17, the last PV17c-2 (#425), to the canvas

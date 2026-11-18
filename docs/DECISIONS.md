@@ -8,6 +8,57 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-17** — **LO14, the lock-only phase's end (#614–#632): its review findings and the bugs found after a
+  merge, by step, and what each repeated one became (CLAUDE.md, "End of a phase"; the conductor's list, checked
+  against each PR, its reviews and its CI runs).**
+
+  **By step** (santa's blockers unless named; each fixed, a failing test first for a bug):
+  - None: LO0 #614, LO10a #621, LO10b #626, LO13 #631 and #632.
+  - LO1 #615: four assertions of converted source-text tests that no driven test carried.
+  - LO2 #617: the bar's live class leaving at the old bell after time was added, two paths; no PLAN line. Fixed in
+    LO6: the unlock pop-up clipped 2 px at 640–759 px.
+  - LO3 #620: Check on's rarer rows, new facts about students, held until the owner approved them; two converted
+    tests no longer pinning the page. After it: its canvas publish, from a stale `canvas.json`, dropped LO5's
+    LiveTopStates (LO5 put it back); Home's long Check on chip ran into the names, and its Open the recap went to
+    the wrong place for an earlier day (both fixed in #632).
+  - LO4 #618: pins dropped converting three files; focus left on the page's body leaving Present after the bell.
+  - LO5 #619: no PLAN line; its worker took santa's size call itself (later briefs: report and wait).
+  - LO6 #622: a name from Home's Check on reopening its panel at a later session; the panel's loading line losing its
+    status role and a focus pin. After it: its `?student=` test found focus on the page's body once, on main's run
+    after #626 (not yet looked into).
+  - LO7 #623: a track drawing an unlock during protection off as unlocked; Claude Review, twice: a superseded unlock
+    drawn as unlocked, the tracks copying the grid's rules. Left as WARNs: a superseded unlock only R2's report
+    lists, still drawn; an unlock after a student left, drawn as nothing.
+  - LO8 #624: deleting `reports-list.test.ts` lost the only tests of the page's guard against a late answer for
+    another class.
+  - LO9 #627: none; its WARN, `present.test.ts`'s guard on Present's question and slide gone with it, driven again
+    in #632.
+  - LO11 #628: none; a WARN fixed as the bug it was: a register's late answer put a just-removed block back.
+  - LO12a #629: parked, no approved board drawing a student's frame. LO12b #630: the conductor's call amended
+    ARCHITECTURE's decision 8, so it was built to decision 8 as written.
+
+  **Repeated, and what each became:**
+  - **A converted source-text test losing an assertion** (LO1 four, LO3 two, LO4 two, LO8 one, LO9's guard): a
+    rule in CLAUDE.md's driven-test bullet, its how in `docs/WEB.md`'s Testing the portal, and a line for santa's
+    reviewers. A rule, not a check: no check can tell whether a driven test pins the line a source-text one did;
+    undoing the line is the proof.
+  - **A stale canvas publish** (once; live whenever two workers share a canvas): a GOTCHAS entry, The Windows PC.
+  - **The tracks' copy of the grid's rules** (LO7, four times): tests already added for the two fixed. Sharing the
+    grid's code, as ARCHITECTURE's rule 2 asks, would retire the copy and its two WARNs: a step to plan.
+  - **A call the rules keep for the owner, taken as the conductor's** (LO3's rows, LO12a's frame, LO12b's decision
+    8): already rules, and santa held each to them; none shipped without the owner.
+  - Smaller, nothing new: the PLAN line (missing in LO2 and LO5, which "Plan doc updated" holds too; its PR's
+    number, a WARN five times, set once the PR is open); source pins renamed in place over code no step changed
+    (LO5, LO7, LO9), for the step that changes it.
+
+  **Left, not ruled:**
+  - **Android's JVM tests timing out on CI**, each passing on its next run: "No request to … came in time"
+    (SlideTest once; DeletedOnServerTest on #617, #626, main after #626, and #631) and LessonsTest's real-socket
+    test past 60 s (main after #614 and after #631). For the Android work the owner has paused.
+  - **Every screen step but LO11 over santa's ~400 lines** (LO2–LO9, 679 to 1,679 lines without tests, mostly v2's
+    view deleted): the conductor sent each on as one PR with its reason, and split LO12 and LO13; LO3's Reviewer B
+    read a quarter of its diff at first. A question for the owner, not a rule.
+
 - **2026-11-17** — **LO13, part 2: the lock-only phase's tidy-up. Try again in the new look on every rebuilt page,
   Home's four fixes, the record's words in one place, v2's unused pieces gone, Present's guard driven again, and the
   pilot block's old code retired by Remove (the worker's calls, the owner away; LO13, closes #625).**
