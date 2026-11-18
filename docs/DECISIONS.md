@@ -29,10 +29,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   never rises above the live part, so GA2's guarantee holds (the audit's C01, where a click on End session landed on a
   pop-up): from 1024 px it starts 12 px over the session list's top, 380 px wide (28 px into the gap beside the list),
   so neither the header nor the count, Check on or the room is under it at the page's top; below 1024 px it starts 12
-  px over the room (8 on a phone), the count and Check on above it, as before, the room's width on a phone. So from
-  1024 px its place at the page's top moves from the room's top right to the list's, the window's top right as the
-  ruling says. The rest is GA2's: newest on top, the name, the reason and the time, each until it's closed, Open
-  student, never in Present. LO6's "two unlocks at once" on the board now points to the ruling for where they sit.
+  px over the room's tiles (8 on a phone), under the room's heading, the count and Check on above it, as before
+  (PhoneLive), the room's width on a phone. So from 1024 px its place at the page's top moves from the room's top right
+  to the list's, the window's top right as the ruling says. The rest is GA2's: newest on top, the name, the reason and
+  the time, each until it's closed, Open student, never in Present. LO6's "two unlocks at once" on the board now points
+  to the ruling for where they sit, and DESIGN.md says where they sit.
   *Weighed:* fixed at the window's top right from the page's top, which covers +5, +10, End session and Present until
   closed (C01 again); and the room's right edge at every width, which at 1024 px is the window's middle, not its top
   right.
@@ -45,8 +46,11 @@ a real decision? Add a dated entry at the top: what was decided and why.
   **What it covers, said plainly:** from 1024 px, the list's title and newest lines (the unlock's own line among them),
   and the list's Try again should its read fail, until the pop-up is closed; pinned, whatever scrolls under it, as the
   room's top tiles were before; the student panel's middle when both are open, as under 1024 px before (over it, so no
-  unlock hides behind the panel); and on a phone whose bar carries a second live class, or has its menu open, the bar's
-  lower part, the pop-up whole.
+  unlock hides behind the panel); on a phone whose bar carries a second live class, or has its menu open, the bar's
+  lower part, the pop-up whole; and in its columns, a control that focus scrolls into view from above, which lands 112
+  px down (the bar's `scroll-padding-top`), until the pop-up is closed. A stack taller than the window runs past its
+  foot, the oldest out of view until newer ones are closed, as the sticky stack did before. Its pinned top is the bar's
+  height plus 18 px, written in both places (`portal-bar.tsx` says so beside the bar).
 
   **Tests:** driven. `unlock-popups.test.tsx` (the layer and the pinned stack), `classes/[id]/page.test.tsx` (the
   layer's cells, every control of the header and Check on before it and out of it), `live-grid.driven.test.tsx` (the

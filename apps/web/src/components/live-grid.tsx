@@ -936,7 +936,7 @@ export function LiveGrid({
         <div className="flex min-w-0 flex-col gap-10 max-lg:contents">
           <section
             aria-labelledby={`${id}-count`}
-            className="flex min-w-0 flex-col gap-6 max-lg:col-start-1 max-lg:row-start-1 max-[760px]:mb-2"
+            className={`flex min-w-0 flex-col gap-6 max-lg:col-start-1 max-lg:row-start-1${roomShown ? ' max-[760px]:mb-2' : ''}`}
           >
             {lost ? <FeedLine stale={lost} /> : null}
             <h2

@@ -93,21 +93,22 @@ export const reasonWords = (reason: UnlockReason | null) =>
  * grid, which places it (`LiveGrid`) where no control of the header, the count or Check on is ever
  * under it (GA2; the audit's C01): at 1024 px and wider over the session list's column, from 12 px
  * over its top to the live part's foot, 28 px into the gap beside it and 12 px past its right,
- * inside the page's 40 px margin, 380 px in all; under 1024 px from 12 px over the room (8 px on a
- * phone) to the foot of the session list under it, out 12 px past the page's right but on a phone
- * (PhoneLive), so no pop-up is ever cut at the window's edge. Its size is the grid's alone
- * (`contain-size`), so a tall stack never moves the room or the list, and it takes nobody's clicks
- * but the pop-ups' own.
+ * inside the page's 40 px margin, 380 px in all; under 1024 px from 12 px over the room's tiles (8
+ * px on a phone), past its heading's 24 px row and the 16 px under it, as PhoneLive draws it, to the
+ * foot of the session list under it, out 12 px past the page's right but on a phone, so no pop-up is
+ * ever cut at the window's edge. Its size is the grid's alone (`contain-size`), so a tall stack never
+ * moves the room or the list, and it takes nobody's clicks but the pop-ups' own.
  */
 const LAYER =
-  'pointer-events-none -mt-3 -mr-3 self-stretch contain-size lg:-ml-7 max-[760px]:-mt-2 max-[760px]:mr-0';
+  'pointer-events-none -mt-3 -mr-3 self-stretch contain-size lg:-ml-7 min-[760px]:max-lg:mt-7 max-[760px]:mt-8 max-[760px]:mr-0';
 /**
  * The stack (ClassLive's `.popups`, LiveListStates): at the layer's top right, 380 px wide at most
  * (on a phone the room's width), 10 px apart. Pinned (the owner's ruling, 2026-11-17: "Pin them"):
  * while one is open it stays in view at the window's top right, 18 px under the top bar (its 60 px
- * row and hairline, 56 px on a phone), however far down the page is scrolled, and never above the
- * layer's top. Over the bar and the student panel (z 3 and 5). A stack taller than the window's
- * room for it scrolls with the page.
+ * row and hairline, 56 px on a phone: `portal-bar.tsx`'s `ROW`), however far down the page is
+ * scrolled, and never above the layer's top. Over the bar and the student panel (z 3 and 5). A
+ * stack taller than the window runs past its foot, the oldest out of view until newer ones are
+ * closed; one taller than its layer scrolls with the page.
  */
 const STACK =
   'sticky top-[79px] z-20 ml-auto flex w-95 max-w-full flex-col gap-2.5 max-[760px]:top-[75px] max-[760px]:w-full';

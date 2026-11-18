@@ -256,6 +256,14 @@ describe('the room on the class page (LO5; ClassLive, LiveStates’ rare tiles)'
     expect(screen.getAllByRole('heading', { level: 2 })[0]?.textContent).toBe('0 of 0 focused');
     expect(screen.getByText('No students yet.')).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'Everyone' })).toBeNull();
+    // Under 1024 px the session list takes the room's row, the grid's second, 32 px under the
+    // count on a phone: no 8 px more there, which keeps the count 40 px over a room (LO13).
+    const count = screen.getByRole('region', { name: '0 of 0 focused' });
+    expect(count.classList.contains('max-[760px]:mb-2')).toBe(false);
+    const list = screen.getByRole('complementary', { name: 'This session' });
+    expect(Array.from(list.parentElement?.classList ?? [])).toEqual(
+      expect.arrayContaining(['max-lg:col-start-1', 'max-lg:row-start-2']),
+    );
   });
 });
 

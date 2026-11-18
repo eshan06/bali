@@ -188,7 +188,8 @@ function LiveStrip({
  * lock.css's top bar (Main, Reports, PhonePages): on the page's colour with its hairline, staying in
  * view as the page scrolls, under the student panel and a pop-up (z 5 and up). Its row 1360 px wide
  * at most, 40 px in; under 760 px 16 px in, two columns, the live class on a row of its own
- * (BarStates, drawn first).
+ * (BarStates, drawn first). Its height, 60 px and the hairline (56 on a phone), is where the unlock
+ * pop-ups pin, 18 px under it (`unlock-popups.tsx`'s `STACK`, LO13): change the two together.
  */
 const BAR = 'sticky top-0 z-3 border-b border-border-default bg-surface-page';
 const ROW =

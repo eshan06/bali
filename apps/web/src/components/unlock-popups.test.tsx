@@ -22,8 +22,9 @@ import {
  * tile's pulse, and it stays until it is closed; never on the projector. An unlock is the one event
  * a teacher must never miss: no pop-up swallows or hides another, and one already shown never opens
  * again when the stream replays its unlock. Driven here in a page (jsdom, Testing Library: the
- * owner's decision of 2026-10-22); how the class page places them, over the room alone, is its own
- * test (`app/classes/[id]/page.test.tsx`).
+ * owner's decision of 2026-10-22); how the class page places them, pinned at the window's top right
+ * and never over the header, the count or Check on (the owner's "Pin them", LO13), is its own test
+ * (`app/classes/[id]/page.test.tsx`).
  */
 
 afterEach(() => {
@@ -364,11 +365,12 @@ describe('a pop-up, as ClassLive draws it', () => {
     ]);
     const stack = boxes[0]?.parentElement;
     const layer = stack?.parentElement;
-    // The layer, an item of the live page's grid, in the cells the grid gives it (`place`): 12 px
-    // over them, 28 px into the gap beside the session list from 1024 px, so 380 px over it, and out
-    // 12 px past the right, inside the page's 40 px margin; on a phone 8 px over them and no wider
-    // than the room, so none is ever cut at the window's edge. Its size the grid's alone, so a tall
-    // stack moves nothing; it takes no clicks but the pop-ups'.
+    // The layer, an item of the live page's grid, in the cells the grid gives it (`place`): from
+    // 1024 px 12 px over the session list's, 28 px into the gap beside it, so 380 px over it; under
+    // 1024 px 12 px over the room's tiles, past its heading's row and the 16 px under it (28 px
+    // down), and on a phone 8 px over them (32 px down), no wider than the room; out 12 px past the
+    // right but on a phone, inside the page's 40 px margin, so none is ever cut at the window's edge.
+    // Its size the grid's alone, so a tall stack moves nothing; it takes no clicks but the pop-ups'.
     expect(classes(layer).sort()).toEqual(
       [
         'pointer-events-none',
@@ -377,7 +379,8 @@ describe('a pop-up, as ClassLive draws it', () => {
         'self-stretch',
         'contain-size',
         'lg:-ml-7',
-        'max-[760px]:-mt-2',
+        'min-[760px]:max-lg:mt-7',
+        'max-[760px]:mt-8',
         'max-[760px]:mr-0',
         'lg:col-start-2',
       ].sort(),
