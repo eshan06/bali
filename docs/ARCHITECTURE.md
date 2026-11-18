@@ -1488,7 +1488,9 @@ the reads its pages need are additive steps of their own (PV2, PV3).
 *Amended 2026-11-16 (the owner's approval; `docs/DECISIONS.md`):* a teacher's pages move to the
 canvas "Bali portal, lock only", page by page in PLAN's Lock-only portal steps (LO): a top bar with
 Classes, Reports and Help in place of the side menu, Home and Classes one page; sign-in, the invite
-page and Help keep their looks. Still a look: every figure the canvas draws is one Bali already
+page and Help keep their looks. A student's pages follow since LO12 (2026-11-17, the conductor's call
+for the owner's look): a top bar with Your classes and Help, as the canvas's StudentWebStates draws
+it. Still a look: every figure the canvas draws is one Bali already
 keeps, and its one new call is LO10's, a teacher removing a lost block.
 
 **8. The lessons switch** (the owner, 2026-11-16; `docs/DECISIONS.md`): Bali is sold as a phone

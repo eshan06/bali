@@ -190,7 +190,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO11** 👀 Home: Remove a lost block (#613; lane A; after LO3 and LO10) — ✅ (#628; DECISIONS 2026-11-17); its in-between states on the canvas's RemoveBlockStates (version 64), the confirm in ClassFlows' words; for the phase's last steps, Phase 7's finished step lines and four other finished lines moved to the archive; for the phase's end: the pilot block's old code retired by Remove, no owner command (the header line, Before the pilot's item 3, Open owner items, `docs/PILOT.md`'s step 6)
 
-- **LO12** 👀 A student's home (#616; lane A) — LO12b, the home with lessons off, ✅ (#630; DECISIONS 2026-11-17), under v2's side menu until LO12a, the student's frame, parked (#629) for the owner's approval on StudentWebStates (v63); 18 source-text tests left
+- **LO12** 👀 A student's home (#616; lane A) — LO12b, the home with lessons off, ✅ (#630; DECISIONS 2026-11-17); LO12a, the student's frame, ✅ (#629, on the owner's approval of StudentWebStates, v63; DECISIONS 2026-11-17); 18 source-text tests left
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 

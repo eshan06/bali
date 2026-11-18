@@ -8,6 +8,37 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-17** — **LO12a, the student's frame: a student's pages under a top bar of their own, Your classes and Help,
+  in place of v2's side menu; part 1 of LO12, split from the home (LO12b) by the conductor, the frame holding Sign out
+  (the worker's calls and the conductor's, awaiting the owner's look; LO12, #616).**
+
+  **The bar** (no board draws a student's: drawn first on the canvas's new StudentWebStates, version 63, beside
+  StudentWeb, whose page sits under it): the teacher's bar (`TopBar`, LO2) with a student's places, as v2's side menu had
+  them: Bali, a link home; Your classes, marked on the home and on a lesson's page under it (lessons on, reached by its
+  address); then Help, and the account, its initials, its name (whole on hover, gone under 1024 px) and Sign out an
+  icon. With no name, Sign out in words, an icon on a phone; signing out, held and dimmed, its words Signing out… where
+  they show (BarStates' rules). No class rides in it, as a student has no class page, and no menu opens: with two
+  places, under 760 px Your classes goes, Bali leading home, and Help and the account keep their places on one row.
+
+  **The frame:** `frameFor` puts a student's every signed-in page under the top bar's frame (`TOP_PAGE`), as a teacher's;
+  the invite page keeps the bar, as before; the account not read keeps v2's frame (`PAGE`), whoever it is. The home
+  under it is LO12b's: StudentWeb with lessons off, today's with lessons on (decision 8). With lessons on, the home and a
+  lesson's page sit under the new bar in v2's look.
+
+  **Left for the phase's tidy-up (#625):** the student's bar draws with `TopBar`'s classes written again in `shell.tsx`,
+  since `portal-bar.tsx` is outside this step's files, the two bars' look to fold into one; `--text-menu-name`, the side
+  menu's name line, has no user now (`tokens.test.ts` still pins it); and `PortalBar`'s comment still says a student's
+  pages have the side menu.
+
+  **Awaiting the owner** (santa's round 1, Reviewer B's blocker): no board the owner approved draws a student's frame
+  (the lock-only look was approved for a teacher's pages, 2026-11-16), so the bar drawn on StudentWebStates is a new
+  design, not an in-between state of an approved one, and waits for the owner's look (CLAUDE.md, Working rules). The
+  step's PR is parked as a draft until the owner approves the frame's figures there or strikes the finding.
+
+  **Tests:** driven. The side menu's rendered tests in `shell.test.ts` go with the menu, the bar's own driven in
+  `shell.driven.test.tsx` (its places and what it marks, the account, Sign out once, no name, signing out); the file
+  stays on the source-text list for its reads of the account's wiring.
+
 - **2026-11-17** — **LO12b, a student's home with lessons off rebuilt from StudentWeb: Your classes over a ledger, In
   class now and the phone's chip in a class's row; with lessons on, today's home as LO1 left it (decision 8 as written);
   beside v2's side menu until LO12a's frame (#629, parked) is approved (the worker's calls and the conductor's, awaiting
