@@ -8,9 +8,11 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-18 (Central) — Android's JVM tests: CI's three flakes fixed in the tests, each
-a wait that went on too soon, Bali's code unchanged (#638; DECISIONS 2026-11-18). Before it, the
-Lock-only portal phase is done (LO0–LO16, #614–#637), LO12a parked for the owner's approval (#629).
+_Last updated: 2026-11-18 (Central) — lessons off in production: `NEXT_PUBLIC_LESSONS=off` on
+Vercel's `bali-portal` (the owner's order, 2026-11-18), live from #638's build, `/questions` and
+`/slides` sending teachers home. Before it, Android's JVM tests: CI's three flakes fixed in the
+tests, each a wait that went on too soon, Bali's code unchanged (#638; DECISIONS 2026-11-18); and
+the Lock-only portal phase is done (LO0–LO16, #614–#637), LO12a parked for the owner's approval (#629).
 Next, in the conductor's order: the phase's step lines to the archive, and LO14's step for the
 recap's tracks; AN11b and AN12 wait for the owner's go. Also open: the owner's switch of prod's
 domain, the release call and disabling the review account (Open owner items); the owner's fresh
@@ -308,10 +310,8 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
 **The rest of the owner's queue:**
 
 - **The lock-only portal (2026-11-16; DECISIONS 2026-11-16):**
-  - 🔧 Turn lessons off on Vercel's `bali-portal` when ready: `NEXT_PUBLIC_LESSONS=off`, then
-    Redeploy (LO1 ships the switch on). Best before LO2 lands: each teacher page rebuilt from the
-    canvas shows no lesson pieces whatever the switch says (DESIGN.md), so with lessons on, the
-    portal mixes pages with them and pages without until the phase ends.
+  - ✅ Lessons off on Vercel's `bali-portal`: `NEXT_PUBLIC_LESSONS=off` (Production; the owner's
+    order, 2026-11-18), live from #638's build, `/questions` and `/slides` answering 307 to `/`.
   - The App Store screenshot about questions, the third, "Answer without unlocking."
     (`docs/APP-STORE.md`, Screenshots): whether it stays.
   - The website's lesson pictures (`demo3`).
