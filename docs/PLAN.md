@@ -8,16 +8,15 @@ It holds the current state only: a finished step is one line (its PR, its DECISI
 is in `docs/DECISIONS.md`, and finished history is word for word in
 [`docs/PLAN-ARCHIVE.md`](PLAN-ARCHIVE.md): search it like DECISIONS, never read it front to back.
 
-_Last updated: 2026-11-16 (Central) — Bali's portal becomes a phone lock only: the Lock-only portal
-phase is planned (LO0, #614; DECISIONS 2026-11-16), rebuilding it from the approved canvas, with
-questions and slides switched off but kept in the code, and two workers at once on its lanes. Before
-it, a student holds at most five push tokens (AN11a2, #599). Next: LO1 and LO10 at once, then LO2,
-then lanes A and B; while the phase runs, its step lines below are its status and this line waits
-for its end. Also open: the owner's switch of prod's domain, the release call and disabling the
-review account (Open owner items); the owner's fresh block code, the old one retired by Home's
-Remove (LO11, no command); the owner the
-sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11b, AN12;
-AN1's part 2 on the owner's phones; the audit's polish waits._
+_Last updated: 2026-11-18 (Central) — Android's JVM tests: CI's three flakes fixed in the tests, each
+a wait that went on too soon, Bali's code unchanged (#638; DECISIONS 2026-11-18). Before it, the
+Lock-only portal phase is done (LO0–LO16, #614–#637), LO12a parked for the owner's approval (#629).
+Next, in the conductor's order: the phase's step lines to the archive, and LO14's step for the
+recap's tracks; AN11b and AN12 wait for the owner's go. Also open: the owner's switch of prod's
+domain, the release call and disabling the review account (Open owner items); the owner's fresh
+block code, the old one retired by Home's Remove (LO11, no command); the owner the sitting's
+findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN1's part 2 on the
+owner's phones; the audit's polish waits._
 
 ## Now
 
@@ -49,9 +48,10 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   one worker at a time, or two at once on a phase's lanes (the owner, 2026-11-16), and builds the
   portal's UI steps from PV7 on, screenshotted in a preview tab the owner signs in; its traps are
   `docs/GOTCHAS.md`'s "The Windows PC" (DECISIONS 2026-10-14).
-- **The lock-only portal (the owner, 2026-11-16; DECISIONS 2026-11-16):** the portal rebuilt from
-  its approved canvas as a phone lock only, questions and slides switched off but kept in the code;
-  its steps under "Lock-only portal (LO)" below.
+- **The lock-only portal (the owner, 2026-11-16; DECISIONS 2026-11-16)** ✅ done (LO0–LO16,
+  #614–#637): the portal rebuilt from its approved canvas as a phone lock only, questions and slides
+  switched off but kept in the code; LO12a, the student's frame, parked for the owner's approval
+  (#629); its steps under "Lock-only portal (LO)" below.
 - **The owner's Mac session (Xcode and the iPhone):** the app's Sign in & sign up is built; the app
   keeps D1's look, Sign in the sign-in redesign's (#583), until the owner approves a new one (its
   redesign rolled back, 2026-10-06). The push's app half and the phone's Phase 7 screens are built
@@ -90,6 +90,12 @@ build in use links it. The iPhone's build 13 links the new address, Android's fr
   side by side, "Typecheck · lint · build" (x64) and "Unit tests (PGlite)" (Arm, a Vitest worker
   per core); each PGlite test database is restored from one migrated copy per test file. The
   real-Postgres lane (~5 minutes, unchanged) and Claude Review (6–12) now bound a PR's merge.
+
+- **Android's JVM tests on CI (the owner, 2026-11-18: "Yes, fix them")** ✅ (#638; DECISIONS
+  2026-11-18): the three flakes LO14 left, each a test's wait, never Bali's code: DeletedOnServerTest's
+  waits for the check-in take it past a read of the truth still on its way, and the lesson tests wait
+  for the account through the 13+ check; SlideTest's cause is inferred, never met on this PC; a wait
+  for a request that runs out names what was sent and not taken.
 
 - **Worker and reviewer effort (the owner, 2026-10-14 and 2026-10-24):** a worker that only builds an approved portal screen runs at `xhigh`, every other worker at `max`; santa's reviewers run at `xhigh` on a screen step and at `max` on every other (`.claude/commands/plan.md`, `santa-loop.md`); the first 3–5 `xhigh` steps' blockers and times decide whether each stays (DECISIONS 2026-10-14, 2026-10-24).
 
@@ -195,9 +201,9 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO13** The phase's tidy-up (#625; last) — ✅ (#631, #632; DECISIONS 2026-11-17): the owner's "Pin them" built (LiveListStates, version 65) and "Leave it out" recorded; Try again in the new look on every rebuilt page, Home's fixes, the record's words in one place, v2's unused tokens gone, Present's guard driven; `--text-menu-name` and PortalBar's side-menu comment wait for #629
 
-- **LO14** The phase's end: its findings by step, each repeated one a rule, a GOTCHAS entry or a test (part of #601; after LO13) — ✅ (#633; DECISIONS 2026-11-17): converting a source-text test loses nothing it pinned (CLAUDE.md, `docs/WEB.md`, santa-loop); a canvas publish merges into the `canvas.json` read just before it (GOTCHAS); left, not ruled: Android's JVM timing flake, for the Android work, and the screen steps' size, the owner's question; left for a step: the recap's tracks to share the grid's state code (ARCHITECTURE's rule 2), closing LO7's three WARNs; for the owner: a student whose only unlock was superseded shows under Not focused the whole time while their track reads focused
+- **LO14** The phase's end: its findings by step, each repeated one a rule, a GOTCHAS entry or a test (part of #601; after LO13) — ✅ (#633; DECISIONS 2026-11-17): converting a source-text test loses nothing it pinned (CLAUDE.md, `docs/WEB.md`, santa-loop); a canvas publish merges into the `canvas.json` read just before it (GOTCHAS); left, not ruled: Android's JVM timing flake, since fixed (#638), and the screen steps' size, the owner's question; left for a step: the recap's tracks to share the grid's state code (ARCHITECTURE's rule 2), closing LO7's three WARNs; for the owner: a student whose only unlock was superseded shows under Not focused the whole time while their track reads focused
 
-- **LO15** Students off the web for now, behind `NEXT_PUBLIC_STUDENT_WEB` (#634; the owner's order, 2026-11-18) — ✅ (#635; DECISIONS 2026-11-18); off unless it says on, so off from this deploy with nothing to set on Vercel; its in-between states on v2's canvas's Signing in row (version 128); for the owner: the sign-in page's two lines that still promise students the web
+- **LO15** Students off the web for now, behind `NEXT_PUBLIC_STUDENT_WEB` (#634; the owner's order, 2026-11-18) — ✅ (#635; DECISIONS 2026-11-18); off unless it says on, so off from this deploy with nothing to set on Vercel; its in-between states on v2's canvas's Signing in row (version 128)
 
 - **LO16** The sign-in page's two lines for students follow the student web's switch (#636; the owner's answer, 2026-11-18) — ✅ (#637; DECISIONS 2026-11-18); off, a line for teachers and one sending students to the app, on, the sign-in redesign's words; its in-between states on the sign-in redesign canvas (version 33); settles LO15's line for the owner
 
