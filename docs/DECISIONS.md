@@ -8,6 +8,40 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-18** — **The sign-in page's two lines for students follow the student web's switch (LO16, #636, the
+  owner's answer; ARCHITECTURE, Web portal, decision 9): off, the card's line is for teachers and the line under the
+  card sends students to the app; on, the sign-in redesign's words, exactly.**
+
+  **The owner (2026-11-18):** asked "Change the sign-in page's student lines to match?", the conductor recommending
+  yes, they answered "take your reccomended im not here". LO15 had left the lines for the owner (its entry below):
+  sign-in was to stay unchanged, and they are the sign-in redesign's approved words.
+
+  **What changed** (`apps/web/src/app/login/page.tsx`, its `LINES`, chosen by LO15's `studentWebOn()` as the page
+  renders; baked into the build, so the server's page and the browser's say the same):
+  - Off, nothing set or anything but `on`: the card's line reads "Teachers sign in here to see their classes.", and
+    the line under the card "Students: use Bali in the app on your phone."
+  - On: "Teachers and students sign in here to see their classes." and "Students: set up Bali in the app on your
+    iPhone first.", as before.
+
+  Nothing else on the page changes: its title, Sign in, the signed-out lines, the error line, the layout and the
+  public pages; nor sign-in itself, Cognito or the 13+ check.
+
+  **This step's calls** (the owner away: the recommended option, recorded here):
+  - The words, in DESIGN.md's voice and through `no-ai-slop`, LO15's where they fit. The card's line drops "and
+    students", the smallest change that makes it a line for teachers. The line for students keeps the approved
+    "Students:" and takes LO15's "use Bali in the app on your phone", leaving out LO15's "This site is for teachers.",
+    which the card's line now says. "phone", not "iPhone", as LO15 has it: the app is on both.
+  - Drawn first on the sign-in redesign canvas (version 33), the sign-in page's own (DESIGN.md, Sources), where its
+    states are (PortalStates, PortalPhone, PortalZoom), rather than v2's canvas, where LO15 drew its pages: a row of
+    its own, "Computer: the portal's sign-in page with the student web off, intermediate states", holding
+    PortalStudentWebOff, PortalStudentWebOffStates, PortalStudentWebOffPhone and PortalStudentWebOffZoom, the owner's
+    answer on its note.
+  - `docs/WEB.md`'s row for the switch said sign-in doesn't change either way; it now names these lines.
+
+  **Tests** (`login.test.tsx`, driving the page): its words in their order with the switch unset, `off` and `on`,
+  the card's own words each way; the page's other tests run with it unset. Each switched line, broken in turn, failed
+  a test, as did the switch ignored either way or turned around.
+
 - **2026-11-18** — **Students off the web for now, behind a switch that brings them back: `NEXT_PUBLIC_STUDENT_WEB`,
   off unless it says on; off, a student who signs in on the portal gets one page saying the web is for teachers and
   Bali is in the app on their phone (LO15, #634, the owner's order; ARCHITECTURE, Web portal, decision 9).**

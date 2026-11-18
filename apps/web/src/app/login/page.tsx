@@ -6,6 +6,25 @@ import { Button } from '@/components/button';
 import { SessionRingArt } from '@/components/mark';
 import { TextLink } from '@/components/text-link';
 import { type SignedOut, signedOut, startLogin } from '@/lib/auth';
+import { studentWebOn } from '@/lib/student-web-switch';
+
+/**
+ * The card's line and the line for students under it, by the student web's switch (LO16, the
+ * owner's answer of 2026-11-18). On, the sign-in redesign's words for both (decision 13). Off,
+ * students are off the web (LO15), so the card's line is for teachers and the line for students
+ * sends them to the app, in the words of the page a student gets after signing in, as the canvas's
+ * PortalStudentWebOff boards draw them (drawn first).
+ */
+const LINES = {
+  on: {
+    card: 'Teachers and students sign in here to see their classes.',
+    students: 'Students: set up Bali in the app on your iPhone first.',
+  },
+  off: {
+    card: 'Teachers sign in here to see their classes.',
+    students: 'Students: use Bali in the app on your phone.',
+  },
+};
 
 /** What a Sign out in this tab (S4a) left behind, said once on the way back here. */
 const SIGNED_OUT: Record<SignedOut, string> = {
@@ -22,18 +41,20 @@ const PUBLIC_PAGES = [
 ];
 
 /**
- * Sign in, for teachers and students (the sign-in redesign's "The portal's sign-in page", the
- * owner, 2026-11-12): two panels, side by side from 1024 px. On the art's, green-50, Bali over the
- * session ring and its line; on the other, the card in W3's words for both (decision 13), its Sign
- * in a 52 px pill, the line for students under it, then the public pages. No Sign up: students sign
- * up in the app, where the 13+ question is. A Sign out's word sits over Sign in, a page that didn't
- * open under it (PortalStates). Narrower, the panels stack, the art on top, 240 px wide with its
- * line at 26/32, so Sign in shows on a 390 × 844 phone's first screen (PortalPhone; PortalZoom, the
- * 200 % a 1440 px window zooms to).
+ * Sign in (the sign-in redesign's "The portal's sign-in page", the owner, 2026-11-12): two panels,
+ * side by side from 1024 px. On the art's, green-50, Bali over the session ring and its line; on
+ * the other, the card, its Sign in a 52 px pill, the line for students under it, then the public
+ * pages. The card's line and the line for students follow the student web's switch (`LINES`).
+ * No Sign up: students sign up in the app, where the 13+ question is. A Sign out's word sits over
+ * Sign in, a page that didn't open under it (PortalStates). Narrower, the panels stack, the art on
+ * top, 240 px wide with its line at 26/32, so Sign in shows on a 390 × 844 phone's first screen
+ * (PortalPhone; PortalZoom, the 200 % a 1440 px window zooms to).
  */
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [left, setLeft] = useState<SignedOut | null>(null);
+  // Baked into the build, so the server's page and the browser's say the same.
+  const lines = studentWebOn() ? LINES.on : LINES.off;
 
   // Read after hydration: sessionStorage is the browser's, and the server drew none.
   useEffect(() => setLeft(signedOut()), []);
@@ -66,9 +87,7 @@ export default function LoginPage() {
           <h1 id="sign-in-title" className="text-h1 text-balance">
             Sign in to Bali
           </h1>
-          <p className="mb-2.5 text-body text-text-secondary">
-            Teachers and students sign in here to see their classes.
-          </p>
+          <p className="mb-2.5 text-body text-text-secondary">{lines.card}</p>
           {left ? (
             <p role="status" className="text-body text-pretty">
               {SIGNED_OUT[left]}
@@ -83,9 +102,7 @@ export default function LoginPage() {
             </p>
           ) : null}
         </section>
-        <p className="max-w-100 text-center text-caption text-text-tertiary">
-          Students: set up Bali in the app on your iPhone first.
-        </p>
+        <p className="max-w-100 text-center text-caption text-text-tertiary">{lines.students}</p>
         {/* The public pages, under the card: the card keeps to signing in. */}
         <nav aria-label="Help and policies">
           <ul className="flex flex-wrap justify-center gap-x-4.5 gap-y-1.5 text-caption">

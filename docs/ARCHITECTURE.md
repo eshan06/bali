@@ -1520,8 +1520,13 @@ invite page's line for students promises no home after a refresh (drawn first on
 StudentWebOff and its states). On, the student web is Live lesson decision 13's, as it was. No
 backend change: the portal already decides where an account goes (`homeFor`), and the API keeps
 serving students, whose phones call it. Sign-in, the 13+ check, Cognito, the apps and teachers are
-unchanged; a student can still finish Cognito's sign-in, which can't know the role before it, and
-lands on that page. The student web's code and tests stay, the tests covering both values.
+unchanged, but for the sign-in page's two lines that spoke to students (LO16, the owner's answer of
+2026-11-18): off, its card's line is for teachers, "Teachers sign in here to see their classes.",
+and the line under the card sends students to the app, "Students: use Bali in the app on your
+phone." (drawn first on the sign-in redesign canvas: PortalStudentWebOff and its states); on, the
+sign-in redesign's words. A student can still finish Cognito's sign-in, which can't know the role
+before it, and lands on that page. The student web's code and tests stay, the tests covering both
+values.
 
 ## Live lesson (Phase 7)
 
@@ -2035,7 +2040,9 @@ everything below stands as written.
   line, and 200% zoom (one column under 1024 px, the question first, as on the phone; the card
   first in the page's order at every width). Redrawn in v2's look on 2026-10-12: the teacher's
   layout, its side menu holding Your classes and Help, and the sign-in page adding "Students:
-  set up Bali in the app on your iPhone first."
+  set up Bali in the app on your iPhone first." While the student web is off, the sign-in page's
+  card says "Teachers sign in here to see their classes." and the line under it "Students: use
+  Bali in the app on your phone." (LO16; Web portal, decision 9).
 
 **Settled** (the owner, 2026-10-10, each as recommended; PLAN's step for each in parentheses):
 - `event_id` uniqueness in both directions: every writer in the transition engine refuses an
