@@ -8,11 +8,12 @@ import { endSession, startLogin } from '@/lib/auth';
 import LoginPage from './page';
 
 /*
- * Sign in, for teachers and students (the sign-in redesign's "The portal's sign-in page", the
- * owner, 2026-11-12), used as a person uses it (the owner, 2026-10-22): its words, Sign in starting
- * the sign-in, the line when AWS's page didn't open, and what a Sign out left behind
- * (PortalStates). `startLogin` is held here, since the real one leaves the page for Cognito's; the
- * rest of `@/lib/auth` is the portal's own, so a Sign out is remembered as the shell leaves it.
+ * Sign in (the sign-in redesign's "The portal's sign-in page", the owner, 2026-11-12), used as a
+ * person uses it (the owner, 2026-10-22): its words, the card's line and the line for students as
+ * the student web's switch says them (LO16), Sign in starting the sign-in, the line when AWS's page
+ * didn't open, and what a Sign out left behind (PortalStates). `startLogin` is held here, since the
+ * real one leaves the page for Cognito's; the rest of `@/lib/auth` is the portal's own, so a Sign
+ * out is remembered as the shell leaves it.
  */
 vi.mock('@/lib/auth', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/auth')>()),
@@ -23,9 +24,24 @@ afterEach(() => {
   cleanup();
   sessionStorage.clear();
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
 });
 
 const COULDNT_OPEN = "Bali couldn't open the sign-in page. Try again.";
+
+/**
+ * The card's line and the line for students under it, by the student web's switch (LO16): on, the
+ * sign-in redesign's words; off, the canvas's PortalStudentWebOff boards', a line for teachers and
+ * one sending students to the app.
+ */
+const ON = {
+  card: 'Teachers and students sign in here to see their classes.',
+  students: 'Students: set up Bali in the app on your iPhone first.',
+};
+const OFF = {
+  card: 'Teachers sign in here to see their classes.',
+  students: 'Students: use Bali in the app on your phone.',
+};
 
 /** Whether `a` comes before `b` in the page, as a screen reader reads them. */
 const before = (a: Node, b: Node) =>
@@ -35,42 +51,49 @@ const before = (a: Node, b: Node) =>
 const card = () => screen.getByRole('region', { name: 'Sign in to Bali' });
 
 describe('the sign-in page', () => {
-  it('says the board’s words in its order: Bali and its line, the card, the line for students, the public pages', () => {
-    render(<LoginPage />);
-    expect(screen.getByRole('main').textContent).toBe(
-      [
-        'Bali',
-        'Quiet until the bell.',
-        'Sign in to Bali',
-        'Teachers and students sign in here to see their classes.',
-        'Sign in',
-        'Students: set up Bali in the app on your iPhone first.',
-        'Help and questions',
-        'Privacy policy',
-        'Terms',
-      ].join(''),
-    );
-    expect(screen.getAllByRole('heading').map((h) => [h.tagName, h.textContent])).toEqual([
-      ['H1', 'Sign in to Bali'],
-    ]);
-    // The card is a region a screen reader names by its title.
-    expect(card().textContent).toBe(
-      'Sign in to BaliTeachers and students sign in here to see their classes.Sign in',
-    );
-    // Sign in is its one button: no Sign up, by design (students sign up in the app).
-    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Sign in']);
-    const links = within(screen.getByRole('navigation', { name: 'Help and policies' }))
-      .getAllByRole('link')
-      .map((a) => [a.getAttribute('href'), a.textContent]);
-    expect(links).toEqual([
-      ['/support', 'Help and questions'],
-      ['/privacy', 'Privacy policy'],
-      ['/terms', 'Terms'],
-    ]);
-    // Nothing said until something happens.
-    expect(screen.queryByRole('status')).toBeNull();
-    expect(screen.queryByRole('alert')).toBeNull();
-  });
+  it.each([
+    // Off unless it says on (LO15): nothing set is how every deploy starts.
+    { web: 'off, nothing set', said: undefined, lines: OFF },
+    { web: 'off', said: 'off', lines: OFF },
+    { web: 'on', said: 'on', lines: ON },
+  ])(
+    'says the board’s words in its order with the student web $web: Bali and its line, the card, the line for students, the public pages',
+    ({ said, lines }) => {
+      vi.stubEnv('NEXT_PUBLIC_STUDENT_WEB', said);
+      render(<LoginPage />);
+      expect(screen.getByRole('main').textContent).toBe(
+        [
+          'Bali',
+          'Quiet until the bell.',
+          'Sign in to Bali',
+          lines.card,
+          'Sign in',
+          lines.students,
+          'Help and questions',
+          'Privacy policy',
+          'Terms',
+        ].join(''),
+      );
+      expect(screen.getAllByRole('heading').map((h) => [h.tagName, h.textContent])).toEqual([
+        ['H1', 'Sign in to Bali'],
+      ]);
+      // The card is a region a screen reader names by its title; the line for students is under it.
+      expect(card().textContent).toBe(`Sign in to Bali${lines.card}Sign in`);
+      // Sign in is its one button: no Sign up, by design (students sign up in the app).
+      expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Sign in']);
+      const links = within(screen.getByRole('navigation', { name: 'Help and policies' }))
+        .getAllByRole('link')
+        .map((a) => [a.getAttribute('href'), a.textContent]);
+      expect(links).toEqual([
+        ['/support', 'Help and questions'],
+        ['/privacy', 'Privacy policy'],
+        ['/terms', 'Terms'],
+      ]);
+      // Nothing said until something happens.
+      expect(screen.queryByRole('status')).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+    },
+  );
 
   it('draws the session ring as art: hidden from a screen reader, and never a countdown', () => {
     render(<LoginPage />);

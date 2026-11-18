@@ -199,6 +199,8 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO15** Students off the web for now, behind `NEXT_PUBLIC_STUDENT_WEB` (#634; the owner's order, 2026-11-18) — ✅ (#635; DECISIONS 2026-11-18); off unless it says on, so off from this deploy with nothing to set on Vercel; its in-between states on v2's canvas's Signing in row (version 128); for the owner: the sign-in page's two lines that still promise students the web
 
+- **LO16** The sign-in page's two lines for students follow the student web's switch (#636; the owner's answer, 2026-11-18) — ✅ (#637; DECISIONS 2026-11-18); off, a line for teachers and one sending students to the app, on, the sign-in redesign's words; its in-between states on the sign-in redesign canvas (version 33); settles LO15's line for the owner
+
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 
 **Done** (2026-10-16): PV0–PV17, the last PV17c-2 (#425), to the canvas
