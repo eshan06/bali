@@ -245,6 +245,23 @@ class DeletedOnServerTest : EngineFiles() {
         }
 
     @Test
+    fun aReadOfTheTruthStillOnItsWayAsTheScreenComesOnSendsTheCheckInOnceItLandsAndThatCheckInsFourOhNineStillTakesTheLockOff(): Unit =
+        runBlocking {
+            // CI's flake (DECISIONS 2026-11-18), staged with no window of time: the 13+ check's let-through can leave a read of the
+            // truth on its way as inLesson returns, and the read loop sends the screen's check-in only once that read is answered. A
+            // Try again puts one on its way here, unanswered, as the screen comes on.
+            val (rig, routed) = inLesson()
+            rig.engine.retryNow()
+            eventually { meRoute in rig.server.waiting }
+            rig.engine.setScreenOn(true)
+            rig.server.next(checkInRoute).reply(409, deletedOnServer)
+            eventually { !routed.lock.holds }
+            assertEquals(Standing.Out, rig.outbox.standing())
+            routed.until { it == Screen.Shown(Screen.SignIn, false) }
+            rig.stop()
+        }
+
+    @Test
     fun a409ForAnAccountNoLongerSignedInChangesNothingForTheOneThatIsItsSignInItsQueueItsLockAndItsScreen(): Unit =
         runBlocking {
             // Two accounts on one phone are ruled impossible for the pilot; the rule SignIn.accountDeleted keeps holds all the same.

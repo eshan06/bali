@@ -226,7 +226,8 @@ class Server : HttpTransport {
 
     /**
      * The next request the engine sends, the next to [route] when one is named, once it has; none in
-     * time fails the test rather than hanging it.
+     * time fails the test rather than hanging it, naming what was sent and not taken, which a loop of the
+     * engine's may be waiting on.
      */
     suspend fun next(route: String? = null): Exchange {
         val taker = Taker(route, CompletableDeferred())
@@ -238,7 +239,7 @@ class Server : HttpTransport {
         withTimeoutOrNull(patience) { taker.take.await() }?.let { return it }
         // Expired, unless a request came just now: taken, it is the test's.
         synchronized(lock) { if (takers.remove(taker)) taker.take.complete(null) }
-        return taker.take.await() ?: fail("No request to ${route ?: "any route"} came in time")
+        return taker.take.await() ?: fail("No request to ${route ?: "any route"} came in time; sent and not taken: $waiting")
     }
 
     /** No answer to anything from now on, a request in flight included, taken or not, so none holds the engine up. */
