@@ -76,6 +76,16 @@ is the pattern.
   component test that reads a file's text unless it is listed, and its list only shrinks:
   a UI step converts the tests it touches. It sees files, not checks: a new source-text
   check in a file still listed gets past it, so a step adds none there either.
+- **Converting a source-text test loses nothing it pinned** (LO14, 2026-11-17). The
+  lock-only phase lost an assertion that way in LO1, LO3, LO4, LO6 and LO8, and a guard in
+  LO9, each caught only in review. Work assertion by assertion, not test by test: LO1 named
+  every case it converted and where each went, and four assertions inside them still went
+  missing. Before a source-text test goes, list each assertion it holds (a word, a line of
+  wiring, a guard), and beside each the driven test that now carries it, or the behavior
+  change this PR names that removes it. Then show each of those driven tests failing
+  without the line it pins: undo or break that line, run the test, see it fail, put the
+  line back. The list goes in the PR's description, where santa's reviewers and Claude
+  Review check it against the deleted lines.
 
 ## Cognito app client — author action (needs the AWS console)
 

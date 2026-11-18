@@ -45,6 +45,7 @@ Launch both reviewers **in parallel** (one message, two tool uses). Every Claude
 - the rules from Step 1, verbatim
 - the diff (`git diff origin/main...HEAD`), not whole files — reviewers open files themselves when they need context
 - the PR's description, or the one it will carry (the rules' exception for a loosened test reads it)
+- when the diff converts or deletes a source-text test: the PR's list of every assertion it held, each beside the driven test now carrying it or the behavior change that removes it (`docs/WEB.md`, Testing the portal), to check against the deleted lines; an assertion with neither is a test loosened under Step 1's rules
 - this instruction: "You are an independent reviewer and have NOT seen any other review. Report a BLOCKER only if it fits the rules and you can cite the file:line and a concrete failure: this input or state → this wrong result. Everything else is a WARN. Zero findings is a normal, common result — do not manufacture findings."
 - this output format:
 
