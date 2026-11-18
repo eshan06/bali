@@ -703,11 +703,13 @@ describe('an extend with no answer, and its Try again (ClassRetryStates)', () =>
 });
 
 /*
- * An unlock the grid's stream brings opens its pop-up (PV10; ClassUnlock), placed as GA2's boards
- * draw it: over the room's top right, never over the teacher's controls. jsdom lays nothing out, so
- * the place is the box it is laid over: the tiles' own, after the header with Present, the count
- * and Check on (LO5), holding none of their controls (the audit's C01, where a click on End session
- * landed on a pop-up). Screenshots at each width show the rest, beside their boards.
+ * An unlock the grid's stream brings opens its pop-up (PV10; ClassUnlock), pinned at the window's
+ * top right while one is open (the owner's "Pin them", 2026-11-17; LiveListStates), never over the
+ * teacher's controls. jsdom lays nothing out, so the place is the grid's cells its layer spans: the
+ * session list's column from 1024 px, the room's row and the list's under it, after the header with
+ * Present, the count and Check on (LO5), holding none of their controls (GA2; the audit's C01, where
+ * a click on End session landed on a pop-up). Screenshots at each width show the rest, beside their
+ * board.
  */
 describe('a class live, an unlock lands (GA2)', () => {
   const CONTROLS = ['+5 min', '+10 min', 'End session', 'Present'];
@@ -738,7 +740,7 @@ describe('a class live, an unlock lands (GA2)', () => {
     });
   };
 
-  it('lays its pop-up over the room’s tiles alone, after every control of the header and Check on', async () => {
+  it('pins its pop-up in the session list’s cells, after every control of the header and Check on', async () => {
     await live();
     await bring(unlocked(5));
 
@@ -746,28 +748,49 @@ describe('a class live, an unlock lands (GA2)', () => {
     expect(alert.textContent).toMatch(/^Ana Rodríguez used Emergency Unlock/);
     // Beside her tile's pulse (bali-softpulse), which the same live unlock starts.
     expect(anasTile().querySelector('.animate-softpulse')).not.toBeNull();
-    // The pop-ups' layer, and the positioned box it is laid over: the tiles' own, to its foot.
-    const layer = alert.closest('.absolute');
-    const box = layer?.parentElement;
-    expect(layer?.classList.contains('bottom-0')).toBe(true);
-    expect(box?.classList.contains('relative')).toBe(true);
-    expect(box?.contains(anasTile())).toBe(true);
-    // Never over the session list beside the room, which keeps the unlock as a line of its own.
+    // The pop-ups' layer, an item of the live part's grid: from 1024 px the session list's column,
+    // in its row; under 1024 px the room's row and the list's under it, the count with Check on
+    // the row above them, so no pop-up rises over those, and none over the header, which is out of
+    // the grid. Its stack sticks 18 px under the top bar however far the page scrolls.
+    const stack = alert.closest('.sticky');
+    const layer = stack?.parentElement;
+    const grid = layer?.parentElement;
     const list = screen.getByRole('complementary', { name: 'This session' });
-    expect(box?.contains(list)).toBe(false);
+    expect(Array.from(stack?.classList ?? [])).toEqual(
+      expect.arrayContaining(['top-[79px]', 'max-[760px]:top-[75px]', 'z-20']),
+    );
+    expect(Array.from(layer?.classList ?? [])).toEqual(
+      expect.arrayContaining([
+        'lg:col-start-2',
+        'lg:row-start-1',
+        'max-lg:col-start-1',
+        'max-lg:row-[2/span_2]',
+        'self-stretch',
+      ]),
+    );
+    expect(grid?.classList.contains('grid')).toBe(true);
+    // The cells it spans are the list's and the room's own: the same column and row from 1024 px,
+    // and under it the room's row (2) to the list's (3), the count's the first.
+    const room = screen.getByRole('region', { name: 'Everyone' });
+    const count = screen.getByRole('region', { name: '0 of 1 focused' });
+    expect(Array.from(list.parentElement?.classList ?? [])).toEqual(
+      expect.arrayContaining(['lg:col-start-2', 'lg:row-start-1', 'max-lg:row-start-3']),
+    );
+    expect(room.classList.contains('max-lg:row-start-2')).toBe(true);
+    expect(count.classList.contains('max-lg:row-start-1')).toBe(true);
+    // The session list keeps the unlock as a line of its own.
     expect(within(list).getByText('Ana Rodríguez used Emergency Unlock')).toBeTruthy();
-    // Every control of the header, and Check on's, is outside that box, before it: her name in
+    // Every control of the header, and Check on's, is outside the layer, before it: her name in
     // Check on and its Open, now she is unlocked.
-    const checkOn = screen.getByRole('region', { name: '0 of 1 focused' });
     const controls = [
       ...CONTROLS.map((name) => screen.getByRole('button', { name })),
-      ...within(checkOn).getAllByRole('button'),
+      ...within(count).getAllByRole('button'),
     ];
     expect(controls).toHaveLength(CONTROLS.length + 2);
     for (const control of controls) {
       const name = control.textContent ?? '';
-      expect(box?.contains(control), name).toBe(false);
-      expect(control.compareDocumentPosition(box as Node), name).toBe(
+      expect(layer?.contains(control), name).toBe(false);
+      expect(control.compareDocumentPosition(layer as Node), name).toBe(
         Node.DOCUMENT_POSITION_FOLLOWING,
       );
     }

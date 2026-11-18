@@ -8,6 +8,56 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-17** — **LO13, part 1: the owner's two rulings of 2026-11-17. "Pin them": a new unlock's pop-up stays
+  pinned in view at the window's top right while one is open, drawn first on the canvas's LiveListStates (version 65),
+  then built. "Leave it out": no recap row for a student who never joined but used Emergency Unlock (the worker's
+  calls, the owner away; LO13, part of #625).**
+
+  **The rulings, as asked and answered** (#625's comments):
+  - The owner was asked whether a new unlock's pop-up should "stay pinned in view at the window's top right while one
+    is open, rather than over the room as today": a teacher who had scrolled below the room (the session list under the
+    room below 1024 px, or a long list beside it) could miss one, LO6's WARN left for the owner (#622). The owner chose
+    **"Pin them"**.
+  - "Should the recap show a row for a student who never joined but used Emergency Unlock?" The owner chose **"Leave it
+    out"**. LO7's way stands (its "Awaiting the owner", below): that student is counted in the figures and named under
+    Didn't join, with no row and no record. Nothing in the code changes; LO7's PLAN line no longer awaits the owner on
+    it, only on the tracks' contrast.
+
+  **Where the pinned stack sits** (drawn first, LiveListStates' "The owner's ruling, 2026-11-17: Pin them."; the
+  worker's calls): while one is open it stays 18 px under the top bar (79 px from the window's top, 75 on a phone), at
+  the window's top right, 12 px past the page's content inside its margin, however far down the page is scrolled. It
+  never rises above the live part, so GA2's guarantee holds (the audit's C01, where a click on End session landed on a
+  pop-up): from 1024 px it starts 12 px over the session list's top, 380 px wide (28 px into the gap beside the list),
+  so neither the header nor the count, Check on or the room is under it at the page's top; below 1024 px it starts 12
+  px over the room's tiles (8 on a phone), under the room's heading, the count and Check on above it, as before
+  (PhoneLive), the room's width on a phone. So from 1024 px its place at the page's top moves from the room's top right
+  to the list's, the window's top right as the ruling says. The rest is GA2's: newest on top, the name, the reason and
+  the time, each until it's closed, Open student, never in Present. LO6's "two unlocks at once" on the board now points
+  to the ruling for where they sit, and DESIGN.md says where they sit.
+  *Weighed:* fixed at the window's top right from the page's top, which covers +5, +10, End session and Present until
+  closed (C01 again); and the room's right edge at every width, which at 1024 px is the window's middle, not its top
+  right.
+
+  **How** (no script): the live part's grid places the pop-ups' layer in its own cells, the session list's column from
+  1024 px and the room's row to the list's below it (the left column `display: contents` there, each part placed by
+  row and column), and the stack is sticky in it, so it stays in view to the page's foot. The layer's size is the
+  grid's alone (`contain: size`), so a tall stack moves nothing.
+
+  **What it covers, said plainly:** from 1024 px, the list's title and newest lines (the unlock's own line among them),
+  and the list's Try again should its read fail, until the pop-up is closed; pinned, whatever scrolls under it, as the
+  room's top tiles were before; the student panel's middle when both are open, as under 1024 px before (over it, so no
+  unlock hides behind the panel); on a phone whose bar carries a second live class, or has its menu open, the bar's
+  lower part, the pop-up whole; and in its columns, a control that focus scrolls into view from above, which lands 112
+  px down (the bar's `scroll-padding-top`), until the pop-up is closed. A stack taller than the window runs past its
+  foot, the oldest out of view until newer ones are closed, as the sticky stack did before. Its pinned top is the bar's
+  height plus 18 px, written in both places (`portal-bar.tsx` says so beside the bar).
+
+  **Tests:** driven. `unlock-popups.test.tsx` (the layer and the pinned stack), `classes/[id]/page.test.tsx` (the
+  layer's cells, every control of the header and Check on before it and out of it), `live-grid.driven.test.tsx` (the
+  grid's cells for the count, the room and the list). jsdom lays nothing out, so the place at each width is shown in
+  the screenshots (1440 px at the page's top and scrolled to its foot, 1024 at the top, 820 and 390 scrolled past the
+  room, 390 at the top), beside the board.
+
 - **2026-11-17** — **LO12b, a student's home with lessons off rebuilt from StudentWeb: Your classes over a ledger, In
   class now and the phone's chip in a class's row; with lessons on, today's home as LO1 left it (decision 8 as written);
   beside v2's side menu until LO12a's frame (#629, parked) is approved (the worker's calls and the conductor's, awaiting

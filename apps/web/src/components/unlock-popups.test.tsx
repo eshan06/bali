@@ -22,8 +22,9 @@ import {
  * tile's pulse, and it stays until it is closed; never on the projector. An unlock is the one event
  * a teacher must never miss: no pop-up swallows or hides another, and one already shown never opens
  * again when the stream replays its unlock. Driven here in a page (jsdom, Testing Library: the
- * owner's decision of 2026-10-22); how the class page places them, over the room alone, is its own
- * test (`app/classes/[id]/page.test.tsx`).
+ * owner's decision of 2026-10-22); how the class page places them, pinned at the window's top right
+ * and never over the header, the count or Check on (the owner's "Pin them", LO13), is its own test
+ * (`app/classes/[id]/page.test.tsx`).
  */
 
 afterEach(() => {
@@ -341,12 +342,21 @@ describe('a pop-up, as ClassLive draws it', () => {
     );
   });
 
-  it('stacks several, newest on top, over the room’s top right, in view as it scrolls (GA2)', () => {
-    show([
-      unlock('c'),
-      unlock('b', { studentId: 'u2-0000-bbbb', reason: null }),
-      unlock('a', { reason: 'bathroom' }),
-    ]);
+  it('stacks several, newest on top, pinned at the window’s top right as the page scrolls (the owner’s “Pin them”)', () => {
+    render(
+      <UnlockPopups
+        unlocks={[
+          unlock('c'),
+          unlock('b', { studentId: 'u2-0000-bbbb', reason: null }),
+          unlock('a', { reason: 'bathroom' }),
+        ]}
+        students={STUDENTS}
+        tileOf={(studentId) => `tile-${studentId}`}
+        onClose={() => undefined}
+        onOpen={() => undefined}
+        place="lg:col-start-2"
+      />,
+    );
     const boxes = popups();
     expect(boxes.map((p) => p.querySelector('p')?.id)).toEqual([
       'unlock-c',
@@ -355,35 +365,41 @@ describe('a pop-up, as ClassLive draws it', () => {
     ]);
     const stack = boxes[0]?.parentElement;
     const layer = stack?.parentElement;
-    // The layer over the room's own box (ClassLive's `.popups`): 12 px over its top and out 12 px
-    // past its right, inside the page's 40 px margin; on a phone 8 px over its top and no wider
-    // than the room, so none is ever cut at the window's edge (LO2's 2 px at 640 to 759 px). It
-    // takes no clicks but the pop-ups'.
+    // The layer, an item of the live page's grid, in the cells the grid gives it (`place`): from
+    // 1024 px 12 px over the session list's, 28 px into the gap beside it, so 380 px over it; under
+    // 1024 px 12 px over the room's tiles, past its heading's row and the 16 px under it (28 px
+    // down), and on a phone 8 px over them (32 px down), no wider than the room; out 12 px past the
+    // right but on a phone, inside the page's 40 px margin, so none is ever cut at the window's edge.
+    // Its size the grid's alone, so a tall stack moves nothing; it takes no clicks but the pop-ups'.
     expect(classes(layer).sort()).toEqual(
       [
         'pointer-events-none',
-        'absolute',
-        '-top-3',
-        '-right-3',
-        'bottom-0',
-        'left-0',
-        'z-20',
-        'max-[760px]:-top-2',
-        'max-[760px]:right-0',
+        '-mt-3',
+        '-mr-3',
+        'self-stretch',
+        'contain-size',
+        'lg:-ml-7',
+        'min-[760px]:max-lg:mt-7',
+        'max-[760px]:mt-8',
+        'max-[760px]:mr-0',
+        'lg:col-start-2',
       ].sort(),
     );
-    // At the layer's top right, 380 px wide at most, the room's width on a phone, 10 px apart; 18 px
-    // from the window's top once the room scrolls (GA2).
+    // At the layer's top right, 380 px wide at most, the room's width on a phone, 10 px apart.
+    // Pinned while one is open: 18 px under the top bar's 60 px row and hairline (56 px on a
+    // phone) however far the page scrolls, over the bar and the student panel (z 3 and 5).
     expect(classes(stack).sort()).toEqual(
       [
         'sticky',
-        'top-4.5',
+        'top-[79px]',
+        'z-20',
         'ml-auto',
         'flex',
         'w-95',
         'max-w-full',
         'flex-col',
         'gap-2.5',
+        'max-[760px]:top-[75px]',
         'max-[760px]:w-full',
       ].sort(),
     );

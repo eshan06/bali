@@ -849,9 +849,16 @@ export function LiveGrid({
   // Its tiles are buttons, and its panel shows, on the live page alone, and never in Present.
   const selects = livePage && !present;
   const shown = selects && panel !== null ? students?.[panel.studentId] : undefined;
-  // The unlock pop-ups (ClassUnlock, ClassUnlocks, placed as GA2's boards draw them), never on the
-  // projector: laid over the tiles' own box, so never over the header, the count or Check on
-  // above it. Open student closes its pop-up, as ClassStudent draws none.
+  // Under 1024 px the room's part is one column: the count with Check on, the room and the session
+  // list, each a row of the grid (the left column's `contents`), so the pop-ups' layer can run from
+  // the room's top to the list's foot; at 1024 px and wider the list's column, from its top. So the
+  // header, the count and Check on are never under a pop-up (GA2; the audit's C01). Each is placed
+  // by its row and its column both, as a grid lays two items in one cell only then.
+  const roomShown = rows.length > 0;
+  const listRow = `max-lg:col-start-1 ${roomShown ? 'max-lg:row-start-3' : 'max-lg:row-start-2'}`;
+  // The unlock pop-ups (ClassUnlock, ClassUnlocks), never on the projector, pinned at the window's
+  // top right as the page scrolls (the owner's "Pin them", 2026-11-17). Open student closes its
+  // pop-up, as ClassStudent draws none.
   const unlocks =
     selects && students ? (
       <UnlockPopups
@@ -863,6 +870,7 @@ export function LiveGrid({
           tell({ kind: 'close', eventId: u.eventId });
           open(u.studentId);
         }}
+        place={`lg:col-start-2 lg:row-start-1 max-lg:col-start-1 ${roomShown ? 'max-lg:row-[2/span_2]' : 'max-lg:row-start-2'}`}
       />
     ) : null;
   const tilesOf = rows.map((s) => {
@@ -922,11 +930,14 @@ export function LiveGrid({
     // at the last update, faded (LiveStates, LiveTopStates). Nobody in the class yet: no room. On
     // the right, 340 px and 48 px off, the session list; under 1024 px, where beside it the room
     // would narrow to a tile or two a row, after the room, 40 px under it, and on a phone, under
-    // 760 px, 32 (LiveListStates' tablet, PhoneLive).
+    // 760 px, 32 (LiveListStates' tablet, PhoneLive); the pop-ups' layer over the list's cells.
     return (
       <div className="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-12 max-lg:grid-cols-1 max-[760px]:gap-8 min-[760px]:max-lg:gap-10">
-        <div className="flex min-w-0 flex-col gap-10">
-          <section aria-labelledby={`${id}-count`} className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-10 max-lg:contents">
+          <section
+            aria-labelledby={`${id}-count`}
+            className={`flex min-w-0 flex-col gap-6 max-lg:col-start-1 max-lg:row-start-1${roomShown ? ' max-[760px]:mb-2' : ''}`}
+          >
             {lost ? <FeedLine stale={lost} /> : null}
             <h2
               id={`${id}-count`}
@@ -952,24 +963,27 @@ export function LiveGrid({
               }
             />
           </section>
-          {rows.length === 0 ? null : (
-            <section aria-labelledby={`${id}-room`} className="flex flex-col gap-4">
+          {roomShown ? (
+            <section
+              aria-labelledby={`${id}-room`}
+              className="flex min-w-0 flex-col gap-4 max-lg:col-start-1 max-lg:row-start-2"
+            >
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
                 <h2 id={`${id}-room`} className="text-section-title">
                   Everyone
                 </h2>
                 <span className="text-data font-normal text-text-tertiary">{rows.length}</span>
               </div>
-              <div className="relative">
-                <ul aria-label="Everyone in the class" className={`grid ${ROOM}`}>
-                  {tilesOf}
-                </ul>
-                {unlocks}
-              </div>
+              <ul aria-label="Everyone in the class" className={`grid ${ROOM}`}>
+                {tilesOf}
+              </ul>
             </section>
-          )}
+          ) : null}
         </div>
-        <SessionList id={id} log={log} students={students} onRetry={readAgain} />
+        <div className={`min-w-0 lg:col-start-2 lg:row-start-1 ${listRow}`}>
+          <SessionList id={id} log={log} students={students} onRetry={readAgain} />
+        </div>
+        {unlocks}
         {studentPanel}
       </div>
     );

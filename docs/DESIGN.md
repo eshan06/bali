@@ -245,7 +245,8 @@ tile's pulse, newest on top, each until it is closed, on the live page alone and
 in Present. Since GA2 (2026-11-01) the stack starts at the grid's top right, over its first
 tiles, under the counts and the Questions and slides card, at every width, kept 18 px from the
 window's top as the grid scrolls and never above the grid, so no pop-up covers the header's
-controls, Present or the card's (GA2's boards, intermediate states drawn on the canvas first). The
+controls, Present or the card's (GA2's boards, intermediate states drawn on the canvas first);
+pinned at the window's top right since LO13, the owner's ruling (The lock-only look, below). The
 student panel is v2's since PV11b (2026-10-14): ClassStudent's, 372 px from
 the right over the live page, opened by a tile, a button there marked while its panel is open
 (`.tile.is-selected`), and by a pop-up's Open student; its states as PanelStates draws them,
@@ -666,8 +667,8 @@ lane B's block. Since LO6 (2026-11-17) the live page's right side is ClassLive's
 session list, "This session": a line per moment, newest first, from the
 session's log (its start, each Emergency Unlock, a phone gone silent, a student
 back in focus, protection off), under the room below 1024 px and on a phone
-(PhoneLive); the unlock pop-ups are ClassLive's, over the room's top right and
-12 px past it, the room's width on a phone, their behaviour today's; the student
+(PhoneLive); the unlock pop-ups are ClassLive's, 12 px past the page's content,
+the room's width on a phone, their behaviour today's, pinned since LO13 (below); the student
 panel is ClassStudent's, its moments newest first in the list's words, an
 unlock's reason under it, then the last check-in once it is a minute old and
 Clock off's line; an open student's tile is edged in the primary ink; Check on's
@@ -731,6 +732,12 @@ draws them (drawn on the canvas first): Checking… and each chip, "Can't reach 
 once under the classes, the account's later read failing on HomeStates' line, two
 classes live, a phone. It sits beside v2's side menu until the student's top bar
 drawn there (LO12a, #629) has the owner's approval.
+Since LO13 (2026-11-17; the owner's ruling, "Pin them") a new unlock's pop-up
+stays pinned in view at the window's top right while one is open, 18 px under
+the top bar however far down the page is scrolled, as LiveListStates draws it;
+never above the live part, so the header, the count and Check on are never under
+it: from 1024 px it starts over the session list's top, below 1024 px over the
+room's tiles, as before. Their behaviour is otherwise today's.
 
 Density: the teacher's live grid is dense (many students at a glance); the
 student app is airy and simple. Theme: **light, everywhere.** The app and the

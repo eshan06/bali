@@ -256,6 +256,14 @@ describe('the room on the class page (LO5; ClassLive, LiveStates’ rare tiles)'
     expect(screen.getAllByRole('heading', { level: 2 })[0]?.textContent).toBe('0 of 0 focused');
     expect(screen.getByText('No students yet.')).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'Everyone' })).toBeNull();
+    // Under 1024 px the session list takes the room's row, the grid's second, 32 px under the
+    // count on a phone: no 8 px more there, which keeps the count 40 px over a room (LO13).
+    const count = screen.getByRole('region', { name: '0 of 0 focused' });
+    expect(count.classList.contains('max-[760px]:mb-2')).toBe(false);
+    const list = screen.getByRole('complementary', { name: 'This session' });
+    expect(Array.from(list.parentElement?.classList ?? [])).toEqual(
+      expect.arrayContaining(['max-lg:col-start-1', 'max-lg:row-start-2']),
+    );
   });
 });
 
@@ -479,8 +487,11 @@ describe('the session list (LO6; ClassLive, PhoneLive, LiveListStates)', () => {
       `${time(1500)} Session started`,
     ]);
     // Its own column beside the count and the room, 340 px and 48 px off; under them under 1024 px,
-    // 40 px down, where the room would narrow to a tile or two a row, and on a phone 32 px down.
-    const grid = list.parentElement;
+    // 40 px down, where the room would narrow to a tile or two a row, and on a phone 32 px down:
+    // the grid's third row then, the count's and the room's the first two (the left column's
+    // `contents`), so the pop-ups' layer can span the room's and the list's (LO13).
+    const cell = list.parentElement;
+    const grid = cell?.parentElement;
     expect(Array.from(grid?.classList ?? [])).toEqual(
       expect.arrayContaining([
         'grid',
@@ -491,9 +502,25 @@ describe('the session list (LO6; ClassLive, PhoneLive, LiveListStates)', () => {
         'min-[760px]:max-lg:gap-10',
       ]),
     );
-    expect(
-      grid?.firstElementChild?.contains(screen.getByRole('region', { name: 'Everyone' })),
-    ).toBe(true);
+    expect(Array.from(cell?.classList ?? []).sort()).toEqual(
+      [
+        'min-w-0',
+        'lg:col-start-2',
+        'lg:row-start-1',
+        'max-lg:col-start-1',
+        'max-lg:row-start-3',
+      ].sort(),
+    );
+    const left = grid?.firstElementChild;
+    expect(left?.classList.contains('max-lg:contents')).toBe(true);
+    const [count, room] = Array.from(left?.children ?? []);
+    expect(room).toBe(screen.getByRole('region', { name: 'Everyone' }));
+    expect(Array.from(count?.classList ?? [])).toEqual(
+      expect.arrayContaining(['max-lg:col-start-1', 'max-lg:row-start-1', 'max-[760px]:mb-2']),
+    );
+    expect(Array.from(room?.classList ?? [])).toEqual(
+      expect.arrayContaining(['max-lg:col-start-1', 'max-lg:row-start-2']),
+    );
   });
 
   it('adds what the stream brings as it lands, the unlock on top, and keeps it once they are back', async () => {
