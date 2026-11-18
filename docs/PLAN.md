@@ -195,7 +195,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO13** The phase's tidy-up (#625; last) — ✅ (#631, #632; DECISIONS 2026-11-17): the owner's "Pin them" built (LiveListStates, version 65) and "Leave it out" recorded; Try again in the new look on every rebuilt page, Home's fixes, the record's words in one place, v2's unused tokens gone, Present's guard driven; `--text-menu-name` and PortalBar's side-menu comment wait for #629
 
-- **LO14** The phase's end: its findings by step, each repeated one a rule, a GOTCHAS entry or a test (part of #601; after LO13) — ✅ (#633; DECISIONS 2026-11-17): converting a source-text test loses nothing it pinned (CLAUDE.md, `docs/WEB.md`, santa-loop); a canvas publish merges into the `canvas.json` read just before it (GOTCHAS); left, not ruled: Android's JVM timing flake, for the Android work, and the screen steps' size, the owner's question
+- **LO14** The phase's end: its findings by step, each repeated one a rule, a GOTCHAS entry or a test (part of #601; after LO13) — ✅ (#633; DECISIONS 2026-11-17): converting a source-text test loses nothing it pinned (CLAUDE.md, `docs/WEB.md`, santa-loop); a canvas publish merges into the `canvas.json` read just before it (GOTCHAS); left, not ruled: Android's JVM timing flake, for the Android work, and the screen steps' size, the owner's question; left for a step: the recap's tracks to share the grid's state code (ARCHITECTURE's rule 2), closing LO7's three WARNs; for the owner: a student whose only unlock was superseded shows under Not focused the whole time while their track reads focused
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 

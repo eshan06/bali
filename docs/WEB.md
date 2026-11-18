@@ -77,8 +77,8 @@ is the pattern.
   a UI step converts the tests it touches. It sees files, not checks: a new source-text
   check in a file still listed gets past it, so a step adds none there either.
 - **Converting a source-text test loses nothing it pinned** (LO14, 2026-11-17). The
-  lock-only phase lost an assertion that way in LO1, LO3, LO4 and LO8, and a guard in LO9,
-  each caught only in review. Work assertion by assertion, not test by test: LO1 named
+  lock-only phase lost an assertion that way in LO1, LO3, LO4, LO6 and LO8, and a guard in
+  LO9, each caught only in review. Work assertion by assertion, not test by test: LO1 named
   every case it converted and where each went, and four assertions inside them still went
   missing. Before a source-text test goes, list each assertion it holds (a word, a line of
   wiring, a guard), and beside each the driven test that now carries it, or the behavior
