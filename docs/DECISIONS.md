@@ -22,8 +22,8 @@ a real decision? Add a dated entry at the top: what was decided and why.
 
   **The frame:** `frameFor` puts a student's every signed-in page under the top bar's frame (`TOP_PAGE`), as a teacher's;
   the invite page keeps the bar, as before; the account not read keeps v2's frame (`PAGE`), whoever it is. The home
-  under it keeps v2's cards until LO12b rebuilds it, as LO2 left a teacher's pages. With lessons on, a lesson's page
-  reached by its address sits under the new bar in v2's look.
+  under it is LO12b's: StudentWeb with lessons off, today's with lessons on (decision 8). With lessons on, the home and a
+  lesson's page sit under the new bar in v2's look.
 
   **Left for the phase's tidy-up (#625):** the student's bar draws with `TopBar`'s classes written again in `shell.tsx`,
   since `portal-bar.tsx` is outside this step's files, the two bars' look to fold into one; `--text-menu-name`, the side
