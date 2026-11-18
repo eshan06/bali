@@ -8,6 +8,73 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-18** — **Android's JVM tests: CI's three flakes, each a test's wait that went on too soon, fixed in the tests,
+  Bali's code unchanged (the owner, asked "Fix the flaky Android tests next?": "Yes, fix them"; LO14 left them; #638).**
+
+  **What failed**, each passing on its re-run unchanged: DeletedOnServerTest, "No request to POST /v1/sessions/s/checkin came in
+  time", seven times in six runs (`eachPlaceA409…`'s check-in on #600, #617 and #631; `aPhoneLockedInALesson…` on #617, main after
+  #626 and #637; `aReadSentBefore…` on #626); LessonsTest's real-socket case, `anEmergencyUnlocksSendGoesAtOnce…`, past its 60 s
+  waiting for the card (#599, main after #614 and after #631); SlideTest's `anotherStudentsSignInAndADeletion…`, "No request to
+  GET /v1/decks/d1/download came in time" (#621).
+
+  **The causes, plainly** (each probe a copy of the case's steps looped in one JVM, on this PC, some runs under 20 busy loops):
+  - **The check-in** (found, then staged): the 13+ check's let-through asks the engine for the truth twice, `forgetMe` then
+    `retryNow`. When the read loop wakes between the two, it sends one more `GET /v1/me` after the read that let the test go on,
+    so `inLesson` can return with it on its way, unanswered. The loop sends one read at a time, so the screen's check-in waits
+    behind it, and a test that waits for the check-in alone (`Server.next(checkInRoute)`) waits out its 60 s; the file's other
+    cases wait through `past()`, which answers such reads. The probe met it once in 500 runs, under load: the server held one
+    `GET /v1/me`, sent and not taken.
+  - **The real-socket lesson case** (found): it waited for the account's `me` alone. Its sign-in is ungated, so a read made before
+    the let-through carries a token and shows `me`; the let-through then hides it until the next read, the lesson half that
+    followed it meanwhile follows again, and the test's server holds every poll but the first: no card. The probe met it 12 times
+    in 500 runs, 4 of them in the 200 on a JVM capped at CI's 4 processors (`me` shown before the let-through 144 times); waiting
+    for the check's pass too, as `through()` does, never in 500.
+  - **SlideTest** (inferred, never met here): its wait for Bob's `me` alone has the same opening: a read of Bob's landing between
+    his sign-in's pass and its let-through shows his `me`, the let-through hides it, and the lesson half drops the slide the test
+    then asks for, so nothing is fetched. With the sign-in gated, that read must go with Bob's token in that moment: the read loop
+    held back till then (by a read Ana's sign-in left on its way, the first cause, say) and the account's own thread stalled there.
+    1,100 probe runs, 400 of them with such a read staged, never met it. It is the one path the code leaves; the wait now closes it
+    whatever the timing, and a recurrence would name what was sent and not taken.
+
+  **What a phone would have seen: nothing.** Each is a test's wait: the extra read is a read whose answer is the truth, and `me`
+  forgotten and read again at the let-through is the account's own rule (`letThrough`). On a phone the sign-in is gated, so no
+  read before the check has a token.
+
+  **The fix**, in the tests alone: DeletedOnServerTest's three waits for the check-in go through `past()`, `inLesson`'s KDoc saying
+  why; the real-socket case and the two where Bob signs in over Ana wait for `AgeCheck.Answer.Passed` with the `me` they want, as
+  `through()` does; `Server.next`'s timeout names the requests sent and not taken. No timeout changed: none was the cause. Not
+  chosen: one engine call for the let-through's two asks (product code, the app paused), or a seam in `Account` to hold it
+  mid-let-through (product code changed for a test, as AN13e2 declined one).
+
+  **The regression test, failing first** (its own commit): `aReadOfTheTruthStillOnItsWay…`, a Try again's read put on its way
+  after `inLesson`, then the check-in awaited as the three did: it failed 3 runs of 3 with CI's message, now ending "sent and not
+  taken: [GET /v1/me]"; through `past()`, it passes. The lesson waits have no staged twin, since holding the account mid-let-through
+  needs that seam; the probes stand for it.
+
+  **Each changed test still fails when what it pins breaks** (mutants, each undone): the check-in's 409 not read as deleted fails
+  the staged case, `aPhoneLockedInALesson…`, and `eachPlace…` at "the check-in"; the sign-out counting no change fails
+  `aReadSentBefore…` (Out expected, InSession found); `OkHttpTransport.apart()` sharing the engine's queue fails the real-socket
+  case; a drop keeping the deck fails SlideTest's ("documents open", 1 for 0); a drop keeping the lesson read fails LessonsTest's
+  twin, where a drop keeping the card's own passes, the next lesson's first read letting that go too.
+
+  **The loops** (the scratchpad's `flake-loop.sh`: each run a fresh Gradle run of `:outbox:test` filtered to the three classes,
+  `--rerun`, never UP-TO-DATE, its XML counted, the test JVM capped at 4 processors through `JAVA_TOOL_OPTIONS`, the PC under 12
+  busy loops, main's code in a loop of its own beside it): after the fix, 100 runs of the three classes' 47 cases, 0 failures (54
+  min); main's code, 100 runs of its 46, 1 failure: the real-socket case by another door, "the lesson's calls held as the unlock
+  came" 6 for 5, by its likeliest reading the lesson half following twice, the poll its drop cancelled freeing OkHttp's slot for a
+  sixth call. Then, the machine quiet, `./gradlew :core:test :outbox:test` whole: core's 162 and outbox's 596 (CI's 595 and the
+  staged case), none failing. The one change after the loops was comments, reworded for santa's WARNs, no line of code moved.
+  CI's own runs of this PR, its Android jobs run again on it, are on the PR.
+
+  **Santa's review:** NICE in one round, two Claude Opus reviewers at max effort (no Codex or Gemini CLI on this PC, so context
+  isolation holds and model diversity doesn't): no blockers; their WARNs taken: `inLesson`'s KDoc narrowed to waits for a request
+  of the loop's other than a read of the truth, the file's six waits for `GET /v1/me` free to take the leftover read itself (both
+  reviewers), and the PR's description saying what `past()` lets through, a read ahead of the check-in, that order of the engine's
+  still pinned by ReadTest (reviewer B).
+
+  **The conductor's calls, in the brief:** PLAN.md's tidy-up: the lock-only phase marked done, LO12a parked for the owner; LO15's
+  line no longer naming the sign-in words LO16 settled; and, this PR's own, LO14's flake marked fixed.
+
 - **2026-11-18** — **The sign-in page's two lines for students follow the student web's switch (LO16, #636, the
   owner's answer; ARCHITECTURE, Web portal, decision 9): off, the card's line is for teachers and the line under the
   card sends students to the app; on, the sign-in redesign's words, exactly.**

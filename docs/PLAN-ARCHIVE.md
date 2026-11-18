@@ -10,6 +10,28 @@ at the end of `docs/DECISIONS.md` ("Archive: PLAN's old Now (to 2026-10-05)").
 
 ## The status line's past entries (newest first)
 
+`docs/PLAN.md`'s, replaced by the Android JVM tests' flake fix's on 2026-11-18, which marked the lock-only phase done:
+_Last updated: 2026-11-16 (Central) — Bali's portal becomes a phone lock only: the Lock-only portal
+phase is planned (LO0, #614; DECISIONS 2026-11-16), rebuilding it from the approved canvas, with
+questions and slides switched off but kept in the code, and two workers at once on its lanes. Before
+it, a student holds at most five push tokens (AN11a2, #599). Next: LO1 and LO10 at once, then LO2,
+then lanes A and B; while the phase runs, its step lines below are its status and this line waits
+for its end. Also open: the owner's switch of prod's domain, the release call and disabling the
+review account (Open owner items); the owner's fresh block code, the old one retired by Home's
+Remove (LO11, no command); the owner the
+sitting's findings' calls; GA5's known limit, the owner's call (DECISIONS 2026-11-02); AN11b, AN12;
+AN1's part 2 on the owner's phones; the audit's polish waits._
+
+`docs/PLAN-ANDROID.md`'s, replaced by the JVM tests' flake fix's on 2026-11-18: _Last updated: 2026-11-13 (Central) — AN11a2, a cap on how many push tokens one student holds, server-wide (#599;
+`docs/DECISIONS.md`, 2026-11-13): at most five a student, APNs's and FCM's together; a register that would make a sixth lets go
+of the student's oldest, by when each was last registered, in its own transaction under a lock per student, so no account piles
+up rows and a Start rings at most five of a student's phones; `PUT`'s answers unchanged (the conductor's calls and this step's,
+awaiting the owner's look). Before it, AN11a, the push token's service in the API and the database. Next: AN11b, the FCM sender,
+then AN12 and Phase 10's screens, in the conductor's order; AN7f and AN8's 📱 check on the owner's phones, on any Chrome now,
+signed in on dev as an account that passed the 13+ check on an iPhone (Q7), and AN6f's checks on a Chrome before 136; prod's
+Android client, the owner's (Open owner items, 8); compileSdk 37 with today's AndroidX and OkHttp 5.5 in the step that needs them
+(Open owner items, 6); AN1's part 2 once the owner has the phones. Not on the pilot's critical path._
+
 `docs/PLAN.md`'s, replaced by LO0's on 2026-11-16: _Last updated: 2026-11-13 (Central) — a student holds at most five push tokens, APNs's and FCM's
 together, a register past them letting the oldest go (AN11a2, #599; DECISIONS 2026-11-13). Before
 it, the API takes an Android phone's FCM token (AN11a, #598). Next: the owner's switch of prod's

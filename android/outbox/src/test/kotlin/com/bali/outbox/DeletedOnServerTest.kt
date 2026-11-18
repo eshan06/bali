@@ -111,7 +111,13 @@ private suspend fun past(rig: SignedRig, route: String, me: String = Answer.me()
     }
 }
 
-/** a1 signed in and through the 13+ check, standing focused in session s till its bell, the lock on and the router on Focus. */
+/**
+ * a1 signed in and through the 13+ check, standing focused in session s till its bell, the lock on and the router on Focus. The
+ * check's let-through asks for the truth twice (the account's `forgetMe`, then its `retryNow`), so a read of the truth can still
+ * be on its way as this returns, the read loop waiting on its answer. A test that then waits for another request of the loop's,
+ * the screen's check-in or a 13+ yes, takes it through [past], never [Server.next] alone; one that waits for `GET /v1/me` may
+ * take that read itself, sent under a1's token as its own would be (CI's flake; DECISIONS 2026-11-18).
+ */
 private suspend fun EngineFiles.inLesson(): Pair<SignedRig, Routed> {
     val rig = signedRig(gated = true)
     val routed = routed(rig.engine, rig.clock)
@@ -160,7 +166,7 @@ private val arrivals: List<Pair<String, suspend (SignedRig, CoroutineScope) -> S
         },
         "the check-in" to { rig, _ ->
             rig.engine.setScreenOn(true)
-            rig.server.next(checkInRoute)
+            past(rig, checkInRoute)
         },
         "the read of the truth" to { rig, _ ->
             rig.engine.retryNow()
@@ -236,9 +242,26 @@ class DeletedOnServerTest : EngineFiles() {
             val (rig, routed) = inLesson()
             assertEquals(session().endsAt, routed.enforcer.updates.value.until)
             rig.engine.setScreenOn(true)
-            rig.server.next(checkInRoute).reply(409, deletedOnServer)
+            past(rig, checkInRoute).reply(409, deletedOnServer)
             eventually { !routed.lock.holds }
             assertTrue(rig.clock.now() < session().endsAt)
+            assertEquals(Standing.Out, rig.outbox.standing())
+            routed.until { it == Screen.Shown(Screen.SignIn, false) }
+            rig.stop()
+        }
+
+    @Test
+    fun aReadOfTheTruthStillOnItsWayAsTheScreenComesOnSendsTheCheckInOnceItLandsAndThatCheckInsFourOhNineStillTakesTheLockOff(): Unit =
+        runBlocking {
+            // CI's flake (DECISIONS 2026-11-18), staged with no window of time: the 13+ check's let-through can leave a read of the
+            // truth on its way as inLesson returns, and the read loop sends the screen's check-in only once that read is answered. A
+            // Try again puts one on its way here, unanswered, as the screen comes on.
+            val (rig, routed) = inLesson()
+            rig.engine.retryNow()
+            eventually { meRoute in rig.server.waiting }
+            rig.engine.setScreenOn(true)
+            past(rig, checkInRoute).reply(409, deletedOnServer)
+            eventually { !routed.lock.holds }
             assertEquals(Standing.Out, rig.outbox.standing())
             routed.until { it == Screen.Shown(Screen.SignIn, false) }
             rig.stop()
@@ -515,7 +538,7 @@ class DeletedOnServerTest : EngineFiles() {
             // once another call's 409 has signed the phone out.
             val (rig, routed) = inLesson()
             rig.engine.setScreenOn(true)
-            val checkIn = rig.server.next(checkInRoute)
+            val checkIn = past(rig, checkInRoute)
             val history = async { rig.engine.history(null) }
             rig.server.next(historyRoute).reply(409, deletedOnServer)
             history.await()
