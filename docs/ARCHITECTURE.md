@@ -1478,11 +1478,13 @@ has its own cursor; capped at 5 per account), and a tab left open across a deplo
 results, the projector's view, the deck library and the presenter — thin client screens on
 the same `/v1` API, under the rules of "Live lesson (Phase 7)" below. Students follow a
 running lesson there too (Slice 3, Live lesson decision 13): their classes, the question and the
-slide, and their own phone's state, never a control that changes the phone.
+slide, and their own phone's state, never a control that changes the phone. Only while the student
+web is on: it is off for now, on the owner's order (decision 9).
 
 **7. The portal's look is v2's, with a side menu** (the owner, 2026-10-12): Home, Classes,
 Reports, Questions, Slides and Help on a teacher's signed-in pages, and a student's in the same
-layout with Your classes and Help. Its pages and their order are PLAN's "Portal redesign (v2's
+layout with Your classes and Help while the student web is on (decision 9; off, a student's pages
+have the invite page's bar). Its pages and their order are PLAN's "Portal redesign (v2's
 look)" steps (PV0–PV17); the look is DESIGN.md's. A look only: the API stays the one brain, and
 the reads its pages need are additive steps of their own (PV2, PV3).
 *Amended 2026-11-16 (the owner's approval; `docs/DECISIONS.md`):* a teacher's pages move to the
