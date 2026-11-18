@@ -193,7 +193,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO12** 👀 A student's home (#616; lane A) — LO12b, the home with lessons off, ✅ (#630; DECISIONS 2026-11-17), under v2's side menu until LO12a, the student's frame, parked (#629) for the owner's approval on StudentWebStates (v63); 18 source-text tests left
 
-- **LO13** The phase's tidy-up (#625; last) — ✅ (#631, #PR2; DECISIONS 2026-11-17): the owner's "Pin them" built (LiveListStates, version 65) and "Leave it out" recorded; Try again in the new look on every rebuilt page, Home's fixes, the record's words in one place, v2's unused tokens gone, Present's guard driven; `--text-menu-name` and PortalBar's side-menu comment wait for #629
+- **LO13** The phase's tidy-up (#625; last) — ✅ (#631, #632; DECISIONS 2026-11-17): the owner's "Pin them" built (LiveListStates, version 65) and "Leave it out" recorded; Try again in the new look on every rebuilt page, Home's fixes, the record's words in one place, v2's unused tokens gone, Present's guard driven; `--text-menu-name` and PortalBar's side-menu comment wait for #629
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 
