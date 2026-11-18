@@ -11,13 +11,14 @@ import { LEDGER_LIVE } from './card';
 import { StudentHome } from './student-home';
 
 /*
- * A student's home (LO12; the lock-only canvas's StudentWeb, its other moments on StudentWebStates,
- * drawn first), as a student meets it (the owner's decision of 2026-10-22: the portal's tests drive
- * the page), StudentWeb's sample data in it: Biology, period 3 in class now with Ms. Rivera, 23:04
- * left of its 50 minutes, and Chemistry, period 5 with Mr. Okafor. Bali's answers come from a
- * stand-in `fetch` under the portal's own client: each class's read of its session, held until a
- * test gives one. Converted from `student-home.test.ts`'s read of the home's source and its markup
- * (LO12), with LO1's tests of the lessons switch.
+ * A student's home as a student meets it (the owner's decision of 2026-10-22: the portal's tests
+ * drive the page): with lessons off, the lock-only canvas's StudentWeb (LO12b; its other moments on
+ * StudentWebStates, drawn first); with lessons on, today's home as LO1 left it (ARCHITECTURE, Web
+ * portal, decision 8). The boards' sample data in it: Biology, period 3 in class now with
+ * Ms. Rivera, 23:04 left of its 50 minutes, and Chemistry, period 5 with Mr. Okafor. Bali's answers
+ * come from a stand-in `fetch` under the portal's own client: each class's read of its session, held
+ * until a test gives one. Converted from `student-home.test.ts`'s read of the home's source and its
+ * markup (LO12b), with LO1's tests of the lessons switch.
  */
 const bali = vi.hoisted(() => ({
   /** Every path the page asked Bali for. */
@@ -76,15 +77,17 @@ afterEach(() => {
 });
 
 /**
- * The home as it opens at NOW, in the shell's one `<main>`, on this page's own clock unless `clock`
- * is false, its reads the test's: `failed`, the account's last read failed; `onRead` and
- * `onRefresh`, the shell's.
+ * The home as it opens at NOW, in the shell's one `<main>`, with lessons off unless `lessons` says
+ * on, on this page's own clock unless `clock` is false, its reads the test's: `failed`, the
+ * account's last read failed; `onRead` and `onRefresh`, the shell's.
  */
 function open(
   account: MeResponse,
   over: Partial<Parameters<typeof StudentHome>[0]> = {},
   clock = true,
+  lessons: 'on' | 'off' = 'off',
 ) {
+  vi.stubEnv('NEXT_PUBLIC_LESSONS', lessons);
   if (clock) vi.useFakeTimers({ now: NOW });
   bali.client = createApiClient({
     baseUrl: 'http://api',
@@ -131,10 +134,12 @@ const phone = (name = 'Biology, period 3') =>
 /** The line saying Bali can't be reached, if the page says it. */
 const unreached = () => screen.queryByText(/^Can.t reach Bali right now/);
 
-describe('a student’s home (StudentWeb)', () => {
+describe('a student’s home with lessons off (StudentWeb)', () => {
   it('heads the page Your classes over a ledger: each class in session first, in the live green, then the rest, each part in the account’s order, each with its teacher', () => {
     open(me(CHEMISTRY, BIOLOGY, ENGLISH));
     expect(screen.getByRole('heading', { level: 1, name: 'Your classes' })).toBeTruthy();
+    // The ledger named by the page's title, as Your classes and Reports name theirs.
+    expect(screen.getByRole('table', { name: 'Your classes' })).toBeTruthy();
     expect(screen.getAllByRole('columnheader').map((head) => head.textContent)).toEqual([
       'Class',
       'Teacher',
@@ -361,17 +366,91 @@ describe('the account’s reads (the shell’s, handed to the home)', () => {
   });
 });
 
-describe('no lesson piece, whichever way the lessons switch is set (LO12; ARCHITECTURE, Web portal, decision 8)', () => {
-  it.each(['on', 'off'])(
-    'lessons %s: no way into a lesson and no line about one, the phone’s read going on',
-    async (said) => {
-      vi.stubEnv('NEXT_PUBLIC_LESSONS', said);
-      open(me(BIOLOGY, CHEMISTRY));
-      await tick(0);
-      expect(screen.queryAllByRole('link')).toEqual([]);
-      expect(document.querySelector('a[href^="/lessons/"]')).toBeNull();
-      expect(screen.queryByText(/slides|questions|lesson/i)).toBeNull();
-      expect(bali.asked).toEqual([READ]);
-    },
-  );
+describe('the lessons switch (LO1; ARCHITECTURE, Web portal, decision 8)', () => {
+  const LINE = "Your teacher's slides and questions show up here during class.";
+  /** The live card, with lessons on: the section named by its class. */
+  const card = () => screen.getByRole('region', { name: 'Biology, period 3' });
+  /** What the live card's phone says, each of its parts: the status its label is in. */
+  const cardPhone = () =>
+    Array.from(
+      within(card()).getByText('Your phone').parentElement?.children ?? [],
+      (part) => part.textContent,
+    );
+
+  it('off: no way into a lesson and no line about one, StudentWeb drawing none; the phone’s read goes on', async () => {
+    open(me(BIOLOGY, CHEMISTRY));
+    await tick(0);
+    expect(screen.queryAllByRole('link')).toEqual([]);
+    expect(document.querySelector('a[href^="/lessons/"]')).toBeNull();
+    expect(screen.queryByText(/slides|questions|lesson/i)).toBeNull();
+    expect(bali.asked).toEqual([READ]);
+  });
+
+  it('on: today’s home as LO1 left it, the line on slides and questions, the class in session on its live card with its time, its bell, Open the lesson and the phone’s chip, then Other classes', async () => {
+    open(me(BIOLOGY, CHEMISTRY), {}, true, 'on');
+    await tick(0);
+    const title = screen.getByRole('heading', { level: 1, name: 'Your classes' });
+    expect(title.nextElementSibling?.textContent).toBe(LINE);
+    expect(screen.queryByRole('table')).toBeNull();
+    // The live card: its teacher's line, the time left and the bell, Open the lesson to its page.
+    expect(within(card()).getByText('Ms. Rivera · in class now')).toBeTruthy();
+    expect(within(card()).getByText('23:04')).toBeTruthy();
+    expect(card().querySelector(`time[datetime="${BELL}"]`)?.textContent).toBe(bellTime(BELL));
+    expect(within(card()).getByRole('link', { name: 'Open the lesson' }).getAttribute('href')).toBe(
+      '/lessons/bio/s-bio',
+    );
+    // The phone's chip from the class's own read, Checking… until it answers.
+    expect(cardPhone()).toEqual(['Your phone', 'Checking…']);
+    expect(bali.asked).toEqual([READ]);
+    // The other classes under their label, how to join under them.
+    const others = screen.getByRole('heading', { level: 2, name: 'Other classes' });
+    expect(others.nextElementSibling?.textContent).toBe('Chemistry, period 5Mr. Okafor');
+    expect(screen.getByText('To join a class, use the Bali app on your iPhone.')).toBeTruthy();
+  });
+
+  it('on: the class’s chip once its read answers, and Bali unreached said on its card while its reads fail before one answers', async () => {
+    bali.answers.set(READ, offline);
+    open(me(BIOLOGY), {}, true, 'on');
+    await tick(0);
+    expect(cardPhone()).toEqual(['Your phone', 'Checking…']);
+    expect(within(card()).getByText(/^Can.t reach Bali right now/)).toBeTruthy();
+    bali.answers.set(READ, says({ state: 'unlocked', lastSeenAt: null }));
+    await tick(2_000);
+    expect(cardPhone()).toEqual(['Your phone', 'Unlocked']);
+    expect(unreached()).toBeNull();
+  });
+
+  it('on: a class whose teacher has no name in class now, the rest with no label beside no live card, a row’s name alone', () => {
+    open(
+      me(
+        { ...BIOLOGY, teacher: { displayName: null } },
+        { ...CHEMISTRY, teacher: { displayName: ' ' } },
+      ),
+      {},
+      true,
+      'on',
+    );
+    expect(within(card()).getByText('In class now')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Other classes' })).toBeTruthy();
+    expect(screen.getByText('Chemistry, period 5').parentElement?.textContent).toBe(
+      'Chemistry, period 5',
+    );
+    cleanup();
+    open(me({ ...BIOLOGY, liveSession: null }, CHEMISTRY), {}, true, 'on');
+    expect(screen.queryByRole('heading', { name: 'Other classes' })).toBeNull();
+    expect(screen.queryByRole('region')).toBeNull();
+    expect(screen.getByText('Biology, period 3')).toBeTruthy();
+  });
+
+  it('on: with no class yet, the empty card and a teacher’s way to the invite page; a failed read said with Try again', () => {
+    open(me(), { failed: true }, true, 'on');
+    expect(
+      screen.getByRole('heading', { level: 2, name: "You're not in a class yet" }),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Enter your invite code' }).getAttribute('href')).toBe(
+      '/invite',
+    );
+    expect(screen.getByRole('alert').textContent).toBe("Bali couldn't load your classes.");
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+  });
 });

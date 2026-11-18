@@ -8,16 +8,17 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
-- **2026-11-17** — **LO12b, a student's home rebuilt from StudentWeb: Your classes over a ledger, In class now and the
-  phone's chip in a class's row; no lesson piece whichever way the switch is set; beside v2's side menu until LO12a's
-  frame (#629, parked) is approved (the worker's calls and the conductor's, awaiting the owner's look; LO12, #616).**
+- **2026-11-17** — **LO12b, a student's home with lessons off rebuilt from StudentWeb: Your classes over a ledger, In
+  class now and the phone's chip in a class's row; with lessons on, today's home as LO1 left it (decision 8 as written);
+  beside v2's side menu until LO12a's frame (#629, parked) is approved (the worker's calls and the conductor's, awaiting
+  the owner's look; LO12, #616).**
 
-  **The page** (StudentWeb; its in-between states on the canvas's StudentWebStates, drawn first, version 63): Your
-  classes over a ledger of Class, Teacher and a hidden Now: each class in session first, in the live green with In class
-  now, its ring the share of the session left on this computer's clock to the server's bell; then the rest, each part in
-  the account's order, as today's home lists them; how to join under it; 880 px at most. No class yet: StudentWeb's line
-  and the way to the invite page. Gone with v2's cards, no board drawing them: the countdown and the bell, Other
-  classes, and the empty card's title and ring.
+  **The page with lessons off** (StudentWeb; its in-between states on the canvas's StudentWebStates, drawn first,
+  version 63): Your classes over a ledger of Class, Teacher and a hidden Now: each class in session first, in the live
+  green with In class now, its ring the share of the session left on this computer's clock to the server's bell; then
+  the rest, each part in the account's order, as today's home lists them; how to join under it; 880 px at most. No class
+  yet: StudentWeb's line and the way to the invite page. Not there, no board drawing them: v2's cards' countdown and
+  bell, Other classes, and the empty card's title and ring.
 
   **The phone's chip, kept** (the conductor's brief; StudentWeb doesn't draw it): today's chip and words (`YourPhone`,
   W4) after In class now in the class's row, from the class's own read about every 2 s, never the account's (decision
@@ -29,23 +30,22 @@ a real decision? Add a dated entry at the top: what was decided and why.
   under the title, over what was read before; Try again keeps v2's button until the phase's tidy-up (#625), held until
   Bali answers, focus then on the title.
 
-  **No lesson piece either way** (the conductor's call, for the owner's look; ARCHITECTURE, Web portal, decision 8,
-  amended): StudentWeb draws none, so the home has no Open the lesson and no line on slides and questions whichever way
-  the switch is set, as a teacher's rebuilt page has none; fitting lessons back takes the design pass DESIGN.md names;
-  with lessons on, a lesson's page reached by its address keeps its look. The class's own read goes on, for the chip.
-  Santa's round 1 (Reviewer B) held that amending decision 8 needs the owner first; the worker kept it, recorded as the
-  conductor's call awaiting the owner, as ARCHITECTURE records the conductor's other calls, since nothing reaches a
-  student's lesson either way: no portal page mounts the ask or slide panels since LO5 and LO9. The owner may strike it.
+  **With lessons on, today's home** (ARCHITECTURE, Web portal, decision 8, as written: on, a page shows its lesson
+  pieces as it did, and only a teacher's rebuilt page is spared them): v2's StudentHome as LO1 left it, its line on
+  slides and questions and its live card with Open the lesson, unchanged; with lessons off, StudentWeb, which draws no
+  lesson piece, as #616 scopes the step. The conductor's call was StudentWeb either way, which amends decision 8; santa
+  held in both rounds (both reviewers in round 2) that this needs the owner first (CLAUDE.md), the cost aside: since LO5
+  and LO9 no portal page mounts the ask or slide panels, so no question or slide reaches a student either way. So the
+  step follows decision 8, and StudentWeb with lessons on too waits for the owner, with fitting lessons into it the
+  design pass DESIGN.md names. The class's own read goes on in both, for the chip.
 
   **The frame** (the conductor's call): v2's side menu, as LO2 left a teacher's pages for a while, until the owner
   approves the student's top bar (LO12a, #629, parked); the body sits in v2's frame at 1,440, 820 and 390 px.
 
-  **Left for the phase's tidy-up (#625):** v2's `LIVE_CARD` and `LiveCardHead` (`live-header.tsx`) have no user now;
-  the comments on `Ring`, `CantReach`, `YourPhone` and `lessonsOn` still name the home's live card or its Open the lesson.
-
   **Tests:** driven. `student-home.test.ts` (its source reads and markup) is converted into
-  `student-home.driven.test.tsx` and leaves the source-text list: 18 left, for Now at the phase's end. The page's wiring
-  (Try again the shell's `refresh`, a tab back in view its `load`) is driven in `app/page.test.tsx`.
+  `student-home.driven.test.tsx`, both homes driven there, and leaves the source-text list: 18 left, for Now at the
+  phase's end. The page's wiring (Try again the shell's `refresh`, a tab back in view its `load`) is driven in
+  `app/page.test.tsx`.
 
 - **2026-11-17** — **LO11, Home: Remove a lost block, ClassFlows' Remove and its confirm on each row of Your blocks,
   through LO10b's `DELETE /v1/blocks/{id}`; its in-between states drawn first on the canvas's RemoveBlockStates
