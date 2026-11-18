@@ -192,7 +192,7 @@ that PR, and the lines move to `docs/PLAN-ARCHIVE.md` together once the phase is
 
 - **LO12** 👀 A student's home (#616; lane A) — LO12b, the home with lessons off, ✅ (#630; DECISIONS 2026-11-17), under v2's side menu until LO12a, the student's frame, parked (#629) for the owner's approval on StudentWebStates (v63); 18 source-text tests left
 
-- **LO12** 👀 A student's home with lessons off (#616; lane A; after LO8) — part 1 of 2, LO12a, the student's frame (DECISIONS 2026-11-17); its in-between states on the canvas's StudentWebStates (version 63)
+- **LO12** 👀 A student's home with lessons off (#616; lane A; after LO8) — part 1 of 2, LO12a, the student's frame, parked for the owner's look (DECISIONS 2026-11-17); its in-between states on the canvas's StudentWebStates (version 63)
 
 ### Portal redesign (v2's look) steps (PV; one PR each; 👀 = the owner looks at screenshots)
 

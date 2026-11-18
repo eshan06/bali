@@ -26,7 +26,14 @@ a real decision? Add a dated entry at the top: what was decided and why.
   reached by its address sits under the new bar in v2's look.
 
   **Left for the phase's tidy-up (#625):** the student's bar draws with `TopBar`'s classes written again in `shell.tsx`,
-  since `portal-bar.tsx` is outside this step's files; the two bars' look to fold into one.
+  since `portal-bar.tsx` is outside this step's files, the two bars' look to fold into one; `--text-menu-name`, the side
+  menu's name line, has no user now (`tokens.test.ts` still pins it); and `PortalBar`'s comment still says a student's
+  pages have the side menu.
+
+  **Awaiting the owner** (santa's round 1, Reviewer B's blocker): no board the owner approved draws a student's frame
+  (the lock-only look was approved for a teacher's pages, 2026-11-16), so the bar drawn on StudentWebStates is a new
+  design, not an in-between state of an approved one, and waits for the owner's look (CLAUDE.md, Working rules). The
+  step's PR is parked as a draft until the owner approves the frame's figures there or strikes the finding.
 
   **Tests:** driven. The side menu's rendered tests in `shell.test.ts` go with the menu, the bar's own driven in
   `shell.driven.test.tsx` (its places and what it marks, the account, Sign out once, no name, signing out); the file

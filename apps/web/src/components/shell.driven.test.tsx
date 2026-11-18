@@ -229,6 +229,12 @@ describe('a student’s top bar (StudentWeb’s frame; StudentWebStates, LO12)',
     const [words, icon] = screen.getAllByRole('button', { name: 'Sign out' });
     expect(words.textContent).toBe('Sign out');
     expect(icon.textContent).toBe('');
+    // One of the two at every width, so Sign out is never out of sight: the words from 760 px up,
+    // the icon under it, two queries that meet without a gap.
+    expect(words.className.split(' ')).toContain('max-[760px]:hidden');
+    expect(icon.className.split(' ')).toContain('min-[760px]:hidden');
+    expect(icon.className.split(' ')).not.toContain('max-[760px]:hidden');
+    expect(words.className.split(' ')).not.toContain('min-[760px]:hidden');
     await user.click(words);
     await user.click(icon);
     expect(props.onSignOut).toHaveBeenCalledTimes(2);
