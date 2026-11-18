@@ -545,10 +545,12 @@ export function lessonGone(state: LessonState): boolean {
 }
 
 /**
- * Whether the home's live card says it can't reach Bali (W4's follow-up; StudentChipUnreached,
- * drawn first): its lesson's reads fail and none has answered, so there's no read to keep the chip
- * "as of" and Checking… alone would hide the failure; they're read again every 2 s, as ever. Never
- * for a refusal, which has the account read again (`lessonGone`), nor a `401`, which signed out.
+ * Whether the home says it can't reach Bali for a class in session (W4's follow-up;
+ * StudentChipUnreached, drawn first: on its live card with lessons on, once under the classes with
+ * lessons off since LO12b): its session's reads fail
+ * and none has answered, so there's no read to keep the chip "as of" and Checking… alone would hide
+ * the failure; they're read again every 2 s, as ever. Never for a refusal, which has the account
+ * read again (`lessonGone`), nor a `401`, which signed out.
  */
 export function unreached(state: LessonState): boolean {
   return state.presentation === null && state.problem?.kind === 'failed';
