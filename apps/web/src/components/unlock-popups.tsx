@@ -89,22 +89,28 @@ export const reasonWords = (reason: UnlockReason | null) =>
   reason === null ? 'No reason given' : REASON[reason];
 
 /**
- * The stack's layer, over the room's tiles alone (LO6; ClassLive's `.popups`), placed against the
- * box that holds them (`LiveGrid`): from 12 px over the room's top to its foot, out 12 px past its
- * right edge, inside the page's 40 px margin; on a phone, under 760 px, 8 px over its top and no
- * wider than the room (PhoneLive), so no pop-up is ever cut at the window's edge. It takes no room
- * and nobody's clicks but the pop-ups' own, over the reconnect pill's layer (z-10). The header, the
- * count and Check on are above it, so no pop-up ever covers their controls (GA2; the audit's C01).
+ * The stack's layer (LO6; ClassLive's `.popups`, pinned since LO13), an item of the live page's
+ * grid, which places it (`LiveGrid`) where no control of the header, the count or Check on is ever
+ * under it (GA2; the audit's C01): at 1024 px and wider over the session list's column, from 12 px
+ * over its top to the live part's foot, 28 px into the gap beside it and 12 px past its right,
+ * inside the page's 40 px margin, 380 px in all; under 1024 px from 12 px over the room (8 px on a
+ * phone) to the foot of the session list under it, out 12 px past the page's right but on a phone
+ * (PhoneLive), so no pop-up is ever cut at the window's edge. Its size is the grid's alone
+ * (`contain-size`), so a tall stack never moves the room or the list, and it takes nobody's clicks
+ * but the pop-ups' own.
  */
 const LAYER =
-  'pointer-events-none absolute -top-3 -right-3 bottom-0 left-0 z-20 max-[760px]:-top-2 max-[760px]:right-0';
+  'pointer-events-none -mt-3 -mr-3 self-stretch contain-size lg:-ml-7 max-[760px]:-mt-2 max-[760px]:mr-0';
 /**
  * The stack (ClassLive's `.popups`, LiveListStates): at the layer's top right, 380 px wide at most
- * (on a phone the room's width), 10 px apart. It stays in view as the room scrolls, 18 px from the
- * window's top (GA2), so a new unlock isn't left above a room scrolled to its last row, and never
- * rises above the layer's top. A stack taller than the room scrolls with the page.
+ * (on a phone the room's width), 10 px apart. Pinned (the owner's ruling, 2026-11-17: "Pin them"):
+ * while one is open it stays in view at the window's top right, 18 px under the top bar (its 60 px
+ * row and hairline, 56 px on a phone), however far down the page is scrolled, and never above the
+ * layer's top. Over the bar and the student panel (z 3 and 5). A stack taller than the window's
+ * room for it scrolls with the page.
  */
-const STACK = 'sticky top-4.5 ml-auto flex w-95 max-w-full flex-col gap-2.5 max-[760px]:w-full';
+const STACK =
+  'sticky top-[79px] z-20 ml-auto flex w-95 max-w-full flex-col gap-2.5 max-[760px]:top-[75px] max-[760px]:w-full';
 /**
  * One pop-up (lock.css's `.popup`): white, a strong hairline, 12 px corners, `shadow-3`, 16 px in,
  * dropping in 6 px as it opens (`pop-in`); the lock in its tint's 36 px well, the words, then Close.
@@ -115,8 +121,9 @@ const POPUP =
 /**
  * The unlock pop-ups (PV10, ClassUnlock; the lock-only look since LO6, ClassLive, LiveStates' An
  * unlock lands, LiveListStates): each unlock the stream brings, newest on top, until it is closed,
- * over the room's top right. The live grid holds them, so they go with the session's live page,
- * never in Present; each unlock stays in the session list, then the recap. Its words are an alert,
+ * pinned at the window's top right (LO13). The live grid holds them and places them (`place`, its
+ * grid's cells for the layer), so they go with the session's live page, never in Present; each
+ * unlock stays in the session list, then the recap. Its words are an alert,
  * so a screen reader says each as it opens
  * ("Ethan Park used Emergency Unlock. Nurse 9:31 AM") without moving focus; Close, named for
  * whose pop-up it closes ("Close Ethan Park's pop-up", the audit's C02), is described by them, and
@@ -132,6 +139,7 @@ export function UnlockPopups({
   tileOf,
   onClose,
   onOpen,
+  place = '',
 }: {
   unlocks: readonly Unlock[];
   /** The grid's students, so a pop-up names each as their tile does now. */
@@ -141,12 +149,14 @@ export function UnlockPopups({
   onClose: (eventId: string) => void;
   /** Open student: the panel for whoever unlocked. */
   onOpen: (unlock: Unlock) => void;
+  /** The layer's cells in the live page's grid (`LiveGrid`). */
+  place?: string;
 }) {
   if (unlocks.length === 0) return null;
   // As the tile names them: their display name, else the start of their id until the grid has it.
   const nameOf = (u: Unlock) => students[u.studentId]?.displayName ?? u.studentId.slice(0, 8);
   return (
-    <div className={LAYER}>
+    <div className={`${LAYER} ${place}`.trim()}>
       <div className={STACK}>
         {unlocks.map((u) => (
           <div key={u.eventId} className={POPUP}>
