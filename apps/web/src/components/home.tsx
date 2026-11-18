@@ -7,15 +7,9 @@ import { type Ref, useCallback, useEffect, useId, useRef, useState } from 'react
 
 import { type LastSession, lastOf, liveNow, type TaughtClass } from '@/lib/classes';
 import { CANT_REACH } from '@/lib/errors';
-import {
-  gridDisplay,
-  type GridDisplay,
-  silentNote,
-  type Student,
-  type Students,
-} from '@/lib/grid-state';
+import { gridDisplay } from '@/lib/grid-state';
 import { type RecapFormat, recapGroups } from '@/lib/recap';
-import { readSessionPage, type SessionPage } from '@/lib/reports';
+import { readSessionPage, reportPath, type SessionPage } from '@/lib/reports';
 import { bellTime, laterBell } from '@/lib/session-controls';
 import { useApi } from '@/lib/use-api';
 
@@ -23,9 +17,18 @@ import { Blocks } from './blocks';
 import { LockButton, lockButton, NAME_BUTTON } from './button';
 import { LIVE_WELL, WELL } from './card';
 import { FirstClass, OOPS, sessionRan, YourClasses } from './classes';
-import { CHIP, type GridNow, LiveGrid, LockChip, StaleWords, stateCounts } from './live-grid';
+import {
+  checkOn,
+  type CheckRow,
+  type GridNow,
+  LiveGrid,
+  LockChip,
+  StaleWords,
+  stateCounts,
+} from './live-grid';
 import { Ring, shareLeft, timeLeft, useClock } from './live-header';
 import { NewClass, type NewClassHandle } from './new-class';
+import { sameDay } from './recap-card';
 import { TryAgain } from './try-again';
 
 /** Where a live class's Present goes (Main to Present): the class's page, Present on. */
@@ -55,56 +58,14 @@ export function nextTurn(now: number): number {
 }
 
 /**
- * Check on's rows in order: the unlocks first, then protection off, Silent, Not here, Left, Unknown.
- * The boards draw Unlocked, Silent and Not here; the rest are HomeMoments', the owner's approval of
- * 2026-11-17 (DECISIONS).
- */
-const CHECK_ORDER: readonly GridDisplay[] = [
-  'unlocked',
-  'left_unprotected',
-  'protection_off',
-  'left_protection_off',
-  'silent',
-  'absent',
-  'ended',
-  'unknown',
-];
-
-/** A row of Check on: a state in its tile's words ("Silent · 5 min"), and who is in it. */
-export interface CheckRow {
-  display: GridDisplay;
-  words: string;
-  students: Student[];
-}
-
-/**
- * Who to check on (Main; LiveStates, HomeMoments): everyone the grid shows who isn't focused, the
- * count the board draws (28 − 24 = 4), a row per state in its tile's words, Silent's with its minutes
- * so two silent for different times get a row each; in `CHECK_ORDER`, each row's students in the
- * grid's order.
- */
-export function checkOn(students: Students, now: Date): CheckRow[] {
-  const rows = new Map<string, CheckRow>();
-  for (const s of Object.values(students)) {
-    const display = gridDisplay(s, now);
-    if (display === 'focused') continue;
-    const { label } = CHIP[display];
-    const words = display === 'silent' ? `${label} · ${silentNote(s, now)}` : label;
-    const row = rows.get(words) ?? { display, words, students: [] };
-    row.students.push(s);
-    rows.set(words, row);
-  }
-  return [...rows.values()].sort(
-    (a, b) => CHECK_ORDER.indexOf(a.display) - CHECK_ORDER.indexOf(b.display),
-  );
-}
-
-/**
- * Check on (Main; LiveStates, HomeMoments): "Check on 4" over its rows, each the state's chip and
- * who is in it, each name a link to them on the class's page; while the live feed is down, the rows
- * faded and the names plain, as they were at the last update. Everyone focused says so in one line;
- * a class with no students yet says that. A row keeps its key as Silent's minutes turn, so a name
- * focused in it keeps focus.
+ * Check on (Main; LiveStates, HomeMoments): "Check on 4" over its rows, the class page's own count
+ * (`checkOn`, LO5's), each the state's chip and who is in it, each name a link to them on the
+ * class's page; a chip longer than its column ("Left · protection off") widens it rather than run
+ * into the names, as on the class page. While the live feed is down, the rows faded and the names
+ * plain, as they were at the last update. Everyone focused says so in one line; a class with no
+ * students yet says that. A row keeps its key as Silent's minutes turn, so a name focused in it
+ * keeps focus. The boards draw Unlocked, Silent and Not here; the rarer rows are HomeMoments', the
+ * owner's approval of 2026-11-17 (DECISIONS).
  */
 function CheckOn({
   classId,
@@ -134,7 +95,7 @@ function CheckOn({
         {rows.map((row) => (
           <li
             key={row.display === 'silent' ? `silent:${row.students[0]?.studentId}` : row.display}
-            className="grid grid-cols-[150px_minmax(0,1fr)] items-center gap-4 border-b border-live-edge py-3 max-[760px]:grid-cols-[140px_minmax(0,1fr)] max-[760px]:gap-x-3 max-[760px]:gap-y-2"
+            className="grid grid-cols-[minmax(150px,max-content)_minmax(0,1fr)] items-center gap-4 border-b border-live-edge py-3 max-[760px]:grid-cols-[minmax(140px,max-content)_minmax(0,1fr)] max-[760px]:gap-x-3 max-[760px]:gap-y-2"
           >
             <span>
               <LockChip display={row.display} words={row.words} />
@@ -228,7 +189,7 @@ export function LiveWellView({
       <div className="flex flex-col justify-between gap-6">
         {grid.error !== null ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <TryAgain onRetry={grid.retry} held={grid.retrying} then={[id]}>
+            <TryAgain look="lock" onRetry={grid.retry} held={grid.retrying} then={[id]}>
               <p role="alert">Couldn&apos;t load this session. {grid.error}</p>
             </TryAgain>
           </div>
@@ -275,7 +236,7 @@ export function LiveWellView({
       {students !== null && counts !== null ? (
         <CheckOn
           classId={classId}
-          rows={checkOn(students, grid.now)}
+          rows={checkOn(Object.values(students), grid.now)}
           total={counts.total}
           stale={grid.stale !== null}
         />
@@ -383,8 +344,10 @@ function LastFigures({ page }: { page: Extract<SessionPage, { kind: 'ready' }> }
  * Last session (HomeIdle; HomeMoments), while no class runs: the last session over, its class and
  * when it ran from the account (PV2's `lastSession`), then its figures (`LastFigures`) from its
  * report, its events and the class's roster, the recap's own reads (`readSessionPage`). Open the
- * recap goes to the class's page once they are in. Being read, a line in their place; failed, the
- * reason with Try again, held until its read answers, focus then on its title.
+ * recap goes, once they are in, to the class's page the day the session ended by this computer's
+ * calendar, where the page is its recap (LO7), and on a later day to the session's own report
+ * page, the same recap. Being read, a line in their place; failed, the reason with Try again, held
+ * until its read answers, focus then on its title.
  */
 export function LastSessionView({
   last,
@@ -423,7 +386,7 @@ export function LastSessionView({
           </p>
         ) : read.kind === 'error' ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <TryAgain onRetry={onRetry} then={[id]}>
+            <TryAgain look="lock" onRetry={onRetry} then={[id]}>
               <p role="alert">Couldn&apos;t load the last session. {read.message}</p>
             </TryAgain>
           </div>
@@ -433,7 +396,11 @@ export function LastSessionView({
       </div>
       {read.kind === 'ready' ? (
         <Link
-          href={`/classes/${last.classId}`}
+          href={
+            sameDay(last.session.endedAt, new Date(now))
+              ? `/classes/${last.classId}`
+              : reportPath(last.classId, last.session.id)
+          }
           aria-describedby={name}
           className={lockButton('secondary')}
         >
@@ -532,7 +499,7 @@ export function TeacherHome({
     <div className="flex flex-col gap-10 text-body max-[760px]:gap-8">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
         <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-1">
-          <h1 ref={ref} tabIndex={-1} className="text-page-title">
+          <h1 ref={ref} tabIndex={-1} className="text-page-title max-[760px]:text-page-title-phone">
             Classes
           </h1>
           <p className="text-meta text-text-secondary">{dayOf(now)}</p>
@@ -544,7 +511,7 @@ export function TeacherHome({
       </div>
       {failed !== null ? (
         <div className={OOPS}>
-          <TryAgain onRetry={onRetry} then={[yours]}>
+          <TryAgain look="lock" onRetry={onRetry} then={[yours]}>
             <p role="alert" className="flex items-center gap-3">
               <CircleAlert size={18} aria-hidden="true" className="shrink-0" />
               {/* HomeStates' line where Bali couldn't be reached; any other failure named as

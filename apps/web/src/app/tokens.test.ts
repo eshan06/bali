@@ -109,14 +109,10 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   'tile-name': ['15px', '20px', 600],
   'tile-line': ['12.5px', '17px', 500],
   'home-countdown': ['30px', '34px', 600],
-  'present-title': ['36px', '42px', 600, '-0.01em'],
   'present-countdown': ['44px', '48px', 600],
   'present-question': ['34px', '40px', 600, '-0.01em'],
-  'present-tile-name': ['21px', '28px', 600],
-  'present-tile-state': ['17px', '24px', 600],
   'code-chip': ['17px', '26px', 600, '0.16em'],
   'code-card': ['40px', '48px', 600, '0.16em'],
-  'code-present': ['34px', '44px', 600, '0.16em'],
   // The side menu's (PV5), which v2.css draws and §1's facts don't list: the lockup's word, the
   // name at its foot and the initials in its avatar.
   lockup: ['16px', '22px', 600],
@@ -129,10 +125,7 @@ const V2_SIZES: Record<string, [string, string, number, string?]> = {
   'countdown-sub': ['12.5px', '17px', 400],
   // Present's (PV9): the line under its countdown, its code's label and its counts.
   'present-caption': ['16px', '22px', 400],
-  // Reports' (PV13): a class's pill, a bar's row, a table's cell and the line under its words.
-  pill: ['13.5px', '18px', 500],
-  'bar-row': ['13.5px', '18px', 400],
-  cell: ['14px', '19px', 400],
+  // Reports' (PV13): the line under a table cell's words, a live card's "ends 9:55 AM" since (W3).
   'cell-sub': ['12px', '16px', 400],
   // The entry pages' (PV15): an entry page's card title and the large buttons' label (the
   // callback's 48 px button, the sign-in's pill).
@@ -204,10 +197,8 @@ const V2_PRIMITIVES = [
   'green-200',
   'green-800',
   'orange-400',
-  'orange-700',
   'red-300',
   'stone-300',
-  'stone-400',
   'stone-500',
 ];
 /** A colour token's `#rrggbb` on one side, through its `{primitive}` if it names one. */
@@ -410,7 +401,8 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     // (2026-10-05), its line height on the 4-pt grid; the design system gains it at the owner's
     // next export. And v2's look's sizes, as drawn (2026-10-12), pinned below. The Present view's
     // old names and chip labels (20 and 14 px, 2026-10-05) went with its tiles (PV8), and its
-    // code-lg (24 px, 2026-10-06) with its header (PV9), whose code is v2's `code-present`.
+    // code-lg (24 px, 2026-10-06) with its header (PV9); v2's own Present sizes and code went
+    // with v2's Present (LO9, gone in LO13).
     const sizes = [...theme.keys()]
       .filter((k) => k.startsWith('--text-') && k !== '--text-*' && !k.slice(2).includes('--'))
       .map((k) => k.slice('--text-'.length));
@@ -439,8 +431,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
         line,
       ]);
     }
-    // A Present tile's two sizes are the live grid's alone (LO9; v2's, PV8, used by no page since,
-    // left for the phase's tidy-up).
+    // A Present tile's two sizes are the live grid's alone (LO9; v2's, PV8, gone in LO13).
     const src = fileURLToPath(new URL('../', import.meta.url));
     const present = sources(src).filter(
       (file) =>
@@ -509,7 +500,7 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     }
   });
 
-  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10) and Open student (PV11b), the recap’s marks (PV12b), a live card’s edge (W3), a question’s bars and correct letter (L7; the letter on Your questions too, L7b), the correct answer’s fill on the projector (L7, part 2), the "is ready" dialog’s check (PV16b), the sign-in page’s art panel (the sign-in redesign), the lock-only look’s live class (LO2), and the recap’s tracks (LO7)', () => {
+  it('beside them, only border-input, the side menu’s avatar (PV5), a dialog’s backdrop (PV6), the reconnect pill’s dot (PV7), the unlock pop-up’s edge (PV10), a protection off’s mark (PV12b), a live card’s edge (W3), a question’s bars and correct letter (L7; the letter on Your questions too, L7b), the correct answer’s fill on the projector (L7, part 2), the sign-in page’s art panel (the sign-in redesign), the lock-only look’s live class (LO2), and the recap’s tracks (LO7)', () => {
     const named = [...inline.keys()].filter((k) => k.startsWith('--color-'));
     const semanticNames = semantic(tokens.color.tokens).map((t) =>
       t.name === 'focus-ring-color' ? '--color-focus-ring' : `--color-${t.name}`,
@@ -525,16 +516,13 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
       '--color-live-edge',
       '--color-live-fill',
       '--color-live-hover',
-      '--color-mark',
       '--color-mark-off',
       '--color-option-right',
       '--color-pip',
-      '--color-ready',
       '--color-scrim',
       '--color-track-focused',
       '--color-track-silent',
       '--color-unlock-edge',
-      '--color-unlock-link',
     ]);
     // The recap's tracks (LO7), as lock.css draws them: a focused stretch green-200 and a silence's
     // dashes stone-500, beside the marks' orange and red below. Graphics read beside their words
@@ -549,12 +537,6 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     expect(inline.get('--color-live-hover')).toBe('var(--bali-green-600)');
     expect(contrast(hexOf('text-secondary', 'light'), hexOf('green-50', 'light'))).toBeGreaterThan(
       4.5,
-    );
-    // The "is ready" dialog's check (PV16b, ClassesCreated): green-600, as the board draws it, a
-    // graphic at 3:1 and more on the dialog's white (1.4.11).
-    expect(inline.get('--color-ready')).toBe('var(--bali-green-600)');
-    expect(contrast(hexOf('green-600', 'light'), hexOf('surface-card', 'light'))).toBeGreaterThan(
-      3,
     );
     // A live question's results (L7), as v2.css draws them: an option's bar stone-500, the correct
     // one's green-600, its letter green-700 on green-100 as v2.css's `.right .letter` draws it (the
@@ -575,20 +557,14 @@ describe('the portal’s tokens are bali-tokens.json’s', () => {
     // The sign-in page's art panel (the sign-in redesign, 2026-11-12): green-50, as its board fills
     // it, under Bali and the art's line in the primary ink, checked just above.
     expect(inline.get('--color-art-panel')).toBe('var(--bali-green-50)');
-    // The recap's marks' rings, as v2.css's `.mk` draws them: stone-400, and red-300 for a
-    // protection off (an unlock's is `unlock-edge`). Graphics, not text: 1.4.11 asks 3:1 of a
-    // control's edge, and a mark is no control; its icon is in its state's ink.
-    expect(inline.get('--color-mark')).toBe('var(--bali-stone-400)');
+    // A protection off's mark, as v2.css's `.mk` rings it: red-300 (an unlock's is `unlock-edge`),
+    // a stretch of the recap's tracks since LO7. Graphics, not text: 1.4.11 asks 3:1 of a
+    // control's edge, and a mark is no control; its words are its track's label and the Key's.
     expect(inline.get('--color-mark-off')).toBe('var(--bali-red-300)');
     // The reconnect pill's dot (DESIGN.md §4): stone-500, as v2.css draws it.
     expect(inline.get('--color-pip')).toBe('var(--bali-stone-500)');
     // The unlock pop-up's 3 px top edge: orange-400, as v2.css's `.toast` draws it.
     expect(inline.get('--color-unlock-edge')).toBe('var(--bali-orange-400)');
-    // Its Open student: orange-700, as v2.css's `.t-act` draws it, small text at 4.5:1 on white.
-    expect(inline.get('--color-unlock-link')).toBe('var(--bali-orange-700)');
-    expect(contrast(hexOf('orange-700', 'light'), hexOf('surface-card', 'light'))).toBeGreaterThan(
-      4.5,
-    );
     expect(inline.get('--color-avatar-bg')).toBe('var(--bali-green-200)');
     expect(inline.get('--color-avatar-fg')).toBe('var(--bali-green-800)');
     // Its initials are small text: 4.5:1 at least, as every chip's ink on its fill.
@@ -788,9 +764,8 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
     );
     // v2's on the class page: the length
     // picker's track and the join code's chip; the recap's track and its Key's Not here (LO7, as
-    // lock.css's `.track` and `.sw.k-notin` draw them, where v2's dots and name pills were); v2's
-    // table head (PV13), which a session's report kept until LO7, and Reports' bars' tracks (LO8,
-    // `.minibar`); on Help (PV15, SupportPage) the two lists of what a teacher sees, drawn as the
+    // lock.css's `.track` and `.sw.k-notin` draw them, where v2's dots and name pills were);
+    // Reports' bars' tracks (LO8, `.minibar`), v2's table head with them until LO13; on Help (PV15, SupportPage) the two lists of what a teacher sees, drawn as the
     // stale banner is; a live question's (L7) options' letters, and its "Results can't refresh",
     // drawn as the stale banner is, on the class page and in Present (L7, part 2); on Your questions
     // (L7b) the answers' letters; Your slides' (M5b) file tiles and an upload's progress track; on a
@@ -805,7 +780,7 @@ describe('no grey tray behind a card, anywhere (the owner, 2026-10-06)', () => {
       [join('components', 'join-code.tsx')]: 1,
       [join('components', 'present-question.tsx')]: 2,
       [join('components', 'question-card.tsx')]: 2,
-      [join('components', 'reports-list.tsx')]: 2,
+      [join('components', 'reports-list.tsx')]: 1,
       [join('components', 'saved-questions.tsx')]: 1,
       [join('components', 'slides.tsx')]: 2,
       [join('components', 'student-lesson.tsx')]: 1,
@@ -929,21 +904,13 @@ describe('the lock-only look’s buttons (DESIGN.md §1, The lock-only look; LO2
   });
 });
 
-describe('Reports’ tables are each in a box that scrolls sideways (PV13, PV14; DESIGN.md §8)', () => {
+describe('Reports’ table is in a box that scrolls sideways, and no other page draws one (PV13, PV14; DESIGN.md §8)', () => {
   // v2's look superseded the card per session (D2g) and "never a table that scrolls sideways": the
   // box scrolls, never the page, and no figure wraps or shrinks below its size to fit. Reports' own
-  // since LO8 is driven in app/reports/page.test.tsx.
-  const list = read('../components/reports-list.tsx');
-
-  it('scrolls in its own box, and only there', () => {
-    expect(list).toMatch(/export const TABLE_BOX =\s*'overflow-x-auto [^']*';/);
+  // since LO8 is driven in app/reports/page.test.tsx, and v2's table pieces went in LO13.
+  it('draws none on a session’s report or around Reports’ list', () => {
     // A session's report is the recap since LO7, its Unlocks table gone with v2's page.
     expect(read('../components/session-report.tsx')).not.toMatch(/overflow-x|<table\b/);
     expect(read('./reports/page.tsx')).not.toMatch(/overflow-x|<table\b/);
-  });
-
-  it('keeps each figure on one line in the cells’ own size', () => {
-    expect(list).toMatch(/const FIGURE = `\$\{CELL\} text-right whitespace-nowrap`;/);
-    expect(list).toMatch(/const CELL = '[^']*\btext-cell\b[^']*';/);
   });
 });

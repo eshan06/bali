@@ -217,6 +217,7 @@ function RegisterFirst({ onRegistered }: { onRegistered: () => void }) {
           aria-describedby={said ? `${id}-said` : undefined}
         />
         <TryAgain
+          look="lock"
           type="submit"
           variant="primary"
           size="md"
@@ -1106,6 +1107,7 @@ export default function ClassDetailPage() {
               {/* One button throughout, so focus stays on it whatever it comes to say: Start,
                   Starting… while it is on its way, and Try again once one failed. */}
               <TryAgain
+                look="lock"
                 type="submit"
                 variant="primary"
                 size="md"

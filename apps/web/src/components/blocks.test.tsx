@@ -14,6 +14,7 @@ import {
 } from '@/lib/errors';
 
 import { Blocks } from './blocks';
+import { lockButton } from './button';
 import { DIALOG_LOCK } from './card';
 import { CountContext } from './count';
 
@@ -169,7 +170,8 @@ describe('Your block, none yet (ClassFlows)', () => {
     expect(field().classList).toContain('font-mono');
     const register = button('Register block');
     expect(register.getAttribute('type')).toBe('submit');
-    expect(register.classList).toContain('bg-action-primary-bg');
+    // The lock-only look's primary button (LO13), Registering… and Try again with it.
+    expect(register.className).toBe(lockButton('primary', 'md'));
     expect(screen.queryByRole('button', { name: 'Register another block' })).toBeNull();
   });
 
@@ -283,6 +285,7 @@ describe('Your block, its list not read (HomeMoments)', () => {
     );
     await answer('none');
     expect(screen.getByRole('alert').textContent).toBe(`Couldn't load your blocks. ${CANT_REACH}`);
+    expect(button('Try again').className).toBe(lockButton('secondary', 'sm'));
     await user.click(button('Try again'));
     expect(button('Loading…')).toBeDefined();
     await answer(200, { blocks: [BLOCK] });
@@ -360,6 +363,7 @@ describe('Remove a lost block (LO11; ClassFlows, RemoveBlockStates)', () => {
   it('removes it: Removing…, Cancel and Escape held; then the row goes, said under the list, focus on the next block’s Remove', async () => {
     const { user, count } = await opened([BLOCK, NEW_BLOCK]);
     await user.click(remove('T7XK2M9QPF'));
+    expect(inConfirm('Remove block').className).toBe(lockButton('primary', 'md'));
     await user.click(inConfirm('Remove block'));
     expect(inConfirm('Removing…').getAttribute('aria-busy')).toBe('true');
     expect(inConfirm('Cancel').getAttribute('aria-disabled')).toBe('true');

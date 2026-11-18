@@ -2,7 +2,7 @@
 
 import { Fragment, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import { Button } from './button';
+import { Button, lockButton } from './button';
 
 /** What can take focus in a page's `main`: a control, or anything given a tabindex. */
 const FOCUSABLE =
@@ -59,7 +59,8 @@ export function handOff(
  * kept until Bali answers. A send's own button (`send`: Register block, Make new code, Create
  * class, the invite code), or a read's (Reports' Show earlier), says its words, and Try again only
  * once one of it failed. Held at rest (`blocked`), nothing of its own on its way, it keeps its
- * words.
+ * words. On a page rebuilt from the lock-only canvas (`look="lock"`, LO13) it is that look's button
+ * (`lockButton`), Start and Starting… with it; sign-in, the invite page and Help keep v2's.
  */
 export function TryAgain({
   onRetry,
@@ -69,6 +70,7 @@ export function TryAgain({
   size = 'sm',
   variant = 'secondary',
   type = 'button',
+  look = 'v2',
   send,
   describedBy,
   className = '',
@@ -87,6 +89,8 @@ export function TryAgain({
   size?: 'sm' | 'md';
   variant?: 'primary' | 'secondary';
   type?: 'button' | 'submit';
+  /** The page's look: v2's button, or the lock-only canvas's on a page rebuilt from it. */
+  look?: 'v2' | 'lock';
   /** A send's own words: at rest, while it sends, and whether its last send failed. */
   send?: { words: string; sending: string; failed: boolean };
   /** What it is about, where its line doesn't say (a deck in the side panel's list). */
@@ -125,22 +129,31 @@ export function TryAgain({
     answer.then(done, done);
   }
 
+  const words = busy
+    ? (send?.sending ?? 'Loading…')
+    : !send || send.failed
+      ? 'Try again'
+      : send.words;
+  const own = {
+    ref: button,
+    type,
+    'aria-disabled': busy || blocked,
+    'aria-busy': busy,
+    'aria-describedby': describedBy,
+    onClick: press,
+  };
   return (
     <>
       <Fragment key={said}>{children}</Fragment>
-      <Button
-        ref={button}
-        type={type}
-        variant={variant}
-        size={size}
-        aria-disabled={busy || blocked}
-        aria-busy={busy}
-        aria-describedby={describedBy}
-        onClick={press}
-        className={className}
-      >
-        {busy ? (send?.sending ?? 'Loading…') : !send || send.failed ? 'Try again' : send.words}
-      </Button>
+      {look === 'lock' ? (
+        <button {...own} className={lockButton(variant, size, className)}>
+          {words}
+        </button>
+      ) : (
+        <Button {...own} variant={variant} size={size} className={className}>
+          {words}
+        </Button>
+      )}
     </>
   );
 }

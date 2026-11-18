@@ -1,23 +1,11 @@
 'use client';
 
-import {
-  CircleCheck,
-  Flag,
-  LockOpen,
-  type LucideIcon,
-  ShieldCheck,
-  ShieldOff,
-  Wifi,
-  WifiOff,
-  X,
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { ICON_BUTTON } from '@/components/button';
-import { INK, Log, logIcon } from '@/components/log';
-import { reasonWords } from '@/components/unlock-popups';
+import { Log, momentLine } from '@/components/log';
 import { gridDisplay, lastSeenNote, type Student } from '@/lib/grid-state';
-import type { Moment } from '@/lib/recap';
 import { bellTime } from '@/lib/session-controls';
 import type { LogRead } from '@/lib/session-log';
 import { studentPanel } from '@/lib/student-panel';
@@ -29,22 +17,6 @@ import { Oops } from './live-grid';
  * phone's own claim held to the session's window.
  */
 export const CLOCK_OFF = "This phone's clock is off, so its times may be off too.";
-
-/**
- * Each moment in the panel's words and icon, in its state's ink (ClassStudent: "Used Emergency
- * Unlock", "Tapped in and focused"; the rest as LiveListStates draws them, in the session list's
- * words).
- */
-const MOMENT: Record<Moment, [words: string, Icon: LucideIcon, ink: string]> = {
-  in: ['Tapped in and focused', CircleCheck, INK.focused],
-  unlock: ['Used Emergency Unlock', LockOpen, INK.unlocked],
-  focus: ['Back in focus', CircleCheck, INK.focused],
-  off: ['Turned protection off', ShieldOff, INK.off],
-  on: ['Turned protection back on', ShieldCheck, INK.quiet],
-  silent: ['Went silent', WifiOff, INK.quiet],
-  back: ['Checked in again', Wifi, INK.quiet],
-  left: ['Left', Flag, INK.quiet],
-};
 
 /**
  * lock.css's `.panel`: 372 px from the right, white, `shadow-3`, sliding in on the drawer curve
@@ -138,17 +110,9 @@ export function StudentPanel({
             </p>
           ) : (
             <Log
-              // Newest first, at one instant the engine's later first (ClassStudent).
-              items={[...panel.moments].reverse().map((m) => {
-                const [words, Icon, ink] = MOMENT[m.moment];
-                return {
-                  key: m.key,
-                  at: m.at,
-                  icon: logIcon(Icon, ink),
-                  words,
-                  under: m.moment === 'unlock' ? reasonWords(m.reason) : null,
-                };
-              })}
+              // Newest first, at one instant the engine's later first (ClassStudent), in the
+              // record's words (`momentLine`).
+              items={[...panel.moments].reverse().map(momentLine)}
             />
           )}
         </section>

@@ -6,25 +6,13 @@ import type {
   SessionReportResponse,
   SessionReportSummary as Summary,
 } from '@bali/shared';
-import {
-  CircleCheck,
-  Flag,
-  LockOpen,
-  type LucideIcon,
-  ShieldCheck,
-  ShieldOff,
-  Wifi,
-  WifiOff,
-  X,
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { ICON_BUTTON, LockButton, QUIET } from '@/components/button';
-import { INK, Log, logIcon } from '@/components/log';
+import { Log, momentLine } from '@/components/log';
 import { Key, RecapRows } from '@/components/timeline';
-import { reasonWords } from '@/components/unlock-popups';
 import {
-  type Moment,
   payloadOf,
   type RecapFormat,
   recapGroups,
@@ -41,10 +29,19 @@ import { bellTime } from '@/lib/session-controls';
  * student's minutes, so nothing ranks them.
  */
 
+/** Whether `at` falls on `now`'s day by this computer's calendar (`format`'s, in a test). */
+export function sameDay(at: string, now = new Date(), format: RecapFormat = {}): boolean {
+  const day = new Intl.DateTimeFormat(format.locale, {
+    dateStyle: 'short',
+    timeZone: format.timeZone,
+  });
+  return day.format(new Date(at)) === day.format(now);
+}
+
 /**
  * The class page's line after the bell (ClassEnded), the time in "Ended at 9:55 AM": the end the
- * server marked, when that was today on this computer's calendar. Null for none, and for an older
- * session, which the page shows as its last line instead.
+ * server marked, when that was today on this computer's calendar (`sameDay`). Null for none, and for
+ * an older session, which the page shows as its last line instead.
  */
 export function endedToday(
   session: Summary | null,
@@ -53,33 +50,14 @@ export function endedToday(
 ): string | null {
   if (session === null) return null;
   const end = session.endedAt ?? session.endsAt;
-  const day = new Intl.DateTimeFormat(format.locale, {
-    dateStyle: 'short',
-    timeZone: format.timeZone,
-  });
-  return day.format(new Date(end)) === day.format(now) ? bellTime(end, format) : null;
+  return sameDay(end, now, format) ? bellTime(end, format) : null;
 }
-
-/**
- * Each moment in the record's words and icon, in its state's ink: the student panel's own
- * (`student-panel.tsx`, ClassStudent and LiveListStates), as ClassEndedOpen draws them.
- */
-const MOMENT: Record<Moment, [words: string, Icon: LucideIcon, ink: string]> = {
-  in: ['Tapped in and focused', CircleCheck, INK.focused],
-  unlock: ['Used Emergency Unlock', LockOpen, INK.unlocked],
-  focus: ['Back in focus', CircleCheck, INK.focused],
-  off: ['Turned protection off', ShieldOff, INK.off],
-  on: ['Turned protection back on', ShieldCheck, INK.quiet],
-  silent: ['Went silent', WifiOff, INK.quiet],
-  back: ['Checked in again', Wifi, INK.quiet],
-  left: ['Left', Flag, INK.quiet],
-};
 
 /**
  * A student's record (ClassEndedOpen): lock.css's `.panel`, 372 px from the right as the student
  * panel is, sliding in on the drawer curve, its name over This session, their moments oldest first,
- * each with its time and an unlock its reason under it. Focus comes to the name as it opens; Close
- * or Escape closes it.
+ * each with its time and an unlock its reason under it, in the panel's own words (`momentLine`).
+ * Focus comes to the name as it opens; Close or Escape closes it.
  */
 function Record({
   id,
@@ -126,18 +104,7 @@ function Record({
           <h3 id={`${id}-session`} className="mb-2 text-data font-semibold">
             This session
           </h3>
-          <Log
-            items={student.moments.map((m) => {
-              const [words, Icon, ink] = MOMENT[m.moment];
-              return {
-                key: m.key,
-                at: m.at,
-                icon: logIcon(Icon, ink),
-                words,
-                under: m.moment === 'unlock' ? reasonWords(m.reason) : null,
-              };
-            })}
-          />
+          <Log items={student.moments.map(momentLine)} />
         </section>
       </div>
     </aside>

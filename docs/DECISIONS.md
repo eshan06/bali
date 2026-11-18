@@ -8,6 +8,60 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-17** — **LO13, part 2: the lock-only phase's tidy-up. Try again in the new look on every rebuilt page,
+  Home's four fixes, the record's words in one place, v2's unused pieces gone, Present's guard driven again, and the
+  pilot block's old code retired by Remove (the worker's calls, the owner away; LO13, closes #625).**
+
+  **Try again** (`TryAgain`'s `look="lock"`, `lockButton`): the lock-only look's button, 12 px in, a press that
+  scales, its cursor not allowed while held, on every page rebuilt from the canvas: Home (the account's later read, a
+  live well's session, Last session), Your blocks (its read, Register block, Remove block), New class, the class page
+  (Register your block first, and Start, Starting… with it, LO4's), New code, the live part's failures (`Oops`: the
+  session, the list, the panel, a session's report), Reports (its sessions, Show earlier) and, LO12b having merged
+  first, a student's home with lessons off. v2's stays where nothing was redrawn: sign-in, the invite page, the shell's
+  failed account read, a student's lesson, the lesson pieces, a student's home with lessons on, and End session's
+  confirm, GA6's dialog whole (Cancel v2's too), which no board redraws: a step with a board, should the owner want it.
+
+  **Home:** its title takes LO4's `page-title-phone` (23/29) on a phone; its Check on widens the chips' column for a
+  long chip ("Left · protection off") rather than run it into the names, as LO5 did on the class page; one Check on
+  count, LO5's `checkOn`, which Home now reads, its own copy gone. The count stays in `live-grid.tsx`, not
+  `apps/web/src/lib`: its words are its chips' (`CHIP`), a component's. Open the recap goes to the class's page the day
+  the session ended, by this computer's calendar, where the page is its recap (LO7's rule, `sameDay`, which
+  `endedToday` shares now), and on a later day to the session's own report page, the same recap, where before it led
+  to ClassPage's line.
+
+  **The record's words** (ClassStudent, ClassEndedOpen): one copy, `momentLine` in `components/log.tsx`, which the
+  student panel and the recap's record both read, where each had its own.
+
+  **Gone, with no user left** (each searched for first; `tokens.test.ts` true): the colours `ready` (LO3), `unlock-link`
+  (LO6), `mark` (LO7) and the primitive orange-700, which `unlock-link` alone drew with; the sizes `present-title`,
+  `present-tile-name`, `present-tile-state`, `code-present` (LO9), `pill`, `bar-row` (LO8) and `cell`, whose only user
+  was v2's table pieces in `reports-list.tsx` (`LABEL`, `HEAD`, `CELL`, `FIGURE`, `TABLE_BOX`), gone too. **Kept:**
+  `--text-menu-name` and PortalBar's comment on the side menu, since #629 (LO12a, the student's frame) is parked and
+  v2's student side menu still uses that size; and `cell-sub`, a live card's "ends 9:55 AM". `portal-bar.tsx` no
+  longer says Classes is marked "until LO3": a class's page marks it, as ClassLive draws.
+
+  **Present's guard, driven again** (`components/present-views.test.tsx`): the question and slide views, drawn as the
+  class page drew them, read nothing of the questions panel and show none of it, a saved question and its correct
+  answer waiting at Bali's address; it fails on a view that reads `GET /v1/saved-questions`. The views stay behind
+  LO1's switch with their tests.
+
+  **The pilot block** (LO11's note): a teacher retires a block with Home's Remove, so no owner command is built.
+  PLAN's header line, Before the pilot's item 3 and Open owner items, and `docs/PILOT.md`'s step 6 say so.
+
+  **The canvas's index:** every board the phase drew is listed (BarStates, HomeMoments, ClassBeforeStates,
+  LiveTopStates, LiveListStates, ReportsMoments, ClassEndedStates, PresentStates, RemoveBlockStates and
+  StudentWebStates), checked before part 1's publish (version 65); nothing to put back.
+
+  **Left as they are:** LO9's two source pins renamed in place (`class-page.test.ts`'s count of Try agains held by a
+  read, `live-grid.test.ts`'s hook-order anchor) pin no behaviour this step changes, so they wait for the step that
+  touches them.
+
+  **Tests:** driven. `try-again.test.tsx` (both looks, a send in the new one); the new look as each page draws it in
+  `home.test.tsx`, `before.test.tsx` (Start and Starting…), `live-grid.driven.test.tsx`, `student-home.driven.test.tsx`
+  and `reports/page.test.tsx`; Home's phone title, the long chip's column and Open the recap by the day in
+  `home.test.tsx`, whose first Last session test now gives Home the session's end as its clock, so the session ended
+  today at any hour of the run; `present-views.test.tsx`, new. `tokens.test.ts` lists what is left.
+
 - **2026-11-17** — **LO13, part 1: the owner's two rulings of 2026-11-17. "Pin them": a new unlock's pop-up stays
   pinned in view at the window's top right while one is open, drawn first on the canvas's LiveListStates (version 65),
   then built. "Leave it out": no recap row for a student who never joined but used Emergency Unlock (the worker's

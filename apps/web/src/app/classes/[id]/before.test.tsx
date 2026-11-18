@@ -13,6 +13,7 @@ import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { lockButton } from '@/components/button';
 import { CountContext } from '@/components/count';
 import { type ApiClient, createApiClient } from '@/lib/api-client';
 import { ACCOUNT_DELETED, CANT_REACH, NOT_A_BLOCK_ID, NOT_A_SESSION_LENGTH } from '@/lib/errors';
@@ -354,8 +355,11 @@ describe('a class before it starts (ClassPage)', () => {
     bali.now.hold = START_KEY;
     const user = open();
     const start = await screen.findByRole('button', { name: 'Start 50-minute session' });
+    // The lock-only look's button, Starting… with it (LO13; ClassPage).
+    expect(start.className).toBe(lockButton('primary', 'md'));
     await user.click(start);
     expect(start.textContent).toBe('Starting…');
+    expect(start.className).toBe(lockButton('primary', 'md'));
     expect(start.getAttribute('aria-busy')).toBe('true');
     expect(start.getAttribute('aria-disabled')).toBe('true');
     expect(document.activeElement).toBe(start);
@@ -407,6 +411,8 @@ describe('a class before it starts, no block yet (ClassStates)', () => {
     expect(screen.queryByRole('button', { name: START })).toBeNull();
     const code = screen.getByRole('textbox', { name: 'Block code' });
 
+    // The lock-only look's primary button, Registering… and Try again with it (LO13).
+    expect(button('Register block').className).toBe(lockButton('primary', 'md'));
     // Not a block's code: said under the form, nothing sent, focus on the code.
     await user.type(code, 'ABC');
     await user.click(button('Register block'));

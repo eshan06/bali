@@ -7,6 +7,7 @@ import { createApiClient } from '@/lib/api-client';
 import { bellTime } from '@/lib/session-controls';
 import { ACCOUNT_EVERY_MS } from '@/lib/student-web';
 
+import { lockButton } from './button';
 import { LEDGER_LIVE } from './card';
 import { StudentHome } from './student-home';
 
@@ -325,6 +326,8 @@ describe('the account’s reads (the shell’s, handed to the home)', () => {
     expect(rows()).toEqual([['Chemistry, period 5', 'Mr. Okafor', '']]);
 
     const again = screen.getByRole('button', { name: 'Try again' });
+    // The lock-only look's button, StudentWeb being rebuilt from its canvas (LO13).
+    expect(again.className).toBe(lockButton('secondary', 'sm'));
     again.focus();
     fireEvent.click(again);
     expect(onRefresh).toHaveBeenCalledTimes(1);

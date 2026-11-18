@@ -270,7 +270,7 @@ export function Blocks() {
       {blocks === null ? (
         loadError !== null ? (
           <div className={OOPS}>
-            <TryAgain onRetry={load} then={[titleId]}>
+            <TryAgain look="lock" onRetry={load} then={[titleId]}>
               <p role="alert">
                 Couldn&apos;t load your blocks.{loadError ? ` ${loadError}` : null}
               </p>
@@ -361,6 +361,7 @@ export function Blocks() {
                 trailing={
                   // One button throughout, so focus stays on it whatever it comes to say.
                   <TryAgain
+                    look="lock"
                     type="submit"
                     variant="primary"
                     size="md"
@@ -423,6 +424,7 @@ export function Blocks() {
             Cancel
           </LockButton>
           <TryAgain
+            look="lock"
             variant="primary"
             size="md"
             onRetry={remove}

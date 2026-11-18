@@ -19,19 +19,6 @@ import {
   sessionRow,
 } from '@/lib/reports';
 
-/*
- * v2.css's `.wtable`, which a session's own page keeps for its Unlocks until LO7 redraws it: a
- * section's name over its part, 12 px above it; the table's head grey, each cell 16 px in, a
- * hairline under every row but the last, in a box that scrolls sideways.
- */
-export const LABEL = 'mb-3 text-section-label text-text-tertiary uppercase';
-export const HEAD =
-  'border-b border-border-default bg-surface-sunken px-4 py-2.75 text-section-label whitespace-nowrap text-text-tertiary uppercase';
-export const CELL = 'border-b border-border-default px-4 py-3 align-middle text-cell';
-export const FIGURE = `${CELL} text-right whitespace-nowrap`;
-export const TABLE_BOX =
-  'overflow-x-auto rounded-frame border border-border-default bg-surface-card';
-
 /** The sessions' figures, in their columns' order after the session's own (Reports). */
 const COLUMNS = [
   'Joined',
@@ -85,6 +72,7 @@ export function ReportsView({
         {failed ? (
           <div className={OOPS}>
             <TryAgain
+              look="lock"
               onRetry={() => onRead('newest')}
               held={list.reading === 'newest'}
               then={[tableId]}
@@ -117,6 +105,7 @@ export function ReportsView({
             // the last page, it lands focus on the table.
             <div className={earlier ? 'flex flex-wrap items-center gap-x-4 gap-y-3' : undefined}>
               <TryAgain
+                look="lock"
                 onRetry={() => onRead('earlier')}
                 held={list.reading === 'earlier'}
                 blocked={list.reading !== null}

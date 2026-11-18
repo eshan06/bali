@@ -5,6 +5,7 @@ import { userEvent } from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { lockButton } from '@/components/button';
 import { DIALOG_LOCK } from '@/components/card';
 import { type ApiClient, createApiClient } from '@/lib/api-client';
 import { CANT_COPY, CANT_REACH, NEW_CODE_MADE } from '@/lib/errors';
@@ -202,6 +203,8 @@ describe('New code’s confirm, a dialog (ClassFlows)', () => {
     expect(confirm().textContent).toBe(
       'Make a new code?VMAF7E stops working right away.CancelMake new code',
     );
+    // The lock-only look's primary button, Making… and Try again with it (LO13).
+    expect(inConfirm('Make new code').className).toBe(lockButton('primary', 'md'));
     expect(document.activeElement).toBe(inConfirm('Cancel'));
 
     await user.click(inConfirm('Cancel'));

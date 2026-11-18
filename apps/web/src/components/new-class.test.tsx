@@ -9,6 +9,7 @@ import { type ApiClient, createApiClient, SAVE_TIMEOUT_MS } from '@/lib/api-clie
 import { ACCOUNT_DELETED, CANT_COPY, CANT_CREATE, CANT_REACH } from '@/lib/errors';
 import { captureApiFailure } from '@/lib/monitoring';
 
+import { lockButton } from './button';
 import { CODE_WELL, DIALOG_LOCK } from './card';
 import { cardId, NewClass, type NewClassHandle } from './new-class';
 
@@ -177,7 +178,7 @@ describe('New class, the dialog (ClassFlows)', () => {
     // Cancel the lock-only look's secondary, pressed by `press`; Create class primary.
     expect(button('Cancel').classList).toContain('border-border-strong');
     expect(button('Cancel').classList).toContain('press');
-    expect(button('Create class').classList).toContain('bg-action-primary-bg');
+    expect(button('Create class').className).toBe(lockButton('primary', 'md'));
     // The form's own submit goes nowhere: Enter in the field presses Create class instead.
     expect(fireEvent.submit(dialog().querySelector('form')!)).toBe(false);
     expect(bali.calls).toEqual([]);

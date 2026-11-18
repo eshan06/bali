@@ -182,6 +182,7 @@ export function JoinCode({
           Cancel
         </LockButton>
         <TryAgain
+          look="lock"
           variant="primary"
           size="md"
           onRetry={make}

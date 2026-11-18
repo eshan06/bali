@@ -13,6 +13,7 @@ import { userEvent } from '@testing-library/user-event';
 import { useLayoutEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { lockButton } from '@/components/button';
 import type { Me } from '@/components/shell';
 import { type ApiClient, createApiClient } from '@/lib/api-client';
 import { CANT_REACH } from '@/lib/errors';
@@ -452,6 +453,8 @@ describe('Reports in between (ReportsMoments, drawn first)', () => {
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toBe(`Couldn't load the sessions. ${CANT_REACH}`);
     const again = screen.getByRole('button', { name: 'Try again' });
+    // The lock-only look's button, as the page is rebuilt from its canvas (LO13).
+    expect(again.className).toBe(lockButton('secondary', 'sm'));
     expect(screen.queryByText('Loading sessions…')).toBeNull();
     const answer = held({ sessions: [MON], nextBefore: null });
     lists([MON]);
@@ -505,6 +508,8 @@ describe('Reports in between (ReportsMoments, drawn first)', () => {
     bali.routes.set(EARLIER(MON.id), answer.route);
     open();
     const show = await screen.findByRole('button', { name: 'Show earlier' });
+    // The lock-only look's button, Loading… and Try again with it (LO13).
+    expect(show.className).toBe(lockButton('secondary', 'sm'));
     const user = userEvent.setup();
     await user.click(show);
     expect(show.textContent).toBe('Loading…');

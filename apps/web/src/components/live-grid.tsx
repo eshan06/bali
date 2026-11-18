@@ -362,7 +362,7 @@ export function Oops({
       className={`flex flex-wrap items-center gap-x-4 gap-y-3${ruled ? ' border-y border-border-default py-4' : ''}`}
     >
       {onRetry ? (
-        <TryAgain onRetry={onRetry} held={held} then={then}>
+        <TryAgain look="lock" onRetry={onRetry} held={held} then={then}>
           {line}
         </TryAgain>
       ) : (
