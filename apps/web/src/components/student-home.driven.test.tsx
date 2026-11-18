@@ -173,6 +173,8 @@ describe('a student’s home (StudentWeb)', () => {
     await tick(0);
     expect(bali.asked).toEqual([READ]);
     expect(phone()).toEqual(['Your phone', 'Checking…']);
+    // A read on its way is no failure: nothing said of Bali being out of reach.
+    expect(unreached()).toBeNull();
     await act(async () => give(await says({ state: 'focused', lastSeenAt: null })()));
     await tick(0);
     expect(phone()).toEqual(['Your phone', 'Focused']);
@@ -181,6 +183,23 @@ describe('a student’s home (StudentWeb)', () => {
     await tick(2_000);
     expect(phone()).toEqual(['Your phone', 'Unlocked']);
     expect(bali.asked).toEqual([READ, READ]);
+  });
+
+  it('starts a new session of a class from Checking…, never the last session’s chip, reading the new one', async () => {
+    bali.answers.set(READ, says({ state: 'focused', lastSeenAt: null }));
+    const { props, view } = open(me(BIOLOGY));
+    await tick(0);
+    expect(phone()).toEqual(['Your phone', 'Focused']);
+    // The account read again: the class has a new session, the student not in it yet.
+    const next = { ...BIOLOGY, liveSession: { id: 's-bio-2', startedAt: STARTED, endsAt: BELL } };
+    view.rerender(
+      <main>
+        <StudentHome {...props} me={me(next)} />
+      </main>,
+    );
+    expect(phone()).toEqual(['Your phone', 'Checking…']);
+    await tick(0);
+    expect(bali.asked).toEqual([READ, '/v1/sessions/s-bio-2/presentation']);
   });
 
   it('says Bali can’t be reached under the classes while a class’s reads fail before one answers, and no more once one answers (StudentChipUnreached)', async () => {

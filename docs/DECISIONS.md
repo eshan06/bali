@@ -33,9 +33,15 @@ a real decision? Add a dated entry at the top: what was decided and why.
   amended): StudentWeb draws none, so the home has no Open the lesson and no line on slides and questions whichever way
   the switch is set, as a teacher's rebuilt page has none; fitting lessons back takes the design pass DESIGN.md names;
   with lessons on, a lesson's page reached by its address keeps its look. The class's own read goes on, for the chip.
+  Santa's round 1 (Reviewer B) held that amending decision 8 needs the owner first; the worker kept it, recorded as the
+  conductor's call awaiting the owner, as ARCHITECTURE records the conductor's other calls, since nothing reaches a
+  student's lesson either way: no portal page mounts the ask or slide panels since LO5 and LO9. The owner may strike it.
 
   **The frame** (the conductor's call): v2's side menu, as LO2 left a teacher's pages for a while, until the owner
   approves the student's top bar (LO12a, #629, parked); the body sits in v2's frame at 1,440, 820 and 390 px.
+
+  **Left for the phase's tidy-up (#625):** v2's `LIVE_CARD` and `LiveCardHead` (`live-header.tsx`) have no user now;
+  the comments on `Ring`, `CantReach`, `YourPhone` and `lessonsOn` still name the home's live card or its Open the lesson.
 
   **Tests:** driven. `student-home.test.ts` (its source reads and markup) is converted into
   `student-home.driven.test.tsx` and leaves the source-text list: 18 left, for Now at the phase's end. The page's wiring

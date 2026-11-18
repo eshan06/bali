@@ -3,7 +3,7 @@
 import type { MeResponse } from '@bali/shared';
 import { CircleAlert } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 
 import {
   followLesson,
@@ -126,6 +126,7 @@ export function StudentHome({
   onRead: () => void;
   onRefresh: () => Promise<void>;
 }) {
+  const title = useId();
   const [now, setNow] = useState(() => Date.now());
   // The sessions whose reads fail before one answers (StudentChipUnreached): said once, under them.
   const [unreachable, setUnreachable] = useState<ReadonlySet<string>>(() => new Set());
@@ -169,7 +170,9 @@ export function StudentHome({
 
   return (
     <div className="flex max-w-220 flex-col gap-4 text-body">
-      <h1 className="text-page-title max-[760px]:text-page-title-phone">Your classes</h1>
+      <h1 id={title} className="text-page-title max-[760px]:text-page-title-phone">
+        Your classes
+      </h1>
 
       {failed ? (
         <div className={OOPS}>
@@ -197,7 +200,7 @@ export function StudentHome({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className={LEDGER}>
+            <table aria-labelledby={title} className={LEDGER}>
               <thead>
                 <tr>
                   <th scope="col" className={LEDGER_HEAD}>
