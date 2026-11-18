@@ -111,7 +111,12 @@ private suspend fun past(rig: SignedRig, route: String, me: String = Answer.me()
     }
 }
 
-/** a1 signed in and through the 13+ check, standing focused in session s till its bell, the lock on and the router on Focus. */
+/**
+ * a1 signed in and through the 13+ check, standing focused in session s till its bell, the lock on and the router on Focus. The
+ * check's let-through asks for the truth twice (the account's `forgetMe`, then its `retryNow`), so a read of the truth can still
+ * be on its way as this returns, the read loop waiting on its answer: a test that waits for the loop's next request takes it
+ * through [past], never [Server.next] alone (CI's flake; DECISIONS 2026-11-18).
+ */
 private suspend fun EngineFiles.inLesson(): Pair<SignedRig, Routed> {
     val rig = signedRig(gated = true)
     val routed = routed(rig.engine, rig.clock)
@@ -160,7 +165,7 @@ private val arrivals: List<Pair<String, suspend (SignedRig, CoroutineScope) -> S
         },
         "the check-in" to { rig, _ ->
             rig.engine.setScreenOn(true)
-            rig.server.next(checkInRoute)
+            past(rig, checkInRoute)
         },
         "the read of the truth" to { rig, _ ->
             rig.engine.retryNow()
@@ -236,7 +241,7 @@ class DeletedOnServerTest : EngineFiles() {
             val (rig, routed) = inLesson()
             assertEquals(session().endsAt, routed.enforcer.updates.value.until)
             rig.engine.setScreenOn(true)
-            rig.server.next(checkInRoute).reply(409, deletedOnServer)
+            past(rig, checkInRoute).reply(409, deletedOnServer)
             eventually { !routed.lock.holds }
             assertTrue(rig.clock.now() < session().endsAt)
             assertEquals(Standing.Out, rig.outbox.standing())
@@ -254,7 +259,7 @@ class DeletedOnServerTest : EngineFiles() {
             rig.engine.retryNow()
             eventually { meRoute in rig.server.waiting }
             rig.engine.setScreenOn(true)
-            rig.server.next(checkInRoute).reply(409, deletedOnServer)
+            past(rig, checkInRoute).reply(409, deletedOnServer)
             eventually { !routed.lock.holds }
             assertEquals(Standing.Out, rig.outbox.standing())
             routed.until { it == Screen.Shown(Screen.SignIn, false) }
@@ -532,7 +537,7 @@ class DeletedOnServerTest : EngineFiles() {
             // once another call's 409 has signed the phone out.
             val (rig, routed) = inLesson()
             rig.engine.setScreenOn(true)
-            val checkIn = rig.server.next(checkInRoute)
+            val checkIn = past(rig, checkInRoute)
             val history = async { rig.engine.history(null) }
             rig.server.next(historyRoute).reply(409, deletedOnServer)
             history.await()

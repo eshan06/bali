@@ -663,7 +663,10 @@ class LessonsTest : EngineFiles() {
             tapped.await()
             assertNull(lessons.state.value.card)
             rig.server.next(ageCheckRoute).reply(200, ageCheckPassed)
-            rig.readsAnswered(meInSession("bob")) { account.state.value.sync?.me?.user?.id == "bob" }
+            // Through the 13+ check, as `through` waits, so his `me` stays shown (SlideTest's twin case; DECISIONS 2026-11-18).
+            rig.readsAnswered(meInSession("bob")) {
+                account.state.value.let { it.age == AgeCheck.Answer.Passed && it.sync?.me?.user?.id == "bob" }
+            }
             assertNull(lessons.state.value.lesson, "followed for a student who hasn't seen the list")
             // He sees the list: his own lesson, under his own token, with nothing of hers on its card.
             account.sawList()
@@ -781,7 +784,10 @@ class LessonsTest : EngineFiles() {
                     val account = checkNotNull(Account.of(rig.engine, scope, clock, MemoryNotes()))
                     scope.launch { account.run() }
                     rig.signStudentIn(accessToken("a1"))
-                    account.until { it.sync?.me != null }
+                    // Through the 13+ check, `me` read after its let-through: a read before it shows `me`, then the let-through hides
+                    // it until read again, and a lesson half that followed it meanwhile follows again, its second poll held below
+                    // with the card never shown (CI's flake; DECISIONS 2026-11-18).
+                    account.until { it.age == AgeCheck.Answer.Passed && it.sync?.me != null }
                     account.sawList()
                     // The lesson's client waits out a held call to the transport's 30 s bound, so a queue it shared would hold the
                     // unlock past the ten seconds below.
@@ -1231,7 +1237,11 @@ class SlideTest : EngineFiles() {
             world.until { it.lesson == null && it.slide == null }
             renderer.holds(lessons, "another student's sign-in")
             rig.server.next(ageCheckRoute).reply(200, ageCheckPassed)
-            rig.readsAnswered(meInSession("bob")) { account.state.value.sync?.me?.user?.id == "bob" }
+            // Through the 13+ check, as `through` waits: Bob's `me` read before its let-through could show, then go there, the
+            // lesson half followed and dropped again under the ask below (CI's flake, its likeliest path; DECISIONS 2026-11-18).
+            rig.readsAnswered(meInSession("bob")) {
+                account.state.value.let { it.age == AgeCheck.Answer.Passed && it.sync?.me?.user?.id == "bob" }
+            }
             account.sawList()
             // Bob's lesson, the same deck shown: loading, nothing of Ana's, fetched afresh under Bob's own token.
             world.read(presentation(slide = slideOf(deck)))
