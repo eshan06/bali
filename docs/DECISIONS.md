@@ -8,6 +8,14 @@ touching before changing how something works. A pointer of the form
 "docs/PLAN.md decision log, <date>" means the entry with that date here. Made
 a real decision? Add a dated entry at the top: what was decided and why.
 
+- **2026-11-24** — **Bali 1.0 goes out under Bali Focus Inc., on a new build (the owner).** The owner holds the release
+  until the developer account is the company's ("I want it to be released under Bali Focus Inc and not my name";
+  the pilot isn't soon). With the D-U-N-S number in hand, Apple's individual-to-organization switch was requested on
+  2026-11-24. App Store Connect takes no new version beside one pending release and lets it change only some fields,
+  so the approved 1.0 is cancelled and resubmitted rather than shipped as 1.0.1: build 16 carries the new Sign in
+  (#583) and the copyright becomes `2026 Bali Focus Inc.`. Cancelling gives up build 14's approval for another review,
+  which took about a day last time. The owner releases once both App Review and the switch are done.
+
 - **2026-11-18** — **Android's JVM tests: CI's three flakes, each a test's wait that went on too soon, fixed in the tests,
   Bali's code unchanged (the owner, asked "Fix the flaky Android tests next?": "Yes, fix them"; LO14 left them; #638).**
 

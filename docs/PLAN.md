@@ -114,8 +114,9 @@ as it stood until LO0: `docs/PLAN-ARCHIVE.md`):
    `/privacy`'s section 11 promises: owed to no one yet, and due for any change that matters from
    the first pilot user on (the owner; DECISIONS 2026-11-07).
 5. The App Store submission — ✅ approved 2026-11-12 on build 14 (`docs/APP-STORE.md`, sections 1–4),
-   Apple's answer on §3.3.3(P) (ISSUES #3); released by hand, not yet (the owner); no external beta
-   for now (the owner, 2026-11-04).
+   Apple's answer on §3.3.3(P) (ISSUES #3); released by hand, under Bali Focus Inc. only (the owner,
+   2026-11-18): 1.0 resubmitted on build 16 with the new Sign in and the company's copyright, released
+   once Apple has switched the account (`docs/APP-STORE.md`); no external beta for now (2026-11-04).
 6. The App Store privacy label — ✅ published 2026-11-09 (`docs/APP-STORE.md` §3).
 7. Production backups on (L0b), before the pilot's first class: `/privacy` (sections 4, 6 and 7)
    already promises a daily and a weekly backup (the owner, 2026-11-05: "we will have those backups
@@ -323,7 +324,7 @@ Owner-only (not PRs): the Sentry, Vercel, Railway-prod and App Store Connect acc
   ("The domain's switch, and back", its rollback beside it), then sign in once on prod to confirm.
 - 🔧 **Prod's MFA, a mismatch (2026-11-12):** AWS reports prod's pool's `MfaConfiguration` as `OFF`,
   where this file and runbook 2 say MFA Optional (TOTP) ✅. Nothing changed: the owner's to check.
-- **Bali Focus Inc. (2026-11-11):** App Store Connect's seller and copyright fields, and the provider's address and phone for the terms' California notice (§ 1789.3).
+- **Bali Focus Inc. (2026-11-11):** the D-U-N-S number came 2026-11-24 and Apple's switch of the developer account to the company was requested the same day (Apple answers at the Apple ID's email); the store's seller follows it, the copyright goes with 1.0's resubmission. Still open: the provider's address and phone for the terms' California notice (§ 1789.3).
 - **The prod sitting's findings (2026-11-08):**
   - 👀 A student with no name shows as their account id's first 8 characters ("01a11334" on the
     grid, the recap's Didn't join and a session's report): `displayName ?? id.slice(0, 8)`, `nameOf`

@@ -18,6 +18,13 @@ for the Family Controls entitlement (ISSUES #3), with new screenshots and a head
 **Approved 2026-11-12:** build 14, "Pending Developer Release" (ISSUES #3). Not released: the
 owner presses Release when they choose.
 
+**Released under Bali Focus Inc., not the owner's name (the owner, 2026-11-18):** the pilot isn't soon, so 1.0
+waits for the developer account's switch to the company (D-U-N-S in hand and Apple's request sent, 2026-11-24).
+App Store Connect lets a version pending release change only some fields and takes no second version beside it,
+so 1.0's release is cancelled (the owner's go, then), build 16 (TestFlight run 16, the new Sign in, #583) is
+attached, the copyright set to `2026 Bali Focus Inc.`, and 1.0 resubmitted; the owner releases it once App Review
+has approved it and Apple has finished the switch, so the store names the company from the first day.
+
 **The framing rule (ISSUES #3).** Apple's developer agreement §3.3.3(P) allows Family
 Controls for "individuals the ability to manage their devices to enable focus and
 productivity", and says the framework "may not be used … in organizational settings". So
@@ -88,8 +95,8 @@ the Kids category brings its own rules (guideline 1.3) for under-13 apps.
 - Marketing URL: the website, `https://www.getbali.app`.
 - Privacy policy URL: C2's privacy policy page, `https://app.getbali.app/privacy`, given with the
   App Privacy answers (section 3). ⚖️ its words.
-- Copyright: `2026 Eshan Shah`. Bali is Bali Focus Inc. since 2026-11-11 (`docs/DECISIONS.md`): the owner
-  changes it to `2026 Bali Focus Inc.` here, and the seller's name with the developer account.
+- Copyright: `2026 Eshan Shah` on build 14's submission; `2026 Bali Focus Inc.` from the resubmission above
+  (Bali Focus Inc. since 2026-11-11, `docs/DECISIONS.md`). The seller's name follows the developer account's switch.
 - Content Rights: "Yes, it contains, shows, or accesses third-party content, and I have the
   necessary rights": a teacher's slides and questions. `/terms` has teachers upload only what they
   have the right to share (section 3), and give Bali permission to show it to their class
@@ -443,8 +450,8 @@ by the owner in App Store Connect → the app → **TestFlight**. How builds are
 ### 5.2 Test Information (TestFlight → Test Information)
 
 - **Beta App Description:** the store listing's promotional text (section 1) is enough.
-- **Feedback email:** `eshan.shah@vanderbilt.edu` (P4's support address until 2026-11-09, when the
-  support page moved to `team@getbali.app`; this field is App Store Connect's). Testers' in-app
+- **Feedback email:** empty in App Store Connect (seen 2026-11-24): there is no external beta (the owner,
+  2026-11-04). If one starts, `team@getbali.app`, the support page's address since 2026-11-09. Testers' in-app
   feedback (a screenshot from TestFlight) reaches App Store Connect → TestFlight →
   Feedback.
 - **Marketing URL / Privacy policy URL:** the support page
